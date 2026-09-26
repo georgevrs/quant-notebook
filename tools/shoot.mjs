@@ -89,8 +89,8 @@ const browser = await chromium.launch({ ...launchOpts, headless: true });
 let failed = 0;
 try {
   for (const page of pages) {
-    const url = pathToFileURL(resolve(page)).href;
-    const stem = basename(page, ".html");
+    const url = page.startsWith("http://") || page.startsWith("https://") ? page : pathToFileURL(resolve(page)).href;
+    const stem = basename(page.replace(/[?#].*$/, ""), ".html") || "index";
     const outDir = join(outRoot, stem);
     if (!noShots) {
       rmSync(outDir, { recursive: true, force: true });
