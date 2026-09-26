@@ -8,6 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 
 import build  # noqa: E402
 import sync_nav  # noqa: E402
+import verify_labs  # noqa: E402
 from course import Course, rel_link, sub_outside_comments, term_anchor  # noqa: E402
 
 
@@ -119,3 +120,14 @@ def test_fmt_value_no_negative_zero():
     assert build.fmt_value(-1.0, "$,.2f") == "−$1.00"
     assert build.fmt_value(1234.5, "$,.2f") == "$1,234.50"
     assert build.fmt_value(-0.001, "$.2f") == "$0.00"
+
+
+def test_verify_labs_loose_tol_for_scs():
+    # SCS's own near-zero residual is platform-sensitive; it gets a wider absolute tolerance than
+    # a normal reproducibility check, but one still far tighter than the owning lab's own assert.
+    assert verify_labs.compare(
+        {"tol_daily_scs_dvol_bp": -9.79e-08, "tol_daily_scs_dw": 9.51e-09, "other": 1.0},
+        {"tol_daily_scs_dvol_bp": -6.04e-05, "tol_daily_scs_dw": 2.32e-05, "other": 1.0},
+    ) == []
+    # an ordinary key doesn't get the loose tolerance — the same-sized drift is still a real diff
+    assert verify_labs.compare({"other": -9.79e-08}, {"other": -6.04e-05}) != []

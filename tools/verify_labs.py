@@ -24,6 +24,21 @@ from course import ROOT, Course  # noqa: E402
 
 REL_TOL, ABS_TOL = 1e-6, 1e-9
 
+# SCS (an ADMM solver) can converge to a materially different near-optimal point across
+# platforms/BLAS builds than the one committed — most visibly in Session 3.4's "daily units"
+# case, which is deliberately badly scaled to demonstrate solver fragility. That is the lesson,
+# not a bug, so its residual-vs-reference diagnostics get a looser absolute tolerance instead of
+# the strict default. Each override stays >=100x tighter than that lab's own semantic assert on
+# the same quantity (dvol_bp < 0.1, max_dw < 1e-2), so a real regression is still caught.
+LOOSE_ABS_TOL = {"_scs_dvol_bp": 1e-3, "_scs_dw": 1e-4, "_scs_minw": 1e-5}
+
+
+def tol_for(key: str) -> tuple[float, float]:
+    for suffix, atol in LOOSE_ABS_TOL.items():
+        if suffix in key:
+            return REL_TOL, atol
+    return REL_TOL, ABS_TOL
+
 
 def changed_sessions(course: Course) -> set[str]:
     out = subprocess.run(["git", "diff", "--name-only", "origin/main...HEAD"], cwd=ROOT,
@@ -48,7 +63,8 @@ def compare(old: dict, new: dict) -> list[str]:
         else:
             a, b = old[key], new[key]
             if isinstance(a, (int, float)) and isinstance(b, (int, float)):
-                if not math.isclose(a, b, rel_tol=REL_TOL, abs_tol=ABS_TOL):
+                rtol, atol = tol_for(key)
+                if not math.isclose(a, b, rel_tol=rtol, abs_tol=atol):
                     problems.append(f"{key}: committed {a!r} ≠ re-run {b!r}")
             elif a != b:
                 problems.append(f"{key}: committed {a!r} ≠ re-run {b!r}")
