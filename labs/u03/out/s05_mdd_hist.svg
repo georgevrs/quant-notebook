@@ -1,0 +1,68 @@
+<svg viewBox="0 0 720 280" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Maximum drawdown over 10 years — 6,000 simulated paths, 8% drift, 20% volatility">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">MAXIMUM DRAWDOWN OVER 10 YEARS — 6,000 SIMULATED PATHS, 8% DRIFT, 20% VOLATILITY</text>
+  <line x1="64" y1="197.7" x2="680" y2="197.7" stroke="#E4E8EC" stroke-width="1"/>
+  <line x1="64" y1="151.4" x2="680" y2="151.4" stroke="#E4E8EC" stroke-width="1"/>
+  <line x1="64" y1="105.1" x2="680" y2="105.1" stroke="#E4E8EC" stroke-width="1"/>
+  <line x1="64" y1="58.8" x2="680" y2="58.8" stroke="#E4E8EC" stroke-width="1"/>
+  <line x1="64" y1="244" x2="680" y2="244" stroke="#C9CFC6" stroke-width="1"/>
+  <line x1="118.9" y1="244" x2="118.9" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="118.9" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">−80%</text>
+  <line x1="298.7" y1="244" x2="298.7" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="298.7" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">−60%</text>
+  <line x1="478.5" y1="244" x2="478.5" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="478.5" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">−40%</text>
+  <line x1="658.3" y1="244" x2="658.3" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="658.3" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">−20%</text>
+  <rect x="64.5" y="243.4" width="11.3" height="0.6" fill="#D64B2A" fill-opacity="0.55"><title>−86% to −85%</title></rect>
+  <rect x="76.8" y="242.2" width="11.3" height="1.8" fill="#D64B2A" fill-opacity="0.55"><title>−85% to −83%</title></rect>
+  <rect x="89.1" y="241.6" width="11.3" height="2.4" fill="#D64B2A" fill-opacity="0.55"><title>−83% to −82%</title></rect>
+  <rect x="101.5" y="241" width="11.3" height="3" fill="#D64B2A" fill-opacity="0.55"><title>−82% to −81%</title></rect>
+  <rect x="113.8" y="242.2" width="11.3" height="1.8" fill="#D64B2A" fill-opacity="0.55"><title>−81% to −79%</title></rect>
+  <rect x="126.1" y="241.6" width="11.3" height="2.4" fill="#D64B2A" fill-opacity="0.55"><title>−79% to −78%</title></rect>
+  <rect x="138.4" y="239.2" width="11.3" height="4.8" fill="#D64B2A" fill-opacity="0.55"><title>−78% to −77%</title></rect>
+  <rect x="150.7" y="238.6" width="11.3" height="5.4" fill="#D64B2A" fill-opacity="0.55"><title>−77% to −75%</title></rect>
+  <rect x="163.1" y="238" width="11.3" height="6" fill="#D64B2A" fill-opacity="0.55"><title>−75% to −74%</title></rect>
+  <rect x="175.4" y="231.9" width="11.3" height="12.1" fill="#D64B2A" fill-opacity="0.55"><title>−74% to −72%</title></rect>
+  <rect x="187.7" y="232.5" width="11.3" height="11.5" fill="#D64B2A" fill-opacity="0.55"><title>−72% to −71%</title></rect>
+  <rect x="200" y="229.5" width="11.3" height="14.5" fill="#D64B2A" fill-opacity="0.55"><title>−71% to −70%</title></rect>
+  <rect x="212.3" y="223.5" width="11.3" height="20.5" fill="#D64B2A" fill-opacity="0.55"><title>−70% to −68%</title></rect>
+  <rect x="224.7" y="219.9" width="11.3" height="24.1" fill="#D64B2A" fill-opacity="0.55"><title>−68% to −67%</title></rect>
+  <rect x="237" y="215" width="11.3" height="29" fill="#D64B2A" fill-opacity="0.55"><title>−67% to −66%</title></rect>
+  <rect x="249.3" y="213.8" width="11.3" height="30.2" fill="#D64B2A" fill-opacity="0.55"><title>−66% to −64%</title></rect>
+  <rect x="261.6" y="212.6" width="11.3" height="31.4" fill="#3A56C5" fill-opacity="0.55"><title>−64% to −63%</title></rect>
+  <rect x="273.9" y="194.5" width="11.3" height="49.5" fill="#3A56C5" fill-opacity="0.55"><title>−63% to −61%</title></rect>
+  <rect x="286.3" y="192.1" width="11.3" height="51.9" fill="#3A56C5" fill-opacity="0.55"><title>−61% to −60%</title></rect>
+  <rect x="298.6" y="184.9" width="11.3" height="59.1" fill="#3A56C5" fill-opacity="0.55"><title>−60% to −59%</title></rect>
+  <rect x="310.9" y="182.5" width="11.3" height="61.5" fill="#3A56C5" fill-opacity="0.55"><title>−59% to −57%</title></rect>
+  <rect x="323.2" y="163.2" width="11.3" height="80.8" fill="#3A56C5" fill-opacity="0.55"><title>−57% to −56%</title></rect>
+  <rect x="335.5" y="171.6" width="11.3" height="72.4" fill="#3A56C5" fill-opacity="0.55"><title>−56% to −55%</title></rect>
+  <rect x="347.9" y="157.1" width="11.3" height="86.9" fill="#3A56C5" fill-opacity="0.55"><title>−55% to −53%</title></rect>
+  <rect x="360.2" y="136" width="11.3" height="108" fill="#3A56C5" fill-opacity="0.55"><title>−53% to −52%</title></rect>
+  <rect x="372.5" y="142.7" width="11.3" height="101.3" fill="#3A56C5" fill-opacity="0.55"><title>−52% to −50%</title></rect>
+  <rect x="384.8" y="136.6" width="11.3" height="107.4" fill="#3A56C5" fill-opacity="0.55"><title>−50% to −49%</title></rect>
+  <rect x="397.1" y="137.8" width="11.3" height="106.2" fill="#3A56C5" fill-opacity="0.55"><title>−49% to −48%</title></rect>
+  <rect x="409.5" y="114.9" width="11.3" height="129.1" fill="#3A56C5" fill-opacity="0.55"><title>−48% to −46%</title></rect>
+  <rect x="421.8" y="88.4" width="11.3" height="155.6" fill="#3A56C5" fill-opacity="0.55"><title>−46% to −45%</title></rect>
+  <rect x="434.1" y="104.7" width="11.3" height="139.3" fill="#3A56C5" fill-opacity="0.55"><title>−45% to −44%</title></rect>
+  <rect x="446.4" y="90.2" width="11.3" height="153.8" fill="#3A56C5" fill-opacity="0.55"><title>−44% to −42%</title></rect>
+  <rect x="458.7" y="76.3" width="11.3" height="167.7" fill="#3A56C5" fill-opacity="0.55"><title>−42% to −41%</title></rect>
+  <rect x="471.1" y="81.1" width="11.3" height="162.9" fill="#3A56C5" fill-opacity="0.55"><title>−41% to −40%</title></rect>
+  <rect x="483.4" y="77.5" width="11.3" height="166.5" fill="#3A56C5" fill-opacity="0.55"><title>−40% to −38%</title></rect>
+  <rect x="495.7" y="63.6" width="11.3" height="180.4" fill="#3A56C5" fill-opacity="0.55"><title>−38% to −37%</title></rect>
+  <rect x="508" y="58.8" width="11.3" height="185.2" fill="#3A56C5" fill-opacity="0.55"><title>−37% to −35%</title></rect>
+  <rect x="520.3" y="75.7" width="11.3" height="168.3" fill="#3A56C5" fill-opacity="0.55"><title>−35% to −34%</title></rect>
+  <rect x="532.7" y="86" width="11.3" height="158" fill="#3A56C5" fill-opacity="0.55"><title>−34% to −33%</title></rect>
+  <rect x="545" y="96.2" width="11.3" height="147.8" fill="#3A56C5" fill-opacity="0.55"><title>−33% to −31%</title></rect>
+  <rect x="557.3" y="110.1" width="11.3" height="133.9" fill="#3A56C5" fill-opacity="0.55"><title>−31% to −30%</title></rect>
+  <rect x="569.6" y="114.9" width="11.3" height="129.1" fill="#3A56C5" fill-opacity="0.55"><title>−30% to −29%</title></rect>
+  <rect x="581.9" y="131.2" width="11.3" height="112.8" fill="#3A56C5" fill-opacity="0.55"><title>−29% to −27%</title></rect>
+  <rect x="594.3" y="158.3" width="11.3" height="85.7" fill="#3A56C5" fill-opacity="0.55"><title>−27% to −26%</title></rect>
+  <rect x="606.6" y="186.7" width="11.3" height="57.3" fill="#3A56C5" fill-opacity="0.55"><title>−26% to −24%</title></rect>
+  <rect x="618.9" y="192.1" width="11.3" height="51.9" fill="#3A56C5" fill-opacity="0.55"><title>−24% to −23%</title></rect>
+  <rect x="631.2" y="219.9" width="11.3" height="24.1" fill="#3A56C5" fill-opacity="0.55"><title>−23% to −22%</title></rect>
+  <rect x="643.5" y="228.9" width="11.3" height="15.1" fill="#3A56C5" fill-opacity="0.55"><title>−22% to −20%</title></rect>
+  <rect x="655.9" y="238.6" width="11.3" height="5.4" fill="#3A56C5" fill-opacity="0.55"><title>−20% to −19%</title></rect>
+  <rect x="668.2" y="241" width="11.3" height="3" fill="#3A56C5" fill-opacity="0.55"><title>−19% to −18%</title></rect>
+  <line x1="265.3" y1="42" x2="265.3" y2="244" stroke="#4A5A68" stroke-width="1"/>
+  <text x="260.3" y="38" font-size="10.5" text-anchor="end" fill="#1F2C38">worst 5% ←</text>
+</svg>

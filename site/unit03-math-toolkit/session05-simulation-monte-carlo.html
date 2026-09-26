@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- nav:head -->
+<title>3.5 · Simulation &amp; Monte Carlo</title>
+<meta name="description" content="Simulate prices, strategies and uncertainty with seeded Monte Carlo — random walks, GBM, bootstraps and variance reduction.">
+<link rel="canonical" href="https://georgevrs.github.io/quant-notebook/unit03-math-toolkit/session05-simulation-monte-carlo.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Quant Notebook">
+<meta property="og:title" content="3.5 · Simulation &amp; Monte Carlo">
+<meta property="og:description" content="Simulate prices, strategies and uncertainty with seeded Monte Carlo — random walks, GBM, bootstraps and variance reduction.">
+<meta property="og:url" content="https://georgevrs.github.io/quant-notebook/unit03-math-toolkit/session05-simulation-monte-carlo.html">
+<meta name="twitter:card" content="summary">
+<link rel="stylesheet" href="../assets/brand.css">
+<link rel="stylesheet" href="../assets/temml.css">
+<!-- /nav:head -->
+</head>
+<body><div class="page" id="top">
+<!-- Session 3.5 — every simulated number on this page comes from labs/u03/s05_simulation_monte_carlo.py. -->
+<!-- nav:tabs -->
+<nav class="tabs">
+<a href="../index.html">⌂ Course home</a>
+<a href="session01-probability-expected-value.html">3.1 · Probability &amp; EV</a>
+<a href="session02-distributions-fat-tails.html">3.2 · Fat Tails</a>
+<a href="session03-linear-algebra-portfolios.html">3.3 · Linear Algebra</a>
+<a href="session04-convex-optimization.html">3.4 · Optimization</a>
+<a class="active" href="session05-simulation-monte-carlo.html">3.5 · Monte Carlo</a>
+<a href="session06-kelly-bet-sizing.html">3.6 · Kelly &amp; Ruin</a>
+<a href="../roadmap.html">🗺 Roadmap</a>
+</nav>
+<!-- /nav:tabs -->
+
+<header class="cover">
+<!-- nav:heading -->
+<p class="eyebrow">Unit 3 · The Quant Math Toolkit — Session 05 of 06</p>
+<h1>Simulation &amp; Monte Carlo</h1>
+<!-- /nav:heading -->
+<p class="subtitle">How deep can a drawdown get? How often will a stop-loss fire? How sure are you of a volatility estimate? Most questions a quant asks have no formula, and simulation answers all of them — seeded, repeatable and, done right, with an honest error bar. This session builds Monte Carlo from random walks to bootstraps and checks every result against theory. <mark>The core move: every simulated number is a measurement, so report it with its standard error.</mark></p>
+<div class="meta">
+<span>DURATION <b>1.5 h + lab</b></span>
+<span>LEVEL <b>Foundations</b></span>
+<span>TRACKS <b>QR · QT · QD · IND</b></span>
+<span>HANDS-ON <b>Simulate, bootstrap &amp; audit your own asserts</b></span>
+</div>
+<!-- nav:labstrip -->
+<div class="labstrip"><b>📓 Companion lab</b>
+<a href="https://colab.research.google.com/github/georgevrs/quant-notebook/blob/main/labs/u03/s05_simulation_monte_carlo.ipynb">Open in Colab</a>
+<a href="https://github.com/georgevrs/quant-notebook/blob/main/labs/u03/s05_simulation_monte_carlo.ipynb">Notebook on GitHub</a>
+<a href="https://github.com/georgevrs/quant-notebook/blob/main/labs/u03/s05_simulation_monte_carlo.py">Source (.py)</a>
+</div>
+<!-- /nav:labstrip -->
+<div class="toc">
+<b>On this page</b>
+<ol>
+<li><a href="#s1">Why simulate</a></li>
+<li><a href="#s2">The Monte Carlo workflow &amp; its standard error</a></li>
+<li><a href="#s3">Random walks &amp; GBM: simulate in log space</a></li>
+<li><a href="#s4">Drawdowns &amp; barriers: when the path matters</a></li>
+<li><a href="#s5">The bootstrap: resampling history</a></li>
+<li><a href="#s6">Variance reduction: same precision, fewer paths</a></li>
+<li><a href="#s7">Many checks, one lab: the multiple-testing trap</a></li>
+<li><a href="#s8">Try it</a></li>
+<li><a href="#s9">Glossary · Check yourself · Go deeper</a></li>
+</ol>
+</div>
+</header>
+
+<main>
+
+<!-- ============ §1 — mental model ============ -->
+<section id="s1">
+<h2><span class="no">3.5.1</span> Why simulate</h2>
+<p class="lede">A formula answers one question exactly. A simulation answers almost any question approximately — and, done properly, tells you how approximately.</p>
+
+<p>In 1946, recovering from brain surgery, the mathematician Stanislaw Ulam played solitaire and wondered what fraction of deals could be won. The combinatorics were hopeless; dealing a hundred hands and counting was easy. With John von Neumann he turned the idea into a way to compute neutron diffusion at Los Alamos, and Nicholas Metropolis named it after the casino where Ulam's uncle liked to gamble (Metropolis 1987; LANL 2023). Phelim Boyle brought it to option pricing in 1977 (Boyle 1977).</p>
+
+<p><strong>Monte Carlo simulation</strong> estimates a quantity by drawing many random scenarios from a model, computing the quantity in each, and averaging. It is the <a class="term" href="session01-probability-expected-value.html#g-law-of-large-numbers" data-term="law of large numbers">law of large numbers</a> of <a class="xref" href="session01-probability-expected-value.html#s5" data-xref="3.1#s5" data-style="short" data-auto="">Session 3.1</a> put to work: the average over n independent scenarios converges to the expected value, and its error shrinks like 1/√n. Quants reach for it for three jobs.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 236" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <rect x="20" y="14" width="680" height="206" rx="12" fill="#fff" stroke="#1F2C38" stroke-width="1.5"/>
+  <text x="40" y="40" font-size="12" fill="#4A5A68" font-family="IBM Plex Mono,monospace">WHY SIMULATE — three jobs a formula can't always do</text>
+  <rect x="42" y="56" width="202" height="118" rx="8" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="143" y="82" font-size="13" font-weight="600" text-anchor="middle" fill="#3A56C5">PATH-DEPENDENT</text>
+  <text x="143" y="104" font-size="10.5" text-anchor="middle" fill="#4A5A68">the answer depends on the</text>
+  <text x="143" y="119" font-size="10.5" text-anchor="middle" fill="#4A5A68">route, not just the end</text>
+  <text x="143" y="150" font-size="10.5" text-anchor="middle" fill="#1F2C38" font-style="italic">drawdown, stop-loss,</text>
+  <text x="143" y="164" font-size="10.5" text-anchor="middle" fill="#1F2C38" font-style="italic">margin call, barrier</text>
+  <rect x="259" y="56" width="202" height="118" rx="8" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="360" y="82" font-size="13" font-weight="600" text-anchor="middle" fill="#1F7A55">NO CLOSED FORM</text>
+  <text x="360" y="104" font-size="10.5" text-anchor="middle" fill="#4A5A68">fat tails, clustering, rules,</text>
+  <text x="360" y="119" font-size="10.5" text-anchor="middle" fill="#4A5A68">many assets at once</text>
+  <text x="360" y="150" font-size="10.5" text-anchor="middle" fill="#1F2C38" font-style="italic">a strategy's whole</text>
+  <text x="360" y="164" font-size="10.5" text-anchor="middle" fill="#1F2C38" font-style="italic">P&amp;L distribution</text>
+  <rect x="476" y="56" width="202" height="118" rx="8" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="577" y="82" font-size="13" font-weight="600" text-anchor="middle" fill="#8A6D00">CHECK A FORMULA</text>
+  <text x="577" y="104" font-size="10.5" text-anchor="middle" fill="#4A5A68">formulas have bugs too:</text>
+  <text x="577" y="119" font-size="10.5" text-anchor="middle" fill="#4A5A68">simulate, then compare</text>
+  <text x="577" y="150" font-size="10.5" text-anchor="middle" fill="#1F2C38" font-style="italic">every lab in this course</text>
+  <text x="577" y="164" font-size="10.5" text-anchor="middle" fill="#1F2C38" font-style="italic">asserts one against the other</text>
+  <text x="360" y="203" font-size="12" text-anchor="middle" fill="#4A5A68" font-style="italic">One recipe for all three: a model, many random paths, an average — and its standard error.</text>
+</svg>
+<figcaption>fig 3.5.1 — the three jobs of simulation: path-dependent questions, questions with no closed form, and checking the formulas you do have</figcaption>
+</figure>
+
+<p>The first job is the one formulas are worst at. A stop-loss, a <a class="term" href="../unit02-markets-instruments/session04-futures.html#g-margin-call" data-term="margin call">margin call</a> or the maximum <a class="term" href="../unit02-markets-instruments/session03-returns-pnl-leverage.html#g-drawdown" data-term="drawdown">drawdown</a> depends on the route the price took, not only on where it ended (§3.5.4). The second is realism: add <a class="term" href="session02-distributions-fat-tails.html#g-fat-tails" data-term="fat tails">fat tails</a>, <span class="term soon" data-term="volatility clustering" title="Defined in Session 5.1 (coming soon)">volatility clustering</span> or a strategy's trading rules and the closed form disappears, while a simulation only needs a model it can sample from — or a history it can resample (§3.5.5). The third matters most in this course: formulas have bugs too, so every lab computes its key answers twice, from theory and by simulation, and asserts that they agree — the volatility drag of <a class="xref" href="../unit02-markets-instruments/session03-returns-pnl-leverage.html#s4" data-xref="2.3#s4" data-style="short" data-auto="">Session 2.3</a>, the margin-call odds of <a class="xref" href="../unit02-markets-instruments/session04-futures.html#s7" data-xref="2.4#s7" data-style="short" data-auto="">Session 2.4</a>, the law of large numbers of <a class="xref" href="session01-probability-expected-value.html#s5" data-xref="3.1#s5" data-style="short" data-auto="">Session 3.1</a>.</p>
+
+<p>The random numbers are not random. A pseudo-random generator is a deterministic function of its <a class="term" href="../unit01-quant-landscape/session05-quant-lab-setup.html#g-random-seed" data-term="random seed">seed</a>. NumPy's default generator, PCG64, has a period of 2<sup>128</sup>, and <code>Generator.spawn</code> derives child streams whose chance of ever colliding is, by NumPy's own pessimistic estimate, about n² · 2<sup>−128</sup> for n streams (NumPy docs). <a class="xref" href="../unit01-quant-landscape/session05-quant-lab-setup.html#s5" data-xref="1.5#s5" data-style="short" data-auto="">Session 1.5</a> explained why you seed and why each experiment gets its own stream, so that editing one section never shifts the numbers in another. This session's lab starts the way every lab does, with seven streams for seven experiments:</p>
+
+<pre>lab = qn.Lab(<span class="s">"3.5"</span>)  <span class="c"># seeds the random generators: every run gives the same numbers</span>
+(rng_se, rng_gbm, rng_dd, rng_bar, rng_boot, rng_vr, rng_mt) = lab.rng.spawn(<span class="p">7</span>)</pre>
+
+<div class="co key"><span class="co-t">📌 Key idea — a simulation is an experiment</span>
+<p>It has a sample size, a seed and an error bar, like any measurement, and like any experiment it can be run badly. <mark>A simulated number without its standard error is a rumour, not a result.</mark> The rest of this session is about producing that error bar and keeping it honest.</p>
+</div>
+
+<div class="co note"><span class="co-t">🧭 Margin note — the engineering analogy</span>
+<p>Monte Carlo is property-based testing for a model: you cannot enumerate every path a price might take, so you generate thousands at random and measure, the way a fuzzer probes code you cannot prove correct. Like any randomised test suite, it can pass or fail by luck (§3.5.7).</p>
+</div>
+</section>
+
+<!-- ============ §2 — workflow and SE ============ -->
+<section id="s2">
+<h2><span class="no">3.5.2</span> The Monte Carlo workflow &amp; its standard error</h2>
+<p class="lede">Every simulation in this course, from a coin flip to a margin call, follows the same five steps. The fourth — attaching a standard error — is the one people skip.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 196" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">THE MONTE CARLO WORKFLOW — the same five steps in every lab of this course</text>
+  <rect x="19" y="38" width="122" height="70" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="80" y="64" font-size="10.5" text-anchor="middle" fill="#3A56C5" font-weight="600">1 · MODEL</text>
+  <text x="80" y="82" font-size="9.5" text-anchor="middle" fill="#4A5A68">GBM, GARCH, or</text>
+  <text x="80" y="95" font-size="9.5" text-anchor="middle" fill="#4A5A68">resampled history</text>
+  <rect x="159" y="38" width="122" height="70" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="220" y="64" font-size="10.5" text-anchor="middle" fill="#3A56C5" font-weight="600">2 · GENERATE</text>
+  <text x="220" y="82" font-size="9.5" text-anchor="middle" fill="#4A5A68">seeded, one stream</text>
+  <text x="220" y="95" font-size="9.5" text-anchor="middle" fill="#4A5A68">per experiment</text>
+  <rect x="299" y="38" width="122" height="70" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="360" y="64" font-size="10.5" text-anchor="middle" fill="#3A56C5" font-weight="600">3 · COMPUTE</text>
+  <text x="360" y="82" font-size="9.5" text-anchor="middle" fill="#4A5A68">one number per path:</text>
+  <text x="360" y="95" font-size="9.5" text-anchor="middle" fill="#4A5A68">a payoff, a drawdown</text>
+  <rect x="439" y="38" width="122" height="70" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="500" y="64" font-size="10.5" text-anchor="middle" fill="#1F7A55" font-weight="600">4 · ESTIMATE ± SE</text>
+  <text x="500" y="82" font-size="9.5" text-anchor="middle" fill="#4A5A68">the average, with</text>
+  <text x="500" y="95" font-size="9.5" text-anchor="middle" fill="#4A5A68">SE = s / √n</text>
+  <rect x="579" y="38" width="122" height="70" rx="9" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="640" y="64" font-size="10.5" text-anchor="middle" fill="#8A6D00" font-weight="600">5 · CHECK</text>
+  <text x="640" y="82" font-size="9.5" text-anchor="middle" fill="#4A5A68">against theory, at</text>
+  <text x="640" y="95" font-size="9.5" text-anchor="middle" fill="#4A5A68">4 SE, where it exists</text>
+  <path d="M143 73 H155" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M283 73 H295" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M423 73 H435" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M563 73 H575" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M640 110 V134 H80 V114" fill="none" stroke="#D64B2A" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#s2b)"/>
+  <text x="360" y="150" font-size="9.5" text-anchor="middle" fill="#D64B2A">a failed check → fix the model or the code, never the seed</text>
+  <text x="360" y="180" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">Steps 4 and 5 turn a simulation from an anecdote into a measurement.</text>
+  <defs>
+    <marker id="s2a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F2C38"/></marker>
+    <marker id="s2b" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#D64B2A"/></marker>
+  </defs>
+</svg>
+<figcaption>fig 3.5.2 — the Monte Carlo workflow: model, generate, compute, estimate with a standard error, check against theory — and when a check fails, suspect the code before the luck</figcaption>
+</figure>
+
+<p>Take a question with a known answer so you can watch the method work. This session's base asset is the one from <a class="xref" href="../unit02-markets-instruments/session03-returns-pnl-leverage.html" data-xref="2.3" data-style="short" data-auto="">Session 2.3</a>: drift μ = <span data-lab="mu" data-fmt=".0%">8%</span> and volatility σ = <span data-lab="sigma" data-fmt=".0%">20%</span> a year, no dividends, and a risk-free rate of zero throughout. What is the chance it loses money over a year? Under geometric Brownian motion (§3.5.3) the one-year log return is normal with mean ν = μ − σ²/2 = <span data-lab="nu" data-fmt=".0%">6%</span> and standard deviation σ, so the exact answer is Φ(−ν/σ) = <span data-lab="ploss_theory" data-fmt=".2%">38.21%</span>, where Φ is the standard normal cumulative distribution function. Pretend you don't know that. Step 1 is the model; step 2 draws n one-year log returns; step 3 records a 1 for each losing year and a 0 otherwise.</p>
+
+<p>Step 4 is where the statistics come in. The estimate is the average of the n simulated values <math><semantics><msub><mi>Y</mi><mi>i</mi></msub><annotation encoding="application/x-tex">Y_i</annotation></semantics></math>, and its <strong>Monte Carlo standard error</strong> is the <a class="term" href="session01-probability-expected-value.html#g-standard-error" data-term="standard error">standard error</a> of <a class="xref" href="session01-probability-expected-value.html#s5" data-xref="3.1#s5" data-style="short" data-auto="">Session 3.1</a> applied to your own simulated draws: their sample standard deviation <math><semantics><msub><mi>s</mi><mi>Y</mi></msub><annotation encoding="application/x-tex">s_Y</annotation></semantics></math> divided by √n. A probability is the expected value of an indicator (1 if the event happens, 0 if not), so its standard error has a closed form, and it is never more than 0.5/√n:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><msub><mover><mi>θ</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><mi>n</mi></msub><mo>=</mo><mfrac><mn>1</mn><mi>n</mi></mfrac><mrow><munderover><mo movablelimits="false">∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>n</mi></munderover></mrow><msub><mi>Y</mi><mi>i</mi></msub><mo separator="true">,</mo><mspace width="2em"></mspace><mtext>SE</mtext><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><msub><mover><mi>θ</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><mi>n</mi></msub><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mo>=</mo><mfrac><msub><mi>s</mi><mi>Y</mi></msub><msqrt><mrow><mi>n</mi><mspace width="0pt" height="0.5em"></mspace></mrow></msqrt></mfrac><mo separator="true">,</mo><mspace width="2em"></mspace><mtext>SE</mtext><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><msub><mover><mi>p</mi><mo stretchy="false" class="chr-med wbk-med-acc" style="math-depth:0;">ˆ</mo></mover><mi>n</mi></msub><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mo>=</mo><msqrt><mfrac><mrow><msub><mover><mi>p</mi><mo stretchy="false" class="chr-med wbk-med-acc" style="math-depth:0;">ˆ</mo></mover><mi>n</mi></msub><mspace width="0.1667em"></mspace><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mn>1</mn><mo>−</mo><msub><mover><mi>p</mi><mo stretchy="false" class="chr-med wbk-med-acc" style="math-depth:0;">ˆ</mo></mover><mi>n</mi></msub><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><mi>n</mi></mfrac></msqrt><mo>≤</mo><mfrac><mn>0.5</mn><msqrt><mrow><mi>n</mi><mspace width="0pt" height="0.5em"></mspace></mrow></msqrt></mfrac></mrow><annotation encoding="application/x-tex">\hat\theta_n = \frac{1}{n}\sum_{i=1}^{n} Y_i, \qquad \text{SE}(\hat\theta_n) = \frac{s_Y}{\sqrt{n}}, \qquad \text{SE}(\hat p_n) = \sqrt{\frac{\hat p_n\,(1 - \hat p_n)}{n}} \le \frac{0.5}{\sqrt{n}}</annotation></semantics></math></div>
+
+<table>
+<thead><tr><th>Paths n</th><th>Estimated P(losing year)</th><th>Estimate ± 2 SE</th><th>Error, in SEs</th></tr></thead>
+<tbody>
+<tr><td>100</td><td><span data-lab="ploss_100_est" data-fmt=".2%">43.00%</span></td><td><span data-lab="ploss_100_lo" data-fmt=".2%">33.10%</span> to <span data-lab="ploss_100_hi" data-fmt=".2%">52.90%</span></td><td><span data-lab="ploss_100_z" data-fmt="+.2f">+0.97</span></td></tr>
+<tr><td>1,000</td><td><span data-lab="ploss_1000_est" data-fmt=".2%">38.20%</span></td><td><span data-lab="ploss_1000_lo" data-fmt=".2%">35.13%</span> to <span data-lab="ploss_1000_hi" data-fmt=".2%">41.27%</span></td><td><span data-lab="ploss_1000_z" data-fmt="+.2f">−0.01</span></td></tr>
+<tr><td>10,000</td><td><span data-lab="ploss_10000_est" data-fmt=".2%">36.95%</span></td><td><span data-lab="ploss_10000_lo" data-fmt=".2%">35.98%</span> to <span data-lab="ploss_10000_hi" data-fmt=".2%">37.92%</span></td><td><span data-lab="ploss_10000_z" data-fmt="+.2f">−2.61</span></td></tr>
+<tr><td>100,000</td><td><span data-lab="ploss_100000_est" data-fmt=".2%">37.93%</span></td><td><span data-lab="ploss_100000_lo" data-fmt=".2%">37.63%</span> to <span data-lab="ploss_100000_hi" data-fmt=".2%">38.24%</span></td><td><span data-lab="ploss_100000_z" data-fmt="+.2f">−1.79</span></td></tr>
+<tr><td>1,000,000</td><td><span data-lab="ploss_1000000_est" data-fmt=".2%">38.26%</span></td><td><span data-lab="ploss_1000000_lo" data-fmt=".2%">38.17%</span> to <span data-lab="ploss_1000000_hi" data-fmt=".2%">38.36%</span></td><td><span data-lab="ploss_1000000_z" data-fmt="+.2f">+1.13</span></td></tr>
+<tr><td>Truth, Φ(−ν/σ)</td><td><span data-lab="ploss_theory" data-fmt=".2%">38.21%</span></td><td>—</td><td>—</td></tr>
+</tbody>
+</table>
+
+<p>The interval narrows by √10 ≈ 3.2 with every tenfold increase in paths — <span data-lab="se_ratio_100x" data-fmt=".1f">9.9</span> times narrower from 10,000 to 1,000,000. That is the √n rule of <a class="xref" href="session01-probability-expected-value.html#s5" data-xref="3.1#s5" data-style="short" data-auto="">Session 3.1</a>, and the economics of Monte Carlo: each extra decimal place costs a hundred times the computing. Notice also that <span data-lab="ploss_rows_beyond_2" data-fmt="d">1</span> of the <span data-lab="ploss_rows" data-fmt="d">5</span> estimates misses the truth by more than 2 SE. Nothing is wrong. "Estimate ± 2 SE" promises that about 95% of such intervals contain the truth, not all of them, and the lab checks the promise directly: it reruns the n = 1,000 experiment <span data-lab="cover_repeats" data-fmt=",d">4,000</span> times, and <span data-lab="cover_2se" data-fmt=".1%">96.2%</span> of the intervals contain the true value, against <span data-lab="cover_2se_exact" data-fmt=".1%">95.6%</span> exactly for this discrete count (<span data-lab="cover_2se_normal" data-fmt=".2%">95.45%</span> for a normal).</p>
+
+<div class="co note"><span class="co-t">🧭 Margin note — statistics with no formula for their standard error</span>
+<p>For an average, s/√n is the whole story. For a median, a quantile or a maximum drawdown there is no simple formula. Split the paths into 50 batches, compute the statistic in each batch, and take the standard deviation of the 50 values divided by √50. That is the batch-means standard error, <code>qn.stats.batch_se</code>, used in §3.5.3 and §3.5.4.</p>
+</div>
+
+<div class="co key"><span class="co-t">📌 Key idea — report a simulation like a measurement</span>
+<p>Write "<span data-lab="ploss_1000000_est" data-fmt=".2%">38.26%</span> ± <span data-lab="ploss_1000000_2se_pp" data-fmt=".2f">0.10</span> pp (2 SE, 1,000,000 paths)", never a bare 38.26%. <mark>The standard error tells you how well you computed the model's answer — not whether the model is right.</mark> Only better models and better data can shrink the second error; §3.5.5 shows how stubborn it is.</p>
+</div>
+</section>
+
+<!-- ============ §3 — random walks and GBM ============ -->
+<section id="s3">
+<h2><span class="no">3.5.3</span> Random walks &amp; GBM: simulate in log space</h2>
+<p class="lede">The workhorse model of a price is a random walk in its logarithm. Simulate it in log space and it is exact at any step size; simulate it the obvious way and it is not.</p>
+
+<p>A <strong>random walk</strong> is what you get by adding up independent random steps: <math><semantics><mrow><msub><mi>X</mi><mi>k</mi></msub><mo>=</mo><msub><mi>X</mi><mrow><mi>k</mi><mo>−</mo><mn>1</mn></mrow></msub><mo>+</mo><msub><mi>ε</mi><mi>k</mi></msub></mrow><annotation encoding="application/x-tex">X_k = X_{k-1} + \varepsilon_k</annotation></semantics></math>. Prices make a poor random walk — a $1 move means something different at $10 and at $1,000 — but log prices make a good one, because <a class="term" href="../unit02-markets-instruments/session03-returns-pnl-leverage.html#g-log-return" data-term="log return">log returns</a> add across time (<a class="xref" href="../unit02-markets-instruments/session03-returns-pnl-leverage.html" data-xref="2.3" data-style="short" data-auto="">Session 2.3</a>). <strong>Geometric Brownian motion</strong> (GBM) is the model in which the log price is a random walk with normally distributed steps. Over a step of Δ years:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><mrow><mi>ln</mi><mo>⁡</mo><mspace width="0.1667em"></mspace></mrow><msub><mi>P</mi><mrow><mi>t</mi><mo>+</mo><mrow><mi mathvariant="normal">Δ</mi><mspace></mspace></mrow></mrow></msub><mo>=</mo><mrow><mi>ln</mi><mo>⁡</mo><mspace width="0.1667em"></mspace></mrow><msub><mi>P</mi><mi>t</mi></msub><mo>+</mo><mrow><mo fence="true" form="prefix" stretchy="true">(</mo><mi>μ</mi><mo>−</mo><mstyle displaystyle="false" scriptlevel="0"><mfrac><mn>1</mn><mn>2</mn></mfrac></mstyle><msup><mi>σ</mi><mn>2</mn></msup><mo fence="true" form="postfix" stretchy="true">)</mo></mrow><mrow><mi mathvariant="normal">Δ</mi><mspace></mspace></mrow><mo>+</mo><mi>σ</mi><msqrt><mrow><mi mathvariant="normal">Δ</mi><mspace></mspace></mrow></msqrt><mspace width="0.1667em"></mspace><mi>Z</mi><mo separator="true">,</mo><mspace width="2em"></mspace><mi>Z</mi><mo>∼</mo><mi>N</mi><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mn>0</mn><mo separator="true">,</mo><mn>1</mn><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">\ln P_{t+\Delta} = \ln P_t + \left(\mu - \tfrac{1}{2}\sigma^2\right)\Delta + \sigma\sqrt{\Delta}\,Z, \qquad Z \sim N(0, 1)</annotation></semantics></math></div>
+<p>Here t and Δ are measured in years, μ is the expected (arithmetic) growth rate and σ the volatility. The log price drifts at ν = μ − σ²/2, lower than μ by the <a class="term" href="../unit02-markets-instruments/session03-returns-pnl-leverage.html#g-volatility-drag" data-term="volatility drag">volatility drag</a> of <a class="xref" href="../unit02-markets-instruments/session03-returns-pnl-leverage.html#s4" data-xref="2.3#s4" data-style="short" data-auto="">Session 2.3</a>. Because the steps are independent normals, their sum over a horizon of τ years is normal with mean ντ and variance σ²τ, whatever the step. So this update — the <em>exact scheme</em> — is correct for any Δ: one 10-year step gives exactly the same distribution of the final price as 2,520 daily steps. Final prices are <a class="term" href="session02-distributions-fat-tails.html#g-lognormal-distribution" data-term="lognormal distribution">lognormal</a> and every path stays above zero. Fig 3.5.3 shows three simulated decades of the base asset.</p>
+
+<figure class="diagram chart">
+<!-- chart:gbm_paths -->
+<svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Three simulated 10-year GBM paths: 8% drift, 20% volatility (log scale)">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">THREE SIMULATED 10-YEAR GBM PATHS: 8% DRIFT, 20% VOLATILITY (LOG SCALE)</text>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#3A56C5" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">path 1</text>
+  <line x1="108.4" y1="32" x2="124.4" y2="32" stroke="#E8850C" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="130.4" y="36" font-size="11" fill="#4A5A68">path 2</text>
+  <line x1="190.8" y1="32" x2="206.8" y2="32" stroke="#3F8E5A" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="212.8" y="36" font-size="11" fill="#4A5A68">path 3</text>
+  <line x1="273.20000000000005" y1="32" x2="289.20000000000005" y2="32" stroke="#4A5A68" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="295.20000000000005" y="36" font-size="11" fill="#4A5A68">median path</text>
+  <line x1="64" y1="214.2" x2="602" y2="214.2" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="218.2" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$0.50</text>
+  <line x1="64" y1="136.4" x2="602" y2="136.4" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="140.4" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$1.00</text>
+  <line x1="64" y1="58.6" x2="602" y2="58.6" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="62.6" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$2.00</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#C9CFC6" stroke-width="1"/>
+  <line x1="63.8" y1="264" x2="63.8" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="63.8" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">0</text>
+  <line x1="171.4" y1="264" x2="171.4" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="171.4" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">2</text>
+  <line x1="279.1" y1="264" x2="279.1" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="279.1" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">4</text>
+  <line x1="386.7" y1="264" x2="386.7" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="386.7" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">6</text>
+  <line x1="494.4" y1="264" x2="494.4" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="494.4" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">8</text>
+  <line x1="602" y1="264" x2="602" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="602" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">10</text>
+  <line x1="64" y1="136.4" x2="602" y2="136.4" stroke="#4A5A68" stroke-width="1"/>
+  <polyline points="64,136.3 64.4,133 65.7,141.8 67.4,135.3 68.7,135.7 69.8,139.9 70.8,137.5 73.4,136.4 74.3,136.4 76,143.3 77,139.1 77.9,138.2 79.2,145.5 81.3,144.3 82.4,138.6 83.4,143.3 85.6,142.8 86.6,150.7 87.7,148.3 88.8,153.8 89.8,152.7 92.2,159.7 93,160.2 93.9,154.6 96.3,150.3 97.1,157.3 98.6,160.3 99.9,155.2 101.8,165.9 102.7,165.7 103.7,161.2 105.2,160.2 106.3,164.9 108,153.9 109.5,152 110.1,155.4 112.1,148.2 112.7,153.4 114.4,148 116.1,151 117.6,142.3 118.5,141.2 119.5,144.5 121.9,145.2 122.7,142 124.7,149.5 125.3,147.4 126.6,153.6 128.5,153.7 128.9,148 130.4,152.4 131.7,145.3 133.6,142.5 135.1,143 136.6,150.1 137,152.9 139.2,156.9 140.2,154.8 141.7,153.6 143.7,158.6 143.9,159.8 145.4,152.3 147.1,156.2 149,148.9 150.3,151.4 151.1,147.6 152.6,142.9 153.7,140.7 155.6,149.6 156.5,144.2 157.5,148.9 159,152 160.1,145.5 162.2,145.9 163.3,140.7 165.2,145 165.9,145.1 167.6,141.8 168.9,136.9 169.5,138.9 171.6,130.9 173.4,134.9 174.2,129.9 175.1,129.1 176.8,135.7 178.5,132.9 179.8,127.3 180.4,129.9 182.3,126.6 184.2,113.9 185.3,118.8 186.2,115.1 187.7,117.6 188.9,108.5 190.9,111.7 191.9,104.2 193,110.5 194.3,104.4 195.8,99.1 197.7,100.9 198.6,94.5 200,95.4 200.7,90.3 202,88.6 203.7,93.2 205.6,87 206.5,89.4 207.3,85.2 209.7,86 210.7,77 212,79.6 212.9,75.2 214.8,76.1 215.9,68.7 217.1,71.7 219.3,65.7 219.9,60.1 221.4,59.4 222.5,64.6 224.6,67.2 225.7,75.4 227.4,78 228.5,74.4 228.9,78 230.8,77.4 231.7,78.7 233.2,87.5 234.9,88.4 236.1,85.1 238.3,90.6 239.3,84.5 240.2,81.7 241.7,79.6 243.6,91.2 243.8,88.9 246,88.4 247.2,95.2 249,90.8 249.8,95.7 250.9,91.9 252.2,98.7 254.3,93.6 255.6,97.8 256.9,99.5 258.6,97.3 259.8,104.6 261.1,107.3 262.6,104.5 263.5,99.2 265,92.2 266,95.3 266.7,91.2 268.8,90.5 270.1,100.8 271.4,101.3 273.3,95.3 274.4,102.8 275.7,96.3 277.1,92.8 278,92.2 278.9,97.4 280.4,97.2 281.6,101.3 284.2,106.5 284.8,102.1 285.9,102.3 288.3,113 288.9,107.9 290.6,102.6 292.1,109.1 293.6,106.2 294.4,100 295.1,105.8 297.2,99.8 297.9,103 299.8,106.4 300.6,102 302.4,99.2 304.5,100.1 304.7,97.2 307.1,98.9 307.5,95.4 309.8,95.8 310.3,101.6 312,107.9 312.8,101.8 314.5,100.2 316.2,95.7 317.1,97.2 318.6,88.7 319.9,92.3 321.4,87.6 322.2,97 323.9,102.2 325.6,102.8 327.1,107.7 328.4,105.9 329.3,108.5 331,106 332.9,111.1 333.5,105.9 334.8,108.6 336.3,103.9 337.2,110.6 338.4,108.1 340.4,112.6 341.2,107.8 343.1,109.8 344.4,107.5 345.7,111.1 346.6,106.4 348.9,105.7 349.3,108.6 350.8,111.1 352.3,105.9 353.6,112.7 354.9,108.8 356.6,94.6 358.3,98.3 359.6,94.3 360.4,96.3 361.3,91.3 363,98.4 364.3,96.4 366.6,99.3 367.3,103.3 369,108.3 369.8,104.1 370.9,108.2 373.3,104.4 374.1,98 376,107.4 376.9,101.8 377.7,103.9 379.2,101.4 380.5,103 382,98.8 383.1,106.5 384.8,104.1 386.9,113.3 388,105.9 388.4,108.4 390.3,111.3 392.3,107.6 393.5,100.2 394,97.7 395.3,102.3 397.6,103.5 398.2,98.3 399.5,100.3 401,88 402.3,89.7 403.6,83.1 404.9,79.3 407,83.8 407.4,80.9 408.9,77.6 411.1,84.7 411.7,80.8 413.4,83.2 414.5,77.7 416.2,91.7 417.9,83.7 418.1,87.7 419.4,80.6 421.1,86.8 423.2,89.5 424.3,87.2 425.4,79 426.7,79.3 427.7,71.8 430.1,71.8 430.5,75.8 432.8,61.7 433.3,64.8 434.3,65.7 436.5,65.7 438,60.8 438.4,63.3 439.9,69.3 441.2,69.6 443.1,64.7 444,67.3 446.3,56.9 446.9,60 448.7,59.8 449.7,67.7 450.6,69.2 452.3,61 453.4,62.6 455.1,58.7 455.9,64.9 457.8,62.7 458.9,61.7 460.2,67.7 462.3,67 463.4,65.1 464.7,71.5 465.5,66 467.7,69 468.3,74.5 469.6,72.7 471.1,64.2 472.6,59.5 474.1,56.8 475.6,62.3 477.1,64.1 478.8,53.8 479.6,52 480.5,58 482.2,58.6 483.5,70.5 485.4,67.9 486.5,73.8 487.5,64.7 489.4,57.3 490.5,65.7 491.6,61.6 492.6,65.6 493.9,64.6 495.4,74.1 497.1,73.8 498,78.4 500.3,75.2 501.6,81 503.1,83.8 504.2,81.3 504.6,84.7 506.7,89.3 508.2,84.3 509.5,89.6 510.8,88.6 512.5,81.1 513.8,78.8 514.6,80.7 516.1,93.7 517.2,93.4 519.1,99.8 520,94.7 520.8,97 523.4,89.3 524.3,91 525.1,86.7 527.2,81 528.7,81.1 529.8,86.7 531.3,78.1 532.2,84.8 533,79.6 535.4,82 536.9,74.6 537.5,79.7 539,79.9 540.3,74.5 542.2,81.1 542.6,82 543.7,76.6 545.6,79.9 546.7,77.8 548.2,82.3 549.5,84.6 551.6,82.1 552.9,85.8 553.3,83.7 555.4,84.5 556.1,91.3 558.2,99.8 559.7,92.3 561.2,95.5 562.3,90.7 563.6,93.6 564.4,90.3 565.5,97 567.6,89.8 569.1,91.8 570.4,89.9 571.7,89.7 572.5,95.8 573.6,93.9 574.9,99.6 576.2,95 578.1,93.2 579.8,95.5 580.6,101.7 582.8,102 583.8,96.8 585.1,96.8 585.8,90.9 587,93.6 588.5,89 590.5,104.6 592,101.4 593.5,108.8 595,112.7 595.6,109.5 596.7,108.9 598.6,112.8 599.7,107.2 601.4,108.2 602,103.8" fill="none" stroke="#3A56C5" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>path 1</title></polyline>
+  <circle cx="602" cy="103.8" r="4" fill="#3A56C5" stroke="#FBFBF8" stroke-width="2"><title>path 1: $1.34</title></circle>
+  <polyline points="64,138 64.4,134.8 65.7,144.6 67,150.5 69.3,142.8 70.2,146.1 71.3,141 73.2,147.1 74.5,144 76,144.5 76.2,146.5 77.9,143 79,147.4 80.4,149.1 81.9,143.1 83.2,147.2 85.1,150.9 86,148.8 87.7,156.3 88.6,154.1 90.9,154.8 91.3,158.3 93.3,160.2 94.5,159.1 96.3,153.2 97.3,156.5 98.2,153.3 99.9,158.6 101.6,155.8 103.1,158.1 104.4,149.4 105,151.1 106.9,147.5 108.4,148.5 109.1,148.3 110.3,157.8 111.6,155.6 113.8,158.2 114.6,168.6 115.9,171.2 116.8,166.3 118.9,164.8 120.4,164.9 121,167.6 123.4,168.6 123.6,170.9 125.1,176.4 126.6,174.6 128.5,180.9 128.9,177.5 131.5,172.9 131.9,172.4 133.2,182.7 135.3,171.6 136.8,175.8 137.3,181.5 139.4,183.7 140.5,177.2 141.5,177.7 142.6,187.3 144.9,188.1 145.6,185.2 146.9,189.4 147.9,187.6 149.6,190.6 151.4,183.6 152.4,187.8 153.5,189.4 155.4,182.8 156.7,188.1 158,187 158.8,190.6 160.5,188.8 161.6,193.3 162.7,193.2 164.8,188.9 165.4,191.8 166.7,191.5 168.4,183.7 169.5,186.9 170.8,183.4 172.3,191.5 174,193.4 176.1,184 177.2,190.5 178.7,182.2 179.1,180.3 180.8,186.9 181.7,183.7 183.4,191 184.7,184.5 186.4,186 187.9,182.4 188.7,186 190.9,181.8 191.7,175.5 193.2,178.3 194.7,177.6 195.3,173.8 197.1,172.3 198.1,169.5 200.3,179.9 201.3,184.1 202.8,181.5 203.9,173.8 205.2,166.7 207.1,171.8 208,168.1 208.6,172.5 210.7,169.5 212.4,170.4 212.9,175.5 214.4,169.9 216.3,170.9 217.3,170.2 218.6,162 219.5,168.2 221.8,174.8 223.1,169.3 223.8,172.1 225.7,166.6 227.4,173.5 228.7,170.5 229.5,173.3 231.2,175.1 232.3,171.3 234,177.2 235.3,178.3 236.1,173.9 238.1,169.4 238.5,171 240.8,170.4 241.1,169.5 243,178.5 244.7,177.4 245.8,182.4 246.8,181.9 249,191.7 249.2,189.3 250.9,188.3 252.6,195.3 254.5,187.5 255.8,191.8 256.2,189.5 258.1,187.7 259.6,193.3 260.3,191.1 261.3,192.1 263.7,187.3 264.1,191.9 265.4,195.4 266.9,197.4 268.2,193.5 270.5,190.5 271.8,194.6 273.3,192.9 273.7,189.3 275,187.1 276.7,187.9 277.6,193.4 279.1,195.9 281.2,196.1 282.1,191.2 283.8,194.5 284.6,196.5 285.9,194.3 288,196.5 288.5,191 290.6,193.7 291,190.5 293.2,194.1 294.2,191.1 295.7,197.4 296.8,198.8 297.9,199.8 299.1,195.2 301.3,193.7 301.9,198.5 303.2,196.3 305.6,196.2 306.6,186.9 307.5,191 309,192.1 310.5,189.2 312.2,192.9 313,200.7 314.5,203.7 316.4,202.4 317.9,192.9 318.4,190.3 319.4,196.5 320.9,192.9 322.6,196.7 323.5,194.6 325.2,192.4 326.9,198.8 328.6,192.2 330.1,190.1 331,194.4 332.7,193 333.3,198.4 335.5,202.2 335.9,202 337.8,194.9 338.4,193 340.2,201.9 341,198.1 342.5,209.6 344.4,212.9 346.3,205.1 347.6,202.8 347.8,205.6 349.8,204.2 351,216.2 352.5,214.3 353.6,216.6 354.9,217 357,206.5 357.7,215.4 358.9,222.6 360.2,224.1 361.3,216.7 363.9,222.8 364.1,224.7 365.6,220 367.9,225.3 368.6,223.7 370.5,215.7 370.9,218 373,219.5 373.7,224.7 375.8,223.1 376.5,214.9 377.7,214.1 379.9,225.8 381.4,222.7 382.2,224.7 383.1,219.7 384.6,221.5 385.6,216.8 387.6,219.3 388.9,222.1 390.1,232.6 391.8,232.4 392.7,236.8 394.8,236.8 395.3,239.9 396.5,240.3 398.5,243.4 399.7,250.3 401.7,253.8 402.7,248.1 404.4,252.5 405.3,250.1 407,250.9 408.3,256.2 409.8,254.3 410.4,258.2 412.6,258.3 413.2,254 414.7,251.8 415.5,250.3 417.3,262.2 419.2,259.4 420,262.8 421.5,258.9 423,264 423.9,260 425.2,258.3 427.1,260.6 428.1,259.9 429.2,254.8 431.1,257.4 432.2,253.7 434.1,253.3 435,258.8 436.5,253.3 437.5,253.6 438.4,248.3 439.9,250.4 442.2,246.3 443.3,240.9 444.4,243.6 445.4,240.7 446.9,246.2 447.8,242.7 449.5,244.6 451.4,240.2 452.7,245.2 453.6,244.7 454.8,249.2 457.2,250.6 458.5,240.5 459.5,243.1 460.6,235.6 461.7,240 463.6,233.2 465.1,234.6 466.6,225.4 467.4,228.1 468.7,223.5 470,229.3 471.1,230.1 472.4,229.8 473.4,222.1 476,217.8 476.8,220.9 478.6,219.9 479.4,228.2 481.1,222 481.5,220.3 483.3,223.8 485.4,221.9 486,216 487.1,218.4 489,210.4 490.3,208.1 491.4,210.3 492.4,206.2 493.7,204.5 495.2,208.6 496.5,205.1 497.8,204 499.3,209.8 500.8,212.1 501.8,205.9 504,210 505,207.9 506.7,199 507.4,202.4 508.9,198.2 510.4,195.6 512.1,198.2 512.9,196.1 514.6,198.4 515.7,196.9 517.2,201.8 518.9,202.7 519.8,206.7 521.3,207.3 523,207.5 523.6,202.1 525.1,196.9 527.2,191.3 528.7,199.9 529.4,199.4 530.7,191.2 531.7,190.7 533.2,186.2 534.9,190.1 536.6,191.4 537.5,185.7 538.4,191.2 540.3,182.2 541.6,179.6 543.5,181 545,177 546,183.1 546.5,180.6 547.8,184.3 549.9,181.6 551.6,171.8 552.7,177.8 554.2,180 554.8,174.6 555.9,170.2 558.2,168.9 559.3,171.5 560.4,172.5 562.1,169.2 563.6,164 564.4,172.2 566.3,175.5 566.8,182.8 568.3,181 569.7,188 571.7,190.1 572.3,182.6 574.2,179.2 575.7,186.6 576.4,179.4 577.7,185.2 579.1,185.3 580.6,194 582.8,193.8 583.8,188.4 585.1,185 586.8,187.9 587.7,195.5 588.3,191.8 590.3,196.7 591.1,193.7 593.5,192.9 594.5,197.6 595.4,194.1 596.7,196.3 598.4,193.1 600.1,198.3 601.6,197.8 602,195" fill="none" stroke="#E8850C" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>path 2</title></polyline>
+  <circle cx="602" cy="195" r="4" fill="#E8850C" stroke="#FBFBF8" stroke-width="2"><title>path 2: $0.59</title></circle>
+  <polyline points="64,136 64.4,134.7 65.7,141.5 67.8,142.3 68.3,140.4 70.6,141.1 71.7,135.6 73,133.1 73.6,132.1 74.9,137.9 77,142.5 78.1,138.4 79.6,144.5 81.1,158.3 82.4,159.4 83.2,164 85.4,166.6 86,163.6 87.5,161.4 89,160.4 90.7,165.9 92.2,159.4 92.4,161.9 94.3,163.3 95.4,159.7 96.5,159.8 98.8,168.5 99.7,160.9 101.6,159.6 102,164 103.7,168.7 105.2,162 107.1,161.7 107.4,165 109.3,163.2 110.8,160.5 111.4,155.8 112.7,157.6 114.6,148.3 115.7,149.3 118,143.6 118.9,144.5 119.7,139.1 121,142.9 122.7,140.2 124.7,139.8 125.9,146 127,147.4 128.5,144.1 129.1,136.2 131.1,138.2 132.6,144.6 134.1,141.8 135.3,147.1 136.8,142.2 138.1,146.6 138.8,142.7 140.7,135.9 141.1,139.2 143,128.8 144.3,128.1 146.2,138.8 147.3,139.4 148.8,133.8 150.1,139.4 151.1,130.2 152.2,128.4 154.1,131.1 155.6,120.8 157.1,124.8 158,117 159,118.9 161.2,112.4 161.8,117.5 163.7,118.5 164.6,113.6 166.1,119.9 166.7,120.3 168.4,113.6 170.4,113.9 172.1,120 173.1,115.8 174.4,117.7 174.8,110.8 177.2,103.2 178.5,109.3 179.5,108.1 181,99.7 182.5,108.9 183.4,106.7 185.3,115.5 186.2,113.2 187.2,117.9 188.5,120.2 190.4,117.9 191.7,117.6 192.6,122.2 194.7,118.6 195.1,121 197.7,130.1 198.3,127 199.2,130.7 201.8,122.8 202,122.1 204.1,134.1 205.4,128.9 207.1,136.7 208.4,133.6 209.9,137.1 210.7,133.7 211.6,137.8 212.6,137.1 214.6,128.2 216.5,139.3 216.9,140.1 218.4,132 220.1,132.9 221.6,140.3 223.3,139.8 224,143.3 225.3,138.9 227.4,138.6 228.7,133.2 228.9,131.2 230.6,132.7 232.3,130.6 234.2,122.9 235.1,126.9 236.6,124.2 238.3,132.8 238.9,129 240.6,133.7 242.3,129 243.4,135.2 244.7,134.6 245.5,129.4 247.5,127 249,131 250.5,124.3 250.9,128.8 252.2,131.4 253.4,127.2 254.9,135 256.2,132 258.4,138.3 259.4,132.3 260.3,134.1 261.8,128.6 263.1,128.5 264.1,134.1 266,140.9 267.3,135.4 268.4,136.4 269.9,145.7 271.2,143.3 272.2,151.3 274.6,143.3 274.8,145.7 276.3,142.2 277.6,145.8 279.1,146.6 280.4,139.6 281.8,138.1 283.8,142.1 285.3,139.4 285.7,132.4 288,134.6 288.5,140.1 290.6,145.6 291.2,143.2 293.4,147.2 294.4,141.3 295.9,141.2 297.4,129.3 298.7,131 300.4,130.4 301.5,121 301.9,123 304.5,122.8 305.3,118.5 306.6,121.7 307.5,117.3 309.8,115 310.3,117.9 312,123 313,122.3 315.2,135.9 316.4,127.3 317.7,131.1 319.2,127.5 319.4,125.7 321.6,131 322.2,128.4 324.4,124.3 326.1,134.8 326.3,133.7 328,139.8 329.5,139.5 331,131.8 332.7,130.6 333.3,125.9 335.2,121.1 335.7,124.3 337,120.4 338.7,120.2 339.7,116 341.9,113.6 343.4,122.1 344.4,123.8 346.1,119.1 347.4,120.7 348.9,113.5 350.4,109.6 351,113.3 353,104.9 354,102.3 355.7,106.8 357,103.6 357.7,107.1 359.8,104.7 360.7,108.2 362.2,105.2 363.4,110.5 364.7,112.9 366.4,106.2 367.5,109.8 368.8,99.4 370.3,103.9 371.1,104.4 373.3,92.3 373.9,89.8 375.4,97.3 376.9,93.8 378.8,95.6 379.9,89.5 380.5,92.1 382.4,85.9 383.3,88.4 385.2,84.5 386.1,85.9 387.4,80.9 388.4,86.1 390.1,83.2 391.8,90.4 392.9,86.9 394.8,84 395.3,86.2 397.2,85 398.2,79.6 400,78.7 400.8,84.4 402.3,81.6 404,90.6 405.1,87.5 406.8,87.7 408.5,97.3 409.6,91.7 410.6,95.2 411.3,91.6 412.8,94.2 414.7,91.6 415.5,96.9 417.3,93.3 418.1,95.3 419.8,95.9 421.5,90.4 423,99.7 423.4,101.4 425.8,96.3 426.2,100.2 428.6,94.9 430.1,99 430.7,100.3 431.6,93.9 433.7,88.7 434.6,86.8 436.1,93.4 437.3,95 439,88.1 439.9,84.2 441.4,84.5 443.5,79.5 444.2,84.7 445.7,80.7 447.6,89.1 448,86 449.7,91.5 450.8,94.3 452.5,94.4 454,87.8 455.3,97.9 457,105.2 458,98.7 458.9,106.2 460.4,102.9 461.5,109.4 463.8,107.9 464.5,111.8 465.7,113 467,120.7 468.7,124.4 469.4,121.1 471.9,132.6 473.2,131.6 474.3,124.7 475.3,128 476.2,125.9 478.3,125.9 480,130.1 481.3,135.1 482,136.3 483.7,134.2 485.4,138.4 486.9,134.5 488.2,133.8 488.6,138.8 490.9,142.1 491.6,141.5 492.9,132.9 493.7,136.3 496.1,129.7 497.3,128.9 498.4,131.3 499.3,129.3 501.4,135.1 503.1,133.3 503.8,137.7 505.5,136.1 506.7,129.7 507.8,133.5 509.5,128.1 509.9,130.8 512.1,127.5 513.2,122.2 514.4,119.8 516.4,122 517,127.3 518.1,123.9 519.8,124.7 521.5,132.9 523,134.4 523.6,128.4 525.3,125.4 526.6,129.7 528.3,125.3 529.2,119.4 530.2,118.9 531.9,124.7 534.1,113.7 534.9,112 536.4,108.6 537.1,113.2 538.4,106.6 539.6,110.3 542.2,112 542.6,108.5 544.1,106.6 545.6,109 547.1,103.6 549,103.9 549.9,101.5 550.5,96.6 552.5,95.2 553.7,100.6 554.8,97.7 556.9,96.3 557.6,99.1 559.1,101.2 561.2,93.4 562.3,96 563.1,90.7 564.8,99.8 565.5,101.9 566.8,95.7 568.5,96.4 569.5,91.5 571.5,95 572.5,90.5 574.4,88.3 575.9,96.8 576.8,99.3 577.7,93.4 579.8,94.1 581.3,90.8 582.1,97.7 583.4,103.8 584.7,107.2 586.8,111.5 587.3,107.4 588.8,104.7 590.5,107.1 591.3,100.9 592.6,95.1 593.9,100 596,95.3 596.9,97.5 597.9,97.6 599.4,94.5 601.1,84.7 602,86.4" fill="none" stroke="#3F8E5A" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>path 3</title></polyline>
+  <circle cx="602" cy="86.4" r="4" fill="#3F8E5A" stroke="#FBFBF8" stroke-width="2"><title>path 3: $1.56</title></circle>
+  <polyline points="64,136.4 65.1,136.2 66.1,136.1 67.4,135.9 68.7,135.8 70,135.6 71.5,135.4 72.8,135.3 74,135.1 75.5,134.9 76.8,134.8 78.1,134.6 79.6,134.4 80.9,134.2 82.2,134.1 83.6,133.9 84.9,133.7 86.2,133.6 87.7,133.4 89,133.2 90.3,133.1 91.8,132.9 93,132.7 94.3,132.6 95.8,132.4 97.1,132.2 98.4,132.1 99.9,131.9 101.2,131.7 102.4,131.5 103.9,131.4 105.2,131.2 106.5,131 108,130.9 109.3,130.7 110.6,130.5 112.1,130.3 113.3,130.2 114.6,130 116.1,129.8 117.4,129.7 118.7,129.5 120.2,129.3 121.5,129.2 122.7,129 124.2,128.8 125.5,128.7 126.8,128.5 128.3,128.3 129.6,128.2 130.8,128 132.1,127.8 133.6,127.6 134.9,127.5 136.2,127.3 137.7,127.1 139,127 140.2,126.8 141.7,126.6 143,126.5 144.3,126.3 145.8,126.1 147.1,126 148.4,125.8 149.9,125.6 151.1,125.5 152.4,125.3 153.9,125.1 155.2,124.9 156.5,124.8 158,124.6 159.3,124.4 160.5,124.3 162,124.1 163.3,123.9 164.6,123.8 166.1,123.6 167.4,123.4 168.7,123.3 170.1,123.1 171.4,122.9 172.7,122.8 174.2,122.6 175.5,122.4 176.8,122.2 178.3,122.1 179.5,121.9 180.8,121.7 182.3,121.5 183.6,121.4 184.9,121.2 186.4,121 187.7,120.9 188.9,120.7 190.4,120.5 191.7,120.4 193,120.2 194.5,120 195.8,119.9 197.1,119.7 198.3,119.5 199.8,119.4 201.1,119.2 202.4,119 203.9,118.8 205.2,118.7 206.5,118.5 208,118.3 209.2,118.2 210.5,118 212,117.8 213.3,117.7 214.6,117.5 216.1,117.3 217.3,117.2 218.6,117 220.1,116.8 221.4,116.7 222.7,116.5 224.2,116.3 225.5,116.1 226.7,116 228.2,115.8 229.5,115.6 230.8,115.5 232.3,115.3 233.6,115.1 234.9,115 236.4,114.8 237.6,114.6 238.9,114.5 240.4,114.3 241.7,114.1 243,114 244.5,113.8 245.8,113.6 247,113.4 248.5,113.3 249.8,113.1 251.1,112.9 252.6,112.8 253.9,112.6 255.2,112.4 256.6,112.2 257.9,112.1 259.2,111.9 260.7,111.7 262,111.6 263.3,111.4 264.5,111.3 266,111.1 267.3,110.9 268.6,110.8 270.1,110.6 271.4,110.4 272.7,110.2 274.2,110.1 275.4,109.9 276.7,109.7 278.2,109.5 279.5,109.4 280.8,109.2 282.3,109 283.6,108.9 284.8,108.7 286.3,108.5 287.6,108.4 288.9,108.2 290.4,108 291.7,107.9 293,107.7 294.4,107.5 295.7,107.4 297,107.2 298.5,107 299.8,106.8 301.1,106.7 302.6,106.5 303.8,106.3 305.1,106.2 306.6,106 307.9,105.8 309.2,105.7 310.7,105.5 312,105.3 313.2,105.2 314.7,105 316,104.8 317.3,104.7 318.8,104.5 320.1,104.3 321.4,104.1 322.9,104 324.1,103.8 325.4,103.6 326.9,103.5 328.2,103.3 329.5,103.1 331,102.9 332.3,102.8 333.5,102.6 334.8,102.5 336.3,102.3 337.6,102.1 338.9,102 340.4,101.8 341.6,101.6 342.9,101.4 344.4,101.3 345.7,101.1 347,100.9 348.5,100.8 349.8,100.6 351,100.4 352.5,100.2 353.8,100.1 355.1,99.9 356.6,99.7 357.9,99.6 359.2,99.4 360.7,99.2 361.9,99.1 363.2,98.9 364.7,98.7 366,98.6 367.3,98.4 368.8,98.2 370.1,98.1 371.3,97.9 372.8,97.7 374.1,97.5 375.4,97.4 376.9,97.2 378.2,97 379.5,96.9 380.9,96.7 382.2,96.5 383.5,96.4 385,96.2 386.3,96 387.6,95.9 389.1,95.7 390.3,95.5 391.6,95.4 393.1,95.2 394.4,95 395.7,94.8 397.2,94.7 398.5,94.5 399.7,94.3 401,94.2 402.5,94 403.8,93.8 405.1,93.7 406.6,93.5 407.9,93.3 409.1,93.2 410.6,93 411.9,92.8 413.2,92.7 414.7,92.5 416,92.3 417.3,92.1 418.8,92 420,91.8 421.3,91.6 422.8,91.5 424.1,91.3 425.4,91.1 426.9,90.9 428.1,90.8 429.4,90.6 430.9,90.4 432.2,90.3 433.5,90.1 435,89.9 436.3,89.8 437.5,89.6 439,89.4 440.3,89.3 441.6,89.1 443.1,88.9 444.4,88.8 445.7,88.6 447.2,88.4 448.4,88.2 449.7,88.1 451.2,87.9 452.5,87.7 453.8,87.6 455.3,87.4 456.6,87.2 457.8,87.1 459.3,86.9 460.6,86.7 461.9,86.6 463.4,86.4 464.7,86.2 466,86.1 467.2,85.9 468.7,85.7 470,85.5 471.3,85.4 472.8,85.2 474.1,85 475.3,84.9 476.8,84.7 478.1,84.5 479.4,84.4 480.9,84.2 482.2,84 483.5,83.9 485,83.7 486.2,83.5 487.5,83.4 489,83.2 490.3,83 491.6,82.8 493.1,82.7 494.4,82.5 495.6,82.3 497.1,82.1 498.4,82 499.7,81.8 501.2,81.6 502.5,81.5 503.8,81.3 505.2,81.1 506.5,81 507.8,80.8 509.3,80.6 510.6,80.5 511.9,80.3 513.4,80.1 514.6,80 515.9,79.8 517.4,79.6 518.7,79.4 520,79.3 521.5,79.1 522.8,78.9 524,78.8 525.5,78.6 526.8,78.4 528.1,78.3 529.6,78.1 530.9,77.9 532.2,77.8 533.4,77.6 534.9,77.4 536.2,77.3 537.5,77.1 539,76.9 540.3,76.7 541.6,76.6 543.1,76.4 544.3,76.2 545.6,76.1 547.1,75.9 548.4,75.7 549.7,75.6 551.2,75.4 552.5,75.2 553.7,75.1 555.2,74.9 556.5,74.7 557.8,74.6 559.3,74.4 560.6,74.2 561.8,74 563.3,73.9 564.6,73.7 565.9,73.5 567.4,73.4 568.7,73.2 570,73 571.5,72.8 572.7,72.7 574,72.5 575.5,72.3 576.8,72.2 578.1,72 579.6,71.8 580.9,71.7 582.1,71.5 583.6,71.3 584.9,71.2 586.2,71 587.7,70.8 589,70.7 590.3,70.5 591.7,70.3 593,70.1 594.3,70 595.8,69.8 597.1,69.6 598.4,69.5 599.9,69.3 600.9,69.2 602,69" fill="none" stroke="#4A5A68" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><title>median path</title></polyline>
+  <circle cx="602" cy="69" r="4" fill="#4A5A68" stroke="#FBFBF8" stroke-width="2"><title>median path: $1.82</title></circle>
+  <text x="614" y="73" font-size="11" fill="#1F2C38">median: $1.82</text>
+  <text x="614" y="90.4" font-size="11" fill="#1F2C38">path 3: $1.56</text>
+  <text x="614" y="107.8" font-size="11" fill="#1F2C38">path 1: $1.34</text>
+  <text x="614" y="199" font-size="11" fill="#1F2C38">path 2: $0.59</text>
+</svg>
+<!-- /chart:gbm_paths -->
+<figcaption>fig 3.5.3 — three simulated 10-year paths of the base asset (daily steps, log scale, x-axis in years): the same model ends at <span data-lab="paths_final_1" data-fmt="$,.2f">$1.34</span>, <span data-lab="paths_final_2" data-fmt="$,.2f">$0.59</span> and <span data-lab="paths_final_3" data-fmt="$,.2f">$1.56</span> per starting dollar, around a median path (grey) that ends at <span data-lab="median_final" data-fmt="$,.2f">$1.82</span></figcaption>
+</figure>
+
+<p>The obvious way to simulate a price is to draw normal <em>simple</em> returns with mean μΔ and standard deviation σ√Δ and compound them — the Euler scheme (the <span class="term soon" data-term="Euler-Maruyama scheme" title="Defined in Session 10.2 (coming soon)">Euler–Maruyama scheme</span> applied to the price itself):</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><msub><mi>P</mi><mrow><mi>t</mi><mo>+</mo><mrow><mi mathvariant="normal">Δ</mi><mspace></mspace></mrow></mrow></msub><mo>=</mo><msub><mi>P</mi><mi>t</mi></msub><mrow><mo fence="true" form="prefix" stretchy="true">(</mo><mn>1</mn><mo>+</mo><mi>μ</mi><mrow><mi mathvariant="normal">Δ</mi><mspace></mspace></mrow><mo>+</mo><mi>σ</mi><msqrt><mrow><mi mathvariant="normal">Δ</mi><mspace></mspace></mrow></msqrt><mspace width="0.1667em"></mspace><mi>Z</mi><mo fence="true" form="postfix" stretchy="true">)</mo></mrow></mrow><annotation encoding="application/x-tex">P_{t+\Delta} = P_t\left(1 + \mu\Delta + \sigma\sqrt{\Delta}\,Z\right)</annotation></semantics></math></div>
+<p>It converges to GBM as Δ shrinks, but at any finite step it is an approximation, and with big steps a bad one: any draw with <math><semantics><mrow><mi>Z</mi><mo>&lt;</mo><mo form="prefix" stretchy="false">−</mo><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mn>1</mn><mo>+</mo><mi>μ</mi><mrow><mi mathvariant="normal">Δ</mi><mspace></mspace></mrow><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mi>/</mi><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>σ</mi><msqrt><mrow><mi mathvariant="normal">Δ</mi><mspace></mspace></mrow></msqrt><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">Z \lt -(1 + \mu\Delta)/(\sigma\sqrt{\Delta})</annotation></semantics></math> takes the price to zero or below, which no stock can do (fig 3.5.4).</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 204" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">ONE STEP OF A SIMULATED PRICE, TWO RECIPES — same Z, same μ and σ</text>
+  <rect x="26" y="32" width="326" height="142" rx="9" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="189" y="54" font-size="11" font-weight="700" text-anchor="middle" fill="#D64B2A">NAIVE: EULER ON PRICES</text>
+  <text x="189" y="74" font-size="10.5" text-anchor="middle" fill="#1F2C38" font-family="IBM Plex Mono,monospace">P ← P · (1 + μΔ + σ√Δ · Z)</text>
+  <rect x="46" y="84" width="286" height="22" rx="5" fill="#fff" stroke="#F2CDBF"/>
+  <text x="58" y="99" font-size="9.5" fill="#1F2C38">normal SIMPLE returns, compounded step by step</text>
+  <rect x="46" y="110" width="286" height="22" rx="5" fill="#fff" stroke="#F2CDBF"/>
+  <text x="58" y="125" font-size="9.5" fill="#1F2C38">error grows with the step Δ; the tails bend</text>
+  <rect x="46" y="136" width="286" height="22" rx="5" fill="#fff" stroke="#F2CDBF"/>
+  <text x="58" y="151" font-size="9.5" fill="#1F2C38">a big negative Z can push the price below zero</text>
+  <rect x="368" y="32" width="326" height="142" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="531" y="54" font-size="11" font-weight="700" text-anchor="middle" fill="#1F7A55">EXACT: GBM IN LOG SPACE</text>
+  <text x="531" y="74" font-size="10.5" text-anchor="middle" fill="#1F2C38" font-family="IBM Plex Mono,monospace">ln P ← ln P + (μ − σ²/2)Δ + σ√Δ · Z</text>
+  <rect x="388" y="84" width="286" height="22" rx="5" fill="#fff" stroke="#BFE0CF"/>
+  <text x="400" y="99" font-size="9.5" fill="#1F2C38">normal LOG returns, added: a random walk</text>
+  <rect x="388" y="110" width="286" height="22" rx="5" fill="#fff" stroke="#BFE0CF"/>
+  <text x="400" y="125" font-size="9.5" fill="#1F2C38">exact at any Δ, even one 10-year step</text>
+  <rect x="388" y="136" width="286" height="22" rx="5" fill="#fff" stroke="#BFE0CF"/>
+  <text x="400" y="151" font-size="9.5" fill="#1F2C38">P = exp(log price) is always above zero</text>
+  <text x="360" y="194" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">Both recipes agree as Δ → 0; only the exact one is right at every step size.</text>
+</svg>
+<figcaption>fig 3.5.4 — two ways to take one step of a simulated price: compounding normal simple returns (Euler) is an approximation; adding normal log returns is exact</figcaption>
+</figure>
+
+<p>How bad is the approximation? The lab simulates <span data-lab="gbm_paths" data-fmt=",d">40,000</span> ten-year paths of a volatile asset — <span data-lab="gbm_mu_v" data-fmt=".0%">10%</span> drift, <span data-lab="gbm_sigma_v" data-fmt=".0%">40%</span> volatility, like a single growth stock. For a fair comparison it uses <em>common random numbers</em>: one set of daily shocks per path, summed into longer steps, so every scheme sees the same luck. It tracks two tail quantities with exact answers: the chance of losing more than half, and the 5th percentile of what $1 becomes.</p>
+
+<table>
+<thead><tr><th>Scheme, step</th><th>P(lose half+ in 10 y)</th><th>5th pct of $1</th><th>Paths through zero</th></tr></thead>
+<tbody>
+<tr><td>Theory (lognormal)</td><td><span data-lab="gbm_theory_p_half" data-fmt=".2%">24.01%</span></td><td><span data-lab="gbm_theory_q05" data-fmt="$,.3f">$0.152</span></td><td>none</td></tr>
+<tr><td>Exact, one 10-year step</td><td><span data-lab="gbm_exact_step_p_half" data-fmt=".2%">24.22%</span></td><td><span data-lab="gbm_exact_step_q05" data-fmt="$,.3f">$0.149</span></td><td>none</td></tr>
+<tr><td>Exact, ten 1-year steps</td><td><span data-lab="gbm_exact_year_p_half" data-fmt=".2%">24.22%</span></td><td><span data-lab="gbm_exact_year_q05" data-fmt="$,.3f">$0.149</span></td><td>none</td></tr>
+<tr><td>Euler, 1-day steps</td><td><span data-lab="gbm_euler_day_p_half" data-fmt=".2%">24.27%</span></td><td><span data-lab="gbm_euler_day_q05" data-fmt="$,.3f">$0.149</span></td><td><span data-lab="gbm_euler_day_ruined" data-fmt=".2%">0.00%</span></td></tr>
+<tr><td>Euler, 1-week steps</td><td><span data-lab="gbm_euler_week_p_half" data-fmt=".2%">24.26%</span></td><td><span data-lab="gbm_euler_week_q05" data-fmt="$,.3f">$0.149</span></td><td><span data-lab="gbm_euler_week_ruined" data-fmt=".2%">0.00%</span></td></tr>
+<tr><td>Euler, 1-month steps</td><td><span data-lab="gbm_euler_month_p_half" data-fmt=".2%">24.46%</span></td><td><span data-lab="gbm_euler_month_q05" data-fmt="$,.3f">$0.145</span></td><td><span data-lab="gbm_euler_month_ruined" data-fmt=".2%">0.00%</span></td></tr>
+<tr><td>Euler, 1-quarter steps</td><td><span data-lab="gbm_euler_quarter_p_half" data-fmt=".2%">25.13%</span></td><td><span data-lab="gbm_euler_quarter_q05" data-fmt="$,.3f">$0.131</span></td><td><span data-lab="gbm_euler_quarter_ruined" data-fmt=".2%">0.00%</span></td></tr>
+<tr><td>Euler, 1-year steps</td><td><span data-lab="gbm_euler_year_p_half" data-fmt=".2%">27.58%</span></td><td><span data-lab="gbm_euler_year_q05" data-fmt="$,.3f">$0.035</span></td><td><span data-lab="gbm_euler_year_ruined" data-fmt=".2%">3.06%</span></td></tr>
+<tr><td>Log space, but drift μ instead of μ − σ²/2</td><td><span data-lab="gbm_wrongdrift_p_half" data-fmt=".2%">9.25%</span></td><td><span data-lab="gbm_wrongdrift_q05" data-fmt="$,.3f">$0.332</span></td><td>none</td></tr>
+</tbody>
+</table>
+
+<p>The exact scheme lands on identical final prices whatever the step (the lab asserts it), within sampling error of theory; the first column's standard error is <span data-lab="gbm_se_half_pp" data-fmt=".2f">0.21</span> percentage points. Euler with yearly steps puts the chance of losing half at <span data-lab="gbm_euler_year_p_half" data-fmt=".1%">27.6%</span>, <span data-lab="gbm_euler_year_z_half" data-fmt=".0f">17</span> standard errors above theory, puts the 5th percentile at <span data-lab="gbm_euler_year_q05" data-fmt="$,.3f">$0.035</span> instead of <span data-lab="gbm_theory_q05" data-fmt="$,.3f">$0.152</span>, and sends <span data-lab="gbm_euler_year_ruined" data-fmt=".1%">3.1%</span> of paths through zero. Measured on the same paths against the exact scheme, the excess shrinks with the step: <span data-lab="gbm_euler_year_paired_bias_pp" data-fmt="+.2f">+3.36</span> points with yearly steps, <span data-lab="gbm_euler_quarter_paired_bias_pp" data-fmt="+.2f">+0.91</span> quarterly, <span data-lab="gbm_euler_month_paired_bias_pp" data-fmt="+.2f">+0.24</span> monthly, and <span data-lab="gbm_euler_day_paired_bias_pp" data-fmt="+.2f">+0.05</span> ± <span data-lab="gbm_euler_day_paired_se_pp" data-fmt=".2f">0.03</span> daily, lost in the noise. Euler gets the <em>middle</em> of the distribution nearly right at every step; its error lives in the tails, exactly where risk questions live.</p>
+
+<p>The last row is the most common bug of all: simulating in log space but with drift μ instead of μ − σ²/2. Every path is shifted up by the same factor <math><semantics><msup><mi>e</mi><mrow class="tml-sml-pad"><msup><mi>σ</mi><mn>2</mn></msup><mi>τ</mi><mi>/</mi><mn>2</mn></mrow></msup><annotation encoding="application/x-tex">e^{\sigma^2\tau/2}</annotation></semantics></math> = <span data-lab="gbm_wrongdrift_factor" data-fmt=".2f">2.23</span>, so the median final wealth comes out at <span data-lab="gbm_wrongdrift_median" data-fmt="$,.2f">$2.70</span> instead of <span data-lab="gbm_theory_median" data-fmt="$,.2f">$1.22</span>, and the average at <span data-lab="gbm_wrongdrift_mean" data-fmt="$,.2f">$6.07</span> instead of <span data-lab="gbm_theory_mean" data-fmt="$,.2f">$2.72</span>. The two schemes as the lab writes them:</p>
+
+<pre><span class="k">def</span> euler_terminal(dW: np.ndarray, step_days: int, mu: float, sigma: float) -&gt; tuple[np.ndarray, np.ndarray]:
+    <span class="s">"""Naive Euler on PRICES with steps of `step_days` days: P ← P·(1 + μΔ + σΔW).
+
+    dW holds daily Brownian increments (paths × days). Returns (terminal price from P0 = 1,
+    ruined flag); a path whose price reaches zero or below is absorbed at 0 (it is bust).
+    """</span>
+    n_paths = dW.shape[<span class="p">0</span>]
+    dW_k = dW.reshape(n_paths, -<span class="p">1</span>, step_days).sum(axis=<span class="p">2</span>)       <span class="c"># Brownian increment per step</span>
+    factor = <span class="p">1.0</span> + mu * step_days * DT + sigma * dW_k
+    ruined = (factor &lt;= <span class="p">0</span>).any(axis=<span class="p">1</span>)
+    terminal = np.where(ruined, <span class="p">0.0</span>, np.prod(np.maximum(factor, <span class="p">1e-300</span>), axis=<span class="p">1</span>))
+    <span class="k">return</span> terminal, ruined
+
+
+<span class="k">def</span> exact_terminal(dW: np.ndarray, step_days: int, mu: float, sigma: float) -&gt; np.ndarray:
+    <span class="s">"""Exact GBM in log space with steps of `step_days` days: ln P += (μ − σ²/2)Δ + σΔW."""</span>
+    n_paths = dW.shape[<span class="p">0</span>]
+    dW_k = dW.reshape(n_paths, -<span class="p">1</span>, step_days).sum(axis=<span class="p">2</span>)
+    <span class="k">return</span> np.exp(((mu - <span class="p">0.5</span> * sigma ** <span class="p">2</span>) * step_days * DT + sigma * dW_k).sum(axis=<span class="p">1</span>))</pre>
+
+<div class="co warn"><span class="co-t">⚠️ Pitfall — "normal returns, compounded, is close enough"</span>
+<p>Only for the middle of the distribution and small steps. A spreadsheet that compounds normally distributed yearly returns runs this Euler scheme with one-year steps, and is most wrong about the bad outcomes it exists to measure. For lognormal prices, draw log returns with mean (μ − σ²/2)Δ and exponentiate; for fat tails, change the distribution of Z on purpose (<a class="xref" href="session02-distributions-fat-tails.html" data-xref="3.2" data-style="short" data-auto="">Session 3.2</a>), not by accident.</p>
+</div>
+
+<div class="co tip"><span class="co-t">💡 Looking ahead</span>
+<p>Why −σ²/2 appears is <span class="term soon" data-term="Itô&#x27;s lemma" title="Defined in Session 10.2 (coming soon)">Itô's lemma</span>, derived in <span class="xref soon" data-xref="10.2" data-auto="" title="Coming soon">Session 10.2 — Stochastic Calculus for Engineers</span> with <span class="term soon" data-term="Brownian motion" title="Defined in Session 10.2 (coming soon)">Brownian motion</span> and the Euler–Maruyama scheme for models with no exact recipe. <span class="xref soon" data-xref="10.6" data-auto="" title="Coming soon">Session 10.6 — Stochastic Volatility &amp; Numerical Methods</span> prices options by simulation, where discretisation bias is a pricing error.</p>
+</div>
+</section>
+
+<!-- ============ §4 — path dependence ============ -->
+<section id="s4">
+<h2><span class="no">3.5.4</span> Drawdowns &amp; barriers: when the path matters</h2>
+<p class="lede">The questions a risk manager asks — how deep can it fall, will it hit the stop — are about the whole path. For the drawdown, simulation is not a check on the formula; it is the formula.</p>
+
+<p>Start with the maximum drawdown, the worst fall from a running peak (<a class="xref" href="../unit02-markets-instruments/session03-returns-pnl-leverage.html#s5" data-xref="2.3#s5" data-style="short" data-auto="">Session 2.3</a>). For GBM its distribution has no simple closed form — Magdon-Ismail et al. (2004) express it as an infinite series — so the lab simulates <span data-lab="dd_paths" data-fmt=",d">6,000</span> ten-year daily paths of the base asset, whose <a class="term" href="../unit02-markets-instruments/session03-returns-pnl-leverage.html#g-sharpe-ratio" data-term="Sharpe ratio">Sharpe ratio</a> is μ/σ = <span data-lab="dd_sharpe" data-fmt=".1f">0.4</span> at a zero risk-free rate, and computes each path's maximum drawdown with <code>qn.returns.max_drawdown_paths</code>.</p>
+
+<figure class="diagram chart">
+<!-- chart:mdd_hist -->
+<svg viewBox="0 0 720 280" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Maximum drawdown over 10 years — 6,000 simulated paths, 8% drift, 20% volatility">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">MAXIMUM DRAWDOWN OVER 10 YEARS — 6,000 SIMULATED PATHS, 8% DRIFT, 20% VOLATILITY</text>
+  <line x1="64" y1="197.7" x2="680" y2="197.7" stroke="#E4E8EC" stroke-width="1"/>
+  <line x1="64" y1="151.4" x2="680" y2="151.4" stroke="#E4E8EC" stroke-width="1"/>
+  <line x1="64" y1="105.1" x2="680" y2="105.1" stroke="#E4E8EC" stroke-width="1"/>
+  <line x1="64" y1="58.8" x2="680" y2="58.8" stroke="#E4E8EC" stroke-width="1"/>
+  <line x1="64" y1="244" x2="680" y2="244" stroke="#C9CFC6" stroke-width="1"/>
+  <line x1="118.9" y1="244" x2="118.9" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="118.9" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">−80%</text>
+  <line x1="298.7" y1="244" x2="298.7" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="298.7" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">−60%</text>
+  <line x1="478.5" y1="244" x2="478.5" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="478.5" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">−40%</text>
+  <line x1="658.3" y1="244" x2="658.3" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="658.3" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">−20%</text>
+  <rect x="64.5" y="243.4" width="11.3" height="0.6" fill="#D64B2A" fill-opacity="0.55"><title>−86% to −85%</title></rect>
+  <rect x="76.8" y="242.2" width="11.3" height="1.8" fill="#D64B2A" fill-opacity="0.55"><title>−85% to −83%</title></rect>
+  <rect x="89.1" y="241.6" width="11.3" height="2.4" fill="#D64B2A" fill-opacity="0.55"><title>−83% to −82%</title></rect>
+  <rect x="101.5" y="241" width="11.3" height="3" fill="#D64B2A" fill-opacity="0.55"><title>−82% to −81%</title></rect>
+  <rect x="113.8" y="242.2" width="11.3" height="1.8" fill="#D64B2A" fill-opacity="0.55"><title>−81% to −79%</title></rect>
+  <rect x="126.1" y="241.6" width="11.3" height="2.4" fill="#D64B2A" fill-opacity="0.55"><title>−79% to −78%</title></rect>
+  <rect x="138.4" y="239.2" width="11.3" height="4.8" fill="#D64B2A" fill-opacity="0.55"><title>−78% to −77%</title></rect>
+  <rect x="150.7" y="238.6" width="11.3" height="5.4" fill="#D64B2A" fill-opacity="0.55"><title>−77% to −75%</title></rect>
+  <rect x="163.1" y="238" width="11.3" height="6" fill="#D64B2A" fill-opacity="0.55"><title>−75% to −74%</title></rect>
+  <rect x="175.4" y="231.9" width="11.3" height="12.1" fill="#D64B2A" fill-opacity="0.55"><title>−74% to −72%</title></rect>
+  <rect x="187.7" y="232.5" width="11.3" height="11.5" fill="#D64B2A" fill-opacity="0.55"><title>−72% to −71%</title></rect>
+  <rect x="200" y="229.5" width="11.3" height="14.5" fill="#D64B2A" fill-opacity="0.55"><title>−71% to −70%</title></rect>
+  <rect x="212.3" y="223.5" width="11.3" height="20.5" fill="#D64B2A" fill-opacity="0.55"><title>−70% to −68%</title></rect>
+  <rect x="224.7" y="219.9" width="11.3" height="24.1" fill="#D64B2A" fill-opacity="0.55"><title>−68% to −67%</title></rect>
+  <rect x="237" y="215" width="11.3" height="29" fill="#D64B2A" fill-opacity="0.55"><title>−67% to −66%</title></rect>
+  <rect x="249.3" y="213.8" width="11.3" height="30.2" fill="#D64B2A" fill-opacity="0.55"><title>−66% to −64%</title></rect>
+  <rect x="261.6" y="212.6" width="11.3" height="31.4" fill="#3A56C5" fill-opacity="0.55"><title>−64% to −63%</title></rect>
+  <rect x="273.9" y="194.5" width="11.3" height="49.5" fill="#3A56C5" fill-opacity="0.55"><title>−63% to −61%</title></rect>
+  <rect x="286.3" y="192.1" width="11.3" height="51.9" fill="#3A56C5" fill-opacity="0.55"><title>−61% to −60%</title></rect>
+  <rect x="298.6" y="184.9" width="11.3" height="59.1" fill="#3A56C5" fill-opacity="0.55"><title>−60% to −59%</title></rect>
+  <rect x="310.9" y="182.5" width="11.3" height="61.5" fill="#3A56C5" fill-opacity="0.55"><title>−59% to −57%</title></rect>
+  <rect x="323.2" y="163.2" width="11.3" height="80.8" fill="#3A56C5" fill-opacity="0.55"><title>−57% to −56%</title></rect>
+  <rect x="335.5" y="171.6" width="11.3" height="72.4" fill="#3A56C5" fill-opacity="0.55"><title>−56% to −55%</title></rect>
+  <rect x="347.9" y="157.1" width="11.3" height="86.9" fill="#3A56C5" fill-opacity="0.55"><title>−55% to −53%</title></rect>
+  <rect x="360.2" y="136" width="11.3" height="108" fill="#3A56C5" fill-opacity="0.55"><title>−53% to −52%</title></rect>
+  <rect x="372.5" y="142.7" width="11.3" height="101.3" fill="#3A56C5" fill-opacity="0.55"><title>−52% to −50%</title></rect>
+  <rect x="384.8" y="136.6" width="11.3" height="107.4" fill="#3A56C5" fill-opacity="0.55"><title>−50% to −49%</title></rect>
+  <rect x="397.1" y="137.8" width="11.3" height="106.2" fill="#3A56C5" fill-opacity="0.55"><title>−49% to −48%</title></rect>
+  <rect x="409.5" y="114.9" width="11.3" height="129.1" fill="#3A56C5" fill-opacity="0.55"><title>−48% to −46%</title></rect>
+  <rect x="421.8" y="88.4" width="11.3" height="155.6" fill="#3A56C5" fill-opacity="0.55"><title>−46% to −45%</title></rect>
+  <rect x="434.1" y="104.7" width="11.3" height="139.3" fill="#3A56C5" fill-opacity="0.55"><title>−45% to −44%</title></rect>
+  <rect x="446.4" y="90.2" width="11.3" height="153.8" fill="#3A56C5" fill-opacity="0.55"><title>−44% to −42%</title></rect>
+  <rect x="458.7" y="76.3" width="11.3" height="167.7" fill="#3A56C5" fill-opacity="0.55"><title>−42% to −41%</title></rect>
+  <rect x="471.1" y="81.1" width="11.3" height="162.9" fill="#3A56C5" fill-opacity="0.55"><title>−41% to −40%</title></rect>
+  <rect x="483.4" y="77.5" width="11.3" height="166.5" fill="#3A56C5" fill-opacity="0.55"><title>−40% to −38%</title></rect>
+  <rect x="495.7" y="63.6" width="11.3" height="180.4" fill="#3A56C5" fill-opacity="0.55"><title>−38% to −37%</title></rect>
+  <rect x="508" y="58.8" width="11.3" height="185.2" fill="#3A56C5" fill-opacity="0.55"><title>−37% to −35%</title></rect>
+  <rect x="520.3" y="75.7" width="11.3" height="168.3" fill="#3A56C5" fill-opacity="0.55"><title>−35% to −34%</title></rect>
+  <rect x="532.7" y="86" width="11.3" height="158" fill="#3A56C5" fill-opacity="0.55"><title>−34% to −33%</title></rect>
+  <rect x="545" y="96.2" width="11.3" height="147.8" fill="#3A56C5" fill-opacity="0.55"><title>−33% to −31%</title></rect>
+  <rect x="557.3" y="110.1" width="11.3" height="133.9" fill="#3A56C5" fill-opacity="0.55"><title>−31% to −30%</title></rect>
+  <rect x="569.6" y="114.9" width="11.3" height="129.1" fill="#3A56C5" fill-opacity="0.55"><title>−30% to −29%</title></rect>
+  <rect x="581.9" y="131.2" width="11.3" height="112.8" fill="#3A56C5" fill-opacity="0.55"><title>−29% to −27%</title></rect>
+  <rect x="594.3" y="158.3" width="11.3" height="85.7" fill="#3A56C5" fill-opacity="0.55"><title>−27% to −26%</title></rect>
+  <rect x="606.6" y="186.7" width="11.3" height="57.3" fill="#3A56C5" fill-opacity="0.55"><title>−26% to −24%</title></rect>
+  <rect x="618.9" y="192.1" width="11.3" height="51.9" fill="#3A56C5" fill-opacity="0.55"><title>−24% to −23%</title></rect>
+  <rect x="631.2" y="219.9" width="11.3" height="24.1" fill="#3A56C5" fill-opacity="0.55"><title>−23% to −22%</title></rect>
+  <rect x="643.5" y="228.9" width="11.3" height="15.1" fill="#3A56C5" fill-opacity="0.55"><title>−22% to −20%</title></rect>
+  <rect x="655.9" y="238.6" width="11.3" height="5.4" fill="#3A56C5" fill-opacity="0.55"><title>−20% to −19%</title></rect>
+  <rect x="668.2" y="241" width="11.3" height="3" fill="#3A56C5" fill-opacity="0.55"><title>−19% to −18%</title></rect>
+  <line x1="265.3" y1="42" x2="265.3" y2="244" stroke="#4A5A68" stroke-width="1"/>
+  <text x="260.3" y="38" font-size="10.5" text-anchor="end" fill="#1F2C38">worst 5% ←</text>
+</svg>
+<!-- /chart:mdd_hist -->
+<figcaption>fig 3.5.5 — the maximum drawdown over ten years of an asset with a Sharpe ratio of <span data-lab="dd_sharpe" data-fmt=".1f">0.4</span>, across <span data-lab="dd_paths" data-fmt=",d">6,000</span> simulated paths: the median decade falls <span data-lab="dd_median" data-fmt=".1%">−41.0%</span> from a peak, and the worst 5% (coral) fall further than <span data-lab="dd_q05" data-fmt=".1%">−63.7%</span></figcaption>
+</figure>
+
+<p>The typical decade of a perfectly healthy asset contains a drawdown of <span data-lab="dd_median" data-fmt=".1%">−41.0%</span> (batch-means SE <span data-lab="dd_median_se_pp" data-fmt=".1f">0.2</span> percentage points), and one decade in twenty goes beyond <span data-lab="dd_q05" data-fmt=".1%">−63.7%</span>. A drawdown worse than −30% happens in <span data-lab="dd_p30" data-fmt=".0%">86%</span> of decades, worse than −50% in <span data-lab="dd_p50" data-fmt=".0%">25%</span>. So a <a class="term" href="../unit01-quant-landscape/session03-research-lifecycle.html#g-kill-criterion" data-term="kill criterion">kill criterion</a> (<a class="xref" href="../unit01-quant-landscape/session03-research-lifecycle.html#s3" data-xref="1.3#s3" data-style="short" data-auto="">Session 1.3</a>) must be set against the distribution, not a gut feeling: a rule that shuts a strategy at a −20% drawdown would have shut this asset down in <span data-lab="dd_p20" data-fmt=".1%">99.9%</span> of decades.</p>
+
+<h3>Touching a barrier</h3>
+<p>Now a question with a formula: what is the chance the base asset falls 20% below its starting price at some point within a year — a stop-loss, or the margin call of <a class="xref" href="../unit02-markets-instruments/session04-futures.html#s7" data-xref="2.4#s7" data-style="short" data-auto="">Session 2.4</a>? For a price watched continuously, the <strong>reflection principle</strong> gives the answer (fig 3.5.6). Take a driftless path that touches the barrier and ends above it. Reflect everything after the first touch in the barrier, and you get a path that ends below it — just as likely, because from the barrier a driftless random walk is as likely to go down as up. So the touched-and-ended-above paths pair off one-for-one with the ended-below paths, all of which touched, and P(touch) = 2 × P(end below).</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 284" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">THE REFLECTION PRINCIPLE — mirror the path after its first touch</text>
+  <path d="M60 70 H640" stroke="#9AA6AF" stroke-width="1" stroke-dasharray="4 4"/>
+  <text x="54" y="74" font-size="10" text-anchor="end" fill="#4A5A68">start</text>
+  <path d="M60 140 H640" stroke="#D64B2A" stroke-width="1.5" stroke-dasharray="6 4"/>
+  <text x="54" y="144" font-size="10" text-anchor="end" fill="#D64B2A">barrier</text>
+  <polyline points="60,70 84,82 108,64 132,90 156,84 180,106 204,96 228,122 252,114 276,140" fill="none" stroke="#3A56C5" stroke-width="2" stroke-linejoin="round"/>
+  <polyline points="276,140 300,126 324,134 348,112 372,120 396,98 420,108 444,90 468,100 492,84 516,96 540,80 564,92 588,78 612,88 636,84" fill="none" stroke="#3A56C5" stroke-width="2" stroke-linejoin="round"/>
+  <polyline points="276,140 300,154 324,146 348,168 372,160 396,182 420,172 444,190 468,180 492,196 516,184 540,200 564,188 588,202 612,192 636,196" fill="none" stroke="#D64B2A" stroke-width="2" stroke-dasharray="5 3" stroke-linejoin="round"/>
+  <circle cx="276" cy="140" r="4.5" fill="#1F2C38"/>
+  <text x="268" y="162" font-size="10" text-anchor="end" fill="#1F2C38">first touch</text>
+  <text x="646" y="82" font-size="10" fill="#3A56C5">ends above</text>
+  <text x="646" y="95" font-size="10" fill="#3A56C5">(it touched)</text>
+  <text x="646" y="194" font-size="10" fill="#D64B2A">mirror twin:</text>
+  <text x="646" y="207" font-size="10" fill="#D64B2A">ends below</text>
+  <path d="M60 222 H636" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="60" y="236" font-size="10" text-anchor="middle" fill="#4A5A68">0</text>
+  <text x="348" y="236" font-size="10" text-anchor="middle" fill="#4A5A68">time →</text>
+  <text x="636" y="236" font-size="10" text-anchor="middle" fill="#4A5A68">τ</text>
+  <text x="360" y="256" font-size="11" text-anchor="middle" fill="#1F2C38">No drift: each ‘touched, ended above’ path has an equally likely twin that ended below,</text>
+  <text x="360" y="273" font-size="11" text-anchor="middle" fill="#4A5A68" font-style="italic">so P(touch) = P(end below) + P(touch, end above) = 2 · P(end below).</text>
+</svg>
+<figcaption>fig 3.5.6 — the reflection principle (schematic): reflecting a log-price path in the barrier after its first touch pairs every path that touched and recovered with one that ended below</figcaption>
+</figure>
+
+<p>With a drift the two halves of the pairing are no longer equally likely — the mirror image of an upward-drifting path drifts downward — and the second probability picks up the factor <math><semantics><msup><mi>e</mi><mrow class="tml-sml-pad"><mn>2</mn><mi>ν</mi><mi>h</mi><mi>/</mi><msup><mi>σ</mi><mn>2</mn></msup></mrow></msup><annotation encoding="application/x-tex">e^{2\nu h/\sigma^2}</annotation></semantics></math> (Shreve 2004, §3.7 has the derivation). With <math><semantics><mrow><mi>h</mi><mo>=</mo><mrow><mi>ln</mi><mo>⁡</mo></mrow><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>B</mi><mi>/</mi><msub><mi>P</mi><mn>0</mn></msub><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mo>&lt;</mo><mn>0</mn></mrow><annotation encoding="application/x-tex">h = \ln(B/P_0) \lt 0</annotation></semantics></math> the log distance down to a barrier B:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><mi>ℙ</mi><mo fence="false" symmetric="true" minsize="1.8em" maxsize="1.8em">(</mo><munder><mi>min</mi><mrow><mn>0</mn><mo>≤</mo><mi>t</mi><mo>≤</mo><mi>τ</mi></mrow></munder><mo>⁡</mo><mspace width="0.1667em"></mspace><mrow><mi>ln</mi><mo>⁡</mo><mspace width="0.1667em"></mspace></mrow><mstyle displaystyle="false" scriptlevel="0"><mfrac><msub><mi>P</mi><mi>t</mi></msub><msub><mi>P</mi><mn>0</mn></msub></mfrac></mstyle><mo>≤</mo><mi>h</mi><mo fence="false" symmetric="true" minsize="1.8em" maxsize="1.8em">)</mo><mo>=</mo><mrow><munder><munder><mrow><mrow><mi mathvariant="normal">Φ</mi><mspace></mspace></mrow><mrow style="margin-left:-0.1667em;"></mrow><mrow><mo fence="true" form="prefix" stretchy="true">(</mo><mfrac><mrow><mi>h</mi><mo>−</mo><mi>ν</mi><mi>τ</mi></mrow><mrow><mi>σ</mi><msqrt><mrow><mi>τ</mi><mspace width="0pt" height="0.5em"></mspace></mrow></msqrt></mrow></mfrac><mo fence="true" form="postfix" stretchy="true">)</mo></mrow></mrow><mo stretchy="true" style="math-depth:0;">⏟</mo></munder><mtext>end below</mtext></munder></mrow><mo>+</mo><mrow><munder><munder><mrow><msup><mi>e</mi><mrow class="tml-sml-pad"><mn>2</mn><mi>ν</mi><mi>h</mi><mi>/</mi><msup><mi>σ</mi><mn>2</mn></msup></mrow></msup><mspace width="0.1667em"></mspace><mrow><mi mathvariant="normal">Φ</mi><mspace></mspace></mrow><mrow style="margin-left:-0.1667em;"></mrow><mrow><mo fence="true" form="prefix" stretchy="true">(</mo><mfrac><mrow><mi>h</mi><mo>+</mo><mi>ν</mi><mi>τ</mi></mrow><mrow><mi>σ</mi><msqrt><mrow><mi>τ</mi><mspace width="0pt" height="0.5em"></mspace></mrow></msqrt></mrow></mfrac><mo fence="true" form="postfix" stretchy="true">)</mo></mrow></mrow><mo stretchy="true" style="math-depth:0;">⏟</mo></munder><mtext>touch, end above</mtext></munder></mrow></mrow><annotation encoding="application/x-tex">\Prob\Big(\min_{0 \le t \le \tau} \ln \tfrac{P_t}{P_0} \le h\Big) = \underbrace{\Phi\!\left(\frac{h - \nu\tau}{\sigma\sqrt{\tau}}\right)}_{\text{end below}} + \underbrace{e^{2\nu h/\sigma^2}\,\Phi\!\left(\frac{h + \nu\tau}{\sigma\sqrt{\tau}}\right)}_{\text{touch, end above}}</annotation></semantics></math></div>
+<p>This is <code>qn.stats.p_touch</code>. For a 20% fall within a year it gives <span data-lab="bar_continuous" data-fmt=".2%">18.46%</span>: <span data-lab="refl_term1" data-fmt=".2%">7.84%</span> of ending below plus <span data-lab="refl_term2" data-fmt=".2%">10.62%</span> of touching and recovering, the drift factor being <span data-lab="refl_weight" data-fmt=".3f">0.512</span>. The lab measures the two terms separately at <span data-lab="refl_term1_sim" data-fmt=".2%">7.86%</span> and <span data-lab="refl_term2_sim" data-fmt=".2%">10.51%</span>.</p>
+
+<p>A simulation, like your broker, only looks at the price at its time steps, and a dip that recovers before the next check goes unseen, so the discretely monitored probability is lower. Broadie, Glasserman &amp; Kou (1997) showed that you can correct for this by moving the barrier further away: replace h by h − βσ√Δt, where Δt is the time between checks and β = −ζ(1/2)/√(2π) ≈ <span data-lab="bar_bgk_beta" data-fmt=".4f">0.5826</span> is their constant (ζ is the Riemann zeta function; this β is not a market beta). <code>p_touch(..., dt=Δt)</code> applies it. The lab simulates <span data-lab="bar_paths" data-fmt=",d">200,000</span> one-year paths on a daily grid and looks at them daily, weekly, monthly and quarterly:</p>
+
+<table>
+<thead><tr><th>How often the price is checked</th><th>Simulated P(touch)</th><th>SE (pp)</th><th>Formula</th><th>Simulated − formula (pp)</th></tr></thead>
+<tbody>
+<tr><td>Continuously (Brownian-bridge estimate)</td><td><span data-lab="bar_bridge" data-fmt=".2%">18.38%</span></td><td><span data-lab="bar_bridge_se_pp" data-fmt=".2f">0.09</span></td><td><span data-lab="bar_continuous" data-fmt=".2%">18.46%</span>, no correction</td><td><span data-lab="bar_bridge_gap_pp" data-fmt="+.2f">−0.08</span></td></tr>
+<tr><td>Daily</td><td><span data-lab="bar_daily_sim" data-fmt=".2%">17.17%</span></td><td><span data-lab="bar_daily_se_pp" data-fmt=".2f">0.08</span></td><td><span data-lab="bar_daily_bgk" data-fmt=".2%">17.19%</span>, corrected</td><td><span data-lab="bar_daily_gap_bgk_pp" data-fmt="+.2f">−0.01</span></td></tr>
+<tr><td>Weekly</td><td><span data-lab="bar_weekly_sim" data-fmt=".2%">15.78%</span></td><td><span data-lab="bar_weekly_se_pp" data-fmt=".2f">0.08</span></td><td><span data-lab="bar_weekly_bgk" data-fmt=".2%">15.71%</span>, corrected</td><td><span data-lab="bar_weekly_gap_bgk_pp" data-fmt="+.2f">+0.07</span></td></tr>
+<tr><td>Monthly</td><td><span data-lab="bar_monthly_sim" data-fmt=".2%">13.43%</span></td><td><span data-lab="bar_monthly_se_pp" data-fmt=".2f">0.08</span></td><td><span data-lab="bar_monthly_bgk" data-fmt=".2%">13.19%</span>, corrected</td><td><span data-lab="bar_monthly_gap_bgk_pp" data-fmt="+.2f">+0.24</span></td></tr>
+<tr><td>Quarterly</td><td><span data-lab="bar_quarterly_sim" data-fmt=".2%">11.04%</span></td><td><span data-lab="bar_quarterly_se_pp" data-fmt=".2f">0.07</span></td><td><span data-lab="bar_quarterly_bgk" data-fmt=".2%">10.16%</span>, corrected</td><td><span data-lab="bar_quarterly_gap_bgk_pp" data-fmt="+.2f">+0.88</span></td></tr>
+</tbody>
+</table>
+
+<p>Checking at the daily close instead of continuously lowers the probability from <span data-lab="bar_continuous" data-fmt=".1%">18.5%</span> to <span data-lab="bar_daily_sim" data-fmt=".1%">17.2%</span>, far more than the sampling error, and the corrected formula matches daily checks within it. Weekly it is within a tenth of a point; with monthly and quarterly checks it undershoots, being an approximation built for frequent monitoring. And a drawdown is a barrier that moves up with every new peak, so it is always at least as likely as the same fall from the start: in the same simulation a −20% drawdown within the year happened on <span data-lab="bar_dd20_1y" data-fmt=".1%">37.4%</span> of paths, against <span data-lab="bar_daily_sim" data-fmt=".1%">17.2%</span> for a 20% fall below the starting price.</p>
+
+<div class="co note"><span class="co-t">🧭 Margin note — seeing between the checks</span>
+<p>The top row uses a trick worth knowing. Between neighbouring daily log prices a and b above the log barrier h, a Brownian path dips to the barrier with probability exp(−2(a − h)(b − h)/(σ²Δt)), so each path can contribute the probability of the touches nobody saw. Replacing a random event by its conditional probability is also a variance-reduction technique (§3.5.6).</p>
+</div>
+
+<div class="co key"><span class="co-t">📌 Key idea — how often you look is part of the question</span>
+<p><mark>A barrier probability is only defined together with how often the barrier is checked.</mark> A continuous formula overstates a stop that triggers on daily closes; an intraday margin system is closer to continuous. Match the model's monitoring to the real rule, and simulate path-dependent risks — like the drawdowns of a <a class="term" href="session06-kelly-bet-sizing.html#g-kelly-criterion" data-term="Kelly criterion">Kelly</a> bettor in <a class="xref" href="session06-kelly-bet-sizing.html" data-xref="3.6" data-style="short" data-auto="">Session 3.6</a> — rather than guessing them.</p>
+</div>
+</section>
+
+<!-- ============ §5 — bootstrap ============ -->
+<section id="s5">
+<h2><span class="no">3.5.5</span> The bootstrap: resampling history</h2>
+<p class="lede">When you do not trust any model, let the data be the model and resample the history you have. It is one of the most useful ideas in empirical finance — and it cannot see anything your history did not contain.</p>
+
+<p>The <strong>bootstrap</strong> (Efron 1979) estimates how much a statistic would vary across samples you do not have by treating the sample you do have as the population. Draw a same-length history from it with replacement, recompute the statistic, repeat a few thousand times, and the spread of the results estimates its standard error — no formula needed, which is why <a class="xref" href="session01-probability-expected-value.html#s6" data-xref="3.1#s6" data-style="short" data-auto="">Session 3.1</a> suggested it for fat-tailed returns.</p>
+
+<p>Resampling days one at a time — the iid bootstrap — assumes the days are independent. Returns are not: big moves cluster in time (<span class="term soon" data-term="volatility clustering" title="Defined in Session 5.1 (coming soon)">volatility clustering</span>, <span class="xref soon" data-xref="5.1" data-style="short" data-auto="" title="Coming soon">Session 5.1</span>). The <strong>block bootstrap</strong> (Künsch 1989) resamples runs of consecutive days instead, so calm and stormy stretches survive inside each block (fig 3.5.7). The lab uses the circular variant, which wraps around the end of the sample, with the block length chosen by the Politis–White rule (Politis &amp; White 2004, corrected by Patton, Politis &amp; White 2009) as implemented in the <code>arch</code> package: <span data-lab="boot_block_len" data-fmt="d">93</span> trading days here. The stationary bootstrap of Politis &amp; Romano (1994), with random block lengths, is the common alternative.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 256" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">RESAMPLING ONE HISTORY — day by day, or in blocks</text>
+  <text x="26" y="49" font-size="11" font-weight="600" fill="#1F2C38">HISTORY</text>
+  <text x="26" y="105" font-size="11" font-weight="600" fill="#1F2C38">IID BOOTSTRAP</text>
+  <text x="26" y="161" font-size="11" font-weight="600" fill="#1F2C38">BLOCK BOOTSTRAP</text>
+  <rect x="160" y="34" width="22" height="22" rx="3" fill="#EDF0FC" stroke="#C9D2F1"/><rect x="186" y="34" width="22" height="22" rx="3" fill="#EDF0FC" stroke="#C9D2F1"/><rect x="212" y="34" width="22" height="22" rx="3" fill="#EDF0FC" stroke="#C9D2F1"/><rect x="238" y="34" width="22" height="22" rx="3" fill="#EDF0FC" stroke="#C9D2F1"/><rect x="264" y="34" width="22" height="22" rx="3" fill="#EDF0FC" stroke="#C9D2F1"/><rect x="290" y="34" width="22" height="22" rx="3" fill="#EDF0FC" stroke="#C9D2F1"/><rect x="316" y="34" width="22" height="22" rx="3" fill="#FCEEE9" stroke="#D64B2A"/><rect x="342" y="34" width="22" height="22" rx="3" fill="#FCEEE9" stroke="#D64B2A"/><rect x="368" y="34" width="22" height="22" rx="3" fill="#FCEEE9" stroke="#D64B2A"/><rect x="394" y="34" width="22" height="22" rx="3" fill="#FCEEE9" stroke="#D64B2A"/>
+  <rect x="420" y="34" width="22" height="22" rx="3" fill="#FCEEE9" stroke="#D64B2A"/><rect x="446" y="34" width="22" height="22" rx="3" fill="#EDF0FC" stroke="#C9D2F1"/><rect x="472" y="34" width="22" height="22" rx="3" fill="#EDF0FC" stroke="#C9D2F1"/><rect x="498" y="34" width="22" height="22" rx="3" fill="#EDF0FC" stroke="#C9D2F1"/><rect x="524" y="34" width="22" height="22" rx="3" fill="#EDF0FC" stroke="#C9D2F1"/><rect x="550" y="34" width="22" height="22" rx="3" fill="#EDF0FC" stroke="#C9D2F1"/><rect x="576" y="34" width="22" height="22" rx="3" fill="#FCEEE9" stroke="#D64B2A"/><rect x="602" y="34" width="22" height="22" rx="3" fill="#FCEEE9" stroke="#D64B2A"/><rect x="628" y="34" width="22" height="22" rx="3" fill="#EDF0FC" stroke="#C9D2F1"/><rect x="654" y="34" width="22" height="22" rx="3" fill="#EDF0FC" stroke="#C9D2F1"/>
+  <rect x="160" y="90" width="22" height="22" rx="3" fill="#EDF0FC" stroke="#C9D2F1"/><rect x="186" y="90" width="22" height="22" rx="3" fill="#FCEEE9" stroke="#D64B2A"/><rect x="212" y="90" width="22" height="22" rx="3" fill="#EDF0FC" stroke="#C9D2F1"/><rect x="238" y="90" width="22" height="22" rx="3" fill="#EDF0FC" stroke="#C9D2F1"/><rect x="264" y="90" width="22" height="22" rx="3" fill="#EDF0FC" stroke="#C9D2F1"/><rect x="290" y="90" width="22" height="22" rx="3" fill="#FCEEE9" stroke="#D64B2A"/><rect x="316" y="90" width="22" height="22" rx="3" fill="#EDF0FC" stroke="#C9D2F1"/><rect x="342" y="90" width="22" height="22" rx="3" fill="#EDF0FC" stroke="#C9D2F1"/><rect x="368" y="90" width="22" height="22" rx="3" fill="#FCEEE9" stroke="#D64B2A"/><rect x="394" y="90" width="22" height="22" rx="3" fill="#EDF0FC" stroke="#C9D2F1"/>
+  <rect x="420" y="90" width="22" height="22" rx="3" fill="#EDF0FC" stroke="#C9D2F1"/><rect x="446" y="90" width="22" height="22" rx="3" fill="#FCEEE9" stroke="#D64B2A"/><rect x="472" y="90" width="22" height="22" rx="3" fill="#EDF0FC" stroke="#C9D2F1"/><rect x="498" y="90" width="22" height="22" rx="3" fill="#EDF0FC" stroke="#C9D2F1"/><rect x="524" y="90" width="22" height="22" rx="3" fill="#FCEEE9" stroke="#D64B2A"/><rect x="550" y="90" width="22" height="22" rx="3" fill="#EDF0FC" stroke="#C9D2F1"/><rect x="576" y="90" width="22" height="22" rx="3" fill="#EDF0FC" stroke="#C9D2F1"/><rect x="602" y="90" width="22" height="22" rx="3" fill="#FCEEE9" stroke="#D64B2A"/><rect x="628" y="90" width="22" height="22" rx="3" fill="#EDF0FC" stroke="#C9D2F1"/><rect x="654" y="90" width="22" height="22" rx="3" fill="#FCEEE9" stroke="#D64B2A"/>
+  <rect x="160" y="146" width="22" height="22" rx="3" fill="#EDF0FC" stroke="#C9D2F1"/><rect x="186" y="146" width="22" height="22" rx="3" fill="#EDF0FC" stroke="#C9D2F1"/><rect x="212" y="146" width="22" height="22" rx="3" fill="#FCEEE9" stroke="#D64B2A"/><rect x="238" y="146" width="22" height="22" rx="3" fill="#FCEEE9" stroke="#D64B2A"/><rect x="264" y="146" width="22" height="22" rx="3" fill="#FCEEE9" stroke="#D64B2A"/><rect x="296" y="146" width="22" height="22" rx="3" fill="#EDF0FC" stroke="#C9D2F1"/><rect x="322" y="146" width="22" height="22" rx="3" fill="#EDF0FC" stroke="#C9D2F1"/><rect x="348" y="146" width="22" height="22" rx="3" fill="#FCEEE9" stroke="#D64B2A"/><rect x="374" y="146" width="22" height="22" rx="3" fill="#FCEEE9" stroke="#D64B2A"/><rect x="400" y="146" width="22" height="22" rx="3" fill="#EDF0FC" stroke="#C9D2F1"/>
+  <rect x="432" y="146" width="22" height="22" rx="3" fill="#EDF0FC" stroke="#C9D2F1"/><rect x="458" y="146" width="22" height="22" rx="3" fill="#EDF0FC" stroke="#C9D2F1"/><rect x="484" y="146" width="22" height="22" rx="3" fill="#EDF0FC" stroke="#C9D2F1"/><rect x="510" y="146" width="22" height="22" rx="3" fill="#EDF0FC" stroke="#C9D2F1"/><rect x="536" y="146" width="22" height="22" rx="3" fill="#EDF0FC" stroke="#C9D2F1"/><rect x="568" y="146" width="22" height="22" rx="3" fill="#FCEEE9" stroke="#D64B2A"/><rect x="594" y="146" width="22" height="22" rx="3" fill="#FCEEE9" stroke="#D64B2A"/><rect x="620" y="146" width="22" height="22" rx="3" fill="#FCEEE9" stroke="#D64B2A"/><rect x="646" y="146" width="22" height="22" rx="3" fill="#EDF0FC" stroke="#C9D2F1"/><rect x="672" y="146" width="22" height="22" rx="3" fill="#EDF0FC" stroke="#C9D2F1"/>
+  <rect x="157" y="143" width="132" height="28" rx="5" fill="none" stroke="#3A56C5" stroke-width="1.5"/>
+  <rect x="293" y="143" width="132" height="28" rx="5" fill="none" stroke="#3A56C5" stroke-width="1.5"/>
+  <rect x="429" y="143" width="132" height="28" rx="5" fill="none" stroke="#3A56C5" stroke-width="1.5"/>
+  <rect x="565" y="143" width="132" height="28" rx="5" fill="none" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="160" y="72" font-size="9.5" fill="#4A5A68">calm and stormy days arrive in runs: volatility clustering</text>
+  <text x="160" y="128" font-size="9.5" fill="#4A5A68">the same days, order scrambled: storms become isolated and the clustering is gone</text>
+  <text x="160" y="186" font-size="9.5" fill="#4A5A68">runs inside each block survive; only the joins between blocks are random</text>
+  <rect x="160" y="202" width="14" height="14" rx="3" fill="#EDF0FC" stroke="#C9D2F1"/>
+  <text x="180" y="213" font-size="9.5" fill="#4A5A68">calm day</text>
+  <rect x="250" y="202" width="14" height="14" rx="3" fill="#FCEEE9" stroke="#D64B2A"/>
+  <text x="270" y="213" font-size="9.5" fill="#4A5A68">stormy day</text>
+  <rect x="350" y="202" width="24" height="14" rx="4" fill="none" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="380" y="213" font-size="9.5" fill="#4A5A68">one resampled block of consecutive days</text>
+  <text x="360" y="242" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">Blocks must be longer than the memory you want to keep.</text>
+</svg>
+<figcaption>fig 3.5.7 — two ways to resample one history (schematic): the iid bootstrap keeps every day but scrambles their order; the block bootstrap keeps runs of days together</figcaption>
+</figure>
+
+<p>The lab's history is <span data-lab="boot_years" data-fmt="d">10</span> years of daily returns from a <span class="term soon" data-term="GARCH model" title="Defined in Session 5.5 (coming soon)">GARCH</span> model with Student-t shocks — synthetic, so the truth is known, and built to have the clustering and fat tails of real returns (<span class="xref soon" data-xref="5.5" data-style="short" data-auto="" title="Coming soon">Session 5.5</span>). Clustering shows up as positive <span class="term soon" data-term="autocorrelation" title="Defined in Session 5.1 (coming soon)">autocorrelation</span> of <em>squared</em> returns: a big move today makes a big move tomorrow more likely.</p>
+
+<figure class="diagram chart">
+<!-- chart:acf_boot -->
+<svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Autocorrelation of squared returns, by lag in trading days">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">AUTOCORRELATION OF SQUARED RETURNS, BY LAG IN TRADING DAYS</text>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#3A56C5" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">original history</text>
+  <line x1="172.4" y1="32" x2="188.4" y2="32" stroke="#3F8E5A" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="194.4" y="36" font-size="11" fill="#4A5A68">block bootstrap</text>
+  <line x1="312.4" y1="32" x2="328.4" y2="32" stroke="#E8850C" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="334.4" y="36" font-size="11" fill="#4A5A68">iid bootstrap</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="268" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">−0.05</text>
+  <line x1="64" y1="221.6" x2="602" y2="221.6" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="225.6" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.00</text>
+  <line x1="64" y1="179.2" x2="602" y2="179.2" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="183.2" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.05</text>
+  <line x1="64" y1="136.8" x2="602" y2="136.8" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="140.8" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.10</text>
+  <line x1="64" y1="94.4" x2="602" y2="94.4" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="98.4" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.15</text>
+  <line x1="64" y1="52" x2="602" y2="52" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="56" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.20</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#C9CFC6" stroke-width="1"/>
+  <line x1="177.3" y1="264" x2="177.3" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="177.3" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">5</text>
+  <line x1="318.8" y1="264" x2="318.8" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="318.8" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">10</text>
+  <line x1="460.4" y1="264" x2="460.4" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="460.4" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">15</text>
+  <line x1="602" y1="264" x2="602" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="602" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">20</text>
+  <line x1="64" y1="221.6" x2="602" y2="221.6" stroke="#4A5A68" stroke-width="1"/>
+  <polyline points="64,128.2 92.3,116.9 120.6,97.3 148.9,75.9 177.3,135.5 205.6,154.2 233.9,55.3 262.2,122.8 290.5,134.3 318.8,140.8 347.2,96.3 375.5,127.4 403.8,166.6 432.1,125.3 460.4,177.1 488.7,167.6 517.1,163.2 545.4,146.4 573.7,134.1 602,132.8" fill="none" stroke="#3A56C5" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>original history</title></polyline>
+  <circle cx="602" cy="132.8" r="4" fill="#3A56C5" stroke="#FBFBF8" stroke-width="2"><title>original history: 0.10</title></circle>
+  <polyline points="64,127.2 92.3,116.2 120.6,100.3 148.9,81.6 177.3,139.5 205.6,159.5 233.9,67 262.2,132.5 290.5,142.5 318.8,149.8 347.2,113.1 375.5,140.1 403.8,176.4 432.1,142.5 460.4,185.4 488.7,177.3 517.1,177.2 545.4,161.3 573.7,156.2 602,155.9" fill="none" stroke="#3F8E5A" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>block bootstrap</title></polyline>
+  <circle cx="602" cy="155.9" r="4" fill="#3F8E5A" stroke="#FBFBF8" stroke-width="2"><title>block bootstrap: 0.08</title></circle>
+  <polyline points="64,222.2 92.3,221.3 120.6,221.4 148.9,223.8 177.3,219.3 205.6,221.1 233.9,222.7 262.2,221.4 290.5,221.9 318.8,221.5 347.2,223 375.5,219.9 403.8,222.5 432.1,223.1 460.4,219.1 488.7,222.8 517.1,224.5 545.4,223.7 573.7,223.1 602,223.4" fill="none" stroke="#E8850C" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>iid bootstrap</title></polyline>
+  <circle cx="602" cy="223.4" r="4" fill="#E8850C" stroke="#FBFBF8" stroke-width="2"><title>iid bootstrap: 0.00</title></circle>
+  <text x="614" y="136.8" font-size="11" fill="#1F2C38">original: 0.10</text>
+  <text x="614" y="159.9" font-size="11" fill="#1F2C38">block: 0.08</text>
+  <text x="614" y="227.4" font-size="11" fill="#1F2C38">iid: 0.00</text>
+</svg>
+<!-- /chart:acf_boot -->
+<figcaption>fig 3.5.8 — autocorrelation of squared daily returns in the GARCH history (blue), and averaged over <span data-lab="boot_acf_reps" data-fmt="d">200</span> iid resamples (orange) and <span data-lab="boot_acf_reps" data-fmt="d">200</span> block resamples (green): the iid bootstrap erases volatility clustering; blocks keep most of it</figcaption>
+</figure>
+
+<p>Averaged over lags 1 to 10, the history's autocorrelation of squared returns is <span data-lab="boot_acf_orig_1_10" data-fmt=".3f">0.124</span>; iid resamples average <span data-lab="boot_acf_iid_1_10" data-fmt=".3f">0.000</span> and block resamples <span data-lab="boot_acf_block_1_10" data-fmt=".3f">0.118</span>. Why it matters: ask each bootstrap how precisely ten years pin down the annual volatility, and compare with the truth — the spread of the volatility estimate across <span data-lab="boot_truth_n" data-fmt="d">500</span> fresh ten-year histories drawn from the model.</p>
+
+<table>
+<thead><tr><th>Method</th><th>SE of the 10-year annualised volatility</th><th>What it assumes</th></tr></thead>
+<tbody>
+<tr><td>Truth: fresh histories from the model</td><td><span data-lab="boot_vol_se_truth_pp" data-fmt=".2f">2.26</span> pp</td><td>that you know the model — never true in practice</td></tr>
+<tr><td>Block bootstrap (<span data-lab="boot_block_len" data-fmt="d">93</span>-day blocks)</td><td><span data-lab="boot_vol_se_block_pp" data-fmt=".2f">0.73</span> pp</td><td>dependence dies out within a block</td></tr>
+<tr><td>IID bootstrap</td><td><span data-lab="boot_vol_se_iid_pp" data-fmt=".2f">0.28</span> pp</td><td>days are independent</td></tr>
+</tbody>
+</table>
+
+<p>The iid bootstrap understates the uncertainty <span data-lab="boot_vol_se_ratio_iid" data-fmt=".0f">8</span>-fold. The block bootstrap does better yet still falls short: volatility shocks here fade over months, so even <span data-lab="boot_block_len" data-fmt="d">93</span>-day blocks cut some of the memory, and one history can only show the storms it happened to contain.</p>
+
+<h3>What no bootstrap can fix</h3>
+<p>Two things, both visible in the lab. First, the bootstrap is centred on your sample, not on the truth: this history's volatility is <span data-lab="boot_vol_sample" data-fmt=".1%">13.3%</span>, the model's long-run volatility is <span data-lab="boot_vol_true_uncond" data-fmt=".1%">15.9%</span>, and every resample inherits the gap. Second, it cannot invent what it has not seen. Keep only the first two years: their worst day is <span data-lab="short_worst_day" data-fmt=".2%">−2.23%</span>, so no bootstrap year, iid or block, can contain a worse one — the lab finds a probability of exactly <span data-lab="short_p_worse_boot" data-fmt=".0%">0%</span>. Under the model that generated the data, <span data-lab="short_p_worse_true" data-fmt=".1%">89.1%</span> of years contain a worse day.</p>
+
+<div class="co warn"><span class="co-t">⚠️ Pitfall — "the bootstrap turns my history into every possible history"</span>
+<p>Only into every <em>reshuffle</em> of it. A short or calm sample gives a confident, narrow, wrong answer, and blocks fix only the ordering. Use the longest relevant history, add stress scenarios it lacks, and treat bootstrap error bars as a lower bound. <span class="xref soon" data-xref="5.2" data-auto="" title="Coming soon">Session 5.2 — Regression &amp; Inference That Doesn&#x27;t Lie</span> uses the bootstrap for inference on Sharpe ratios and regressions, and <span class="xref soon" data-xref="9.7" data-auto="" title="Coming soon">Session 9.7 — VaR, ES, EVT &amp; VaR Backtests</span> combines it with a volatility model — <span class="term soon" data-term="filtered historical simulation" title="Defined in Session 9.7 (coming soon)">filtered historical simulation</span> — to work around exactly this problem.</p>
+</div>
+</section>
+
+<!-- ============ §6 — variance reduction ============ -->
+<section id="s6">
+<h2><span class="no">3.5.6</span> Variance reduction: same precision, fewer paths</h2>
+<p class="lede">The √n rule makes precision expensive. Variance reduction beats it honestly: same model, same answer, a smaller standard error for the same number of random draws.</p>
+
+<p><strong>Variance reduction</strong> is any technique that lowers the variance of a Monte Carlo estimator at the same cost. Its payoff is the variance-reduction ratio (VRR): plain variance over new variance at an equal number of random draws — how many times more paths the plain method would need for the same standard error. The lab tests two classics on the expected payoff of a one-year <a class="term" href="../unit02-markets-instruments/session07-options-primer.html#g-call-option" data-term="call option">call option</a> on the base asset struck at its starting price, E[max(P<sub>τ</sub> − K, 0)] with P<sub>0</sub> = K = <span data-lab="vr_k" data-fmt="$,.0f">$100</span>. That expectation has a closed form, <span data-lab="vr_theory" data-fmt="$,.2f">$13.11</span> — the Black–Scholes formula with the drift in place of the interest rate and no discounting, a black box until <span class="xref soon" data-xref="10.3" data-style="short" data-auto="" title="Coming soon">Session 10.3</span> derives it — which here serves only as the answer key.</p>
+
+<p><strong>Antithetic variates</strong> (Hammersley &amp; Morton 1956) use every normal draw twice, as Z and −Z, and average the pair (fig 3.5.9): when f(Z) and f(−Z) are negatively correlated, their errors cancel. <em>Control variates</em> subtract a quantity whose mean you know exactly — here the final price <math><semantics><msub><mi>P</mi><mi>τ</mi></msub><annotation encoding="application/x-tex">P_\tau</annotation></semantics></math>, with <math><semantics><mrow><mi>𝔼</mi><mrow><mo fence="true" form="prefix" stretchy="false">[</mo><msub><mi>P</mi><mi>τ</mi></msub><mo fence="true" form="postfix" stretchy="false">]</mo></mrow><mo>=</mo><msub><mi>P</mi><mn>0</mn></msub><msup><mi>e</mi><mrow class="tml-sml-pad"><mi>μ</mi><mi>τ</mi></mrow></msup></mrow><annotation encoding="application/x-tex">\E[P_\tau] = P_0 e^{\mu\tau}</annotation></semantics></math> — scaled to soak up the noise the two share:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><msub><mover><mi>θ</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><mtext>anti</mtext></msub><mo>=</mo><mfrac><mn>1</mn><mi>n</mi></mfrac><mrow><munderover><mo movablelimits="false">∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>n</mi></munderover></mrow><mfrac><mrow><mi>f</mi><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><msub><mi>Z</mi><mi>i</mi></msub><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mo>+</mo><mi>f</mi><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mo form="prefix" stretchy="false">−</mo><msub><mi>Z</mi><mi>i</mi></msub><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><mn>2</mn></mfrac><mo separator="true">,</mo><mspace width="2em"></mspace><mtext>VRR</mtext><mo>=</mo><mfrac><mn>1</mn><mrow><mn>1</mn><mo>+</mo><mi>ρ</mi></mrow></mfrac></mrow><annotation encoding="application/x-tex">\hat\theta_{\text{anti}} = \frac{1}{n}\sum_{i=1}^{n} \frac{f(Z_i) + f(-Z_i)}{2}, \qquad \text{VRR} = \frac{1}{1 + \rho}</annotation></semantics></math></div>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><msub><mover><mi>θ</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><mtext>cv</mtext></msub><mo>=</mo><mfrac><mn>1</mn><mi>n</mi></mfrac><mrow><munderover><mo movablelimits="false">∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>n</mi></munderover></mrow><mo fence="false" symmetric="true" minsize="1.8em" maxsize="1.8em">(</mo><msub><mi>Y</mi><mi>i</mi></msub><mo>−</mo><mi>b</mi><mspace width="0.1667em"></mspace><mo fence="false" symmetric="true" minsize="1.2em" maxsize="1.2em">(</mo><msub><mi>C</mi><mi>i</mi></msub><mo>−</mo><mi>𝔼</mi><mo form="prefix" stretchy="false">[</mo><mi>C</mi><mo form="postfix" stretchy="false">]</mo><mo fence="false" symmetric="true" minsize="1.2em" maxsize="1.2em">)</mo><mo fence="false" symmetric="true" minsize="1.8em" maxsize="1.8em">)</mo><mo separator="true">,</mo><mspace width="2em"></mspace><mi>b</mi><mo>=</mo><mfrac><mrow><mi>Cov</mi><mo>⁡</mo><mo form="prefix" stretchy="false">(</mo><mi>Y</mi><mo separator="true">,</mo><mi>C</mi><mo form="postfix" stretchy="false" lspace="0em" rspace="0em">)</mo></mrow><mrow><mi>Var</mi><mo>⁡</mo><mo form="prefix" stretchy="false">(</mo><mi>C</mi><mo form="postfix" stretchy="false" lspace="0em" rspace="0em">)</mo></mrow></mfrac><mo separator="true">,</mo><mspace width="2em"></mspace><mtext>VRR</mtext><mo>=</mo><mfrac><mn>1</mn><mrow><mn>1</mn><mo>−</mo><msubsup><mi>ρ</mi><mrow><mi>Y</mi><mi>C</mi></mrow><mn>2</mn></msubsup></mrow></mfrac></mrow><annotation encoding="application/x-tex">\hat\theta_{\text{cv}} = \frac{1}{n}\sum_{i=1}^{n} \Big(Y_i - b\,\big(C_i - \E[C]\big)\Big), \qquad b = \frac{\Cov(Y, C)}{\Var(C)}, \qquad \text{VRR} = \frac{1}{1 - \rho_{YC}^2}</annotation></semantics></math></div>
+<p>Here ρ is the correlation between f(Z) and f(−Z), and <math><semantics><msub><mi>ρ</mi><mrow><mi>Y</mi><mi>C</mi></mrow></msub><annotation encoding="application/x-tex">\rho_{YC}</annotation></semantics></math> the correlation between the payoff Y and the control C. Estimating b from the same paths adds a bias of order 1/n, negligible at these sizes.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 250" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">ANTITHETIC PAIRS — every draw used twice, as Z and −Z</text>
+  <rect x="26" y="32" width="326" height="186" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="189" y="52" font-size="11" font-weight="700" text-anchor="middle" fill="#1F7A55">A CALL PAYOFF: RISES WITH Z</text>
+  <path d="M50 160 H326" stroke="#4A5A68" stroke-width="1"/>
+  <text x="334" y="164" font-size="10" fill="#4A5A68">Z</text>
+  <polyline points="50,160 190,160 230,146 270,126 310,98 326,84" fill="none" stroke="#1F2C38" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M110 145.5 H270" stroke="#1F7A55" stroke-width="1.5" stroke-dasharray="4 3"/>
+  <text x="110" y="139" font-size="9.5" fill="#1F7A55">pair average</text>
+  <path d="M260 160 V131" stroke="#1F7A55" stroke-width="1" stroke-dasharray="2 2"/>
+  <circle cx="120" cy="160" r="4.5" fill="#1F7A55"/>
+  <circle cx="260" cy="131" r="4.5" fill="#1F7A55"/>
+  <text x="120" y="176" font-size="10" text-anchor="middle" fill="#1F2C38">−Z</text>
+  <text x="190" y="176" font-size="10" text-anchor="middle" fill="#4A5A68">0</text>
+  <text x="260" y="176" font-size="10" text-anchor="middle" fill="#1F2C38">+Z</text>
+  <text x="189" y="196" font-size="9.5" text-anchor="middle" fill="#4A5A68">one high, one low: the errors cancel</text>
+  <text x="189" y="209" font-size="9.5" text-anchor="middle" fill="#4A5A68">ρ &lt; 0, so the variance falls</text>
+  <rect x="368" y="32" width="326" height="186" rx="9" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="531" y="52" font-size="11" font-weight="700" text-anchor="middle" fill="#D64B2A">A STRADDLE: SYMMETRIC IN Z</text>
+  <path d="M392 160 H668" stroke="#4A5A68" stroke-width="1"/>
+  <text x="676" y="164" font-size="10" fill="#4A5A68">Z</text>
+  <polyline points="392,84 432,108 472,132 512,152 532,160 552,151 592,128 632,100 668,74" fill="none" stroke="#1F2C38" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M452 123.5 H612" stroke="#D64B2A" stroke-width="1.5" stroke-dasharray="4 3"/>
+  <text x="532" y="116" font-size="9.5" text-anchor="middle" fill="#D64B2A">pair average</text>
+  <path d="M462 160 V126" stroke="#D64B2A" stroke-width="1" stroke-dasharray="2 2"/>
+  <path d="M602 160 V121" stroke="#D64B2A" stroke-width="1" stroke-dasharray="2 2"/>
+  <circle cx="462" cy="126" r="4.5" fill="#D64B2A"/>
+  <circle cx="602" cy="121" r="4.5" fill="#D64B2A"/>
+  <text x="462" y="176" font-size="10" text-anchor="middle" fill="#1F2C38">−Z</text>
+  <text x="532" y="176" font-size="10" text-anchor="middle" fill="#4A5A68">0</text>
+  <text x="602" y="176" font-size="10" text-anchor="middle" fill="#1F2C38">+Z</text>
+  <text x="531" y="196" font-size="9.5" text-anchor="middle" fill="#4A5A68">both high or both low: the errors add up</text>
+  <text x="531" y="209" font-size="9.5" text-anchor="middle" fill="#4A5A68">ρ &gt; 0, so the variance rises</text>
+  <text x="360" y="240" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">At equal cost the variance is multiplied by (1 + ρ): pairing helps only when ρ &lt; 0.</text>
+</svg>
+<figcaption>fig 3.5.9 — antithetic pairs (schematic): for a payoff that rises with Z the pair's errors cancel; for a payoff symmetric in Z they reinforce each other</figcaption>
+</figure>
+
+<table>
+<thead><tr><th>Method (<span data-lab="vr_n" data-fmt=",d">200,000</span> normal draws each)</th><th>Estimate ± SE</th><th>Correlation</th><th>VRR: measured · formula</th></tr></thead>
+<tbody>
+<tr><td>Closed form</td><td><span data-lab="vr_theory" data-fmt="$,.2f">$13.11</span></td><td>—</td><td>—</td></tr>
+<tr><td>Plain Monte Carlo</td><td><span data-lab="vr_plain" data-fmt="$,.2f">$13.14</span> ± <span data-lab="vr_plain_se" data-fmt="$,.3f">$0.038</span></td><td>—</td><td>1</td></tr>
+<tr><td>Antithetic pairs</td><td><span data-lab="vr_anti" data-fmt="$,.2f">$13.10</span> ± <span data-lab="vr_anti_se" data-fmt="$,.3f">$0.024</span></td><td>ρ = <span data-lab="vr_rho_anti" data-fmt="+.2f">−0.58</span></td><td><span data-lab="vrr_anti" data-fmt=".2f">2.40</span> · <span data-lab="vrr_anti_formula" data-fmt=".2f">2.40</span></td></tr>
+<tr><td>Control variate, the final price</td><td><span data-lab="vr_cv" data-fmt="$,.2f">$13.12</span> ± <span data-lab="vr_cv_se" data-fmt="$,.3f">$0.013</span></td><td>ρ<sub>YC</sub> = <span data-lab="vr_rho_cv" data-fmt="+.2f">+0.94</span></td><td><span data-lab="vrr_cv" data-fmt=".2f">8.75</span> · <span data-lab="vrr_cv_formula" data-fmt=".2f">8.75</span></td></tr>
+<tr><td>Antithetic pairs on a straddle, |P<sub>τ</sub> − K|</td><td>—</td><td>ρ = <span data-lab="vr_straddle_rho" data-fmt="+.2f">+0.36</span></td><td><span data-lab="vrr_straddle" data-fmt=".2f">0.73</span></td></tr>
+</tbody>
+</table>
+
+<p>The control variate turns <span data-lab="vr_n" data-fmt=",d">200,000</span> draws into the precision of about <span data-lab="vrr_cv" data-fmt=".1f">8.7</span> times as many, for the price of one subtraction — and Boyle's 1977 paper already used both tricks. The ratios match their formulas, so one correlation from a small pilot run tells you in advance whether a trick will pay.</p>
+
+<div class="co warn"><span class="co-t">⚠️ Pitfall — "antithetic variates always help"</span>
+<p>They help when the payoff moves one way with Z. A straddle, |P<sub>τ</sub> − K|, pays on big moves in either direction, so Z and −Z give similar payoffs, ρ is positive (<span data-lab="vr_straddle_rho" data-fmt="+.2f">+0.36</span>) and at equal cost the variance goes <em>up</em>: a VRR of <span data-lab="vrr_straddle" data-fmt=".2f">0.73</span>. The same goes for anything nearly symmetric in Z, such as the chance of a big move either way. Measure ρ first.</p>
+</div>
+
+<div class="co tip"><span class="co-t">💡 Looking ahead</span>
+<p>The toolbox is bigger: stratified sampling, importance sampling (which steers paths toward rare events such as tail losses), quasi-random Sobol sequences, and conditional Monte Carlo — the Brownian-bridge estimate of §3.5.4 is one. <span class="xref soon" data-xref="10.6" data-auto="" title="Coming soon">Session 10.6 — Stochastic Volatility &amp; Numerical Methods</span> puts them to work pricing options; Glasserman (2003, ch. 4) is the reference.</p>
+</div>
+</section>
+
+<!-- ============ §7 — multiple testing ============ -->
+<section id="s7">
+<h2><span class="no">3.5.7</span> Many checks, one lab: the multiple-testing trap</h2>
+<p class="lede">A lab that asserts dozens of Monte Carlo results against theory is running dozens of statistical tests. Set the bar at 2 or 3 standard errors and a perfectly correct lab will fail by luck.</p>
+
+<p>Each assert is a test. If the code is right, an estimate's error measured in standard errors is roughly standard normal, so a check at c standard errors fails by pure luck with probability 2Φ(−c), the test's <em>size</em>. A lab with k independent checks fails at least one of them with probability</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><mi>ℙ</mi><mo form="prefix" stretchy="false">(</mo><mtext>a correct lab fails</mtext><mo form="postfix" stretchy="false">)</mo><mo>=</mo><mn>1</mn><mo>−</mo><mo fence="false" symmetric="true" minsize="1.2em" maxsize="1.2em">(</mo><mn>1</mn><mo>−</mo><mn>2</mn><mrow><mi mathvariant="normal">Φ</mi><mspace></mspace></mrow><mo form="prefix" stretchy="false">(</mo><mo form="prefix" stretchy="false">−</mo><mi>c</mi><mo form="postfix" stretchy="false">)</mo><msup><mrow><mo fence="false" symmetric="true" minsize="1.2em" maxsize="1.2em">)</mo><mrow></mrow></mrow><mi>k</mi></msup></mrow><annotation encoding="application/x-tex">\Prob(\text{a correct lab fails}) = 1 - \big(1 - 2\Phi(-c)\big)^{k}</annotation></semantics></math></div>
+<p>This is the <span class="term soon" data-term="family-wise error rate" title="Defined in Session 5.2 (coming soon)">family-wise error rate</span> of <span class="term soon" data-term="multiple testing" title="Defined in Session 5.2 (coming soon)">multiple testing</span>, which <span class="xref soon" data-xref="5.2" data-style="short" data-auto="" title="Coming soon">Session 5.2</span> treats properly. This course learned it the hard way: in review, one lab with about <span data-lab="mt_k_review" data-fmt="d">27</span> asserts at 3 SE failed on 8% of alternative seeds (Quant Notebook authoring guide, §12a). The formula predicts <span data-lab="mt_fwer_3se" data-fmt=".1%">7.0%</span> — close, for checks that are not exactly independent or exactly normal. The lab confirms the formula by simulating <span data-lab="mt_n_labs" data-fmt=",d">200,000</span> imaginary labs with perfect code and <span data-lab="mt_k_review" data-fmt="d">27</span> checks each:</p>
+
+<table>
+<thead><tr><th>Threshold c</th><th>One check fails (its size)</th><th>A lab with <span data-lab="mt_k_review" data-fmt="d">27</span> checks fails: formula · simulated</th><th>This lab's <span data-lab="self_k" data-fmt="d">22</span> checks</th></tr></thead>
+<tbody>
+<tr><td>2 SE</td><td><span data-lab="mt_p_one_2se" data-fmt=".2%">4.55%</span></td><td><span data-lab="mt_fwer_2se" data-fmt=".1%">71.6%</span> · <span data-lab="mt_fwer_2se_sim" data-fmt=".1%">71.7%</span></td><td><span data-lab="self_fwer_2se" data-fmt=".1%">64.1%</span></td></tr>
+<tr><td>3 SE</td><td><span data-lab="mt_p_one_3se" data-fmt=".2%">0.27%</span></td><td><span data-lab="mt_fwer_3se" data-fmt=".1%">7.0%</span> · <span data-lab="mt_fwer_3se_sim" data-fmt=".1%">7.0%</span></td><td><span data-lab="self_fwer_3se" data-fmt=".1%">5.8%</span></td></tr>
+<tr><td>4 SE</td><td><span data-lab="mt_p_one_4se" data-fmt=".4%">0.0063%</span></td><td><span data-lab="mt_fwer_4se" data-fmt=".2%">0.17%</span> · <span data-lab="mt_fwer_4se_sim" data-fmt=".2%">0.18%</span></td><td><span data-lab="self_fwer_4se" data-fmt=".2%">0.14%</span></td></tr>
+</tbody>
+</table>
+
+<p>Hence the rule every lab in this course follows: assert Monte Carlo results against theory at 4 standard errors. This lab routes all <span data-lab="self_k" data-fmt="d">22</span> of its statistical checks through one helper that counts them; on the committed seed the largest miss was <span data-lab="self_max_abs_z" data-fmt=".2f">2.61</span> standard errors. Two refinements keep it honest. A looser threshold catches only bigger bugs, so buy sensitivity with more paths, not a tighter c. And a tolerance wider than 4 SE is allowed only for a known, written-down bias in the <em>theory</em>, like the 0.15-point allowance the lab gives the Broadie–Glasserman–Kou correction at weekly checks (§3.5.4):</p>
+
+<pre><span class="k">def</span> check_mc(name: str, estimate: float, truth: float, se: float, n_se: float = N_SE,
+             allowance: float = <span class="p">0.0</span>) -&gt; float:
+    <span class="s">"""Assert that a Monte Carlo estimate lies within n_se standard errors of its theoretical value.
+
+    `allowance` widens the tolerance by a known approximation error of the THEORY (never used to
+    rescue noise; every use carries a comment). Returns the z-score and remembers it, so the lab
+    can count how many statistical checks it makes.
+    """</span>
+    z = (estimate - truth) / se
+    MC_CHECKS.append((name, float(z)))
+    <span class="k">assert</span> abs(estimate - truth) &lt; n_se * se + allowance, (
+        <span class="s">f"{name}: {estimate:.6g} vs theory {truth:.6g} is {z:+.2f} SE away"</span>)
+    <span class="k">return</span> float(z)</pre>
+
+<div class="co key"><span class="co-t">📌 Key idea — when a check fails, the seed is not the suspect</span>
+<p>In a correct lab of this size a 4-SE failure is rarer than one in 500; a bug is far more likely, so investigate the code or the model. <mark>Never rerun with new seeds until the check passes: that is p-hacking your own test suite</mark> — the same best-of-N search that turns noise into a winning <a class="term" href="../unit01-quant-landscape/session03-research-lifecycle.html#g-backtest" data-term="backtest">backtest</a> (<a class="xref" href="../unit01-quant-landscape/session03-research-lifecycle.html#s4" data-xref="1.3#s4" data-style="short" data-auto="">Session 1.3</a>, <a class="xref" href="../unit01-quant-landscape/session05-quant-lab-setup.html#s5" data-xref="1.5#s5" data-style="short" data-auto="">Session 1.5</a>), and the reason <span class="xref soon" data-xref="6.7" data-auto="" title="Coming soon">Session 6.7 — Overfitting Statistics: PSR, DSR, MinTRL &amp; PBO</span> charges you for every trial.</p>
+</div>
+</section>
+
+<!-- ============ §8 — try it ============ -->
+<section id="s8">
+<h2><span class="no">3.5.8</span> Try it</h2>
+<p class="lede">Open the companion lab, predict before you run, and watch the standard errors do what the formulas say.</p>
+<div class="co lab"><span class="co-t">🔧 Try it (20 min, in the lab)</span>
+<p>1. <strong>The √n rule.</strong> In section 1, predict the standard error at 4,000,000 paths from the one at 1,000,000. Then add <code>4_000_000</code> to <code>N_LIST</code> and run the section.<br>
+2. <strong>Mirror twins.</strong> In section 4, add the line <code>MU_B = SIGMA_B ** 2 / 2</code> just before <code>NU_B</code> is computed. The log price is now driftless: predict the two reflection terms before you run, then compare them with the printed values and with 2Φ(h/σ).<br>
+3. <strong>Block length.</strong> In section 5, override <code>block_len</code> with 21 (a month), then with 250 (a year), just before the resampling. Watch the green line in the autocorrelation chart and the block bootstrap's standard error. How many different 250-day blocks does a 10-year history contain?<br>
+4. <strong>Stack the tricks.</strong> In section 6, apply antithetic pairs to the control-variate-adjusted payoff and measure the combined VRR against the plain estimate.<br>
+Success: step 1 lands within a few percent of half the 1,000,000-path standard error, and step 2's two terms agree within their standard errors.</p>
+</div>
+</section>
+
+<hr>
+
+<!-- ============ §9 — close ============ -->
+<section id="s9">
+<h2><span class="no">3.5.9</span> Glossary · Check yourself · Go deeper</h2>
+<div class="gloss" id="glossary">
+<div id="g-monte-carlo-simulation"><b>Monte Carlo simulation</b> — estimating a quantity by computing it on many random scenarios drawn from a model and averaging; the answer comes with a standard error.</div>
+<div id="g-pseudo-random-number-generator"><b>Pseudo-random number generator</b> — a deterministic function of a seed that produces a stream of numbers indistinguishable from random; the same seed and library version always give the same stream.</div>
+<div id="g-monte-carlo-standard-error"><b>Monte Carlo standard error</b> — the standard deviation of a simulation estimate, s/√n for an average over n independent paths; report every simulated number as estimate ± 2 SE.</div>
+<div id="g-batch-means-standard-error"><b>Batch-means standard error</b> — the standard error of a statistic with no simple formula (a median, a quantile, a maximum drawdown): split the paths into batches, compute the statistic in each, and divide the standard deviation of the batch values by √(number of batches).</div>
+<div id="g-random-walk"><b>Random walk</b> — a sequence built by adding independent random steps; under GBM the log price is one.</div>
+<div id="g-geometric-brownian-motion"><b>Geometric Brownian motion</b> — the price model whose log moves by (μ − σ²/2)Δ + σ√Δ·Z each step; simulated exactly in log space, at any step size.</div>
+<div id="g-common-random-numbers"><b>Common random numbers</b> — feeding every scheme or scenario being compared the same underlying random draws, so a difference in the result reflects the method, not new luck.</div>
+<div id="g-reflection-principle"><b>Reflection principle</b> — pairing each path that touches a barrier and ends on one side with an equally likely (or drift-reweighted) mirror path that ends on the other, turning a path-dependent touch probability into a formula.</div>
+<div id="g-discrete-monitoring"><b>Discrete monitoring</b> — checking a barrier only at set times (daily closes, say) rather than continuously; it always understates the continuous probability of touching, which the Broadie–Glasserman–Kou correction adjusts for.</div>
+<div id="g-brownian-bridge"><b>Brownian bridge</b> — the conditional distribution of a Brownian path between two known points; used here to recover the probability that a path dipped through a barrier between two observations that both lie above it.</div>
+<div id="g-bootstrap"><b>Bootstrap</b> — estimating the sampling distribution of a statistic by recomputing it on resamples of the data drawn with replacement; resample blocks of days when the data are dependent.</div>
+<div id="g-block-bootstrap"><b>Block bootstrap</b> — a bootstrap that resamples runs of consecutive observations instead of single points, so dependence within a block, such as volatility clustering, survives in the resample.</div>
+<div id="g-variance-reduction"><b>Variance reduction</b> — any technique that lowers the variance of a Monte Carlo estimator at equal cost; measured by the variance-reduction ratio.</div>
+<div id="g-variance-reduction-ratio"><b>Variance-reduction ratio</b> — the variance of a plain Monte Carlo estimate divided by the variance of an improved one at equal cost; equivalently, how many times more paths the plain method would need for the same precision.</div>
+<div id="g-control-variate"><b>Control variate</b> — a variance-reduction technique that subtracts a quantity of known expected value, scaled to soak up the noise it shares with the estimate, leaving an estimator with the same mean and smaller variance.</div>
+<div id="g-antithetic-variates"><b>Antithetic variates</b> — using every random draw Z together with −Z and averaging the pair; helps when the payoff moves one way with Z, hurts when it is symmetric.</div>
+</div>
+
+<h3>Check yourself</h3>
+<details class="q"><summary>1. A colleague reports that a strategy's simulated probability of a 30% drawdown is 12.4%, from 500 paths. What do you ask, and roughly what is the answer?</summary><div>Ask for the standard error. For a probability it is √(p(1 − p)/n) = √(0.124 × 0.876 / 500) ≈ 1.5 percentage points, so the honest report is 12.4% ± 2.9 pp at 2 SE — anywhere from about 9.5% to 15.3%. To get ± 0.5 pp at 2 SE you need an SE of 0.25 pp, about 17,400 paths: precision costs the square.</div></details>
+<details class="q"><summary>2. A retirement spreadsheet draws each year's return from a normal distribution with mean 7% and standard deviation 18% and compounds 30 of them. What is it, and what does it get wrong?</summary><div>It is the Euler scheme on prices with one-year steps (§3.5.3). It gets the middle of the distribution roughly right and the tails wrong — too many very bad outcomes, and even a small chance of a year below −100%. In the lab, yearly Euler steps put the 5th percentile of a volatile asset at <span data-lab="gbm_euler_year_q05" data-fmt="$,.3f">$0.035</span> instead of <span data-lab="gbm_theory_q05" data-fmt="$,.3f">$0.152</span>. If lognormal prices are the intent, draw log returns with mean μ − σ²/2 and exponentiate.</div></details>
+<details class="q"><summary>3. The barrier formula says there is an 18.5% chance of touching −20% within a year; your daily simulation says 17.2%. Is there a bug?</summary><div>Probably not. The formula assumes continuous monitoring and your simulation only looks at daily closes, so it misses dips that recover within a day. Shift the barrier by βσ√Δt (Broadie–Glasserman–Kou) and the formula gives <span data-lab="bar_daily_bgk" data-fmt=".2%">17.19%</span>, matching the lab's <span data-lab="bar_daily_sim" data-fmt=".2%">17.17%</span>. Decide which monitoring your real stop uses before you decide which number is right.</div></details>
+<details class="q"><summary>4. You bootstrap two calm years of daily returns to estimate the chance of a −5% day within a year and get zero. What went wrong, and would a block bootstrap fix it?</summary><div>A bootstrap can only resample days it has seen; if the worst day in the sample was −2%, no resampled year can contain a −5% day. Blocks fix the ordering, not the missing tail, so no. In the lab the bootstrap said <span data-lab="short_p_worse_boot" data-fmt=".0%">0%</span> for "a day worse than the sample's worst" and the true model said <span data-lab="short_p_worse_true" data-fmt=".1%">89.1%</span>. Use a longer history, a model with fat tails, or explicit stress scenarios.</div></details>
+<details class="q"><summary>5. Antithetic variates cut the standard error of a call payoff estimate. You switch to estimating the probability of a move of more than 20% in either direction, and the standard error gets worse. Why?</summary><div>That probability is (nearly) symmetric in Z, so f(Z) and f(−Z) are positively correlated and the variance-reduction ratio 1/(1 + ρ) falls below 1. In the lab the straddle, another symmetric payoff, had ρ = <span data-lab="vr_straddle_rho" data-fmt="+.2f">+0.36</span> and a ratio of <span data-lab="vrr_straddle" data-fmt=".2f">0.73</span>. Drop the pairing, or use a control variate instead.</div></details>
+<details class="q"><summary>6. A lab with 40 Monte Carlo asserts at 3 SE fails on a new seed. Do you fix the lab, raise the threshold, or change the seed?</summary><div>Never change the seed to make it pass. First look at the failing check: 3.2 SE is plausibly luck, 15 SE is a bug. With 40 checks at 3 SE a correct lab fails about 1 − (1 − 0.0027)<sup>40</sup> ≈ 10% of the time, so move to 4 SE (about 0.25%) and, if the check then lacks power, add paths.</div></details>
+
+<div class="co lab"><span class="co-t">🔧 Homework (~1 h before Session 3.6)</span>
+<p>1. <strong>Bet sizing by simulation.</strong> Simulate 10,000 paths of 1,000 bets on a coin that wins your stake with probability 55% and loses it otherwise, staking a fixed fraction f of current wealth, for f = 0.05, 0.10 and 0.20. Report the median final wealth with its batch-means standard error and the share of paths that end below where they started. Which f grows fastest? <a class="xref" href="session06-kelly-bet-sizing.html" data-xref="3.6" data-style="short" data-auto="">Session 3.6</a> derives why.<br>
+2. <strong>Euler and the drawdown.</strong> Repeat the §3.5.3 comparison for a path-dependent quantity: the probability of a −50% drawdown within 10 years, using the prices at every step. Does Euler's error grow or shrink compared with the terminal-wealth question?<br>
+3. <strong>Audit a lab.</strong> Count the statistical asserts in the <a class="xref" href="session01-probability-expected-value.html" data-xref="3.1" data-style="short" data-auto="">Session 3.1</a> lab, note each one's threshold, and compute the chance that a correct version fails by luck.<br>
+4. <strong>Read</strong> Glasserman (2003), §4.1–4.2 on control and antithetic variates, and the first two sections of Efron (1979).</p>
+</div>
+
+<h3>📚 Go deeper</h3>
+<ol class="refs">
+<li>Glasserman, P. (2003). <em>Monte Carlo Methods in Financial Engineering</em>, ch. 3 "Generating Sample Paths" and ch. 4 "Variance Reduction Techniques". Springer. <span class="rid">ISBN 978-0-387-00451-8</span></li>
+<li>Efron, B. &amp; Tibshirani, R. J. (1993). <em>An Introduction to the Bootstrap</em>. Chapman &amp; Hall. <span class="rid">ISBN 978-0-412-04231-7</span></li>
+<li>Efron, B. (1979). "Bootstrap Methods: Another Look at the Jackknife." <em>Annals of Statistics</em> 7(1), 1–26. <span class="rid">doi:10.1214/aos/1176344552</span></li>
+<li>Künsch, H. R. (1989). "The Jackknife and the Bootstrap for General Stationary Observations." <em>Annals of Statistics</em> 17(3), 1217–1241. <span class="rid">doi:10.1214/aos/1176347265</span></li>
+<li>Politis, D. N. &amp; Romano, J. P. (1994). "The Stationary Bootstrap." <em>Journal of the American Statistical Association</em> 89(428), 1303–1313. <span class="rid">doi:10.1080/01621459.1994.10476870</span></li>
+<li>Broadie, M., Glasserman, P. &amp; Kou, S. (1997). "A Continuity Correction for Discrete Barrier Options." <em>Mathematical Finance</em> 7(4), 325–349. <span class="rid">doi:10.1111/1467-9965.00035</span></li>
+<li>Shreve, S. E. (2004). <em>Stochastic Calculus for Finance II: Continuous-Time Models</em>, §3.7 "Reflection Principle". Springer. <span class="rid">ISBN 978-0-387-40101-0</span></li>
+</ol>
+
+<h3>Sources for the numbers</h3>
+<ol class="refs">
+<li>Metropolis, N. &amp; Ulam, S. (1949). "The Monte Carlo Method." <em>Journal of the American Statistical Association</em> 44(247), 335–341. <span class="rid">doi:10.1080/01621459.1949.10483310</span></li>
+<li>Metropolis, N. (1987). "The Beginning of the Monte Carlo Method." <em>Los Alamos Science</em> 15 (special issue), 125–130. <span class="rid">https://mcnp.lanl.gov/pdf_files/Article_1987_LAS_Metropolis_125--130.pdf</span></li>
+<li>Los Alamos National Laboratory (2023). "Hitting the Jackpot: The Birth of the Monte Carlo Method." <em>Actinide Research Quarterly</em>. <span class="rid">https://www.lanl.gov/media/publications/actinide-research-quarterly/1123-hitting-the-jackpot-the-birth-of-the-monte-carlo-method</span></li>
+<li>Boyle, P. P. (1977). "Options: A Monte Carlo Approach." <em>Journal of Financial Economics</em> 4(3), 323–338. <span class="rid">doi:10.1016/0304-405X(77)90005-8</span></li>
+<li>Hammersley, J. M. &amp; Morton, K. W. (1956). "A New Monte Carlo Technique: Antithetic Variates." <em>Mathematical Proceedings of the Cambridge Philosophical Society</em> 52(3), 449–475. <span class="rid">doi:10.1017/S0305004100031455</span></li>
+<li>Magdon-Ismail, M., Atiya, A. F., Pratap, A. &amp; Abu-Mostafa, Y. S. (2004). "On the Maximum Drawdown of a Brownian Motion." <em>Journal of Applied Probability</em> 41(1), 147–161. <span class="rid">doi:10.1239/jap/1077134674</span></li>
+<li>Politis, D. N. &amp; White, H. (2004). "Automatic Block-Length Selection for the Dependent Bootstrap." <em>Econometric Reviews</em> 23(1), 53–70; with Patton, A., Politis, D. N. &amp; White, H. (2009). "Correction." <em>Econometric Reviews</em> 28(4), 372–375. <span class="rid">doi:10.1081/ETC-120028836</span> · <span class="rid">doi:10.1080/07474930802459016</span></li>
+<li>NumPy developers (2026). "Parallel random number generation" (SeedSequence spawning; PCG64). NumPy documentation. <span class="rid">https://numpy.org/doc/stable/reference/random/parallel.html</span></li>
+<li>Quant Notebook (2026). Authoring guide, §12a "Lessons from review" (the 27-assert lab that failed on 8% of alternative seeds). <span class="rid">https://github.com/georgevrs/quant-notebook/blob/main/AUTHORING.md</span></li>
+</ol>
+</section>
+
+<!-- nav:foot -->
+<div class="foot">
+<a href="session04-convex-optimization.html">← Prev: 3.4 · Optimization</a>
+<a href="session06-kelly-bet-sizing.html">Next: 3.6 · Kelly &amp; Ruin →</a>
+</div>
+<p class="legal">Educational material only — not investment, legal or tax advice. Backtests and simulations are hypothetical. <a href="../start-here.html#disclaimer">Disclaimer</a> · Text CC BY 4.0 · Code MIT.</p>
+<!-- /nav:foot -->
+</main>
+</div></body></html>

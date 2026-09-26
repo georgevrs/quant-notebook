@@ -1,0 +1,34 @@
+<svg viewBox="0 0 720 280" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Growth rate per bet vs fraction of wealth staked (55/45 even-money bet)">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">GROWTH RATE PER BET VS FRACTION OF WEALTH STAKED (55/45 EVEN-MONEY BET)</text>
+  <line x1="64" y1="244" x2="602" y2="244" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="248" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">−0.75%</text>
+  <line x1="64" y1="210" x2="602" y2="210" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="214" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">−0.50%</text>
+  <line x1="64" y1="176" x2="602" y2="176" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="180" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">−0.25%</text>
+  <line x1="64" y1="142" x2="602" y2="142" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="146" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.00%</text>
+  <line x1="64" y1="108" x2="602" y2="108" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="112" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.25%</text>
+  <line x1="64" y1="74" x2="602" y2="74" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="78" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.50%</text>
+  <line x1="64" y1="40" x2="602" y2="40" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="44" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.75%</text>
+  <line x1="64" y1="244" x2="602" y2="244" stroke="#C9CFC6" stroke-width="1"/>
+  <line x1="64" y1="244" x2="64" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="64" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">0</text>
+  <line x1="171.6" y1="244" x2="171.6" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="171.6" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">0.05</text>
+  <line x1="279.2" y1="244" x2="279.2" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="279.2" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">0.1</text>
+  <line x1="386.8" y1="244" x2="386.8" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="386.8" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">0.15</text>
+  <line x1="494.4" y1="244" x2="494.4" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="494.4" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">0.2</text>
+  <line x1="602" y1="244" x2="602" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="602" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">0.25</text>
+  <line x1="64" y1="142" x2="602" y2="142" stroke="#4A5A68" stroke-width="1"/>
+  <polyline points="64,142 69.4,138.6 74.8,135.4 80.1,132.2 85.5,129.1 90.9,126.1 96.3,123.1 101.7,120.3 107,117.5 112.4,114.8 117.8,112.2 123.2,109.7 128.6,107.3 133.9,105 139.3,102.7 144.7,100.5 150.1,98.5 155.5,96.5 160.8,94.5 166.2,92.7 171.6,91 177,89.3 182.4,87.7 187.7,86.2 193.1,84.8 198.5,83.5 203.9,82.3 209.3,81.1 214.6,80 220,79.1 225.4,78.2 230.8,77.4 236.2,76.6 241.5,76 246.9,75.4 252.3,75 257.7,74.6 263.1,74.3 268.4,74.1 273.8,73.9 279.2,73.9 284.6,73.9 290,74.1 295.3,74.3 300.7,74.6 306.1,75 311.5,75.4 316.9,76 322.2,76.6 327.6,77.4 333,78.2 338.4,79.1 343.8,80.1 349.1,81.2 354.5,82.3 359.9,83.6 365.3,84.9 370.7,86.4 376,87.9 381.4,89.5 386.8,91.2 392.2,93 397.6,94.9 402.9,96.8 408.3,98.9 413.7,101 419.1,103.2 424.5,105.5 429.8,107.9 435.2,110.4 440.6,113 446,115.7 451.4,118.5 456.7,121.3 462.1,124.3 467.5,127.3 472.9,130.4 478.3,133.7 483.6,137 489,140.4 494.4,143.9 499.8,147.5 505.2,151.1 510.5,154.9 515.9,158.8 521.3,162.7 526.7,166.8 532.1,170.9 537.4,175.2 542.8,179.5 548.2,183.9 553.6,188.5 559,193.1 564.3,197.8 569.7,202.6 575.1,207.5 580.5,212.5 585.9,217.6 591.2,222.8 596.6,228.1 602,233.5" fill="none" stroke="#3A56C5" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>growth per bet</title></polyline>
+  <circle cx="602" cy="233.5" r="4" fill="#3A56C5" stroke="#FBFBF8" stroke-width="2"><title>growth per bet: −0.67%</title></circle>
+  <text x="614" y="237.5" font-size="11" fill="#1F2C38">−0.67%</text>
+</svg>

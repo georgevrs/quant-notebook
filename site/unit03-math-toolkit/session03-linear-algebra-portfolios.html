@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- nav:head -->
+<title>3.3 · Linear Algebra for Portfolios</title>
+<meta name="description" content="Weights as vectors, risk as a quadratic form, PCA as the hidden structure of a market — linear algebra through the portfolio lens.">
+<link rel="canonical" href="https://georgevrs.github.io/quant-notebook/unit03-math-toolkit/session03-linear-algebra-portfolios.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Quant Notebook">
+<meta property="og:title" content="3.3 · Linear Algebra for Portfolios">
+<meta property="og:description" content="Weights as vectors, risk as a quadratic form, PCA as the hidden structure of a market — linear algebra through the portfolio lens.">
+<meta property="og:url" content="https://georgevrs.github.io/quant-notebook/unit03-math-toolkit/session03-linear-algebra-portfolios.html">
+<meta name="twitter:card" content="summary">
+<link rel="stylesheet" href="../assets/brand.css">
+<link rel="stylesheet" href="../assets/temml.css">
+<!-- /nav:head -->
+</head>
+<body><div class="page" id="top">
+<!-- Session 3.3 — weights as vectors, risk as a quadratic form, PCA. See AUTHORING.md. -->
+<!-- nav:tabs -->
+<nav class="tabs">
+<a href="../index.html">⌂ Course home</a>
+<a href="session01-probability-expected-value.html">3.1 · Probability &amp; EV</a>
+<a href="session02-distributions-fat-tails.html">3.2 · Fat Tails</a>
+<a class="active" href="session03-linear-algebra-portfolios.html">3.3 · Linear Algebra</a>
+<a href="session04-convex-optimization.html">3.4 · Optimization</a>
+<a href="session05-simulation-monte-carlo.html">3.5 · Monte Carlo</a>
+<a href="session06-kelly-bet-sizing.html">3.6 · Kelly &amp; Ruin</a>
+<a href="../roadmap.html">🗺 Roadmap</a>
+</nav>
+<!-- /nav:tabs -->
+
+<header class="cover">
+<!-- nav:heading -->
+<p class="eyebrow">Unit 3 · The Quant Math Toolkit — Session 03 of 06</p>
+<h1>Linear Algebra for Portfolios</h1>
+<!-- /nav:heading -->
+<p class="subtitle">You already know matrices. What you don't know yet is what they mean for money. A portfolio is a vector of weights, its risk is what the covariance matrix does to that vector, and the eigenvectors of that matrix are the handful of hidden portfolios a whole market is really made of. <mark>The core move: stop adding up positions one at a time and read risk as a quadratic form, <math><semantics><mrow><msup><mi>w</mi><mi class="tml-med-pad">⊤</mi></msup><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><mi>w</mi></mrow><annotation encoding="application/x-tex">w^\top \Sigma w</annotation></semantics></math>.</mark></p>
+<div class="meta">
+<span>DURATION <b>1.5 h + lab</b></span>
+<span>LEVEL <b>Foundations</b></span>
+<span>TRACKS <b>QR · QT · QD · IND</b></span>
+<span>HANDS-ON <b>PCA on a 50-asset market with a known truth</b></span>
+</div>
+<!-- nav:labstrip -->
+<div class="labstrip"><b>📓 Companion lab</b>
+<a href="https://colab.research.google.com/github/georgevrs/quant-notebook/blob/main/labs/u03/s03_linear_algebra_portfolios.ipynb">Open in Colab</a>
+<a href="https://github.com/georgevrs/quant-notebook/blob/main/labs/u03/s03_linear_algebra_portfolios.ipynb">Notebook on GitHub</a>
+<a href="https://github.com/georgevrs/quant-notebook/blob/main/labs/u03/s03_linear_algebra_portfolios.py">Source (.py)</a>
+</div>
+<!-- /nav:labstrip -->
+<div class="toc">
+<b>On this page</b>
+<ol>
+<li><a href="#s1">A portfolio is a vector</a></li>
+<li><a href="#s2">From returns to risk: the pipeline</a></li>
+<li><a href="#s3">Risk as a quadratic form, and the diversification floor</a></li>
+<li><a href="#s4">Eigenvectors: the portfolios of risk</a></li>
+<li><a href="#s5">PCA: the hidden structure of a market</a></li>
+<li><a href="#s6">When the matrix lies: positive semi-definiteness</a></li>
+<li><a href="#s7">The condition number: why inverting Σ amplifies noise</a></li>
+<li><a href="#s8">Try it</a></li>
+<li><a href="#s9">Glossary · Check yourself · Go deeper</a></li>
+</ol>
+</div>
+</header>
+
+<main>
+
+<section id="s1">
+<h2><span class="no">3.3.1</span> A portfolio is a vector</h2>
+<p class="lede">Engineers already think in vectors and matrices. The only new thing here is what the numbers mean: each coordinate is a bet, and the matrix that turns bets into risk is built from how assets move together.</p>
+
+<p>A portfolio of <math><semantics><mi>N</mi><annotation encoding="application/x-tex">N</annotation></semantics></math> assets is a list of <math><semantics><mi>N</mi><annotation encoding="application/x-tex">N</annotation></semantics></math> numbers: the fraction of your capital in each one. Stack them in a column and you have the <strong>weight vector</strong> <math><semantics><mrow><mi>w</mi><mo>=</mo><msup><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><msub><mi>w</mi><mn>1</mn></msub><mo separator="true">,</mo><mo>…</mo><mo separator="true">,</mo><msub><mi>w</mi><mi>N</mi></msub><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mi>⊤</mi></msup></mrow><annotation encoding="application/x-tex">w = (w_1, \dots, w_N)^\top</annotation></semantics></math>. Long positions are positive and shorts negative; a fully invested long-only book has weights that sum to 1, a dollar-neutral long-short book has weights that sum to 0. Stack the assets' <a class="term" href="../unit02-markets-instruments/session03-returns-pnl-leverage.html#g-simple-return" data-term="simple return">simple returns</a> for one period into a vector <math><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math> as well, and the portfolio's return is a dot product, <math><semantics><mrow><msub><mi>R</mi><mi>p</mi></msub><mo>=</mo><msup><mi>w</mi><mi class="tml-med-pad">⊤</mi></msup><mi>R</mi><mo>=</mo><msub><mo movablelimits="false">∑</mo><mi>i</mi></msub><msub><mi>w</mi><mi>i</mi></msub><msub><mi>R</mi><mi>i</mi></msub></mrow><annotation encoding="application/x-tex">R_p = w^\top R = \sum_i w_i R_i</annotation></semantics></math>. That is the "simple returns add across assets" rule of <a class="xref" href="../unit02-markets-instruments/session03-returns-pnl-leverage.html" data-xref="2.3" data-auto="">Session 2.3 — Returns, P&amp;L, Compounding &amp; Leverage</a>, written as linear algebra.</p>
+
+<p>Risk needs one more object. In <a class="xref" href="session01-probability-expected-value.html#s2" data-xref="3.1#s2" data-auto="">Session 3.1 — Probability &amp; Expected Value</a> you met the variance of a sum of two bets: <math><semantics><mrow><mi>Var</mi><mo>⁡</mo><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>X</mi><mo>+</mo><mi>Y</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">\Var(X + Y)</annotation></semantics></math> is <math><semantics><mrow><mi>Var</mi><mo>⁡</mo><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>X</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mo>+</mo><mi>Var</mi><mo>⁡</mo><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>Y</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">\Var(X) + \Var(Y)</annotation></semantics></math> plus a cross term, <math><semantics><mrow><mn>2</mn><mspace width="0.1667em"></mspace><mi>Cov</mi><mo>⁡</mo><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>X</mi><mo separator="true">,</mo><mi>Y</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">2\Cov(X, Y)</annotation></semantics></math>. With <math><semantics><mi>N</mi><annotation encoding="application/x-tex">N</annotation></semantics></math> assets there are <math><semantics><mi>N</mi><annotation encoding="application/x-tex">N</annotation></semantics></math> variances and <math><semantics><mrow><mi>N</mi><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>N</mi><mo>−</mo><mn>1</mn><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mi>/</mi><mn>2</mn></mrow><annotation encoding="application/x-tex">N(N-1)/2</annotation></semantics></math> distinct <a class="term" href="session01-probability-expected-value.html#g-covariance" data-term="covariance">covariances</a>, and the natural place to keep them is an <math><semantics><mrow><mi>N</mi><mo>×</mo><mi>N</mi></mrow><annotation encoding="application/x-tex">N \times N</annotation></semantics></math> table: the <strong>covariance matrix</strong> <math><semantics><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><annotation encoding="application/x-tex">\Sigma</annotation></semantics></math>, whose entry in row <math><semantics><mi>i</mi><annotation encoding="application/x-tex">i</annotation></semantics></math>, column <math><semantics><mi>j</mi><annotation encoding="application/x-tex">j</annotation></semantics></math> is <math><semantics><mrow><msub><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><mrow><mi>i</mi><mi>j</mi></mrow></msub><mo>=</mo><mi>Cov</mi><mo>⁡</mo><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><msub><mi>R</mi><mi>i</mi></msub><mo separator="true">,</mo><msub><mi>R</mi><mi>j</mi></msub><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">\Sigma_{ij} = \Cov(R_i, R_j)</annotation></semantics></math>, with the variances <math><semantics><msubsup><mi>σ</mi><mi>i</mi><mn>2</mn></msubsup><annotation encoding="application/x-tex">\sigma_i^2</annotation></semantics></math> on the diagonal. It is symmetric, because <math><semantics><mrow><mi>Cov</mi><mo>⁡</mo><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><msub><mi>R</mi><mi>i</mi></msub><mo separator="true">,</mo><msub><mi>R</mi><mi>j</mi></msub><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mo>=</mo><mi>Cov</mi><mo>⁡</mo><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><msub><mi>R</mi><mi>j</mi></msub><mo separator="true">,</mo><msub><mi>R</mi><mi>i</mi></msub><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">\Cov(R_i, R_j) = \Cov(R_j, R_i)</annotation></semantics></math>. The <strong>portfolio variance</strong> — the <a class="term" href="session01-probability-expected-value.html#g-variance" data-term="variance">variance</a> of the book's return — is then</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><msubsup><mi>σ</mi><mi>p</mi><mn>2</mn></msubsup><mo>=</mo><mi>Var</mi><mo>⁡</mo><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><msup><mi>w</mi><mi class="tml-med-pad">⊤</mi></msup><mi>R</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mo>=</mo><msup><mi>w</mi><mi class="tml-med-pad">⊤</mi></msup><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><mspace width="0.1667em"></mspace><mi>w</mi><mo>=</mo><mrow><munderover><mo movablelimits="false">∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>N</mi></munderover></mrow><mrow><munderover><mo movablelimits="false">∑</mo><mrow><mi>j</mi><mo>=</mo><mn>1</mn></mrow><mi>N</mi></munderover></mrow><msub><mi>w</mi><mi>i</mi></msub><mspace width="0.1667em"></mspace><msub><mi>w</mi><mi>j</mi></msub><mspace width="0.1667em"></mspace><msub><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><mrow><mi>i</mi><mi>j</mi></mrow></msub></mrow><annotation encoding="application/x-tex">\sigma_p^2 = \Var(w^\top R) = w^\top \Sigma\, w = \sum_{i=1}^{N} \sum_{j=1}^{N} w_i\, w_j\, \Sigma_{ij}</annotation></semantics></math></div>
+<p>An expression of the form <math><semantics><mrow><msup><mi>w</mi><mi class="tml-med-pad">⊤</mi></msup><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><mi>w</mi></mrow><annotation encoding="application/x-tex">w^\top \Sigma w</annotation></semantics></math> is called a <em>quadratic form</em>: every term multiplies two weights. Fig 3.3.1 draws it as a grid. Each cell is visited by one pair of weights; the diagonal cells hold each position's own risk, the off-diagonal cells its co-movement with every other position. Add up all <math><semantics><msup><mi>N</mi><mn class="tml-med-pad">2</mn></msup><annotation encoding="application/x-tex">N^2</annotation></semantics></math> cells and you have the variance of the book.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">PORTFOLIO VARIANCE w′Σw — ONE CELL PER PAIR OF POSITIONS</text>
+  <rect x="204" y="32" width="64" height="26" rx="6" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <rect x="284" y="32" width="64" height="26" rx="6" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <rect x="364" y="32" width="64" height="26" rx="6" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="236" y="50" font-size="12" text-anchor="middle" fill="#3A56C5" font-family="IBM Plex Mono,monospace">w₁</text>
+  <text x="316" y="50" font-size="12" text-anchor="middle" fill="#3A56C5" font-family="IBM Plex Mono,monospace">w₂</text>
+  <text x="396" y="50" font-size="12" text-anchor="middle" fill="#3A56C5" font-family="IBM Plex Mono,monospace">w₃</text>
+  <rect x="134" y="87" width="52" height="26" rx="6" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <rect x="134" y="147" width="52" height="26" rx="6" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <rect x="134" y="207" width="52" height="26" rx="6" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="160" y="105" font-size="12" text-anchor="middle" fill="#3A56C5" font-family="IBM Plex Mono,monospace">w₁</text>
+  <text x="160" y="165" font-size="12" text-anchor="middle" fill="#3A56C5" font-family="IBM Plex Mono,monospace">w₂</text>
+  <text x="160" y="225" font-size="12" text-anchor="middle" fill="#3A56C5" font-family="IBM Plex Mono,monospace">w₃</text>
+  <rect x="198" y="72" width="76" height="56" rx="6" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <rect x="278" y="72" width="76" height="56" rx="6" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <rect x="358" y="72" width="76" height="56" rx="6" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <rect x="198" y="132" width="76" height="56" rx="6" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <rect x="278" y="132" width="76" height="56" rx="6" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <rect x="358" y="132" width="76" height="56" rx="6" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <rect x="198" y="192" width="76" height="56" rx="6" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <rect x="278" y="192" width="76" height="56" rx="6" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <rect x="358" y="192" width="76" height="56" rx="6" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="236" y="98" font-size="11" text-anchor="middle" fill="#1F2C38" font-family="IBM Plex Mono,monospace">w₁² σ₁²</text>
+  <text x="316" y="98" font-size="11" text-anchor="middle" fill="#1F2C38" font-family="IBM Plex Mono,monospace">w₁w₂ Σ₁₂</text>
+  <text x="396" y="98" font-size="11" text-anchor="middle" fill="#1F2C38" font-family="IBM Plex Mono,monospace">w₁w₃ Σ₁₃</text>
+  <text x="236" y="158" font-size="11" text-anchor="middle" fill="#1F2C38" font-family="IBM Plex Mono,monospace">w₂w₁ Σ₂₁</text>
+  <text x="316" y="158" font-size="11" text-anchor="middle" fill="#1F2C38" font-family="IBM Plex Mono,monospace">w₂² σ₂²</text>
+  <text x="396" y="158" font-size="11" text-anchor="middle" fill="#1F2C38" font-family="IBM Plex Mono,monospace">w₂w₃ Σ₂₃</text>
+  <text x="236" y="218" font-size="11" text-anchor="middle" fill="#1F2C38" font-family="IBM Plex Mono,monospace">w₃w₁ Σ₃₁</text>
+  <text x="316" y="218" font-size="11" text-anchor="middle" fill="#1F2C38" font-family="IBM Plex Mono,monospace">w₃w₂ Σ₃₂</text>
+  <text x="396" y="218" font-size="11" text-anchor="middle" fill="#1F2C38" font-family="IBM Plex Mono,monospace">w₃² σ₃²</text>
+  <text x="236" y="115" font-size="9" text-anchor="middle" fill="#3A56C5">own risk</text>
+  <text x="316" y="115" font-size="9" text-anchor="middle" fill="#8A6D00">co-movement</text>
+  <text x="396" y="115" font-size="9" text-anchor="middle" fill="#8A6D00">co-movement</text>
+  <text x="236" y="175" font-size="9" text-anchor="middle" fill="#8A6D00">co-movement</text>
+  <text x="316" y="175" font-size="9" text-anchor="middle" fill="#3A56C5">own risk</text>
+  <text x="396" y="175" font-size="9" text-anchor="middle" fill="#8A6D00">co-movement</text>
+  <text x="236" y="235" font-size="9" text-anchor="middle" fill="#8A6D00">co-movement</text>
+  <text x="316" y="235" font-size="9" text-anchor="middle" fill="#8A6D00">co-movement</text>
+  <text x="396" y="235" font-size="9" text-anchor="middle" fill="#3A56C5">own risk</text>
+  <text x="316" y="268" font-size="9.5" text-anchor="middle" fill="#4A5A68">the grid is Σ; the weights enter twice, once from each side</text>
+  <path d="M442 160 H478" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s1a)"/>
+  <text x="460" y="150" font-size="9.5" text-anchor="middle" fill="#4A5A68">add</text>
+  <rect x="484" y="70" width="210" height="180" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="589" y="96" font-size="11" font-weight="600" text-anchor="middle" fill="#1F7A55">PORTFOLIO VARIANCE</text>
+  <text x="589" y="118" font-size="12" text-anchor="middle" fill="#1F2C38" font-family="IBM Plex Mono,monospace">w′Σw — one number</text>
+  <text x="589" y="144" font-size="9.5" text-anchor="middle" fill="#4A5A68">blue: N own-risk cells</text>
+  <text x="589" y="160" font-size="9.5" text-anchor="middle" fill="#4A5A68">yellow: N(N − 1) co-movement cells</text>
+  <text x="589" y="186" font-size="9.5" text-anchor="middle" fill="#4A5A68">with N = 100 positions:</text>
+  <text x="589" y="202" font-size="9.5" text-anchor="middle" fill="#4A5A68">100 blue vs 9,900 yellow</text>
+  <text x="589" y="228" font-size="9.5" text-anchor="middle" fill="#1F7A55" font-weight="600">diversification lives in the yellow</text>
+  <text x="360" y="290" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">Double every weight and every cell quadruples: return is linear in w, risk is quadratic.</text>
+  <defs><marker id="s1a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F2C38"/></marker></defs>
+</svg>
+<figcaption>fig 3.3.1 — the quadratic form <math><semantics><mrow><msup><mi>w</mi><mi class="tml-med-pad">⊤</mi></msup><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><mi>w</mi></mrow><annotation encoding="application/x-tex">w^\top \Sigma w</annotation></semantics></math> as a grid: weights on both edges, one cell per pair of positions; own risk on the diagonal, co-movement everywhere else</figcaption>
+</figure>
+
+<p>A worked example with illustrative inputs: the classic 60/40 portfolio, <span data-lab="w_eq" data-fmt=".0%">60%</span> in equities with <span data-lab="vol_eq" data-fmt=".0%">16%</span> annual <a class="term" href="../unit02-markets-instruments/session03-returns-pnl-leverage.html#g-volatility" data-term="volatility">volatility</a> and <span data-lab="w_bd" data-fmt=".0%">40%</span> in bonds with <span data-lab="vol_bd" data-fmt=".0%">6%</span>, correlated <span data-lab="rho_sb" data-fmt=".1f">0.2</span>. The four cells add up to a variance of <span data-lab="var_6040" data-fmt=".4f">0.0107</span> a year, a volatility of <span data-lab="vol_6040" data-fmt=".2%">10.35%</span>. That is less than the weighted average of the two volatilities, <span data-lab="avg_vol_6040" data-fmt=".2%">12.00%</span>, because the two co-movement cells are small. The gap between the average of the parts and the whole is diversification, and you now have a formula for it.</p>
+
+<div class="co key"><span class="co-t">📌 Key idea — return is a dot product, risk is a quadratic form</span>
+<p>Double every weight and the expected return doubles, while the variance quadruples and the volatility doubles. <mark>Return is linear in the weights, <math><semantics><mrow><msup><mi>w</mi><mi class="tml-med-pad">⊤</mi></msup><mi>R</mi></mrow><annotation encoding="application/x-tex">w^\top R</annotation></semantics></math>; risk is quadratic, <math><semantics><mrow><msup><mi>w</mi><mi class="tml-med-pad">⊤</mi></msup><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><mi>w</mi></mrow><annotation encoding="application/x-tex">w^\top \Sigma w</annotation></semantics></math> — and almost all of it lives off the diagonal.</mark> With <math><semantics><mi>N</mi><annotation encoding="application/x-tex">N</annotation></semantics></math> positions there are <math><semantics><mi>N</mi><annotation encoding="application/x-tex">N</annotation></semantics></math> own-risk cells and <math><semantics><mrow><mi>N</mi><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>N</mi><mo>−</mo><mn>1</mn><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">N(N-1)</annotation></semantics></math> co-movement cells, so in any real book the covariances, not the individual volatilities, decide how risky you are.</p>
+</div>
+</section>
+
+<section id="s2">
+<h2><span class="no">3.3.2</span> From returns to risk: the pipeline</h2>
+<p class="lede">Everything in this session is one pipeline: a table of returns goes in, a covariance matrix comes out, you check it, you take it apart into eigenvectors, and you use the pieces. Each stage has one classic bug.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 196" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="18" font-size="11" font-weight="600" fill="#1F2C38">RETURNS → Σ → CHECK → EIGEN-DECOMPOSITION → FACTORS AND RISK</text>
+  <path d="M366 48 V38 H224 V44" fill="none" stroke="#B99B22" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#s2b)"/>
+  <text x="295" y="33" font-size="9.5" text-anchor="middle" fill="#8A6D00">fails → fix the data, or shrink</text>
+  <rect x="22" y="48" width="120" height="66" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="82" y="74" font-size="11" text-anchor="middle" fill="#3A56C5" font-weight="600">1 · RETURNS</text>
+  <text x="82" y="91" font-size="9.5" text-anchor="middle" fill="#4A5A68">T × N table,</text>
+  <text x="82" y="104" font-size="9.5" text-anchor="middle" fill="#4A5A68">aligned dates</text>
+  <rect x="164" y="48" width="120" height="66" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="224" y="74" font-size="11" text-anchor="middle" fill="#3A56C5" font-weight="600">2 · ESTIMATE Σ</text>
+  <text x="224" y="91" font-size="9.5" text-anchor="middle" fill="#4A5A68">N × N, symmetric,</text>
+  <text x="224" y="104" font-size="9.5" text-anchor="middle" fill="#4A5A68">from one clean table</text>
+  <rect x="306" y="48" width="120" height="66" rx="9" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="366" y="74" font-size="11" text-anchor="middle" fill="#8A6D00" font-weight="600">3 · CHECK</text>
+  <text x="366" y="91" font-size="9.5" text-anchor="middle" fill="#4A5A68">PSD: all λ ≥ 0?</text>
+  <text x="366" y="104" font-size="9.5" text-anchor="middle" fill="#4A5A68">cond(Σ) acceptable?</text>
+  <rect x="448" y="48" width="120" height="66" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="508" y="74" font-size="11" text-anchor="middle" fill="#3A56C5" font-weight="600">4 · DECOMPOSE</text>
+  <text x="508" y="91" font-size="9.5" text-anchor="middle" fill="#4A5A68">Σ = V Λ V′:</text>
+  <text x="508" y="104" font-size="9.5" text-anchor="middle" fill="#4A5A68">eigen-portfolios</text>
+  <rect x="590" y="48" width="108" height="66" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="644" y="74" font-size="11" text-anchor="middle" fill="#1F7A55" font-weight="600">5 · USE</text>
+  <text x="644" y="91" font-size="9.5" text-anchor="middle" fill="#4A5A68">PCA factors, w′Σw,</text>
+  <text x="644" y="104" font-size="9.5" text-anchor="middle" fill="#4A5A68">risk contributions</text>
+  <path d="M145 81 H161" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M287 81 H303" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M429 81 H445" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M571 81 H587" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <text x="82" y="136" font-size="9" text-anchor="middle" fill="#D64B2A">bug: stale or</text>
+  <text x="82" y="148" font-size="9" text-anchor="middle" fill="#D64B2A">missing prices</text>
+  <text x="224" y="136" font-size="9" text-anchor="middle" fill="#D64B2A">bug: pairwise</text>
+  <text x="224" y="148" font-size="9" text-anchor="middle" fill="#D64B2A">deletion of gaps</text>
+  <text x="366" y="136" font-size="9" text-anchor="middle" fill="#D64B2A">bug: skipping it —</text>
+  <text x="366" y="148" font-size="9" text-anchor="middle" fill="#D64B2A">nothing raises an error</text>
+  <text x="508" y="136" font-size="9" text-anchor="middle" fill="#D64B2A">bug: trusting the</text>
+  <text x="508" y="148" font-size="9" text-anchor="middle" fill="#D64B2A">small eigenvalues</text>
+  <text x="644" y="136" font-size="9" text-anchor="middle" fill="#D64B2A">bug: a raw Σ⁻¹</text>
+  <text x="644" y="148" font-size="9" text-anchor="middle" fill="#D64B2A">inside an optimizer</text>
+  <text x="360" y="182" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">One clean table in, one checked matrix out — every later tool inherits the matrix's flaws.</text>
+  <defs>
+    <marker id="s2a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F2C38"/></marker>
+    <marker id="s2b" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#B99B22"/></marker>
+  </defs>
+</svg>
+<figcaption>fig 3.3.2 — the session as a pipeline: returns to covariance matrix to checks to eigen-decomposition to factors and risk, with the classic bug at each stage in coral</figcaption>
+</figure>
+
+<p>Step 1 is a <math><semantics><mrow><mi>T</mi><mo>×</mo><mi>N</mi></mrow><annotation encoding="application/x-tex">T \times N</annotation></semantics></math> matrix of returns: <math><semantics><mi>T</mi><annotation encoding="application/x-tex">T</annotation></semantics></math> periods in the rows, <math><semantics><mi>N</mi><annotation encoding="application/x-tex">N</annotation></semantics></math> assets in the columns, on aligned dates (<span class="xref soon" data-xref="4.4" data-auto="" title="Coming soon">Session 4.4 — Time, Calendars, As-of Joins &amp; Bars</span> builds the joins that make this true). Step 2 estimates <math><semantics><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><annotation encoding="application/x-tex">\Sigma</annotation></semantics></math>. The sample covariance matrix, with <math><semantics><mover><mi>R</mi><mo stretchy="false" class="chr-med wbk-med-acc" style="math-depth:0;">‾</mo></mover><annotation encoding="application/x-tex">\bar R</annotation></semantics></math> the vector of average returns, is an average of outer products, one per day:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><mi>S</mi><mo>=</mo><mfrac><mn>1</mn><mrow><mi>T</mi><mo>−</mo><mn>1</mn></mrow></mfrac><mrow><munderover><mo movablelimits="false">∑</mo><mrow><mi>t</mi><mo>=</mo><mn>1</mn></mrow><mi>T</mi></munderover></mrow><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><msub><mi>R</mi><mi>t</mi></msub><mo>−</mo><mover><mi>R</mi><mo stretchy="false" class="chr-med wbk-med-acc" style="math-depth:0;">‾</mo></mover><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><msup><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><msub><mi>R</mi><mi>t</mi></msub><mo>−</mo><mover><mi>R</mi><mo stretchy="false" class="chr-med wbk-med-acc" style="math-depth:0;">‾</mo></mover><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mi>⊤</mi></msup></mrow><annotation encoding="application/x-tex">S = \frac{1}{T-1} \sum_{t=1}^{T} (R_t - \bar R)(R_t - \bar R)^\top</annotation></semantics></math></div>
+<p>Each outer product gives any portfolio a squared, hence non-negative, contribution, so a matrix built this way from one complete table can never assign a negative variance to anything. Estimates built any other way can (§3.3.6), which is why step 3 exists. Steps 4 and 5 are §3.3.4 and §3.3.5.</p>
+
+<p>The <strong>correlation matrix</strong> <math><semantics><mi>C</mi><annotation encoding="application/x-tex">C</annotation></semantics></math> holds the <a class="term" href="session01-probability-expected-value.html#g-correlation" data-term="correlation">correlations</a> <math><semantics><msub><mi>ρ</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub><annotation encoding="application/x-tex">\rho_{ij}</annotation></semantics></math>, with ones on the diagonal. It carries the same information as <math><semantics><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><annotation encoding="application/x-tex">\Sigma</annotation></semantics></math> once you know the volatilities: with <math><semantics><mrow><mi>D</mi><mo>=</mo><mi>diag</mi><mo>⁡</mo><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><msub><mi>σ</mi><mn>1</mn></msub><mo separator="true">,</mo><mo>…</mo><mo separator="true">,</mo><msub><mi>σ</mi><mi>N</mi></msub><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">D = \diag(\sigma_1, \dots, \sigma_N)</annotation></semantics></math>,</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><mo>=</mo><mi>D</mi><mspace width="0.1667em"></mspace><mi>C</mi><mspace width="0.1667em"></mspace><mi>D</mi><mo separator="true">,</mo><mspace width="2em"></mspace><msub><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><mrow><mi>i</mi><mi>j</mi></mrow></msub><mo>=</mo><msub><mi>σ</mi><mi>i</mi></msub><mspace width="0.1667em"></mspace><msub><mi>ρ</mi><mrow><mi>i</mi><mi>j</mi></mrow></msub><mspace width="0.1667em"></mspace><msub><mi>σ</mi><mi>j</mi></msub></mrow><annotation encoding="application/x-tex">\Sigma = D\, C\, D, \qquad \Sigma_{ij} = \sigma_i\, \rho_{ij}\, \sigma_j</annotation></semantics></math></div>
+<p>Practitioners often estimate the two parts separately and reassemble them: volatilities move fast and can be forecast (<span class="xref soon" data-xref="5.5" data-auto="" title="Coming soon">Session 5.5 — Modeling Volatility</span>), while correlations are often estimated over longer windows. The correlation matrix is also the better input to PCA when assets have very different volatilities (§3.3.5).</p>
+
+<table>
+<thead><tr><th>Object</th><th>Shape</th><th>What it holds</th><th>In this session's lab</th></tr></thead>
+<tbody>
+<tr><td>Returns matrix <math><semantics><mi>R</mi><annotation encoding="application/x-tex">R</annotation></semantics></math></td><td><math><semantics><mrow><mi>T</mi><mo>×</mo><mi>N</mi></mrow><annotation encoding="application/x-tex">T \times N</annotation></semantics></math></td><td>one row per day, one column per asset</td><td><span data-lab="t_days" data-fmt=",d">2,520</span> days × <span data-lab="n_assets" data-fmt="d">50</span> assets</td></tr>
+<tr><td>Weight vector <math><semantics><mi>w</mi><annotation encoding="application/x-tex">w</annotation></semantics></math></td><td><math><semantics><mrow><mi>N</mi><mo>×</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">N \times 1</annotation></semantics></math></td><td>fraction of capital in each asset</td><td>60/40 book: (<span data-lab="w_eq" data-fmt=".1f">0.6</span>, <span data-lab="w_bd" data-fmt=".1f">0.4</span>)</td></tr>
+<tr><td>Covariance matrix <math><semantics><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><annotation encoding="application/x-tex">\Sigma</annotation></semantics></math></td><td><math><semantics><mrow><mi>N</mi><mo>×</mo><mi>N</mi></mrow><annotation encoding="application/x-tex">N \times N</annotation></semantics></math>, symmetric</td><td>variances on the diagonal, covariances off it</td><td><span data-lab="n_cov_entries" data-fmt=",d">1,275</span> distinct entries to estimate</td></tr>
+<tr><td>Correlation matrix <math><semantics><mi>C</mi><annotation encoding="application/x-tex">C</annotation></semantics></math></td><td><math><semantics><mrow><mi>N</mi><mo>×</mo><mi>N</mi></mrow><annotation encoding="application/x-tex">N \times N</annotation></semantics></math>, symmetric</td><td>correlations, ones on the diagonal</td><td><math><semantics><mrow><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><mo>=</mo><mi>D</mi><mi>C</mi><mi>D</mi></mrow><annotation encoding="application/x-tex">\Sigma = DCD</annotation></semantics></math> holds exactly</td></tr>
+<tr><td>Portfolio variance <math><semantics><mrow><msup><mi>w</mi><mi class="tml-med-pad">⊤</mi></msup><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><mi>w</mi></mrow><annotation encoding="application/x-tex">w^\top \Sigma w</annotation></semantics></math></td><td><math><semantics><mrow><mn>1</mn><mo>×</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">1 \times 1</annotation></semantics></math></td><td>the variance of the whole book</td><td>equal-weight book: volatility <span data-lab="ew_vol_true" data-fmt=".1%">16.9%</span> true, <span data-lab="ew_vol_sample" data-fmt=".1%">16.8%</span> estimated</td></tr>
+<tr><td>Eigenvectors <math><semantics><mi>V</mi><annotation encoding="application/x-tex">V</annotation></semantics></math>, eigenvalues <math><semantics><mi>λ</mi><annotation encoding="application/x-tex">\lambda</annotation></semantics></math></td><td><math><semantics><mrow><mi>N</mi><mo>×</mo><mi>N</mi></mrow><annotation encoding="application/x-tex">N \times N</annotation></semantics></math> and <math><semantics><mi>N</mi><annotation encoding="application/x-tex">N</annotation></semantics></math></td><td>uncorrelated portfolios and their variances</td><td>the first carries <span data-lab="pc1_share_sample" data-fmt=".1%">28.6%</span> of all variance</td></tr>
+</tbody>
+</table>
+
+<p>How good is a sample covariance matrix? With <span data-lab="years" data-fmt="d">10</span> years of daily data on <span data-lab="n_assets" data-fmt="d">50</span> assets, the lab's estimate is off by <span data-lab="rel_frob_err" data-fmt=".1%">5.8%</span> of <math><semantics><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><annotation encoding="application/x-tex">\Sigma</annotation></semantics></math>'s size (the relative error in the Frobenius norm, the square root of the sum of squared entry errors); for normal returns the root-mean-square error can be computed exactly, and it is <span data-lab="rel_frob_err_theory" data-fmt=".1%">6.4%</span>. That sounds fine, and for the big structure it is. §3.3.7 shows why it is not fine for everything.</p>
+
+<div class="co tip"><span class="co-t">💡 Looking ahead</span>
+<p>Estimating <math><semantics><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><annotation encoding="application/x-tex">\Sigma</annotation></semantics></math> well is a whole session: <span class="xref soon" data-xref="9.2" data-auto="" title="Coming soon">Session 9.2 — Covariance Estimation</span> covers the failure modes of the <span class="term soon" data-term="sample covariance" title="Defined in Session 9.2 (coming soon)">sample covariance</span> and the shrinkage and denoising fixes. <span class="xref soon" data-xref="9.4" data-auto="" title="Coming soon">Session 9.4 — Factor Risk Models</span> replaces the <math><semantics><mrow><mi>N</mi><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>N</mi><mo>+</mo><mn>1</mn><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mi>/</mi><mn>2</mn></mrow><annotation encoding="application/x-tex">N(N+1)/2</annotation></semantics></math> free entries with a factor model that has far fewer. In this session the sample covariance matrix is the default, and §3.3.6–§3.3.7 show where it breaks.</p>
+</div>
+</section>
+
+<section id="s3">
+<h2><span class="no">3.3.3</span> Risk as a quadratic form, and the diversification floor</h2>
+<p class="lede">Write the variance as a quadratic form and the limit of diversification falls out in one line: adding assets shrinks the diagonal of fig 3.3.1, but the off-diagonal cells never go away.</p>
+
+<p>Take the simplest possible market: <math><semantics><mi>N</mi><annotation encoding="application/x-tex">N</annotation></semantics></math> assets, all with volatility <math><semantics><mi>σ</mi><annotation encoding="application/x-tex">\sigma</annotation></semantics></math>, every pair correlated <math><semantics><mi>ρ</mi><annotation encoding="application/x-tex">\rho</annotation></semantics></math>, held in equal weights <math><semantics><mrow><msub><mi>w</mi><mi>i</mi></msub><mo>=</mo><mn>1</mn><mi>/</mi><mi>N</mi></mrow><annotation encoding="application/x-tex">w_i = 1/N</annotation></semantics></math>. Count the cells of fig 3.3.1. The <math><semantics><mi>N</mi><annotation encoding="application/x-tex">N</annotation></semantics></math> diagonal cells are each worth <math><semantics><mrow><msup><mi>σ</mi><mn>2</mn></msup><mi>/</mi><msup><mi>N</mi><mn class="tml-med-pad">2</mn></msup></mrow><annotation encoding="application/x-tex">\sigma^2/N^2</annotation></semantics></math>, a total of <math><semantics><mrow><msup><mi>σ</mi><mn>2</mn></msup><mi>/</mi><mi>N</mi></mrow><annotation encoding="application/x-tex">\sigma^2/N</annotation></semantics></math>. The <math><semantics><mrow><mi>N</mi><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>N</mi><mo>−</mo><mn>1</mn><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">N(N-1)</annotation></semantics></math> off-diagonal cells are each worth <math><semantics><mrow><mi>ρ</mi><msup><mi>σ</mi><mn>2</mn></msup><mi>/</mi><msup><mi>N</mi><mn class="tml-med-pad">2</mn></msup></mrow><annotation encoding="application/x-tex">\rho\sigma^2/N^2</annotation></semantics></math>, a total of <math><semantics><mrow><mi>ρ</mi><msup><mi>σ</mi><mn>2</mn></msup><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mn>1</mn><mo>−</mo><mn>1</mn><mi>/</mi><mi>N</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">\rho\sigma^2(1 - 1/N)</annotation></semantics></math>. Add them:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><msup><mi>w</mi><mi class="tml-med-pad">⊤</mi></msup><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><mspace width="0.1667em"></mspace><mi>w</mi><mo>=</mo><mrow><munder><munder><mfrac><mrow><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mn>1</mn><mo>−</mo><mi>ρ</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mspace width="0.1667em"></mspace><msup><mi>σ</mi><mn>2</mn></msup></mrow><mi>N</mi></mfrac><mo stretchy="true" style="math-depth:0;">⏟</mo></munder><mtext>diversifiable</mtext></munder></mrow><mo>+</mo><mrow><munder><munder><mrow><mi>ρ</mi><mspace width="0.1667em"></mspace><msup><mi>σ</mi><mn>2</mn></msup></mrow><mo stretchy="true" style="math-depth:0;">⏟</mo></munder><mtext>systematic</mtext></munder></mrow><mspace width="0.2778em"></mspace><mrow><mspace width="0.2778em"></mspace><mover accent="false"><mo stretchy="true" lspace="0" rspace="0">→</mo><mover><mrow><mspace width="0.4286em"></mspace><mrow><mspace width="0.2778em"></mspace><mi>N</mi><mo>→</mo><mi>∞</mi><mspace width="0.2778em"></mspace></mrow><mspace width="0.4286em"></mspace></mrow><mspace width="3.5000em"></mspace></mover></mover><mspace width="0.2778em"></mspace></mrow><mspace width="0.2778em"></mspace><mi>ρ</mi><mspace width="0.1667em"></mspace><msup><mi>σ</mi><mn>2</mn></msup></mrow><annotation encoding="application/x-tex">w^\top \Sigma\, w = \underbrace{\frac{(1-\rho)\,\sigma^2}{N}}_{\text{diversifiable}} + \underbrace{\rho\,\sigma^2}_{\text{systematic}} \;\xrightarrow{\;N \to \infty\;}\; \rho\,\sigma^2</annotation></semantics></math></div>
+<p><a class="xref" href="session01-probability-expected-value.html#s2" data-xref="3.1#s2" data-auto="">Session 3.1 — Probability &amp; Expected Value</a> previewed this limit; the matrix form makes it a one-line count. The first term dies away as you add assets; the second never does. Fig 3.3.3 draws the anatomy.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 286" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">WHERE THE VARIANCE GOES AS YOU ADD ASSETS — equal weights, equal volatilities, common ρ</text>
+  <rect x="70" y="178" width="362" height="54" fill="#FCEEE9"/>
+  <polygon points="70.0,52.0 72.9,77.2 75.8,94.0 78.7,106.0 81.6,115.0 87.4,127.6 93.2,136.0 99.0,142.0 104.8,146.5 116.5,152.8 128.1,157.0 139.7,160.0 151.3,162.2 174.5,165.4 197.7,167.5 221.0,169.0 255.8,170.6 290.6,171.7 337.1,172.8 383.5,173.5 430.0,174.1 430,178 70,178" fill="#EDF0FC"/>
+  <path d="M70 178 H432" stroke="#D64B2A" stroke-width="1.5" stroke-dasharray="5 4"/>
+  <polyline points="70.0,52.0 72.9,77.2 75.8,94.0 78.7,106.0 81.6,115.0 87.4,127.6 93.2,136.0 99.0,142.0 104.8,146.5 116.5,152.8 128.1,157.0 139.7,160.0 151.3,162.2 174.5,165.4 197.7,167.5 221.0,169.0 255.8,170.6 290.6,171.7 337.1,172.8 383.5,173.5 430.0,174.1" fill="none" stroke="#3A56C5" stroke-width="2.2" stroke-linejoin="round"/>
+  <path d="M70 40 V232 H440" fill="none" stroke="#1F2C38" stroke-width="1.5"/>
+  <circle cx="70" cy="52" r="3.5" fill="#3A56C5"/>
+  <text x="78" y="50" font-size="9.5" fill="#4A5A68">N = 1</text>
+  <text x="62" y="56" font-size="11" text-anchor="end" fill="#1F2C38">σ²</text>
+  <text x="62" y="182" font-size="11" text-anchor="end" fill="#D64B2A">ρσ²</text>
+  <text x="62" y="236" font-size="11" text-anchor="end" fill="#1F2C38">0</text>
+  <text x="146" y="100" font-size="10.5" font-weight="700" fill="#3A56C5">DIVERSIFIABLE · (1 − ρ)σ²/N</text>
+  <text x="146" y="114" font-size="9.5" fill="#4A5A68">shrinks like 1/N as you add assets</text>
+  <path d="M142 118 L104 156" stroke="#3A56C5" stroke-width="1"/>
+  <text x="251" y="210" font-size="10.5" font-weight="700" text-anchor="middle" fill="#D64B2A">SYSTEMATIC · ρσ² · never diversifies</text>
+  <text x="251" y="252" font-size="10" text-anchor="middle" fill="#4A5A68">number of assets N →</text>
+  <rect x="468" y="40" width="226" height="192" rx="9" fill="#F5F6F2" stroke="#4A5A68" stroke-width="1.5"/>
+  <text x="581" y="62" font-size="11" font-weight="700" text-anchor="middle" fill="#1F2C38">TWO KNOBS</text>
+  <text x="484" y="88" font-size="10" font-weight="700" fill="#3A56C5">MORE ASSETS (N ↑)</text>
+  <text x="484" y="104" font-size="9.5" fill="#4A5A68">shrinks the blue part only;</text>
+  <text x="484" y="118" font-size="9.5" fill="#4A5A68">past a few dozen, little is left</text>
+  <text x="484" y="146" font-size="10" font-weight="700" fill="#1F7A55">LOWER CORRELATION (ρ ↓)</text>
+  <text x="484" y="162" font-size="9.5" fill="#4A5A68">the only knob that lowers the floor</text>
+  <text x="484" y="190" font-size="10" font-weight="700" fill="#1F2C38">IN VOLATILITY TERMS</text>
+  <text x="484" y="206" font-size="9.5" fill="#4A5A68">floor = √ρ × one asset's volatility</text>
+  <text x="360" y="274" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">The curve is ρσ² + (1 − ρ)σ²/N: it falls fast at first, then barely at all.</text>
+</svg>
+<figcaption>fig 3.3.3 — the anatomy of diversification (schematic): the diversifiable part shrinks like 1/N, the systematic part ρσ² stays however many assets you add</figcaption>
+</figure>
+
+<p>With <math><semantics><mrow><mi>ρ</mi><mo>=</mo><mn>0</mn></mrow><annotation encoding="application/x-tex">\rho = 0</annotation></semantics></math> the variance falls like <math><semantics><mrow><mn>1</mn><mi>/</mi><mi>N</mi></mrow><annotation encoding="application/x-tex">1/N</annotation></semantics></math> and the volatility like <math><semantics><mrow><mn>1</mn><mi>/</mi><msqrt><mi>N</mi></msqrt></mrow><annotation encoding="application/x-tex">1/\sqrt N</annotation></semantics></math> — the √n rule of <a class="xref" href="session01-probability-expected-value.html" data-xref="3.1" data-style="short" data-auto="">Session 3.1</a>. With <math><semantics><mrow><mi>ρ</mi><mo>&gt;</mo><mn>0</mn></mrow><annotation encoding="application/x-tex">\rho \gt 0</annotation></semantics></math> the variance has a floor at <math><semantics><mrow><mi>ρ</mi><msup><mi>σ</mi><mn>2</mn></msup></mrow><annotation encoding="application/x-tex">\rho\sigma^2</annotation></semantics></math>. For single stocks with <span data-lab="sigma_one" data-fmt=".0%">30%</span> volatility and a pairwise correlation of <span data-lab="rho_mid" data-fmt=".1f">0.3</span>, no number of stocks takes an equal-weight portfolio below <math><semantics><mrow><msqrt><mi>ρ</mi></msqrt><mspace width="0.1667em"></mspace><mi>σ</mi></mrow><annotation encoding="application/x-tex">\sqrt{\rho}\,\sigma</annotation></semantics></math> = <span data-lab="floor_vol_03" data-fmt=".1%">16.4%</span>. Fig 3.3.4 plots the curves, computed in the lab both from the closed form and as <math><semantics><mrow><msup><mi>w</mi><mi class="tml-med-pad">⊤</mi></msup><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><mi>w</mi></mrow><annotation encoding="application/x-tex">w^\top \Sigma w</annotation></semantics></math> with the full matrix (they agree to machine precision for every <math><semantics><mi>N</mi><annotation encoding="application/x-tex">N</annotation></semantics></math>).</p>
+
+<figure class="diagram chart">
+<!-- chart:diversification -->
+<svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Equal-weight portfolio volatility as a share of one asset&#x27;s, by number of assets N">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">EQUAL-WEIGHT PORTFOLIO VOLATILITY AS A SHARE OF ONE ASSET&#x27;S, BY NUMBER OF ASSETS N</text>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#3A56C5" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">ρ = 0</text>
+  <line x1="102.0" y1="32" x2="118.0" y2="32" stroke="#E8850C" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="124.0" y="36" font-size="11" fill="#4A5A68">ρ = 0.3</text>
+  <line x1="190.8" y1="32" x2="206.8" y2="32" stroke="#3F8E5A" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="212.8" y="36" font-size="11" fill="#4A5A68">ρ = 0.6</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="268" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0%</text>
+  <line x1="64" y1="221.6" x2="602" y2="221.6" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="225.6" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">20%</text>
+  <line x1="64" y1="179.2" x2="602" y2="179.2" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="183.2" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">40%</text>
+  <line x1="64" y1="136.8" x2="602" y2="136.8" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="140.8" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">60%</text>
+  <line x1="64" y1="94.4" x2="602" y2="94.4" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="98.4" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">80%</text>
+  <line x1="64" y1="52" x2="602" y2="52" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="56" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">100%</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#C9CFC6" stroke-width="1"/>
+  <line x1="167.3" y1="264" x2="167.3" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="167.3" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">20</text>
+  <line x1="275.9" y1="264" x2="275.9" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="275.9" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">40</text>
+  <line x1="384.6" y1="264" x2="384.6" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="384.6" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">60</text>
+  <line x1="493.3" y1="264" x2="493.3" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="493.3" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">80</text>
+  <line x1="602" y1="264" x2="602" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="602" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">100</text>
+  <polyline points="64,52 69.4,114.1 74.9,141.6 80.3,158 85.7,169.2 91.2,177.5 96.6,183.9 102,189 107.5,193.3 112.9,197 118.3,200.1 123.8,202.8 129.2,205.2 134.6,207.3 140.1,209.3 145.5,211 150.9,212.6 156.4,214 161.8,215.4 167.3,216.6 172.7,217.7 178.1,218.8 183.6,219.8 189,220.7 194.4,221.6 199.9,222.4 205.3,223.2 210.7,223.9 216.2,224.6 221.6,225.3 227,225.9 232.5,226.5 237.9,227.1 243.3,227.6 248.8,228.2 254.2,228.7 259.6,229.1 265.1,229.6 270.5,230.1 275.9,230.5 281.4,230.9 286.8,231.3 292.2,231.7 297.7,232 303.1,232.4 308.5,232.7 314,233.1 319.4,233.4 324.8,233.7 330.3,234 335.7,234.3 341.2,234.6 346.6,234.9 352,235.2 357.5,235.4 362.9,235.7 368.3,235.9 373.8,236.2 379.2,236.4 384.6,236.6 390.1,236.9 395.5,237.1 400.9,237.3 406.4,237.5 411.8,237.7 417.2,237.9 422.7,238.1 428.1,238.3 433.5,238.5 439,238.7 444.4,238.8 449.8,239 455.3,239.2 460.7,239.4 466.1,239.5 471.6,239.7 477,239.8 482.4,240 487.9,240.1 493.3,240.3 498.7,240.4 504.2,240.6 509.6,240.7 515.1,240.9 520.5,241 525.9,241.1 531.4,241.3 536.8,241.4 542.2,241.5 547.7,241.7 553.1,241.8 558.5,241.9 564,242 569.4,242.1 574.8,242.2 580.3,242.4 585.7,242.5 591.1,242.6 596.6,242.7 602,242.8" fill="none" stroke="#3A56C5" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>ρ = 0</title></polyline>
+  <circle cx="602" cy="242.8" r="4" fill="#3A56C5" stroke="#FBFBF8" stroke-width="2"><title>ρ = 0: 10%</title></circle>
+  <polyline points="64,52 69.4,93.1 74.9,109.2 80.3,117.9 85.7,123.4 91.2,127.2 96.6,129.9 102,132 107.5,133.7 112.9,135 118.3,136.2 123.8,137.1 129.2,137.9 134.6,138.6 140.1,139.2 145.5,139.7 150.9,140.2 156.4,140.6 161.8,141 167.3,141.3 172.7,141.6 178.1,141.9 183.6,142.1 189,142.4 194.4,142.6 199.9,142.8 205.3,143 210.7,143.1 216.2,143.3 221.6,143.5 227,143.6 232.5,143.7 237.9,143.8 243.3,144 248.8,144.1 254.2,144.2 259.6,144.3 265.1,144.4 270.5,144.5 275.9,144.5 281.4,144.6 286.8,144.7 292.2,144.8 297.7,144.8 303.1,144.9 308.5,145 314,145 319.4,145.1 324.8,145.2 330.3,145.2 335.7,145.3 341.2,145.3 346.6,145.4 352,145.4 357.5,145.4 362.9,145.5 368.3,145.5 373.8,145.6 379.2,145.6 384.6,145.6 390.1,145.7 395.5,145.7 400.9,145.8 406.4,145.8 411.8,145.8 417.2,145.8 422.7,145.9 428.1,145.9 433.5,145.9 439,146 444.4,146 449.8,146 455.3,146 460.7,146.1 466.1,146.1 471.6,146.1 477,146.1 482.4,146.2 487.9,146.2 493.3,146.2 498.7,146.2 504.2,146.2 509.6,146.3 515.1,146.3 520.5,146.3 525.9,146.3 531.4,146.3 536.8,146.4 542.2,146.4 547.7,146.4 553.1,146.4 558.5,146.4 564,146.4 569.4,146.5 574.8,146.5 580.3,146.5 585.7,146.5 591.1,146.5 596.6,146.5 602,146.5" fill="none" stroke="#E8850C" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>ρ = 0.3</title></polyline>
+  <circle cx="602" cy="146.5" r="4" fill="#E8850C" stroke="#FBFBF8" stroke-width="2"><title>ρ = 0.3: 55%</title></circle>
+  <polyline points="64,52 69.4,74.4 74.9,82.5 80.3,86.6 85.7,89.2 91.2,90.9 96.6,92.1 102,93.1 107.5,93.8 112.9,94.4 118.3,94.9 123.8,95.3 129.2,95.6 134.6,95.9 140.1,96.2 145.5,96.4 150.9,96.6 156.4,96.8 161.8,96.9 167.3,97.1 172.7,97.2 178.1,97.3 183.6,97.4 189,97.5 194.4,97.6 199.9,97.7 205.3,97.8 210.7,97.8 216.2,97.9 221.6,98 227,98 232.5,98.1 237.9,98.1 243.3,98.2 248.8,98.2 254.2,98.3 259.6,98.3 265.1,98.4 270.5,98.4 275.9,98.4 281.4,98.5 286.8,98.5 292.2,98.5 297.7,98.5 303.1,98.6 308.5,98.6 314,98.6 319.4,98.6 324.8,98.7 330.3,98.7 335.7,98.7 341.2,98.7 346.6,98.8 352,98.8 357.5,98.8 362.9,98.8 368.3,98.8 373.8,98.8 379.2,98.9 384.6,98.9 390.1,98.9 395.5,98.9 400.9,98.9 406.4,98.9 411.8,98.9 417.2,99 422.7,99 428.1,99 433.5,99 439,99 444.4,99 449.8,99 455.3,99 460.7,99 466.1,99.1 471.6,99.1 477,99.1 482.4,99.1 487.9,99.1 493.3,99.1 498.7,99.1 504.2,99.1 509.6,99.1 515.1,99.1 520.5,99.1 525.9,99.2 531.4,99.2 536.8,99.2 542.2,99.2 547.7,99.2 553.1,99.2 558.5,99.2 564,99.2 569.4,99.2 574.8,99.2 580.3,99.2 585.7,99.2 591.1,99.2 596.6,99.2 602,99.2" fill="none" stroke="#3F8E5A" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>ρ = 0.6</title></polyline>
+  <circle cx="602" cy="99.2" r="4" fill="#3F8E5A" stroke="#FBFBF8" stroke-width="2"><title>ρ = 0.6: 78%</title></circle>
+  <text x="614" y="103.2" font-size="11" fill="#1F2C38">ρ = 0.6: 78%</text>
+  <text x="614" y="150.5" font-size="11" fill="#1F2C38">ρ = 0.3: 55%</text>
+  <text x="614" y="246.8" font-size="11" fill="#1F2C38">ρ = 0: 10%</text>
+</svg>
+<!-- /chart:diversification -->
+<figcaption>fig 3.3.4 — equal-weight portfolio volatility as a share of one asset's volatility: with correlation, the curve flattens onto the floor √ρ after a few dozen assets</figcaption>
+</figure>
+
+<p>Two summary numbers make the curve portable. The <strong>diversification ratio</strong> of Choueifaty &amp; Coignard (2008) divides the weighted-average volatility of the holdings by the portfolio's volatility (the 60/40 book scores <span data-lab="dr_6040" data-fmt=".2f">1.16</span>). Its square, in this equal-correlation market <math><semantics><mrow><mi>N</mi><mi>/</mi><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mn>1</mn><mo>+</mo><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>N</mi><mo>−</mo><mn>1</mn><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mi>ρ</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">N/(1 + (N-1)\rho)</annotation></semantics></math>, is the <em>effective number of independent bets</em>: the number of uncorrelated assets that would give the same risk reduction. The ten correlated positions of <a class="xref" href="session01-probability-expected-value.html" data-xref="3.1" data-style="short" data-auto="">Session 3.1</a> are worth only <span data-lab="div_bets_03_n10" data-fmt=".2f">2.70</span> independent bets, which is why they carried <span data-lab="ratio_10_vs_indep" data-fmt=".2f">1.92</span> times the risk of ten independent ones. Carver-style <span class="term soon" data-term="position sizing" title="Defined in Session 9.5 (coming soon)">position sizing</span> (<span class="xref soon" data-xref="9.5" data-auto="" title="Coming soon">Session 9.5 — Sizing, Vol Targeting &amp; Allocating Across Strategies</span>) applies the same idea to volatility-scaled positions and calls it the <span class="term soon" data-term="diversification multiplier" title="Defined in Session 9.5 (coming soon)">diversification multiplier</span>.</p>
+
+<table>
+<thead><tr><th>Common correlation <math><semantics><mi>ρ</mi><annotation encoding="application/x-tex">\rho</annotation></semantics></math></th><th>Volatility left, <math><semantics><mrow><mi>N</mi><mo>=</mo><mn>10</mn></mrow><annotation encoding="application/x-tex">N = 10</annotation></semantics></math></th><th><math><semantics><mrow><mi>N</mi><mo>=</mo><mn>100</mn></mrow><annotation encoding="application/x-tex">N = 100</annotation></semantics></math></th><th><math><semantics><mrow><mi>N</mi><mo>→</mo><mi>∞</mi></mrow><annotation encoding="application/x-tex">N \to \infty</annotation></semantics></math></th><th>Diversification ratio, <math><semantics><mrow><mi>N</mi><mo>=</mo><mn>100</mn></mrow><annotation encoding="application/x-tex">N = 100</annotation></semantics></math></th><th>Effective bets, <math><semantics><mrow><mi>N</mi><mo>→</mo><mi>∞</mi></mrow><annotation encoding="application/x-tex">N \to \infty</annotation></semantics></math></th></tr></thead>
+<tbody>
+<tr><td>0</td><td><span data-lab="div_frac_00_n10" data-fmt=".1%">31.6%</span></td><td><span data-lab="div_frac_00_n100" data-fmt=".1%">10.0%</span></td><td>0</td><td><span data-lab="div_dr_00_n100" data-fmt=".1f">10.0</span></td><td>unlimited</td></tr>
+<tr><td><span data-lab="rho_mid" data-fmt=".1f">0.3</span></td><td><span data-lab="div_frac_03_n10" data-fmt=".1%">60.8%</span></td><td><span data-lab="div_frac_03_n100" data-fmt=".1%">55.4%</span></td><td><span data-lab="div_frac_03_inf" data-fmt=".1%">54.8%</span></td><td><span data-lab="div_dr_03_n100" data-fmt=".2f">1.80</span></td><td><span data-lab="div_bets_03_inf" data-fmt=".2f">3.33</span></td></tr>
+<tr><td><span data-lab="rho_hi" data-fmt=".1f">0.6</span></td><td><span data-lab="div_frac_06_n10" data-fmt=".1%">80.0%</span></td><td><span data-lab="div_frac_06_n100" data-fmt=".1%">77.7%</span></td><td><span data-lab="div_frac_06_inf" data-fmt=".1%">77.5%</span></td><td><span data-lab="div_dr_06_n100" data-fmt=".2f">1.29</span></td><td><span data-lab="div_bets_06_inf" data-fmt=".2f">1.67</span></td></tr>
+</tbody>
+</table>
+
+<div class="co key"><span class="co-t">📌 Key idea — correlation, not the number of names, limits diversification</span>
+<p>Past a few dozen assets, adding names barely helps; only lower correlation lowers the floor. <mark>The floor <math><semantics><mrow><mi>ρ</mi><msup><mi>σ</mi><mn>2</mn></msup></mrow><annotation encoding="application/x-tex">\rho\sigma^2</annotation></semantics></math> is the risk every asset shares — which is why the first principal component in §3.3.5 turns out to be the market.</mark> A book of 200 stocks at an average correlation of <span data-lab="rho_mid" data-fmt=".1f">0.3</span> is worth fewer than <span data-lab="div_bets_03_inf" data-fmt=".1f">3.3</span> independent bets on "stocks", not 200.</p>
+</div>
+
+<h3>Who is really driving the risk?</h3>
+<p>Because variance is a quadratic form, it splits exactly into one piece per position. Scale every weight by <math><semantics><mi>c</mi><annotation encoding="application/x-tex">c</annotation></semantics></math> and the variance scales by <math><semantics><msup><mi>c</mi><mn class="tml-sml-pad">2</mn></msup><annotation encoding="application/x-tex">c^2</annotation></semantics></math>; Euler's theorem for such functions says that the weights times the gradient <math><semantics><mrow><mi>∂</mi><msubsup><mi>σ</mi><mi>p</mi><mn>2</mn></msubsup><mi>/</mi><mi>∂</mi><mi>w</mi><mo>=</mo><mn>2</mn><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><mi>w</mi></mrow><annotation encoding="application/x-tex">\partial \sigma_p^2/\partial w = 2\Sigma w</annotation></semantics></math> add back up to twice the function. Halve both sides:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><msup><mi>w</mi><mi class="tml-med-pad">⊤</mi></msup><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><mspace width="0.1667em"></mspace><mi>w</mi><mo>=</mo><mrow><munderover><mo movablelimits="false">∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>N</mi></munderover></mrow><msub><mi>w</mi><mi>i</mi></msub><mspace width="0.1667em"></mspace><msub><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><mi>w</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mi>i</mi></msub></mrow><annotation encoding="application/x-tex">w^\top \Sigma\, w = \sum_{i=1}^{N} w_i\, (\Sigma w)_i</annotation></semantics></math></div>
+<p>Each term is the position's <span class="term soon" data-term="risk contribution" title="Defined in Session 9.3 (coming soon)">risk contribution</span>: its weight times its covariance with the whole portfolio. For the 60/40 book the split is lopsided:</p>
+
+<table>
+<thead><tr><th>Asset</th><th>Share of capital</th><th>Volatility</th><th>Share of portfolio variance</th></tr></thead>
+<tbody>
+<tr><td>Equities</td><td><span data-lab="w_eq" data-fmt=".0%">60%</span></td><td><span data-lab="vol_eq" data-fmt=".0%">16%</span></td><td><span data-lab="rc_share_eq" data-fmt=".1%">90.3%</span></td></tr>
+<tr><td>Bonds</td><td><span data-lab="w_bd" data-fmt=".0%">40%</span></td><td><span data-lab="vol_bd" data-fmt=".0%">6%</span></td><td><span data-lab="rc_share_bd" data-fmt=".1%">9.7%</span></td></tr>
+</tbody>
+</table>
+
+<p>A "balanced" portfolio by capital is an equity portfolio by risk. <span class="xref soon" data-xref="9.3" data-auto="" title="Coming soon">Session 9.3 — Risk Parity &amp; HRP</span> turns this decomposition into portfolios that balance risk instead of capital.</p>
+</section>
+
+<section id="s4">
+<h2><span class="no">3.3.4</span> Eigenvectors: the portfolios of risk</h2>
+<p class="lede">The covariance matrix mixes everything with everything. Its eigenvectors un-mix it into a set of portfolios that are uncorrelated with each other and whose variances add up to the total.</p>
+
+<p>An <strong>eigenvector</strong> of <math><semantics><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><annotation encoding="application/x-tex">\Sigma</annotation></semantics></math> is a direction <math><semantics><mi>v</mi><annotation encoding="application/x-tex">v</annotation></semantics></math> that <math><semantics><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><annotation encoding="application/x-tex">\Sigma</annotation></semantics></math> only stretches, <math><semantics><mrow><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><mi>v</mi><mo>=</mo><mi>λ</mi><mi>v</mi></mrow><annotation encoding="application/x-tex">\Sigma v = \lambda v</annotation></semantics></math>; the stretch factor <math><semantics><mi>λ</mi><annotation encoding="application/x-tex">\lambda</annotation></semantics></math> is its <strong>eigenvalue</strong>. (The course reserves <math><semantics><mi>λ</mi><annotation encoding="application/x-tex">\lambda</annotation></semantics></math> for multipliers, and an eigenvalue is exactly that: the number <math><semantics><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><annotation encoding="application/x-tex">\Sigma</annotation></semantics></math> multiplies <math><semantics><mi>v</mi><annotation encoding="application/x-tex">v</annotation></semantics></math> by.) A symmetric <math><semantics><mrow><mi>N</mi><mo>×</mo><mi>N</mi></mrow><annotation encoding="application/x-tex">N \times N</annotation></semantics></math> matrix has <math><semantics><mi>N</mi><annotation encoding="application/x-tex">N</annotation></semantics></math> mutually orthogonal unit eigenvectors and <math><semantics><mi>N</mi><annotation encoding="application/x-tex">N</annotation></semantics></math> real eigenvalues — the spectral theorem — so it factors as</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><mo>=</mo><mi>V</mi><mrow><mi mathvariant="normal">Λ</mi><mspace></mspace></mrow><msup><mi>V</mi><mi>⊤</mi></msup><mo>=</mo><mrow><munderover><mo movablelimits="false">∑</mo><mrow><mi>k</mi><mo>=</mo><mn>1</mn></mrow><mi>N</mi></munderover></mrow><msub><mi>λ</mi><mi>k</mi></msub><mspace width="0.1667em"></mspace><msub><mi>v</mi><mi>k</mi></msub><msubsup><mi>v</mi><mi>k</mi><mi class="tml-sml-pad">⊤</mi></msubsup><mo separator="true">,</mo><mspace width="2em"></mspace><msup><mi>V</mi><mi>⊤</mi></msup><mi>V</mi><mo>=</mo><mi>I</mi></mrow><annotation encoding="application/x-tex">\Sigma = V \Lambda V^\top = \sum_{k=1}^{N} \lambda_k\, v_k v_k^\top, \qquad V^\top V = I</annotation></semantics></math></div>
+<p>with the eigenvectors <math><semantics><msub><mi>v</mi><mi>k</mi></msub><annotation encoding="application/x-tex">v_k</annotation></semantics></math> as the columns of <math><semantics><mi>V</mi><annotation encoding="application/x-tex">V</annotation></semantics></math> and the eigenvalues, sorted from largest to smallest, on the diagonal of <math><semantics><mrow><mi mathvariant="normal">Λ</mi><mspace></mspace></mrow><annotation encoding="application/x-tex">\Lambda</annotation></semantics></math>.</p>
+
+<p>Now read each eigenvector as a portfolio, with weights <math><semantics><msub><mi>v</mi><mi>k</mi></msub><annotation encoding="application/x-tex">v_k</annotation></semantics></math>. Its variance is <math><semantics><mrow><msubsup><mi>v</mi><mi>k</mi><mi class="tml-sml-pad">⊤</mi></msubsup><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><msub><mi>v</mi><mi>k</mi></msub><mo>=</mo><msub><mi>λ</mi><mi>k</mi></msub></mrow><annotation encoding="application/x-tex">v_k^\top \Sigma v_k = \lambda_k</annotation></semantics></math>, and the covariance between two different ones is <math><semantics><mrow><msubsup><mi>v</mi><mi>j</mi><mi class="tml-sml-pad">⊤</mi></msubsup><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><msub><mi>v</mi><mi>k</mi></msub><mo>=</mo><mn>0</mn></mrow><annotation encoding="application/x-tex">v_j^\top \Sigma v_k = 0</annotation></semantics></math>. So the eigen-decomposition re-expresses the market as <math><semantics><mi>N</mi><annotation encoding="application/x-tex">N</annotation></semantics></math> uncorrelated <em>eigen-portfolios</em>, the <math><semantics><mi>k</mi><annotation encoding="application/x-tex">k</annotation></semantics></math>-th with variance <math><semantics><msub><mi>λ</mi><mi>k</mi></msub><annotation encoding="application/x-tex">\lambda_k</annotation></semantics></math>. Every portfolio is a mix of them, and its variance splits cleanly, with no cross terms:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><msup><mi>w</mi><mi class="tml-med-pad">⊤</mi></msup><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><mspace width="0.1667em"></mspace><mi>w</mi><mo>=</mo><mrow><munderover><mo movablelimits="false">∑</mo><mrow><mi>k</mi><mo>=</mo><mn>1</mn></mrow><mi>N</mi></munderover></mrow><msub><mi>λ</mi><mi>k</mi></msub><mspace width="0.1667em"></mspace><msup><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><msubsup><mi>v</mi><mi>k</mi><mi class="tml-sml-pad">⊤</mi></msubsup><mi>w</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mn>2</mn></msup><mo separator="true">,</mo><mspace width="2em"></mspace><mrow><munderover><mo movablelimits="false">∑</mo><mrow><mi>k</mi><mo>=</mo><mn>1</mn></mrow><mi>N</mi></munderover></mrow><msub><mi>λ</mi><mi>k</mi></msub><mo>=</mo><mrow><mi>tr</mi><mo>⁡</mo></mrow><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mo>=</mo><mrow><munderover><mo movablelimits="false">∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>N</mi></munderover></mrow><msubsup><mi>σ</mi><mi>i</mi><mn>2</mn></msubsup></mrow><annotation encoding="application/x-tex">w^\top \Sigma\, w = \sum_{k=1}^{N} \lambda_k\, (v_k^\top w)^2, \qquad \sum_{k=1}^{N} \lambda_k = \tr(\Sigma) = \sum_{i=1}^{N} \sigma_i^2</annotation></semantics></math></div>
+<p>The lab checks each of these identities to machine precision on its <span data-lab="n_assets" data-fmt="d">50</span>-asset market. It also finds that <span data-lab="ew_pc1_share" data-fmt=".1%">99.0%</span> of the equal-weight portfolio's variance sits in the first eigen-portfolio alone: an equal-weight book is, for risk purposes, a bet on one thing.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 290" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">TWO ASSETS, ONE CLOUD OF DAILY RETURNS — THE EIGENVECTORS ARE ITS AXES</text>
+  <path d="M60 138 H292" stroke="#C9CFC6" stroke-width="1.2"/>
+  <path d="M175 42 V234" stroke="#C9CFC6" stroke-width="1.2"/>
+  <text x="292" y="152" font-size="9.5" text-anchor="end" fill="#4A5A68">asset A return →</text>
+  <text x="181" y="48" font-size="9.5" fill="#4A5A68">asset B return ↑</text>
+  <ellipse cx="175" cy="138" rx="112" ry="34" transform="rotate(-45 175 138)" fill="#EDF0FC" fill-opacity="0.6" stroke="#3A56C5" stroke-width="1.2" stroke-dasharray="4 3"/>
+  <g fill="#1F2C38" fill-opacity="0.55">
+  <circle cx="248" cy="134" r="2.6"/><circle cx="190" cy="138" r="2.6"/><circle cx="159" cy="156" r="2.6"/><circle cx="102" cy="201" r="2.6"/><circle cx="144" cy="91" r="2.6"/><circle cx="183" cy="139" r="2.6"/><circle cx="165" cy="161" r="2.6"/><circle cx="137" cy="177" r="2.6"/><circle cx="192" cy="129" r="2.6"/><circle cx="209" cy="115" r="2.6"/><circle cx="176" cy="104" r="2.6"/><circle cx="195" cy="133" r="2.6"/><circle cx="168" cy="132" r="2.6"/><circle cx="245" cy="88" r="2.6"/><circle cx="166" cy="123" r="2.6"/><circle cx="143" cy="170" r="2.6"/><circle cx="207" cy="100" r="2.6"/><circle cx="178" cy="121" r="2.6"/><circle cx="140" cy="202" r="2.6"/><circle cx="185" cy="115" r="2.6"/><circle cx="159" cy="174" r="2.6"/><circle cx="176" cy="138" r="2.6"/><circle cx="226" cy="81" r="2.6"/><circle cx="182" cy="108" r="2.6"/><circle cx="168" cy="164" r="2.6"/><circle cx="196" cy="109" r="2.6"/><circle cx="167" cy="161" r="2.6"/><circle cx="183" cy="185" r="2.6"/><circle cx="200" cy="108" r="2.6"/><circle cx="116" cy="184" r="2.6"/><circle cx="140" cy="149" r="2.6"/><circle cx="102" cy="216" r="2.6"/><circle cx="201" cy="93" r="2.6"/><circle cx="97" cy="211" r="2.6"/><circle cx="187" cy="142" r="2.6"/><circle cx="232" cy="118" r="2.6"/><circle cx="188" cy="150" r="2.6"/><circle cx="226" cy="98" r="2.6"/><circle cx="162" cy="186" r="2.6"/><circle cx="236" cy="73" r="2.6"/><circle cx="202" cy="92" r="2.6"/><circle cx="188" cy="142" r="2.6"/><circle cx="146" cy="178" r="2.6"/><circle cx="224" cy="130" r="2.6"/><circle cx="154" cy="162" r="2.6"/><circle cx="183" cy="119" r="2.6"/><circle cx="130" cy="211" r="2.6"/><circle cx="175" cy="112" r="2.6"/><circle cx="202" cy="112" r="2.6"/><circle cx="164" cy="141" r="2.6"/><circle cx="166" cy="127" r="2.6"/><circle cx="146" cy="158" r="2.6"/><circle cx="171" cy="129" r="2.6"/><circle cx="183" cy="76" r="2.6"/><circle cx="229" cy="63" r="2.6"/><circle cx="102" cy="204" r="2.6"/><circle cx="153" cy="144" r="2.6"/><circle cx="93" cy="178" r="2.6"/><circle cx="213" cy="135" r="2.6"/><circle cx="140" cy="183" r="2.6"/><circle cx="177" cy="123" r="2.6"/><circle cx="249" cy="83" r="2.6"/><circle cx="203" cy="113" r="2.6"/><circle cx="238" cy="71" r="2.6"/><circle cx="224" cy="122" r="2.6"/><circle cx="168" cy="161" r="2.6"/><circle cx="229" cy="80" r="2.6"/><circle cx="164" cy="157" r="2.6"/><circle cx="192" cy="139" r="2.6"/>
+  </g>
+  <path d="M175 138 L250 63" stroke="#3A56C5" stroke-width="2.5" marker-end="url(#s4a)"/>
+  <path d="M175 138 L198 161" stroke="#1F7A55" stroke-width="2.5" marker-end="url(#s4b)"/>
+  <text x="258" y="60" font-size="11" font-weight="700" fill="#3A56C5">PC1</text>
+  <text x="204" y="176" font-size="11" font-weight="700" fill="#1F7A55">PC2</text>
+  <rect x="320" y="34" width="374" height="66" rx="8" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="336" y="54" font-size="10.5" font-weight="700" fill="#3A56C5">PC1 · THE COMMON MOVE</text>
+  <text x="336" y="72" font-size="9.5" fill="#1F2C38" font-family="IBM Plex Mono,monospace">weights (1, 1)/√2 — both assets up together</text>
+  <text x="336" y="89" font-size="9.5" fill="#4A5A68">variance λ₁ = σ²(1 + ρ): the long axis of the cloud</text>
+  <rect x="320" y="108" width="374" height="66" rx="8" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="336" y="128" font-size="10.5" font-weight="700" fill="#1F7A55">PC2 · THE SPREAD</text>
+  <text x="336" y="146" font-size="9.5" fill="#1F2C38" font-family="IBM Plex Mono,monospace">weights (1, −1)/√2 — long one, short the other</text>
+  <text x="336" y="163" font-size="9.5" fill="#4A5A68">variance λ₂ = σ²(1 − ρ): the short axis, what is left</text>
+  <rect x="320" y="182" width="374" height="66" rx="8" fill="#F5F6F2" stroke="#4A5A68" stroke-width="1.5"/>
+  <text x="336" y="202" font-size="10.5" font-weight="700" fill="#1F2C38">ROTATE TO THESE AXES</text>
+  <text x="336" y="220" font-size="9.5" fill="#4A5A68">the two new return series are uncorrelated,</text>
+  <text x="336" y="237" font-size="9.5" fill="#4A5A68">and λ₁ + λ₂ = the two assets' total variance</text>
+  <text x="360" y="276" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">Equal volatilities σ, correlation ρ. PCA finds the same axes in N dimensions, longest first.</text>
+  <defs>
+    <marker id="s4a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#3A56C5"/></marker>
+    <marker id="s4b" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F7A55"/></marker>
+  </defs>
+</svg>
+<figcaption>fig 3.3.5 — two positively correlated assets: the returns form a tilted ellipse, its long axis is PC1 (the common move) and its short axis PC2 (the spread)</figcaption>
+</figure>
+
+<p>Fig 3.3.5 shows the geometry for two assets with equal volatility <math><semantics><mi>σ</mi><annotation encoding="application/x-tex">\sigma</annotation></semantics></math> and correlation <math><semantics><mi>ρ</mi><annotation encoding="application/x-tex">\rho</annotation></semantics></math>. The cloud of daily returns is an ellipse. Its long axis, both assets up together, is the first eigenvector, and the variance along it is <math><semantics><mrow><msub><mi>λ</mi><mn>1</mn></msub><mo>=</mo><msup><mi>σ</mi><mn>2</mn></msup><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mn>1</mn><mo>+</mo><mi>ρ</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">\lambda_1 = \sigma^2(1 + \rho)</annotation></semantics></math>. Its short axis, one up and the other down, is the second, with <math><semantics><mrow><msub><mi>λ</mi><mn>2</mn></msub><mo>=</mo><msup><mi>σ</mi><mn>2</mn></msup><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mn>1</mn><mo>−</mo><mi>ρ</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">\lambda_2 = \sigma^2(1 - \rho)</annotation></semantics></math>. The higher the correlation, the longer and thinner the ellipse — and the less variance is left in the spread. Rotating the coordinates to these axes turns two correlated return series into two uncorrelated ones without losing any variance.</p>
+
+<p>Because each eigenvalue is the variance of a portfolio, none can be negative. A symmetric matrix is <strong>positive semi-definite</strong> (PSD) when <math><semantics><mrow><msup><mi>w</mi><mi class="tml-med-pad">⊤</mi></msup><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><mi>w</mi><mo>≥</mo><mn>0</mn></mrow><annotation encoding="application/x-tex">w^\top \Sigma w \ge 0</annotation></semantics></math> for every <math><semantics><mi>w</mi><annotation encoding="application/x-tex">w</annotation></semantics></math>; equivalently, when all its eigenvalues are <math><semantics><mrow><mo>≥</mo><mn>0</mn></mrow><annotation encoding="application/x-tex">\ge 0</annotation></semantics></math>. Every true covariance matrix is PSD, and so is every sample covariance matrix computed from one complete table (it is an average of outer products). A zero (or near-zero) eigenvalue means some portfolio has (almost) no variance: a perfect hedge, or a redundant asset such as an <a class="term" href="../unit02-markets-instruments/session02-equities-indices-etfs.html#g-etf" data-term="ETF">ETF</a> held alongside all its constituents. When all eigenvalues are strictly positive the matrix is <em>positive definite</em> and can be inverted. A negative eigenvalue means the "matrix" is not the covariance matrix of anything (§3.3.6).</p>
+
+<div class="co key"><span class="co-t">📌 Key idea — eigenvectors are portfolios, eigenvalues are their variances</span>
+<p><mark>Diagonalising <math><semantics><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><annotation encoding="application/x-tex">\Sigma</annotation></semantics></math> re-expresses the market as uncorrelated portfolios whose variances add up to the total.</mark> The big eigenvalues are the risks everything shares; the small ones are the fine print — and, as §3.3.7 shows, the fine print is where <span class="term soon" data-term="estimation error" title="Defined in Session 9.1 (coming soon)">estimation error</span> hides.</p>
+</div>
+</section>
+
+<section id="s5">
+<h2><span class="no">3.3.5</span> PCA: the hidden structure of a market</h2>
+<p class="lede">Principal component analysis is the eigen-decomposition of a covariance matrix estimated from data. On a stock market the first component is almost always the market itself. On synthetic data you can check what PCA gets right, and what it cannot know.</p>
+
+<p><strong>Principal component analysis</strong> (PCA) estimates the covariance (or correlation) matrix of returns, eigen-decomposes it, and calls the eigenvectors <em>principal components</em>. PC1 is the unit-length weight vector with the largest variance; PC2 is the largest-variance direction uncorrelated with PC1; and so on down. Keep the first few and you have compressed <math><semantics><mi>N</mi><annotation encoding="application/x-tex">N</annotation></semantics></math> correlated return series into a handful of uncorrelated factors plus what is left over.</p>
+
+<p>The lab tests PCA where the answer is known. It simulates <span data-lab="years" data-fmt="d">10</span> years (<span data-lab="t_days" data-fmt=",d">2,520</span> trading days) of returns on <span data-lab="n_assets" data-fmt="d">50</span> assets driven by <span data-lab="n_factors" data-fmt="d">3</span> factors: a market factor that every asset loads on (loadings <math><semantics><mi>β</mi><annotation encoding="application/x-tex">\beta</annotation></semantics></math> scattered around 1) and two style factors with loadings scattered around 0. Each factor has <span data-lab="factor_vol" data-fmt=".0%">15%</span> annual volatility, and every asset adds <span data-lab="idio_vol" data-fmt=".0%">25%</span> of its own noise. That is a <span class="term soon" data-term="factor model" title="Defined in Session 7.2 (coming soon)">factor model</span> with known <span class="term soon" data-term="factor loading" title="Defined in Session 7.2 (coming soon)">factor loadings</span> <math><semantics><mi>B</mi><annotation encoding="application/x-tex">B</annotation></semantics></math> — the structure <span class="xref soon" data-xref="7.2" data-auto="" title="Coming soon">Session 7.2 — CAPM, APT &amp; Factor Regressions</span> estimates by regression — so the true covariance matrix is known too:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><mo>=</mo><mi>B</mi><mspace width="0.1667em"></mspace><mspace width="0.1667em"></mspace><mi>diag</mi><mo>⁡</mo><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><msubsup><mi>σ</mi><mi>f</mi><mn>2</mn></msubsup><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mspace width="0.1667em"></mspace><msup><mi>B</mi><mi class="tml-med-pad">⊤</mi></msup><mo>+</mo><msubsup><mi>σ</mi><mi>e</mi><mn>2</mn></msubsup><mspace width="0.1667em"></mspace><mi>I</mi></mrow><annotation encoding="application/x-tex">\Sigma = B\, \diag(\sigma_f^2)\, B^\top + \sigma_e^2\, I</annotation></semantics></math></div>
+<p>It has <span data-lab="n_factors" data-fmt="d">3</span> large eigenvalues and <span data-lab="n_noise_dirs" data-fmt="d">47</span> identical small ones, each worth <span data-lab="idio_eig_share_true" data-fmt=".1%">1.1%</span> of the total. Fig 3.3.6 compares the estimate with the truth.</p>
+
+<figure class="diagram chart">
+<!-- chart:spectrum -->
+<svg viewBox="0 0 720 280" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Share of total variance carried by each principal component (50 assets)">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">SHARE OF TOTAL VARIANCE CARRIED BY EACH PRINCIPAL COMPONENT (50 ASSETS)</text>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#3A56C5" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">sample, 10 years of data</text>
+  <line x1="223.60000000000002" y1="32" x2="239.60000000000002" y2="32" stroke="#4A5A68" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="245.60000000000002" y="36" font-size="11" fill="#4A5A68">truth</text>
+  <line x1="64" y1="236" x2="690" y2="236" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="240" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0%</text>
+  <line x1="64" y1="191" x2="690" y2="191" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="195" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">10%</text>
+  <line x1="64" y1="146" x2="690" y2="146" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="150" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">20%</text>
+  <line x1="64" y1="101" x2="690" y2="101" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="105" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">30%</text>
+  <line x1="64" y1="56" x2="690" y2="56" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="60" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">40%</text>
+  <line x1="64" y1="236" x2="690" y2="236" stroke="#C9CFC6" stroke-width="1"/>
+  <path d="M78.1,236 V111.1 Q78.1,107.1 82.1,107.1 H98.1 Q102.1,107.1 102.1,111.1 V236 Z" fill="#3A56C5"><title>PC1 · sample, 10 years of data: 29%</title></path>
+  <path d="M104.1,236 V109.3 Q104.1,105.3 108.1,105.3 H124.1 Q128.1,105.3 128.1,109.3 V236 Z" fill="#4A5A68"><title>PC1 · truth: 29%</title></path>
+  <text x="103.1" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">PC1</text>
+  <path d="M156.4,236 V196.2 Q156.4,192.2 160.4,192.2 H176.4 Q180.4,192.2 180.4,196.2 V236 Z" fill="#3A56C5"><title>PC2 · sample, 10 years of data: 10%</title></path>
+  <path d="M182.4,236 V195.6 Q182.4,191.6 186.4,191.6 H202.4 Q206.4,191.6 206.4,195.6 V236 Z" fill="#4A5A68"><title>PC2 · truth: 10%</title></path>
+  <text x="181.4" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">PC2</text>
+  <path d="M234.6,236 V203.8 Q234.6,199.8 238.6,199.8 H254.6 Q258.6,199.8 258.6,203.8 V236 Z" fill="#3A56C5"><title>PC3 · sample, 10 years of data: 8%</title></path>
+  <path d="M260.6,236 V204.1 Q260.6,200.1 264.6,200.1 H280.6 Q284.6,200.1 284.6,204.1 V236 Z" fill="#4A5A68"><title>PC3 · truth: 8%</title></path>
+  <text x="259.6" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">PC3</text>
+  <path d="M312.9,236 V232.7 Q312.9,229.4 316.2,229.4 H333.6 Q336.9,229.4 336.9,232.7 V236 Z" fill="#3A56C5"><title>PC4 · sample, 10 years of data: 1%</title></path>
+  <path d="M338.9,236 V233.5 Q338.9,230.9 341.4,230.9 H360.3 Q362.9,230.9 362.9,233.5 V236 Z" fill="#4A5A68"><title>PC4 · truth: 1%</title></path>
+  <text x="337.9" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">PC4</text>
+  <path d="M391.1,236 V232.8 Q391.1,229.6 394.3,229.6 H411.9 Q415.1,229.6 415.1,232.8 V236 Z" fill="#3A56C5"><title>PC5 · sample, 10 years of data: 1%</title></path>
+  <path d="M417.1,236 V233.5 Q417.1,230.9 419.7,230.9 H438.6 Q441.1,230.9 441.1,233.5 V236 Z" fill="#4A5A68"><title>PC5 · truth: 1%</title></path>
+  <text x="416.1" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">PC5</text>
+  <path d="M469.4,236 V232.9 Q469.4,229.7 472.5,229.7 H490.2 Q493.4,229.7 493.4,232.9 V236 Z" fill="#3A56C5"><title>PC6 · sample, 10 years of data: 1%</title></path>
+  <path d="M495.4,236 V233.5 Q495.4,230.9 497.9,230.9 H516.8 Q519.4,230.9 519.4,233.5 V236 Z" fill="#4A5A68"><title>PC6 · truth: 1%</title></path>
+  <text x="494.4" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">PC6</text>
+  <path d="M547.6,236 V232.9 Q547.6,229.8 550.7,229.8 H568.5 Q571.6,229.8 571.6,232.9 V236 Z" fill="#3A56C5"><title>PC7 · sample, 10 years of data: 1%</title></path>
+  <path d="M573.6,236 V233.5 Q573.6,230.9 576.2,230.9 H595.1 Q597.6,230.9 597.6,233.5 V236 Z" fill="#4A5A68"><title>PC7 · truth: 1%</title></path>
+  <text x="572.6" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">PC7</text>
+  <path d="M625.9,236 V233 Q625.9,230 628.9,230 H646.9 Q649.9,230 649.9,233 V236 Z" fill="#3A56C5"><title>PC8 · sample, 10 years of data: 1%</title></path>
+  <path d="M651.9,236 V233.5 Q651.9,230.9 654.4,230.9 H673.3 Q675.9,230.9 675.9,233.5 V236 Z" fill="#4A5A68"><title>PC8 · truth: 1%</title></path>
+  <text x="650.9" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">PC8</text>
+</svg>
+<!-- /chart:spectrum -->
+<figcaption>fig 3.3.6 — the eigenvalue spectrum: three components stand out, then an "elbow" and a flat floor of noise; the sample spectrum spreads the floor a little</figcaption>
+</figure>
+
+<p>PC1 carries <span data-lab="pc1_share_sample" data-fmt=".1%">28.6%</span> of the total variance (truth: <span data-lab="pc1_share_true" data-fmt=".1%">29.1%</span>), and the first three together <span data-lab="top3_share_sample" data-fmt=".1%">46.4%</span> (truth: <span data-lab="top3_share_true" data-fmt=".1%">46.9%</span>). After PC3 the spectrum drops to a floor; sampling noise spreads that floor out, so PC4 is estimated at <span data-lab="pc4_share_sample" data-fmt=".1%">1.5%</span> although its true share is <span data-lab="idio_eig_share_true" data-fmt=".1%">1.1%</span>. The elbow is how you would guess the number of factors on real data, where nobody tells you.</p>
+
+<p>PC1 is the <em>market mode</em>: <span data-lab="pc1_pos_share" data-fmt=".0%">100%</span> of its weights are positive, and they line up with the planted market loadings with a correlation of <span data-lab="corr_pc1_mkt" data-fmt=".3f">0.958</span> (fig 3.3.7). Even the <em>true</em> PC1 correlates only <span data-lab="corr_true_pc1_mkt" data-fmt=".3f">0.961</span> with the market loadings, because the style loadings are not exactly orthogonal to them, so the top eigenvector mixes a little of each in.</p>
+
+<figure class="diagram chart">
+<!-- chart:pc1_loadings -->
+<svg viewBox="0 0 720 320" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="PC1 weight vs the planted market loading, one dot per asset">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">PC1 WEIGHT VS THE PLANTED MARKET LOADING, ONE DOT PER ASSET</text>
+  <line x1="64" y1="272" x2="680" y2="272" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="276" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.05</text>
+  <line x1="64" y1="215" x2="680" y2="215" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="219" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.10</text>
+  <line x1="64" y1="158" x2="680" y2="158" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="162" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.15</text>
+  <line x1="64" y1="101" x2="680" y2="101" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="105" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.20</text>
+  <line x1="64" y1="44" x2="680" y2="44" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="48" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.25</text>
+  <line x1="64" y1="272" x2="680" y2="272" stroke="#C9CFC6" stroke-width="1"/>
+  <line x1="64" y1="272" x2="64" y2="276" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="64" y="290" font-size="11" text-anchor="middle" fill="#4A5A68">0.50</text>
+  <line x1="166.7" y1="272" x2="166.7" y2="276" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="166.7" y="290" font-size="11" text-anchor="middle" fill="#4A5A68">0.75</text>
+  <line x1="269.3" y1="272" x2="269.3" y2="276" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="269.3" y="290" font-size="11" text-anchor="middle" fill="#4A5A68">1.00</text>
+  <line x1="372" y1="272" x2="372" y2="276" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="372" y="290" font-size="11" text-anchor="middle" fill="#4A5A68">1.25</text>
+  <line x1="474.7" y1="272" x2="474.7" y2="276" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="474.7" y="290" font-size="11" text-anchor="middle" fill="#4A5A68">1.50</text>
+  <line x1="577.3" y1="272" x2="577.3" y2="276" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="577.3" y="290" font-size="11" text-anchor="middle" fill="#4A5A68">1.75</text>
+  <line x1="680" y1="272" x2="680" y2="276" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="680" y="290" font-size="11" text-anchor="middle" fill="#4A5A68">2.00</text>
+  <text x="372" y="312" font-size="11" text-anchor="middle" fill="#4A5A68">true market loading (β)</text>
+  <text x="64" y="36" font-size="11" fill="#4A5A68">PC1 weight</text>
+  <circle cx="639.9" cy="67.6" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="95.5" cy="252.5" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="333.8" cy="184.1" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="525" cy="93.5" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="351.7" cy="147.8" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="178.3" cy="231" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="272.6" cy="196.6" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="403.2" cy="142.9" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="241.7" cy="237.8" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="84.3" cy="229.7" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="405.9" cy="116.4" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="223.2" cy="199.3" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="116.6" cy="254.7" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="99.4" cy="267.9" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="255.9" cy="166.2" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="232.4" cy="200" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="188.4" cy="227.7" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="537.8" cy="107.8" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="303" cy="171.4" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="245.2" cy="216.3" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="398.6" cy="161.9" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="253.9" cy="167.8" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="116" cy="224.9" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="409" cy="161.7" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="512.9" cy="113.1" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="535.3" cy="108.6" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="73.1" cy="244.1" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="372.9" cy="129.9" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="104.3" cy="260.1" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="454.3" cy="148" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="101.9" cy="258.6" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="127.8" cy="257.7" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="413.2" cy="150.1" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="184.8" cy="223.7" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="352.8" cy="163.2" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="91.1" cy="267.9" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="281.3" cy="180" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="435.3" cy="129.4" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="384.8" cy="127" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="388.5" cy="158.5" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="230.5" cy="185" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="296" cy="163.4" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="549.8" cy="98.8" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="422.6" cy="126.2" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="103.6" cy="219.4" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="544.4" cy="97.6" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="558.9" cy="106.9" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="289.6" cy="178.7" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="527.6" cy="109.4" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="64.4" cy="237.2" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <line x1="64" y1="257.5" x2="680" y2="53.9" stroke="#1F2C38" stroke-width="2"><title>OLS fit: slope 0.119</title></line>
+</svg>
+<!-- /chart:pc1_loadings -->
+<figcaption>fig 3.3.7 — each dot is one asset: its weight in the sample PC1 against its planted market loading; PCA found the market without being told it exists</figcaption>
+</figure>
+
+<p>How close is close? Sampling theory for PCA (Anderson, 1963) gives the expected squared angle <math><semantics><msub><mi>θ</mi><mn>1</mn></msub><annotation encoding="application/x-tex">\theta_1</annotation></semantics></math> between the sample PC1 and the true one for normal returns and long samples:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><mi>𝔼</mi><mrow><mo fence="true" form="prefix" stretchy="false">[</mo><msup><mi>sin</mi><mn>2</mn></msup><mo>⁡</mo><mspace width="0.1667em"></mspace><msub><mi>θ</mi><mn>1</mn></msub><mo fence="true" form="postfix" stretchy="false">]</mo></mrow><mo>≈</mo><mfrac><mn>1</mn><mrow><mi>T</mi><mo>−</mo><mn>1</mn></mrow></mfrac><mrow><munder><mo movablelimits="false">∑</mo><mrow><mi>k</mi><mo>≠</mo><mn>1</mn></mrow></munder></mrow><mfrac><mrow><msub><mi>λ</mi><mn>1</mn></msub><msub><mi>λ</mi><mi>k</mi></msub></mrow><msup><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><msub><mi>λ</mi><mn>1</mn></msub><mo>−</mo><msub><mi>λ</mi><mi>k</mi></msub><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mn>2</mn></msup></mfrac></mrow><annotation encoding="application/x-tex">\E[\sin^2 \theta_1] \approx \frac{1}{T-1} \sum_{k \ne 1} \frac{\lambda_1 \lambda_k}{(\lambda_1 - \lambda_k)^2}</annotation></semantics></math></div>
+<p>In words: an eigenvector is pinned down well when you have many observations and its eigenvalue stands well clear of the others. Here the formula predicts a typical angle of <span data-lab="pc1_angle_deg_theory" data-fmt=".1f">2.1</span>°, and the lab's sample PC1 sits <span data-lab="pc1_angle_deg_sample" data-fmt=".1f">1.8</span>° from the truth. Across <span data-lab="n_mc_pca" data-fmt="d">300</span> simulated decades from the same market, the average <math><semantics><mrow><msup><mi>sin</mi><mn>2</mn></msup><mo>⁡</mo><mspace width="0.1667em"></mspace><msub><mi>θ</mi><mn>1</mn></msub></mrow><annotation encoding="application/x-tex">\sin^2\theta_1</annotation></semantics></math> is <span data-lab="pc1_sin2_mc" data-fmt=".5f">0.00137</span> ± <span data-lab="pc1_sin2_se" data-fmt=".5f">0.00003</span> against a prediction of <span data-lab="pc1_sin2_theory" data-fmt=".5f">0.00130</span>, inside the four <a class="term" href="session01-probability-expected-value.html#g-standard-error" data-term="standard error">standard errors</a> the lab asserts. The same theory predicts what share of the market loading vector falls outside the estimated three-factor subspace: <span data-lab="mkt_outside_theory" data-fmt=".3%">0.081%</span>, against <span data-lab="mkt_outside_mc" data-fmt=".3%">0.081%</span> simulated.</p>
+
+<p>What PCA cannot know is the labels. PC2 and PC3 together span the same plane as the two style factors — at least <span data-lab="subspace_r2_min" data-fmt=".1%">99.7%</span> of each loading vector lies in the space of the top three components — but PC2 correlates only <span data-lab="corr_pc2_style1" data-fmt=".2f">0.79</span> and <span data-lab="corr_pc2_style2" data-fmt=".2f">0.70</span> with the two style loadings. It is a blend, and any rotation inside that plane explains the data equally well. PCA recovers the <em>subspace</em>, not the factors' names. Naming them ("value", "momentum") takes information PCA never sees, such as company characteristics, which is how the risk models of <span class="xref soon" data-xref="9.4" data-auto="" title="Coming soon">Session 9.4 — Factor Risk Models</span> are built. The lab's code, with the eigenvector signs fixed (an eigenvector's sign is arbitrary, and numerical libraries return either):</p>
+
+<pre><span class="k">def</span> eig_desc(m: np.ndarray) -&gt; tuple[np.ndarray, np.ndarray]:
+    <span class="s">"""Eigenvalues (largest first) and eigenvectors of a symmetric matrix, signs fixed so sum(v) ≥ 0."""</span>
+    lam, vec = np.linalg.eigh(m)            <span class="c"># eigh: for symmetric matrices; ascending order</span>
+    lam, vec = lam[::<span class="p">-1</span>], vec[:, ::<span class="p">-1</span>]
+    vec = vec * np.where(vec.sum(axis=<span class="p">0</span>) &lt; <span class="p">0</span>, <span class="p">-1.0</span>, <span class="p">1.0</span>)
+    <span class="k">return</span> lam, vec
+
+S = R.cov().to_numpy()                      <span class="c"># sample covariance (divides by T − 1)</span>
+lam_s, V_s = eig_desc(S)
+<span class="k">assert</span> np.allclose(V_s @ np.diag(lam_s) @ V_s.T, S)                 <span class="c"># S = V Λ V'</span>
+pcs = (R - R.mean()).to_numpy() @ V_s                               <span class="c"># returns of the eigen-portfolios</span></pre>
+
+<p>Real markets look the same at the top. In Laloux et al.'s (1999) study of 406 S&amp;P 500 stocks over 1991–96, the largest eigenvalue of the correlation matrix sat far above anything pure noise could produce, and its eigenvector had "roughly equal components on all the N stocks" — the market — while 94% of the eigenvalues were indistinguishable from noise. <span class="xref soon" data-xref="9.2" data-auto="" title="Coming soon">Session 9.2 — Covariance Estimation</span> makes that "indistinguishable from noise" precise.</p>
+
+<div class="co note"><span class="co-t">🧭 Margin note — covariance or correlation?</span>
+<p>PCA on <math><semantics><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><annotation encoding="application/x-tex">\Sigma</annotation></semantics></math> weights each asset by its variance, so in a mixed book the most volatile assets dominate PC1: a crypto coin swamps a bond fund. Run PCA on the correlation matrix <math><semantics><mi>C</mi><annotation encoding="application/x-tex">C</annotation></semantics></math> (standardised returns) when volatilities differ a lot and you want the co-movement structure; run it on <math><semantics><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><annotation encoding="application/x-tex">\Sigma</annotation></semantics></math> when the units are comparable and you care about risk in money.</p>
+</div>
+
+<div class="co tip"><span class="co-t">💡 Looking ahead</span>
+<p>PCA comes back three times: <span class="xref soon" data-xref="8.3" data-auto="" title="Coming soon">Session 8.3 — Pairs Trading &amp; Statistical Arbitrage</span> trades the residuals left after removing the top components (PCA-residual <span class="term soon" data-term="statistical arbitrage" title="Defined in Session 8.3 (coming soon)">statistical arbitrage</span>), <span class="xref soon" data-xref="9.4" data-auto="" title="Coming soon">Session 9.4 — Factor Risk Models</span> builds <span class="term soon" data-term="factor risk model" title="Defined in Session 9.4 (coming soon)">factor risk models</span> in which a few factors explain the common risk, and <span class="xref soon" data-xref="11.2" data-auto="" title="Coming soon">Session 11.2 — Duration, Convexity &amp; Curve PCA</span> finds that three components — level, slope and curvature — drive almost every yield curve.</p>
+</div>
+</section>
+
+<section id="s6">
+<h2><span class="no">3.3.6</span> When the matrix lies: positive semi-definiteness</h2>
+<p class="lede">A covariance matrix must be positive semi-definite, because variances cannot be negative. A matrix estimated one entry at a time can break that rule without any error message — and an optimizer will find the break before you do.</p>
+
+<p>Correlations cannot be chosen freely. If asset A is <span data-lab="bad_r12" data-fmt=".1f">0.9</span>-correlated with both B and C, then B and C are forced to be at least <span data-lab="r23_min" data-fmt=".2f">0.62</span> correlated: the smallest value that keeps the <math><semantics><mrow><mn>3</mn><mo>×</mo><mn>3</mn></mrow><annotation encoding="application/x-tex">3 \times 3</annotation></semantics></math> matrix PSD is <math><semantics><mrow><msub><mi>ρ</mi><mrow><mi>A</mi><mi>B</mi></mrow></msub><msub><mi>ρ</mi><mrow><mi>A</mi><mi>C</mi></mrow></msub><mo>−</mo><msqrt><mrow><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mn>1</mn><mo>−</mo><msubsup><mi>ρ</mi><mrow><mi>A</mi><mi>B</mi></mrow><mn>2</mn></msubsup><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mn>1</mn><mo>−</mo><msubsup><mi>ρ</mi><mrow><mi>A</mi><mi>C</mi></mrow><mn>2</mn></msubsup><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow></msqrt></mrow><annotation encoding="application/x-tex">\rho_{AB}\rho_{AC} - \sqrt{(1-\rho_{AB}^2)(1-\rho_{AC}^2)}</annotation></semantics></math>. Type in <span data-lab="bad_r23" data-fmt=".1f">−0.9</span> instead and the "correlation matrix" has an eigenvalue of <span data-lab="bad_eig_min" data-fmt=".2f">−0.80</span>. Its eigenvector — short A, long B and long C in equal parts — is a portfolio with <em>negative</em> variance. No market can produce it, but a minimum-variance optimizer handed this matrix will pile into that portfolio without limit, because every extra unit "reduces" the risk.</p>
+
+<p>Nobody types an impossible correlation on purpose. The common way to get a non-PSD matrix is missing data. The lab takes one year (<span data-lab="miss_days" data-fmt="d">252</span> days) of returns on the same <span data-lab="n_assets" data-fmt="d">50</span> assets and blanks out each asset on a random <span data-lab="miss_p" data-fmt=".0%">40%</span> of days, as happens with illiquid assets, different exchange holidays or a flaky feed. <em>Listwise</em> deletion — keep only the days on which every asset has a price — leaves <span data-lab="miss_complete_rows" data-fmt="d">0</span> days. pandas' <code>DataFrame.cov()</code> instead uses <em>pairwise</em> deletion by default: each entry is estimated from the days on which that particular pair overlaps, <span data-lab="miss_mean_overlap" data-fmt=".0f">92</span> days on average. Every entry is a sensible estimate; the documentation itself warns that the matrix as a whole "is not guaranteed to be positive semi-definite".</p>
+
+<pre>S_pw = X_obs.cov().to_numpy()                             <span class="c"># pandas default: pairwise-complete</span>
+lam_pw, V_pw = eig_desc(S_pw)
+n_neg = int((lam_pw &lt; <span class="p">0</span>).sum())
+<span class="k">assert</span> n_neg &gt;= <span class="p">1</span>, <span class="s">"pairwise estimate should not be PSD in this design"</span>
+...
+S_clip = V_pw @ np.diag(np.clip(lam_pw, <span class="p">0</span>, <span class="k">None</span>)) @ V_pw.T</pre>
+
+<p>Here <span data-lab="miss_n_neg" data-fmt="d">9</span> of the <span data-lab="n_assets" data-fmt="d">50</span> eigenvalues are negative. Scale the worst eigen-portfolio to 100% gross exposure and the matrix assigns it an annual variance of <span data-lab="miss_bad_var_ann" data-fmt=".4f">−0.0007</span> — while its true volatility is <span data-lab="miss_bad_true_vol" data-fmt=".1%">4.4%</span>.</p>
+
+<p>The standard repair is <em>eigenvalue clipping</em>, the last line of the snippet: set the negative eigenvalues to zero and rebuild. The result is the nearest PSD matrix in the Frobenius norm, and because that is a projection onto a convex set that contains the true <math><semantics><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><annotation encoding="application/x-tex">\Sigma</annotation></semantics></math>, it can only move the estimate closer to the truth (the lab asserts this). But read the small print:</p>
+<ul>
+<li><strong>Valid is not accurate.</strong> The error against the true <math><semantics><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><annotation encoding="application/x-tex">\Sigma</annotation></semantics></math> goes from <span data-lab="miss_err_before" data-fmt=".1%">34.6%</span> to <span data-lab="miss_err_after" data-fmt=".1%">33.9%</span>. The matrix was noisy because each entry saw only about <span data-lab="miss_mean_overlap" data-fmt=".0f">92</span> days, and clipping does not fix that.</li>
+<li><strong>Clipped directions now claim zero risk.</strong> The worst portfolio's estimated variance is now exactly 0, and its true volatility is still <span data-lab="miss_bad_true_vol" data-fmt=".1%">4.4%</span>. An optimizer will treat those directions as free hedges. Floor the eigenvalues at a small positive value instead, or better, use a shrinkage estimator (<span class="xref soon" data-xref="9.2" data-style="short" data-auto="" title="Coming soon">Session 9.2</span>) or a factor model (<span class="xref soon" data-xref="9.4" data-style="short" data-auto="" title="Coming soon">Session 9.4</span>).</li>
+<li><strong>It moves the variances too.</strong> Here by up to <span data-lab="miss_var_change_max" data-fmt=".1%">5.3%</span>. For a correlation matrix you also need the unit diagonal back: that is the <em>nearest correlation matrix</em> problem, which Higham (2002) solves by alternating projections.</li>
+<li><strong>It treats the symptom.</strong> The cause is the data: align it (<span class="xref soon" data-xref="4.4" data-style="short" data-auto="" title="Coming soon">Session 4.4</span>) and check it (<span class="xref soon" data-xref="4.6" data-style="short" data-auto="" title="Coming soon">Session 4.6</span>) before you estimate anything.</li>
+</ul>
+
+<table>
+<thead><tr><th>Situation</th><th>What breaks</th><th>What to do</th></tr></thead>
+<tbody>
+<tr><td>Missing or misaligned data, pairwise deletion</td><td>negative eigenvalues; "negative-variance" portfolios</td><td>align the data; a model-based estimate; clip only as a last resort</td></tr>
+<tr><td>Hand-edited or stress-scenario correlations</td><td>impossible combinations, as in the 3 × 3 example above</td><td>check the smallest eigenvalue after every edit; nearest correlation matrix</td></tr>
+<tr><td>Fewer periods than assets (<math><semantics><mrow><mi>T</mi><mo>≤</mo><mi>N</mi></mrow><annotation encoding="application/x-tex">T \le N</annotation></semantics></math>)</td><td>PSD but singular: zero eigenvalues, no inverse</td><td>shrinkage or a factor model; more data per asset</td></tr>
+<tr><td>A redundant asset (an ETF plus all its constituents)</td><td>a zero or near-zero eigenvalue</td><td>drop the redundant asset</td></tr>
+</tbody>
+</table>
+
+<div class="co warn"><span class="co-t">⚠️ Pitfall — "pandas returned a matrix, so it is a covariance matrix"</span>
+<p>The call succeeded, the diagonal is positive, every pairwise correlation looks plausible — and the matrix can still be invalid. Every time you build <math><semantics><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><annotation encoding="application/x-tex">\Sigma</annotation></semantics></math> from anything other than one complete, aligned table, check the smallest eigenvalue: <code>np.linalg.eigvalsh(S)[0] &gt;= -tol</code>. It is a one-line unit test, and it catches the bug before an optimizer does.</p>
+</div>
+</section>
+
+<section id="s7">
+<h2><span class="no">3.3.7</span> The condition number: why inverting Σ amplifies noise</h2>
+<p class="lede">Every tool that uses <math><semantics><msup><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><mrow><mo form="prefix" stretchy="false" lspace="0em" rspace="0em">−</mo><mn>1</mn></mrow></msup><annotation encoding="application/x-tex">\Sigma^{-1}</annotation></semantics></math> divides by the small eigenvalues — the directions your data measured worst. The condition number tells you how much that division can magnify your estimation error.</p>
+
+<p>The <strong>condition number</strong> of a positive definite matrix is the ratio of its largest to its smallest eigenvalue:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><mpadded lspace="0"><mi>cond</mi></mpadded><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mo>=</mo><mfrac><msub><mi>λ</mi><mrow><mi>max</mi><mo>⁡</mo></mrow></msub><msub><mi>λ</mi><mrow><mi>min</mi><mo>⁡</mo></mrow></msub></mfrac></mrow><annotation encoding="application/x-tex">\mathrm{cond}(\Sigma) = \frac{\lambda_{\max}}{\lambda_{\min}}</annotation></semantics></math></div>
+<p>(Numerical analysts write <math><semantics><mi>κ</mi><annotation encoding="application/x-tex">\kappa</annotation></semantics></math>; this course reserves <math><semantics><mi>κ</mi><annotation encoding="application/x-tex">\kappa</annotation></semantics></math> for the <a class="term" href="../unit02-markets-instruments/session02-equities-indices-etfs.html#g-borrow-fee" data-term="borrow fee">borrow fee</a> of <a class="xref" href="../unit02-markets-instruments/session02-equities-indices-etfs.html" data-xref="2.2" data-style="short" data-auto="">Session 2.2</a>.) It bounds how errors are amplified: if you solve <math><semantics><mrow><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><mi>x</mi><mo>=</mo><mi>b</mi></mrow><annotation encoding="application/x-tex">\Sigma x = b</annotation></semantics></math> and <math><semantics><mi>b</mi><annotation encoding="application/x-tex">b</annotation></semantics></math> carries a relative error <math><semantics><mi>ε</mi><annotation encoding="application/x-tex">\varepsilon</annotation></semantics></math>, the solution <math><semantics><mi>x</mi><annotation encoding="application/x-tex">x</annotation></semantics></math> can carry a relative error up to <math><semantics><mrow><mpadded lspace="0"><mi>cond</mi></mpadded><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mspace width="0.1667em"></mspace><mi>ε</mi></mrow><annotation encoding="application/x-tex">\mathrm{cond}(\Sigma)\,\varepsilon</annotation></semantics></math> (Golub &amp; Van Loan, 2013, §2.6). The reason is visible in the eigen-decomposition: <math><semantics><mrow><msup><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><mrow><mo form="prefix" stretchy="false" lspace="0em" rspace="0em">−</mo><mn>1</mn></mrow></msup><mo>=</mo><mi>V</mi><msup><mrow><mi mathvariant="normal">Λ</mi><mspace></mspace></mrow><mrow><mo form="prefix" stretchy="false" lspace="0em" rspace="0em">−</mo><mn>1</mn></mrow></msup><msup><mi>V</mi><mi>⊤</mi></msup></mrow><annotation encoding="application/x-tex">\Sigma^{-1} = V \Lambda^{-1} V^\top</annotation></semantics></math>, so inverting flips the spectrum and the smallest eigenvalue becomes the largest multiplier. The minimum-variance portfolio <math><semantics><mrow><mi>w</mi><mo>∝</mo><msup><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><mrow><mo form="prefix" stretchy="false" lspace="0em" rspace="0em">−</mo><mn>1</mn></mrow></msup><mn>𝟏</mn></mrow><annotation encoding="application/x-tex">w \propto \Sigma^{-1}\mathbf 1</annotation></semantics></math>, mean-variance weights <math><semantics><mrow><msup><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><mrow><mo form="prefix" stretchy="false" lspace="0em" rspace="0em">−</mo><mn>1</mn></mrow></msup><mi>μ</mi></mrow><annotation encoding="application/x-tex">\Sigma^{-1}\mu</annotation></semantics></math> and regression coefficients all lean hardest on the directions with the least variance.</p>
+
+<p>In a sample, those are exactly the directions estimated worst, and wrong in a predictable way: the smallest sample eigenvalues are biased down and the largest up, more so as the number of observations per asset, <math><semantics><mrow><mi>T</mi><mi>/</mi><mi>N</mi></mrow><annotation encoding="application/x-tex">T/N</annotation></semantics></math>, falls. <span class="term soon" data-term="random matrix theory" title="Defined in Session 9.2 (coming soon)">Random-matrix theory</span> — the <span class="term soon" data-term="Marchenko-Pastur distribution" title="Defined in Session 9.2 (coming soon)">Marchenko–Pastur law</span>, which <span class="xref soon" data-xref="9.2" data-style="short" data-auto="" title="Coming soon">Session 9.2</span> puts to work — predicts by how much. So a sample <math><semantics><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><annotation encoding="application/x-tex">\Sigma</annotation></semantics></math> is worse conditioned than the truth: the lab's true matrix has <math><semantics><mrow><mpadded lspace="0"><mi>cond</mi></mpadded><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">\mathrm{cond}(\Sigma)</annotation></semantics></math> = <span data-lab="cond_true" data-fmt=".1f">25.7</span>, and even <span data-lab="years" data-fmt="d">10</span> years of daily data give an estimate at <span data-lab="cond_sample" data-fmt=".1f">33.1</span>.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 262" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">SAME NOISE, TWO MATRICES — WHAT INVERTING Σ DOES WITH IT</text>
+  <rect x="540" y="12" width="9" height="9" fill="#0A66C2"/>
+  <text x="553" y="20" font-size="9.5" fill="#4A5A68">sample 1</text>
+  <rect x="610" y="12" width="9" height="9" fill="#E8850C"/>
+  <text x="623" y="20" font-size="9.5" fill="#4A5A68">sample 2</text>
+  <rect x="26" y="32" width="326" height="198" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="189" y="52" font-size="11" font-weight="700" text-anchor="middle" fill="#1F7A55">WELL-CONDITIONED · cond(Σ) small</text>
+  <ellipse cx="96" cy="122" rx="44" ry="36" fill="#fff" stroke="#1F7A55" stroke-width="1.5"/>
+  <ellipse cx="96" cy="122" rx="47" ry="34" transform="rotate(10 96 122)" fill="none" stroke="#1F2C38" stroke-width="1.2" stroke-dasharray="4 3"/>
+  <text x="96" y="176" font-size="9" text-anchor="middle" fill="#4A5A68">truth (solid)</text>
+  <text x="96" y="188" font-size="9" text-anchor="middle" fill="#4A5A68">estimate (dashed)</text>
+  <text x="255" y="74" font-size="9.5" text-anchor="middle" fill="#4A5A68">min-variance weights, 5 assets</text>
+  <path d="M172 140 H338" stroke="#4A5A68" stroke-width="1"/>
+  <rect x="181" y="106" width="8" height="34" fill="#0A66C2"/><rect x="191" y="109" width="8" height="31" fill="#E8850C"/>
+  <rect x="213" y="116" width="8" height="24" fill="#0A66C2"/><rect x="223" y="113" width="8" height="27" fill="#E8850C"/>
+  <rect x="245" y="112" width="8" height="28" fill="#0A66C2"/><rect x="255" y="114" width="8" height="26" fill="#E8850C"/>
+  <rect x="277" y="120" width="8" height="20" fill="#0A66C2"/><rect x="287" y="118" width="8" height="22" fill="#E8850C"/>
+  <rect x="309" y="114" width="8" height="26" fill="#0A66C2"/><rect x="319" y="116" width="8" height="24" fill="#E8850C"/>
+  <text x="255" y="182" font-size="10" font-weight="700" text-anchor="middle" fill="#1F7A55">two samples, nearly the same book</text>
+  <text x="189" y="216" font-size="9.5" text-anchor="middle" fill="#4A5A68">every direction is well measured; Σ⁻¹ stays tame</text>
+  <rect x="368" y="32" width="326" height="198" rx="9" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="531" y="52" font-size="11" font-weight="700" text-anchor="middle" fill="#D64B2A">ILL-CONDITIONED · cond(Σ) huge</text>
+  <ellipse cx="438" cy="122" rx="58" ry="9" transform="rotate(-35 438 122)" fill="#fff" stroke="#D64B2A" stroke-width="1.5"/>
+  <ellipse cx="438" cy="122" rx="60" ry="4" transform="rotate(-29 438 122)" fill="none" stroke="#1F2C38" stroke-width="1.2" stroke-dasharray="4 3"/>
+  <text x="438" y="176" font-size="9" text-anchor="middle" fill="#4A5A68">truth (solid)</text>
+  <text x="438" y="188" font-size="9" text-anchor="middle" fill="#4A5A68">estimate (dashed)</text>
+  <text x="597" y="74" font-size="9.5" text-anchor="middle" fill="#4A5A68">min-variance weights, 5 assets</text>
+  <path d="M514 122 H680" stroke="#4A5A68" stroke-width="1"/>
+  <rect x="523" y="84" width="8" height="38" fill="#0A66C2"/><rect x="533" y="122" width="8" height="22" fill="#E8850C"/>
+  <rect x="555" y="122" width="8" height="26" fill="#0A66C2"/><rect x="565" y="86" width="8" height="36" fill="#E8850C"/>
+  <rect x="587" y="88" width="8" height="34" fill="#0A66C2"/><rect x="597" y="122" width="8" height="30" fill="#E8850C"/>
+  <rect x="619" y="122" width="8" height="30" fill="#0A66C2"/><rect x="629" y="90" width="8" height="32" fill="#E8850C"/>
+  <rect x="651" y="104" width="8" height="18" fill="#0A66C2"/><rect x="661" y="122" width="8" height="6" fill="#E8850C"/>
+  <text x="597" y="182" font-size="10" font-weight="700" text-anchor="middle" fill="#D64B2A">two samples, opposite bets</text>
+  <text x="531" y="216" font-size="9.5" text-anchor="middle" fill="#4A5A68">the thin direction is barely measured; Σ⁻¹ blows it up</text>
+  <text x="360" y="250" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">An optimizer divides by the smallest eigenvalue — the direction your data measured worst.</text>
+</svg>
+<figcaption>fig 3.3.8 — well- versus ill-conditioned (illustrative bars): the same estimation noise barely moves Σ⁻¹-based weights when every direction is well measured, and flips them when one direction is thin</figcaption>
+</figure>
+
+<p>The lab measures the damage. For each ratio <math><semantics><mrow><mi>T</mi><mi>/</mi><mi>N</mi></mrow><annotation encoding="application/x-tex">T/N</annotation></semantics></math> it draws <span data-lab="n_mc_tn" data-fmt="d">500</span> samples from the same <span data-lab="n_assets" data-fmt="d">50</span>-asset market, estimates <math><semantics><mi>S</mi><annotation encoding="application/x-tex">S</annotation></semantics></math>, and builds the sample global minimum-variance portfolio <math><semantics><mrow><mover><mi>w</mi><mo stretchy="false" class="chr-med wbk-med-acc" style="math-depth:0;">ˆ</mo></mover><mo>=</mo><msup><mi>S</mi><mrow class="tml-med-pad"><mo form="prefix" stretchy="false" lspace="0em" rspace="0em">−</mo><mn>1</mn></mrow></msup><mn>𝟏</mn><mi>/</mi><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><msup><mn>𝟏</mn><mi>⊤</mi></msup><msup><mi>S</mi><mrow class="tml-med-pad"><mo form="prefix" stretchy="false" lspace="0em" rspace="0em">−</mo><mn>1</mn></mrow></msup><mn>𝟏</mn><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">\hat w = S^{-1}\mathbf 1 / (\mathbf 1^\top S^{-1} \mathbf 1)</annotation></semantics></math>. It then compares the variance the portfolio <em>promises</em> (measured with <math><semantics><mi>S</mi><annotation encoding="application/x-tex">S</annotation></semantics></math>) and the variance it <em>delivers</em> (measured with the true <math><semantics><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><annotation encoding="application/x-tex">\Sigma</annotation></semantics></math>) with the true minimum variance <math><semantics><msubsup><mi>σ</mi><mrow><mi>min</mi><mo>⁡</mo></mrow><mn>2</mn></msubsup><annotation encoding="application/x-tex">\sigma^2_{\min}</annotation></semantics></math>. For normal returns both have exact expectations, derived in the lab from the Wishart distribution of <math><semantics><mi>S</mi><annotation encoding="application/x-tex">S</annotation></semantics></math> (Kan &amp; Smith, 2008, develop the full finite-sample theory):</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><mfrac><mrow><mi>𝔼</mi><mrow><mo fence="true" form="prefix" stretchy="false">[</mo><msup><mover><mi>w</mi><mo stretchy="false" class="chr-med wbk-med-acc" style="math-depth:0;">ˆ</mo></mover><mi>⊤</mi></msup><mi>S</mi><mspace width="0.1667em"></mspace><mover><mi>w</mi><mo stretchy="false" class="chr-med wbk-med-acc" style="math-depth:0;">ˆ</mo></mover><mo fence="true" form="postfix" stretchy="false">]</mo></mrow></mrow><msubsup><mi>σ</mi><mrow><mi>min</mi><mo>⁡</mo></mrow><mn>2</mn></msubsup></mfrac><mo>=</mo><mfrac><mrow><mi>T</mi><mo>−</mo><mi>N</mi></mrow><mrow><mi>T</mi><mo>−</mo><mn>1</mn></mrow></mfrac><mo separator="true">,</mo><mspace width="2em"></mspace><mfrac><mrow><mi>𝔼</mi><mrow><mo fence="true" form="prefix" stretchy="false">[</mo><msup><mover><mi>w</mi><mo stretchy="false" class="chr-med wbk-med-acc" style="math-depth:0;">ˆ</mo></mover><mi>⊤</mi></msup><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><mspace width="0.1667em"></mspace><mover><mi>w</mi><mo stretchy="false" class="chr-med wbk-med-acc" style="math-depth:0;">ˆ</mo></mover><mo fence="true" form="postfix" stretchy="false">]</mo></mrow></mrow><msubsup><mi>σ</mi><mrow><mi>min</mi><mo>⁡</mo></mrow><mn>2</mn></msubsup></mfrac><mo>=</mo><mfrac><mrow><mi>T</mi><mo>−</mo><mn>2</mn></mrow><mrow><mi>T</mi><mo>−</mo><mi>N</mi><mo>−</mo><mn>1</mn></mrow></mfrac></mrow><annotation encoding="application/x-tex">\frac{\E[\hat w^\top S\, \hat w]}{\sigma^2_{\min}} = \frac{T-N}{T-1}, \qquad \frac{\E[\hat w^\top \Sigma\, \hat w]}{\sigma^2_{\min}} = \frac{T-2}{T-N-1}</annotation></semantics></math></div>
+
+<table>
+<thead><tr><th><math><semantics><mrow><mi>T</mi><mi>/</mi><mi>N</mi></mrow><annotation encoding="application/x-tex">T/N</annotation></semantics></math></th><th>Days <math><semantics><mi>T</mi><annotation encoding="application/x-tex">T</annotation></semantics></math></th><th>Mean <math><semantics><mrow><mpadded lspace="0"><mi>cond</mi></mpadded><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>S</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">\mathrm{cond}(S)</annotation></semantics></math></th><th><math><semantics><mrow><mpadded lspace="0"><mi>cond</mi></mpadded><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>S</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mi>/</mi><mpadded lspace="0"><mi>cond</mi></mpadded><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">\mathrm{cond}(S) / \mathrm{cond}(\Sigma)</annotation></semantics></math></th><th>Promised variance ÷ true minimum</th><th>Delivered variance ÷ true minimum (exact)</th><th>Weight error</th></tr></thead>
+<tbody>
+<tr><td><span data-lab="tn_1_2_ratio" data-fmt="g">1.2</span></td><td><span data-lab="tn_1_2_T" data-fmt="d">60</span></td><td><span data-lab="tn_1_2_cond" data-fmt=",.0f">2,864</span></td><td><span data-lab="tn_1_2_cond_ratio" data-fmt=".0f">111</span></td><td><span data-lab="tn_1_2_vin" data-fmt=".2f">0.17</span></td><td><span data-lab="tn_1_2_vout" data-fmt=".2f">6.37</span> (<span data-lab="tn_1_2_vout_theory" data-fmt=".2f">6.44</span>)</td><td><span data-lab="tn_1_2_werr" data-fmt=".0%">250%</span></td></tr>
+<tr><td><span data-lab="tn_2_ratio" data-fmt="g">2</span></td><td><span data-lab="tn_2_T" data-fmt="d">100</span></td><td><span data-lab="tn_2_cond" data-fmt=",.0f">265</span></td><td><span data-lab="tn_2_cond_ratio" data-fmt=".1f">10.3</span></td><td><span data-lab="tn_2_vin" data-fmt=".2f">0.51</span></td><td><span data-lab="tn_2_vout" data-fmt=".2f">2.01</span> (<span data-lab="tn_2_vout_theory" data-fmt=".2f">2.00</span>)</td><td><span data-lab="tn_2_werr" data-fmt=".0%">111%</span></td></tr>
+<tr><td><span data-lab="tn_5_ratio" data-fmt="g">5</span></td><td><span data-lab="tn_5_T" data-fmt="d">250</span></td><td><span data-lab="tn_5_cond" data-fmt=",.0f">78</span></td><td><span data-lab="tn_5_cond_ratio" data-fmt=".1f">3.0</span></td><td><span data-lab="tn_5_vin" data-fmt=".2f">0.81</span></td><td><span data-lab="tn_5_vout" data-fmt=".2f">1.25</span> (<span data-lab="tn_5_vout_theory" data-fmt=".2f">1.25</span>)</td><td><span data-lab="tn_5_werr" data-fmt=".0%">55%</span></td></tr>
+<tr><td><span data-lab="tn_10_ratio" data-fmt="g">10</span></td><td><span data-lab="tn_10_T" data-fmt="d">500</span></td><td><span data-lab="tn_10_cond" data-fmt=",.0f">52</span></td><td><span data-lab="tn_10_cond_ratio" data-fmt=".1f">2.0</span></td><td><span data-lab="tn_10_vin" data-fmt=".2f">0.90</span></td><td><span data-lab="tn_10_vout" data-fmt=".2f">1.11</span> (<span data-lab="tn_10_vout_theory" data-fmt=".2f">1.11</span>)</td><td><span data-lab="tn_10_werr" data-fmt=".0%">37%</span></td></tr>
+<tr><td><span data-lab="tn_50_ratio" data-fmt="g">50</span></td><td><span data-lab="tn_50_T" data-fmt=",d">2,500</span></td><td><span data-lab="tn_50_cond" data-fmt=",.0f">34</span></td><td><span data-lab="tn_50_cond_ratio" data-fmt=".1f">1.3</span></td><td><span data-lab="tn_50_vin" data-fmt=".2f">0.98</span></td><td><span data-lab="tn_50_vout" data-fmt=".2f">1.02</span> (<span data-lab="tn_50_vout_theory" data-fmt=".2f">1.02</span>)</td><td><span data-lab="tn_50_werr" data-fmt=".0%">16%</span></td></tr>
+</tbody>
+</table>
+<p>The weight error is the total absolute difference between the estimated and the true minimum-variance weights, as a share of the true weights' gross size. The simulated ratios match the exact formulas within four standard errors at every <math><semantics><mrow><mi>T</mi><mi>/</mi><mi>N</mi></mrow><annotation encoding="application/x-tex">T/N</annotation></semantics></math>, which the lab asserts.</p>
+
+<figure class="diagram chart">
+<!-- chart:gmv_risk -->
+<svg viewBox="0 0 720 280" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Min-variance portfolio: variance ÷ true minimum, by days per asset (T/N)">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">MIN-VARIANCE PORTFOLIO: VARIANCE ÷ TRUE MINIMUM, BY DAYS PER ASSET (T/N)</text>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#E8850C" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">promised (in-sample)</text>
+  <line x1="198.0" y1="32" x2="214.0" y2="32" stroke="#D64B2A" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="220.0" y="36" font-size="11" fill="#4A5A68">realised (true)</text>
+  <line x1="64" y1="236" x2="690" y2="236" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="240" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.0×</text>
+  <line x1="64" y1="191" x2="690" y2="191" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="195" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">2.0×</text>
+  <line x1="64" y1="146" x2="690" y2="146" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="150" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">4.0×</text>
+  <line x1="64" y1="101" x2="690" y2="101" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="105" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">6.0×</text>
+  <line x1="64" y1="56" x2="690" y2="56" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="60" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">8.0×</text>
+  <line x1="64" y1="236" x2="690" y2="236" stroke="#C9CFC6" stroke-width="1"/>
+  <path d="M78.1,236 V234.1 Q78.1,232.2 80,232.2 H100.2 Q102.1,232.2 102.1,234.1 V236 Z" fill="#E8850C"><title>1.2 · promised (in-sample): 0.2×</title></path>
+  <path d="M104.1,236 V96.7 Q104.1,92.7 108.1,92.7 H124.1 Q128.1,92.7 128.1,96.7 V236 Z" fill="#D64B2A"><title>1.2 · realised (true): 6.4×</title></path>
+  <text x="103.1" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">1.2</text>
+  <path d="M156.4,236 V232.1 Q156.4,228.3 160.2,228.3 H176.5 Q180.4,228.3 180.4,232.1 V236 Z" fill="#E8850C"><title>1.5 · promised (in-sample): 0.3×</title></path>
+  <path d="M182.4,236 V170.3 Q182.4,166.3 186.4,166.3 H202.4 Q206.4,166.3 206.4,170.3 V236 Z" fill="#D64B2A"><title>1.5 · realised (true): 3.1×</title></path>
+  <text x="181.4" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">1.5</text>
+  <path d="M234.6,236 V228.6 Q234.6,224.6 238.6,224.6 H254.6 Q258.6,224.6 258.6,228.6 V236 Z" fill="#E8850C"><title>2 · promised (in-sample): 0.5×</title></path>
+  <path d="M260.6,236 V194.8 Q260.6,190.8 264.6,190.8 H280.6 Q284.6,190.8 284.6,194.8 V236 Z" fill="#D64B2A"><title>2 · realised (true): 2.0×</title></path>
+  <text x="259.6" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">2</text>
+  <path d="M312.9,236 V225 Q312.9,221 316.9,221 H332.9 Q336.9,221 336.9,225 V236 Z" fill="#E8850C"><title>3 · promised (in-sample): 0.7×</title></path>
+  <path d="M338.9,236 V206.6 Q338.9,202.6 342.9,202.6 H358.9 Q362.9,202.6 362.9,206.6 V236 Z" fill="#D64B2A"><title>3 · realised (true): 1.5×</title></path>
+  <text x="337.9" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">3</text>
+  <path d="M391.1,236 V221.9 Q391.1,217.9 395.1,217.9 H411.1 Q415.1,217.9 415.1,221.9 V236 Z" fill="#E8850C"><title>5 · promised (in-sample): 0.8×</title></path>
+  <path d="M417.1,236 V212 Q417.1,208 421.1,208 H437.1 Q441.1,208 441.1,212 V236 Z" fill="#D64B2A"><title>5 · realised (true): 1.2×</title></path>
+  <text x="416.1" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">5</text>
+  <path d="M469.4,236 V219.7 Q469.4,215.7 473.4,215.7 H489.4 Q493.4,215.7 493.4,219.7 V236 Z" fill="#E8850C"><title>10 · promised (in-sample): 0.9×</title></path>
+  <path d="M495.4,236 V215 Q495.4,211 499.4,211 H515.4 Q519.4,211 519.4,215 V236 Z" fill="#D64B2A"><title>10 · realised (true): 1.1×</title></path>
+  <text x="494.4" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">10</text>
+  <path d="M547.6,236 V218.6 Q547.6,214.6 551.6,214.6 H567.6 Q571.6,214.6 571.6,218.6 V236 Z" fill="#E8850C"><title>20 · promised (in-sample): 1.0×</title></path>
+  <path d="M573.6,236 V216.3 Q573.6,212.3 577.6,212.3 H593.6 Q597.6,212.3 597.6,216.3 V236 Z" fill="#D64B2A"><title>20 · realised (true): 1.1×</title></path>
+  <text x="572.6" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">20</text>
+  <path d="M625.9,236 V217.9 Q625.9,213.9 629.9,213.9 H645.9 Q649.9,213.9 649.9,217.9 V236 Z" fill="#E8850C"><title>50 · promised (in-sample): 1.0×</title></path>
+  <path d="M651.9,236 V217.1 Q651.9,213.1 655.9,213.1 H671.9 Q675.9,213.1 675.9,217.1 V236 Z" fill="#D64B2A"><title>50 · realised (true): 1.0×</title></path>
+  <text x="650.9" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">50</text>
+</svg>
+<!-- /chart:gmv_risk -->
+<figcaption>fig 3.3.9 — the sample minimum-variance portfolio promises less risk than is possible and delivers more; the gap closes only when there are many days per asset</figcaption>
+</figure>
+
+<p>Read the <math><semantics><mrow><mi>T</mi><mi>/</mi><mi>N</mi><mo>=</mo><mn>2</mn></mrow><annotation encoding="application/x-tex">T/N = 2</annotation></semantics></math> row as a story: <span data-lab="tn_2_T" data-fmt="d">100</span> days of data on <span data-lab="n_assets" data-fmt="d">50</span> assets. The optimizer promises about half the true minimum variance and delivers about twice it, so the realised volatility is <span data-lab="tn_2_vol_gap" data-fmt=".2f">1.99</span> times what was promised, and the weights miss by <span data-lab="tn_2_werr" data-fmt=".0%">111%</span> of their own gross size. Nothing about the code is buggy. It is the arithmetic of dividing by eigenvalues that the data could not pin down.</p>
+
+<div class="co key"><span class="co-t">📌 Key idea — an optimizer amplifies whatever you failed to measure</span>
+<p><mark>Inverting a sample covariance matrix points an amplifier at its smallest, noisiest eigenvalues.</mark> The defences are more observations per asset, a better-conditioned estimate (shrinkage, factor models) and constraints on the weights. <span class="xref soon" data-xref="9.1" data-auto="" title="Coming soon">Session 9.1 — Mean-Variance &amp; Why It Breaks</span> shows why unconstrained <span class="term soon" data-term="mean-variance optimisation" title="Defined in Session 9.1 (coming soon)">mean-variance optimisation</span> is called an <span class="term soon" data-term="error maximisation" title="Defined in Session 9.1 (coming soon)">error maximiser</span>, and <a class="xref" href="session04-convex-optimization.html" data-xref="3.4" data-auto="">Session 3.4 — Convex Optimization</a> shows how constraints tame the optimizer.</p>
+</div>
+
+<div class="co tip"><span class="co-t">💡 Looking ahead</span>
+<p>The standard fix pulls <math><semantics><mi>S</mi><annotation encoding="application/x-tex">S</annotation></semantics></math> toward a well-conditioned target: <span class="term soon" data-term="Ledoit-Wolf shrinkage" title="Defined in Session 9.2 (coming soon)">Ledoit–Wolf shrinkage</span> (<span class="xref soon" data-xref="9.2" data-style="short" data-auto="" title="Coming soon">Session 9.2</span>), a form of the <span class="term soon" data-term="shrinkage" title="Defined in Session 5.3 (coming soon)">shrinkage</span> of <span class="xref soon" data-xref="5.3" data-style="short" data-auto="" title="Coming soon">Session 5.3</span>. It raises the small eigenvalues and lowers the large ones — the exact opposite of the sample bias.</p>
+</div>
+</section>
+
+<section id="s8">
+<h2><span class="no">3.3.8</span> Try it</h2>
+<p class="lede">Open the companion lab, predict before you run, and change one thing at a time.</p>
+<div class="co lab"><span class="co-t">🔧 Try it (15 min, in the lab)</span>
+<p>1. <strong>Predict, then check.</strong> With <math><semantics><mi>N</mi><annotation encoding="application/x-tex">N</annotation></semantics></math> = <span data-lab="n_assets" data-fmt="d">50</span>, for what number of days <math><semantics><mi>T</mi><annotation encoding="application/x-tex">T</annotation></semantics></math> does the formula <math><semantics><mrow><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>T</mi><mo>−</mo><mn>2</mn><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mi>/</mi><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>T</mi><mo>−</mo><mi>N</mi><mo>−</mo><mn>1</mn><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">(T-2)/(T-N-1)</annotation></semantics></math> say the minimum-variance portfolio delivers 1.25 times the true minimum variance? Solve it by hand, then compare with the <math><semantics><mrow><mi>T</mi><mi>/</mi><mi>N</mi><mo>=</mo><mn>5</mn></mrow><annotation encoding="application/x-tex">T/N = 5</annotation></semantics></math> row of the table in §3.3.7.<br>
+2. <strong>Less noise, stronger market.</strong> In section 3 of the lab, change <code>IDIO_VOL</code> from <span data-lab="idio_vol" data-fmt=".2f">0.25</span> to 0.10 and rerun. Before you look, predict three things: does PC1's share of variance go up or down, does the predicted PC1 angle (<code>pc1_angle_deg_theory</code>) grow or shrink, and do you get more or fewer negative eigenvalues in section 7? (Hint: <math><semantics><msub><mi>λ</mi><mrow><mi>min</mi><mo>⁡</mo></mrow></msub><annotation encoding="application/x-tex">\lambda_{\min}</annotation></semantics></math> is <math><semantics><msubsup><mi>σ</mi><mi>e</mi><mn>2</mn></msubsup><annotation encoding="application/x-tex">\sigma_e^2</annotation></semantics></math>.)<br>
+3. <strong>Less missing data.</strong> Set <code>P_MISS</code> to 0.30 in section 7. How many negative eigenvalues are left, and does clipping help more or less?<br>
+Success looks like this: every assert still passes, and you can explain each change from a formula on this page.</p>
+</div>
+</section>
+
+<hr>
+
+<section id="s9">
+<h2><span class="no">3.3.9</span> Glossary · Check yourself · Go deeper</h2>
+<div class="gloss" id="glossary">
+<div id="g-weight-vector"><b>Weight vector</b> — the column <math><semantics><mrow><mi>w</mi><mo>=</mo><msup><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><msub><mi>w</mi><mn>1</mn></msub><mo separator="true">,</mo><mo>…</mo><mo separator="true">,</mo><msub><mi>w</mi><mi>N</mi></msub><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mi>⊤</mi></msup></mrow><annotation encoding="application/x-tex">w = (w_1, \dots, w_N)^\top</annotation></semantics></math> of capital fractions in each asset (negative for shorts); the portfolio return is the dot product <math><semantics><mrow><msup><mi>w</mi><mi class="tml-med-pad">⊤</mi></msup><mi>R</mi></mrow><annotation encoding="application/x-tex">w^\top R</annotation></semantics></math>.</div>
+<div id="g-covariance-matrix"><b>Covariance matrix</b> — the <math><semantics><mrow><mi>N</mi><mo>×</mo><mi>N</mi></mrow><annotation encoding="application/x-tex">N \times N</annotation></semantics></math> symmetric matrix <math><semantics><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><annotation encoding="application/x-tex">\Sigma</annotation></semantics></math> with <math><semantics><mrow><msub><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><mrow><mi>i</mi><mi>j</mi></mrow></msub><mo>=</mo><mi>Cov</mi><mo>⁡</mo><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><msub><mi>R</mi><mi>i</mi></msub><mo separator="true">,</mo><msub><mi>R</mi><mi>j</mi></msub><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">\Sigma_{ij} = \Cov(R_i, R_j)</annotation></semantics></math>: variances on the diagonal, covariances off it.</div>
+<div id="g-correlation-matrix"><b>Correlation matrix</b> — the matrix <math><semantics><mi>C</mi><annotation encoding="application/x-tex">C</annotation></semantics></math> of pairwise correlations, ones on the diagonal; <math><semantics><mrow><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><mo>=</mo><mi>D</mi><mi>C</mi><mi>D</mi></mrow><annotation encoding="application/x-tex">\Sigma = DCD</annotation></semantics></math> with <math><semantics><mi>D</mi><annotation encoding="application/x-tex">D</annotation></semantics></math> the diagonal matrix of volatilities.</div>
+<div id="g-portfolio-variance"><b>Portfolio variance</b> — the variance of a portfolio's return, the quadratic form <math><semantics><mrow><msup><mi>w</mi><mi class="tml-med-pad">⊤</mi></msup><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><mi>w</mi><mo>=</mo><msub><mo movablelimits="false">∑</mo><mi>i</mi></msub><msub><mo movablelimits="false">∑</mo><mi>j</mi></msub><msub><mi>w</mi><mi>i</mi></msub><msub><mi>w</mi><mi>j</mi></msub><msub><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><mrow><mi>i</mi><mi>j</mi></mrow></msub></mrow><annotation encoding="application/x-tex">w^\top \Sigma w = \sum_i \sum_j w_i w_j \Sigma_{ij}</annotation></semantics></math>.</div>
+<div id="g-quadratic-form"><b>Quadratic form</b> — an expression such as <math><semantics><mrow><msup><mi>w</mi><mi class="tml-med-pad">⊤</mi></msup><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><mi>w</mi></mrow><annotation encoding="application/x-tex">w^\top \Sigma w</annotation></semantics></math> in which every term multiplies two entries of a vector; portfolio variance is the quadratic form built from the weight vector and the covariance matrix.</div>
+<div id="g-eigenvalue"><b>Eigenvalue</b> — the factor <math><semantics><mi>λ</mi><annotation encoding="application/x-tex">\lambda</annotation></semantics></math> by which a matrix stretches one of its eigenvectors, <math><semantics><mrow><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><mi>v</mi><mo>=</mo><mi>λ</mi><mi>v</mi></mrow><annotation encoding="application/x-tex">\Sigma v = \lambda v</annotation></semantics></math>; for a covariance matrix, the variance of the eigen-portfolio <math><semantics><mi>v</mi><annotation encoding="application/x-tex">v</annotation></semantics></math>.</div>
+<div id="g-eigenvector"><b>Eigenvector</b> — a direction <math><semantics><mi>v</mi><annotation encoding="application/x-tex">v</annotation></semantics></math> that a matrix only stretches, <math><semantics><mrow><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><mi>v</mi><mo>=</mo><mi>λ</mi><mi>v</mi></mrow><annotation encoding="application/x-tex">\Sigma v = \lambda v</annotation></semantics></math>; a covariance matrix's eigenvectors are uncorrelated portfolios.</div>
+<div id="g-eigen-portfolio"><b>Eigen-portfolio</b> — the portfolio whose weights are one eigenvector of <math><semantics><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><annotation encoding="application/x-tex">\Sigma</annotation></semantics></math>; eigen-portfolios are mutually uncorrelated, and the <math><semantics><mi>k</mi><annotation encoding="application/x-tex">k</annotation></semantics></math>-th has variance equal to its eigenvalue <math><semantics><msub><mi>λ</mi><mi>k</mi></msub><annotation encoding="application/x-tex">\lambda_k</annotation></semantics></math>.</div>
+<div id="g-principal-component-analysis"><b>Principal component analysis</b> — eigen-decomposing an estimated covariance or correlation matrix; the components are uncorrelated portfolios sorted by variance, the first usually the market.</div>
+<div id="g-market-mode"><b>Market mode</b> — the first principal component of a market's returns: usually all its weights share one sign, so it moves every asset together.</div>
+<div id="g-positive-semi-definite"><b>Positive semi-definite</b> — a symmetric matrix with <math><semantics><mrow><msup><mi>w</mi><mi class="tml-med-pad">⊤</mi></msup><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><mi>w</mi><mo>≥</mo><mn>0</mn></mrow><annotation encoding="application/x-tex">w^\top \Sigma w \ge 0</annotation></semantics></math> for every <math><semantics><mi>w</mi><annotation encoding="application/x-tex">w</annotation></semantics></math>, equivalently all eigenvalues <math><semantics><mrow><mo>≥</mo><mn>0</mn></mrow><annotation encoding="application/x-tex">\ge 0</annotation></semantics></math>; every valid covariance matrix is one.</div>
+<div id="g-positive-definite"><b>Positive definite</b> — a positive semi-definite matrix whose eigenvalues are all strictly positive rather than merely non-negative; unlike a positive semi-definite matrix, it can be inverted.</div>
+<div id="g-condition-number"><b>Condition number</b> — <math><semantics><mrow><mpadded lspace="0"><mi>cond</mi></mpadded><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mo>=</mo><msub><mi>λ</mi><mrow><mi>max</mi><mo>⁡</mo></mrow></msub><mi>/</mi><msub><mi>λ</mi><mrow><mi>min</mi><mo>⁡</mo></mrow></msub></mrow><annotation encoding="application/x-tex">\mathrm{cond}(\Sigma) = \lambda_{\max}/\lambda_{\min}</annotation></semantics></math>, how far a matrix is from singular; it bounds how much inverting it can amplify relative errors.</div>
+<div id="g-diversification-ratio"><b>Diversification ratio</b> — the weighted-average volatility of a portfolio's holdings divided by the portfolio's own volatility; the more the holdings' risk cancels out, the higher it is.</div>
+<div id="g-effective-number-of-independent-bets"><b>Effective number of independent bets</b> — the square of the diversification ratio: the number of uncorrelated assets that would give the same risk reduction as the actual, correlated book.</div>
+<div id="g-eigenvalue-clipping"><b>Eigenvalue clipping</b> — repairing a non-PSD matrix by setting its negative eigenvalues to zero and rebuilding it; the result is the nearest PSD matrix in the Frobenius norm, but every clipped direction is left claiming zero risk.</div>
+<div id="g-nearest-correlation-matrix"><b>Nearest correlation matrix</b> — the closest valid correlation matrix (positive semi-definite, unit diagonal) to a broken one, found by alternating projections (Higham, 2002).</div>
+<div id="g-pairwise-deletion"><b>Pairwise deletion</b> — estimating each entry of a covariance or correlation matrix from whichever observations that one pair of assets happens to share; convenient with missing data, but the resulting matrix need not be positive semi-definite.</div>
+<div id="g-listwise-deletion"><b>Listwise deletion</b> — keeping only the rows on which every asset has an observation before estimating a covariance matrix; always positive semi-definite, but can throw away most of the data.</div>
+</div>
+
+<h3>Check yourself</h3>
+<details class="q"><summary>1. Two assets, each with 20% volatility and correlation 0.5, held 50/50. What is the portfolio's volatility?</summary><div><math><semantics><mrow><msup><mi>w</mi><mi class="tml-med-pad">⊤</mi></msup><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><mi>w</mi><mo>=</mo><mn>0.25</mn><mo>×</mo><mn>0.04</mn><mo>+</mo><mn>0.25</mn><mo>×</mo><mn>0.04</mn><mo>+</mo><mn>2</mn><mo>×</mo><mn>0.25</mn><mo>×</mo><mn>0.5</mn><mo>×</mo><mn>0.04</mn><mo>=</mo><mn>0.03</mn></mrow><annotation encoding="application/x-tex">w^\top \Sigma w = 0.25 \times 0.04 + 0.25 \times 0.04 + 2 \times 0.25 \times 0.5 \times 0.04 = 0.03</annotation></semantics></math>, so the volatility is <math><semantics><mrow><msqrt><mn>0.03</mn></msqrt><mo>≈</mo><mn>17.3</mn><mi>%</mi></mrow><annotation encoding="application/x-tex">\sqrt{0.03} \approx 17.3\%</annotation></semantics></math>. Three equal parts: the two own-risk cells, and the two co-movement cells together, worth as much as either. The diversification benefit, from 20% down to 17.3%, is modest because the correlation is high.</div></details>
+<details class="q"><summary>2. You hold 200 stocks in equal weights; average volatility 30%, average pairwise correlation 0.25. Roughly how volatile is the book, and what does doubling it to 400 stocks buy you?</summary><div><math><semantics><mrow><msqrt><mrow><mn>0.25</mn><mo>+</mo><mn>0.75</mn><mi>/</mi><mn>200</mn></mrow></msqrt><mo>×</mo><mn>30</mn><mi>%</mi><mo>≈</mo><mn>15.1</mn><mi>%</mi></mrow><annotation encoding="application/x-tex">\sqrt{0.25 + 0.75/200} \times 30\% \approx 15.1\%</annotation></semantics></math>, and with 400 stocks <math><semantics><mrow><mo>≈</mo><mn>15.06</mn><mi>%</mi></mrow><annotation encoding="application/x-tex">\approx 15.06\%</annotation></semantics></math>: almost nothing. You are already on the floor <math><semantics><mrow><msqrt><mi>ρ</mi></msqrt><mspace width="0.1667em"></mspace><mi>σ</mi><mo>=</mo><mn>15</mn><mi>%</mi></mrow><annotation encoding="application/x-tex">\sqrt{\rho}\,\sigma = 15\%</annotation></semantics></math>. Only lower correlation — other asset classes, market-neutral positions — lowers it further.</div></details>
+<details class="q"><summary>3. A colleague's risk model has eigenvalues 12.1, 3.4, 0.9, …, −0.02. What does the last one mean, and what do you do?</summary><div>The matrix is not positive semi-definite: some portfolio has "negative variance", and an optimizer will exploit it without limit. Find the cause first — pairwise deletion of missing data, misaligned dates, a hand-edited correlation. Fix the data or switch to a proper estimator (shrinkage, factor model). Clipping the eigenvalue to zero is a stopgap that leaves a "zero-risk" portfolio behind.</div></details>
+<details class="q"><summary>4. PCA on 500 stocks: PC1 has all-positive weights and explains 35% of the variance. Your manager says "PC2 is obviously the value factor." What is right and what is overreach?</summary><div>PC1 being the market mode is the usual finding. But PC2 is defined only as the largest-variance direction uncorrelated with PC1: its sign is arbitrary, and when PC2 and PC3 have similar eigenvalues any rotation of the two fits the data equally well. PCA recovers a subspace, not labels. To call it "value" you must check it against value characteristics — which is what a factor risk model does.</div></details>
+<details class="q"><summary>5. You have 60 days of data on 100 stocks and want the minimum-variance portfolio. What goes wrong?</summary><div>With <math><semantics><mrow><mi>T</mi><mo>≤</mo><mi>N</mi></mrow><annotation encoding="application/x-tex">T \le N</annotation></semantics></math> the sample covariance matrix has rank at most <math><semantics><mrow><mi>T</mi><mo>−</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">T - 1</annotation></semantics></math>, so it has zero eigenvalues: its condition number is infinite and <math><semantics><msup><mi>S</mi><mrow class="tml-med-pad"><mo form="prefix" stretchy="false" lspace="0em" rspace="0em">−</mo><mn>1</mn></mrow></msup><annotation encoding="application/x-tex">S^{-1}</annotation></semantics></math> does not exist. The optimizer finds "zero-risk" portfolios that are really just directions the data never saw. You need far more days per asset, a shrinkage or factor-model estimate, or constraints.</div></details>
+<details class="q"><summary>6. A 60/40 portfolio holds 40% of its capital in bonds. Why is "40% bonds" a poor description of its risk?</summary><div>Risk contributions are <math><semantics><mrow><msub><mi>w</mi><mi>i</mi></msub><msub><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><mi>w</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mi>i</mi></msub></mrow><annotation encoding="application/x-tex">w_i (\Sigma w)_i</annotation></semantics></math>, not <math><semantics><msub><mi>w</mi><mi>i</mi></msub><annotation encoding="application/x-tex">w_i</annotation></semantics></math>. Equities are far more volatile, so with the illustrative inputs of §3.3.3 they carry about <span data-lab="rc_share_eq" data-fmt=".0%">90%</span> of the variance. Capital weights describe where the money is; risk contributions describe where the risk is.</div></details>
+
+<div class="co lab"><span class="co-t">🔧 Homework (~1 h before Session 3.4)</span>
+<p>1. Write <code>portfolio_vol(w, vols, corr)</code> that builds <math><semantics><mrow><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><mo>=</mo><mi>D</mi><mi>C</mi><mi>D</mi></mrow><annotation encoding="application/x-tex">\Sigma = DCD</annotation></semantics></math> and returns <math><semantics><msqrt><mrow><msup><mi>w</mi><mi class="tml-med-pad">⊤</mi></msup><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><mi>w</mi></mrow></msqrt><annotation encoding="application/x-tex">\sqrt{w^\top \Sigma w}</annotation></semantics></math>. Unit-test it against the two-asset formula (agreement to <math><semantics><msup><mn>10</mn><mrow><mo form="prefix" stretchy="false" lspace="0em" rspace="0em">−</mo><mn>12</mn></mrow></msup><annotation encoding="application/x-tex">10^{-12}</annotation></semantics></math>) and against the sample volatility of simulated portfolio returns (agreement within four standard errors).<br>
+2. Add a cell to the lab that runs <code>eig_desc</code> on the correlation matrix <code>C</code> instead of <code>S</code>. Compare PC1's share of variance and PC1's weights with the covariance version, and explain the difference in one sentence.<br>
+3. Prepare for <a class="xref" href="session04-convex-optimization.html" data-xref="3.4" data-style="short" data-auto="">Session 3.4</a>: write down the problem "minimise <math><semantics><mrow><msup><mi>w</mi><mi class="tml-med-pad">⊤</mi></msup><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><mi>w</mi></mrow><annotation encoding="application/x-tex">w^\top \Sigma w</annotation></semantics></math> subject to <math><semantics><mrow><msup><mn>𝟏</mn><mi>⊤</mi></msup><mi>w</mi><mo>=</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">\mathbf 1^\top w = 1</annotation></semantics></math>" and check numerically, with the lab's true <math><semantics><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><annotation encoding="application/x-tex">\Sigma</annotation></semantics></math>, that no random fully invested portfolio beats <math><semantics><mrow><msup><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><mrow><mo form="prefix" stretchy="false" lspace="0em" rspace="0em">−</mo><mn>1</mn></mrow></msup><mn>𝟏</mn><mi>/</mi><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><msup><mn>𝟏</mn><mi>⊤</mi></msup><msup><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><mrow><mo form="prefix" stretchy="false" lspace="0em" rspace="0em">−</mo><mn>1</mn></mrow></msup><mn>𝟏</mn><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">\Sigma^{-1}\mathbf 1 / (\mathbf 1^\top \Sigma^{-1} \mathbf 1)</annotation></semantics></math>. <a class="xref" href="session04-convex-optimization.html" data-xref="3.4" data-style="short" data-auto="">Session 3.4</a> derives why.<br>
+4. Read Laloux et al. (1999), four pages, below.</p>
+</div>
+
+<h3>📚 Go deeper</h3>
+<ol class="refs">
+<li>Strang, G. (2016). <em>Introduction to Linear Algebra</em>, 5th ed., §6.4 "Symmetric Matrices", §6.5 "Positive Definite Matrices", §7.3 "Principal Component Analysis (PCA by the SVD)" and §12.2 "Covariance Matrices and Joint Probabilities". Wellesley-Cambridge Press. <span class="rid">ISBN 978-0-9802327-7-6</span></li>
+<li>Jolliffe, I. T. &amp; Cadima, J. (2016). "Principal component analysis: a review and recent developments." <em>Philosophical Transactions of the Royal Society A</em> 374(2065), 20150202. <span class="rid">doi:10.1098/rsta.2015.0202</span></li>
+<li>Meucci, A. (2009). "Managing Diversification." <em>Risk</em> 22(5), 74–79. Effective number of bets from principal components. <span class="rid">SSRN 1358533</span></li>
+<li>Higham, N. J. (2002). "Computing the nearest correlation matrix — a problem from finance." <em>IMA Journal of Numerical Analysis</em> 22(3), 329–343. <span class="rid">doi:10.1093/imanum/22.3.329</span></li>
+</ol>
+
+<h3>Sources for the numbers</h3>
+<ol class="refs">
+<li>Anderson, T. W. (1963). "Asymptotic Theory for Principal Component Analysis." <em>Annals of Mathematical Statistics</em> 34(1), 122–148. <span class="rid">doi:10.1214/aoms/1177704248</span></li>
+<li>Kan, R. &amp; Smith, D. R. (2008). "The Distribution of the Sample Minimum-Variance Frontier." <em>Management Science</em> 54(7), 1364–1380. <span class="rid">doi:10.1287/mnsc.1070.0852</span></li>
+<li>Laloux, L., Cizeau, P., Bouchaud, J.-P. &amp; Potters, M. (1999). "Noise Dressing of Financial Correlation Matrices." <em>Physical Review Letters</em> 83(7), 1467–1470. <span class="rid">doi:10.1103/PhysRevLett.83.1467</span></li>
+<li>Choueifaty, Y. &amp; Coignard, Y. (2008). "Toward Maximum Diversification." <em>Journal of Portfolio Management</em> 35(1), 40–51. <span class="rid">doi:10.3905/JPM.2008.35.1.40</span></li>
+<li>Golub, G. H. &amp; Van Loan, C. F. (2013). <em>Matrix Computations</em>, 4th ed., §2.6 "The Sensitivity of Square Systems". Johns Hopkins University Press. <span class="rid">ISBN 978-1-4214-0794-4</span></li>
+<li>pandas development team (2026). "pandas.DataFrame.cov", pandas 3.0 API reference (notes on missing data and positive semi-definiteness). <span class="rid">https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.cov.html</span></li>
+</ol>
+</section>
+
+<!-- nav:foot -->
+<div class="foot">
+<a href="session02-distributions-fat-tails.html">← Prev: 3.2 · Fat Tails</a>
+<a href="session04-convex-optimization.html">Next: 3.4 · Optimization →</a>
+</div>
+<p class="legal">Educational material only — not investment, legal or tax advice. Backtests and simulations are hypothetical. <a href="../start-here.html#disclaimer">Disclaimer</a> · Text CC BY 4.0 · Code MIT.</p>
+<!-- /nav:foot -->
+</main>
+</div></body></html>

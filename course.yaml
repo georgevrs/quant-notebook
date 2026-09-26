@@ -184,36 +184,36 @@ units:
         short: Fat Tails
         goal: Normal, lognormal and Student-t; skewness, kurtosis and tail indices — and why the normal distribution will eventually lie to you.
         prereqs: ["3.1"]
-        owns: [normal distribution, lognormal distribution, Student-t distribution, skewness, kurtosis, fat tails, tail index, QQ plot, power law]
+        owns: [normal distribution, lognormal distribution, Student-t distribution, skewness, kurtosis, fat tails, tail index, QQ plot, power law, moment, excess kurtosis, Hill estimator, jump-diffusion model, Hill plot]
         deps: [core]
-        status: doing
+        status: published
       - id: "3.3"
         slug: linear-algebra-portfolios
         title: Linear Algebra for Portfolios
         short: Linear Algebra
         goal: Weights as vectors, risk as a quadratic form, PCA as the hidden structure of a market — linear algebra through the portfolio lens.
         prereqs: ["3.1"]
-        owns: [weight vector, covariance matrix, correlation matrix, portfolio variance, eigenvalue, eigenvector, principal component analysis, positive semi-definite, condition number]
+        owns: [weight vector, covariance matrix, correlation matrix, portfolio variance, eigenvalue, eigenvector, principal component analysis, positive semi-definite, condition number, diversification ratio, effective number of independent bets, eigen-portfolio, market mode, eigenvalue clipping, nearest correlation matrix, pairwise deletion, listwise deletion, quadratic form, positive definite]
         deps: [core]
-        status: doing
+        status: published
       - id: "3.4"
         slug: convex-optimization
         title: Convex Optimization
         short: Optimization
         goal: Objectives, constraints, convexity, quadratic programs and Lagrange multipliers — and how to state a portfolio problem so cvxpy can solve it.
         prereqs: ["3.3"]
-        owns: [objective function, constraint, convex set, convex function, quadratic program, Lagrange multiplier, KKT conditions, cvxpy]
+        owns: [objective function, constraint, convex set, convex function, quadratic program, Lagrange multiplier, KKT conditions, cvxpy, decision variable, feasible set, binding constraint, shadow price, marginal variance, Disciplined Convex Programming]
         deps: [core, portfolio]
-        status: doing
+        status: published
       - id: "3.5"
         slug: simulation-monte-carlo
         title: Simulation & Monte Carlo
         short: Monte Carlo
         goal: Simulate prices, strategies and uncertainty with seeded Monte Carlo — random walks, GBM, bootstraps and variance reduction.
         prereqs: ["3.2"]
-        owns: [Monte Carlo simulation, random walk, geometric Brownian motion, bootstrap, variance reduction, antithetic variates, Monte Carlo standard error]
+        owns: [Monte Carlo simulation, random walk, geometric Brownian motion, bootstrap, variance reduction, antithetic variates, Monte Carlo standard error, block bootstrap, reflection principle, control variate, common random numbers, Brownian bridge, variance-reduction ratio, batch-means standard error, pseudo-random number generator, discrete monitoring]
         deps: [core]
-        status: doing
+        status: published
       - id: "3.6"
         slug: kelly-bet-sizing
         title: Bet Sizing, Kelly & Ruin
@@ -222,7 +222,7 @@ units:
         prereqs: ["3.5"]
         owns: [Kelly criterion, fractional Kelly, growth rate, risk of ruin, log utility, bet sizing]
         deps: [core]
-        status: doing
+        status: published
 
   - id: 4
     slug: data-engineering

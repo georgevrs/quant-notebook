@@ -225,7 +225,7 @@ Reserved notation — use these meanings everywhere, or say explicitly that you 
 | \(\mu\) | expected (arithmetic) return | \(\beta\) | factor / market exposure |
 | \(\sigma\) | volatility (standard deviation) | \(\alpha\) | return not explained by factors |
 | \(\SR\) | Sharpe ratio | \(\gamma\) | risk aversion (Euler γ only where stated) |
-| \(W_t\) | wealth / equity | \(\lambda\) | Kyle's lambda in Unit 14 only; else a multiplier |
+| \(W_t\) | wealth / equity | \(\lambda\) | Kyle's lambda in Unit 14 only; else a multiplier — including a Lagrange multiplier (3.4) and, by extension, an eigenvalue (3.3), which is literally the number a matrix multiplies a vector by |
 | \(L\) | leverage | \(f\) | Kelly fraction (Unit 3 onward) |
 | \(Y\) | years of data | \(d\) | fractional-differencing order (Unit 12 only) |
 | \(T\) | number of periods | \(N\) | number of assets **or** trials — say which |
@@ -359,7 +359,11 @@ avoid them up front.
 - Don't reuse a reserved symbol for something else in the same unit (α is alpha; call a test's
   false-positive rate its *size*). Per-period risk-free rates are \(r_{f,t}\).
 - **T is a number of periods; time in years is τ** (or Y for a horizon in years). Unit 2 fixes κ as
-  the borrow fee (2.2); the BGK discrete-monitoring constant is β = 0.5826 (2.1, 2.4).
+  the borrow fee (2.2); the BGK discrete-monitoring constant β = −ζ(1/2)/√(2π) ≈ 0.5826 is defined
+  in 2.1, reused (with the symbol restated) in 3.5, and cited conceptually — without restating the
+  symbol — in 2.4. ζ also denotes the tail index in 3.2 (Gabaix's notation, since α is reserved); the
+  two meanings never collide, but gloss "(ζ is the Riemann zeta function)" wherever it appears inside
+  the BGK formula, as 3.5 does.
 - When a term a later reader will meet again is defined in bold but owned by nobody, flag it in your
   handoff (`new_terms`) so the orchestrator can add it to `owns`.
 

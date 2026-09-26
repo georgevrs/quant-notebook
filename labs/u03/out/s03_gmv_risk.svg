@@ -1,0 +1,42 @@
+<svg viewBox="0 0 720 280" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Min-variance portfolio: variance ÷ true minimum, by days per asset (T/N)">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">MIN-VARIANCE PORTFOLIO: VARIANCE ÷ TRUE MINIMUM, BY DAYS PER ASSET (T/N)</text>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#E8850C" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">promised (in-sample)</text>
+  <line x1="198.0" y1="32" x2="214.0" y2="32" stroke="#D64B2A" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="220.0" y="36" font-size="11" fill="#4A5A68">realised (true)</text>
+  <line x1="64" y1="236" x2="690" y2="236" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="240" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.0×</text>
+  <line x1="64" y1="191" x2="690" y2="191" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="195" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">2.0×</text>
+  <line x1="64" y1="146" x2="690" y2="146" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="150" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">4.0×</text>
+  <line x1="64" y1="101" x2="690" y2="101" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="105" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">6.0×</text>
+  <line x1="64" y1="56" x2="690" y2="56" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="60" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">8.0×</text>
+  <line x1="64" y1="236" x2="690" y2="236" stroke="#C9CFC6" stroke-width="1"/>
+  <path d="M78.1,236 V234.1 Q78.1,232.2 80,232.2 H100.2 Q102.1,232.2 102.1,234.1 V236 Z" fill="#E8850C"><title>1.2 · promised (in-sample): 0.2×</title></path>
+  <path d="M104.1,236 V96.7 Q104.1,92.7 108.1,92.7 H124.1 Q128.1,92.7 128.1,96.7 V236 Z" fill="#D64B2A"><title>1.2 · realised (true): 6.4×</title></path>
+  <text x="103.1" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">1.2</text>
+  <path d="M156.4,236 V232.1 Q156.4,228.3 160.2,228.3 H176.5 Q180.4,228.3 180.4,232.1 V236 Z" fill="#E8850C"><title>1.5 · promised (in-sample): 0.3×</title></path>
+  <path d="M182.4,236 V170.3 Q182.4,166.3 186.4,166.3 H202.4 Q206.4,166.3 206.4,170.3 V236 Z" fill="#D64B2A"><title>1.5 · realised (true): 3.1×</title></path>
+  <text x="181.4" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">1.5</text>
+  <path d="M234.6,236 V228.6 Q234.6,224.6 238.6,224.6 H254.6 Q258.6,224.6 258.6,228.6 V236 Z" fill="#E8850C"><title>2 · promised (in-sample): 0.5×</title></path>
+  <path d="M260.6,236 V194.8 Q260.6,190.8 264.6,190.8 H280.6 Q284.6,190.8 284.6,194.8 V236 Z" fill="#D64B2A"><title>2 · realised (true): 2.0×</title></path>
+  <text x="259.6" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">2</text>
+  <path d="M312.9,236 V225 Q312.9,221 316.9,221 H332.9 Q336.9,221 336.9,225 V236 Z" fill="#E8850C"><title>3 · promised (in-sample): 0.7×</title></path>
+  <path d="M338.9,236 V206.6 Q338.9,202.6 342.9,202.6 H358.9 Q362.9,202.6 362.9,206.6 V236 Z" fill="#D64B2A"><title>3 · realised (true): 1.5×</title></path>
+  <text x="337.9" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">3</text>
+  <path d="M391.1,236 V221.9 Q391.1,217.9 395.1,217.9 H411.1 Q415.1,217.9 415.1,221.9 V236 Z" fill="#E8850C"><title>5 · promised (in-sample): 0.8×</title></path>
+  <path d="M417.1,236 V212 Q417.1,208 421.1,208 H437.1 Q441.1,208 441.1,212 V236 Z" fill="#D64B2A"><title>5 · realised (true): 1.2×</title></path>
+  <text x="416.1" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">5</text>
+  <path d="M469.4,236 V219.7 Q469.4,215.7 473.4,215.7 H489.4 Q493.4,215.7 493.4,219.7 V236 Z" fill="#E8850C"><title>10 · promised (in-sample): 0.9×</title></path>
+  <path d="M495.4,236 V215 Q495.4,211 499.4,211 H515.4 Q519.4,211 519.4,215 V236 Z" fill="#D64B2A"><title>10 · realised (true): 1.1×</title></path>
+  <text x="494.4" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">10</text>
+  <path d="M547.6,236 V218.6 Q547.6,214.6 551.6,214.6 H567.6 Q571.6,214.6 571.6,218.6 V236 Z" fill="#E8850C"><title>20 · promised (in-sample): 1.0×</title></path>
+  <path d="M573.6,236 V216.3 Q573.6,212.3 577.6,212.3 H593.6 Q597.6,212.3 597.6,216.3 V236 Z" fill="#D64B2A"><title>20 · realised (true): 1.1×</title></path>
+  <text x="572.6" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">20</text>
+  <path d="M625.9,236 V217.9 Q625.9,213.9 629.9,213.9 H645.9 Q649.9,213.9 649.9,217.9 V236 Z" fill="#E8850C"><title>50 · promised (in-sample): 1.0×</title></path>
+  <path d="M651.9,236 V217.1 Q651.9,213.1 655.9,213.1 H671.9 Q675.9,213.1 675.9,217.1 V236 Z" fill="#D64B2A"><title>50 · realised (true): 1.0×</title></path>
+  <text x="650.9" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">50</text>
+</svg>

@@ -1,0 +1,104 @@
+<svg viewBox="0 0 720 280" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Minimum-variance weights under three rule sets (assets 1–20)">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">MINIMUM-VARIANCE WEIGHTS UNDER THREE RULE SETS (ASSETS 1–20)</text>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#3A56C5" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">no limits</text>
+  <line x1="127.6" y1="32" x2="143.6" y2="32" stroke="#E8850C" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="149.6" y="36" font-size="11" fill="#4A5A68">long-only</text>
+  <line x1="229.2" y1="32" x2="245.2" y2="32" stroke="#3F8E5A" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="251.2" y="36" font-size="11" fill="#4A5A68">long-only, cap 10%</text>
+  <line x1="64" y1="236" x2="690" y2="236" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="240" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">−20%</text>
+  <line x1="64" y1="206" x2="690" y2="206" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="210" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">−10%</text>
+  <line x1="64" y1="176" x2="690" y2="176" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="180" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0%</text>
+  <line x1="64" y1="146" x2="690" y2="146" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="150" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">10%</text>
+  <line x1="64" y1="116" x2="690" y2="116" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="120" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">20%</text>
+  <line x1="64" y1="86" x2="690" y2="86" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="90" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">30%</text>
+  <line x1="64" y1="56" x2="690" y2="56" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="60" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">40%</text>
+  <line x1="64" y1="176" x2="690" y2="176" stroke="#C9CFC6" stroke-width="1"/>
+  <path d="M66.7,176 V101 Q66.7,97 70.7,97 H70 Q74,97 74,101 V176 Z" fill="#3A56C5"><title>1 · no limits: 26%</title></path>
+  <path d="M76,176 V97.1 Q76,93.1 80,93.1 H79.3 Q83.3,93.1 83.3,97.1 V176 Z" fill="#E8850C"><title>1 · long-only: 28%</title></path>
+  <path d="M85.3,176 V150 Q85.3,146 89.3,146 H88.6 Q92.6,146 92.6,150 V176 Z" fill="#3F8E5A"><title>1 · long-only, cap 10%: 10%</title></path>
+  <text x="79.7" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">1</text>
+  <path d="M98,176 V129 Q98,125 102,125 H101.3 Q105.3,125 105.3,129 V176 Z" fill="#3A56C5"><title>2 · no limits: 17%</title></path>
+  <path d="M107.3,176 V127.7 Q107.3,123.7 111.3,123.7 H110.6 Q114.6,123.7 114.6,127.7 V176 Z" fill="#E8850C"><title>2 · long-only: 17%</title></path>
+  <path d="M116.6,176 V150 Q116.6,146 120.6,146 H119.9 Q123.9,146 123.9,150 V176 Z" fill="#3F8E5A"><title>2 · long-only, cap 10%: 10%</title></path>
+  <text x="111" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">2</text>
+  <path d="M129.3,176 V144.8 Q129.3,140.8 133.3,140.8 H132.6 Q136.6,140.8 136.6,144.8 V176 Z" fill="#3A56C5"><title>3 · no limits: 12%</title></path>
+  <path d="M138.6,176 V151.8 Q138.6,147.8 142.6,147.8 H141.9 Q145.9,147.8 145.9,151.8 V176 Z" fill="#E8850C"><title>3 · long-only: 9%</title></path>
+  <path d="M147.9,176 V150 Q147.9,146 151.9,146 H151.2 Q155.2,146 155.2,150 V176 Z" fill="#3F8E5A"><title>3 · long-only, cap 10%: 10%</title></path>
+  <text x="142.2" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">3</text>
+  <path d="M160.6,176 V149.9 Q160.6,145.9 164.6,145.9 H163.9 Q167.9,145.9 167.9,149.9 V176 Z" fill="#3A56C5"><title>4 · no limits: 10%</title></path>
+  <path d="M169.9,176 V150.3 Q169.9,146.3 173.9,146.3 H173.2 Q177.2,146.3 177.2,150.3 V176 Z" fill="#E8850C"><title>4 · long-only: 10%</title></path>
+  <path d="M179.2,176 V150 Q179.2,146 183.2,146 H182.5 Q186.5,146 186.5,150 V176 Z" fill="#3F8E5A"><title>4 · long-only, cap 10%: 10%</title></path>
+  <text x="173.6" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">4</text>
+  <path d="M191.9,176 V155 Q191.9,151 195.9,151 H195.2 Q199.2,151 199.2,155 V176 Z" fill="#3A56C5"><title>5 · no limits: 8%</title></path>
+  <path d="M201.2,176 V155.9 Q201.2,151.9 205.2,151.9 H204.5 Q208.5,151.9 208.5,155.9 V176 Z" fill="#E8850C"><title>5 · long-only: 8%</title></path>
+  <path d="M210.5,176 V150 Q210.5,146 214.5,146 H213.8 Q217.8,146 217.8,150 V176 Z" fill="#3F8E5A"><title>5 · long-only, cap 10%: 10%</title></path>
+  <text x="204.8" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">5</text>
+  <path d="M223.2,176 V158.1 Q223.2,154.1 227.2,154.1 H226.5 Q230.5,154.1 230.5,158.1 V176 Z" fill="#3A56C5"><title>6 · no limits: 7%</title></path>
+  <path d="M232.5,176 V167.3 Q232.5,163.3 236.5,163.3 H235.8 Q239.8,163.3 239.8,167.3 V176 Z" fill="#E8850C"><title>6 · long-only: 4%</title></path>
+  <path d="M241.8,176 V157.3 Q241.8,153.3 245.8,153.3 H245.1 Q249.1,153.3 249.1,157.3 V176 Z" fill="#3F8E5A"><title>6 · long-only, cap 10%: 8%</title></path>
+  <text x="236.2" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">6</text>
+  <path d="M254.5,176 V158.7 Q254.5,154.7 258.5,154.7 H257.8 Q261.8,154.7 261.8,158.7 V176 Z" fill="#3A56C5"><title>7 · no limits: 7%</title></path>
+  <path d="M263.8,176 V161.8 Q263.8,157.8 267.8,157.8 H267.1 Q271.1,157.8 271.1,161.8 V176 Z" fill="#E8850C"><title>7 · long-only: 6%</title></path>
+  <path d="M273.1,176 V150 Q273.1,146 277.1,146 H276.4 Q280.4,146 280.4,150 V176 Z" fill="#3F8E5A"><title>7 · long-only, cap 10%: 10%</title></path>
+  <text x="267.5" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">7</text>
+  <path d="M285.8,176 V162.6 Q285.8,158.6 289.8,158.6 H289.1 Q293.1,158.6 293.1,162.6 V176 Z" fill="#3A56C5"><title>8 · no limits: 6%</title></path>
+  <path d="M295.1,176 V167.5 Q295.1,163.5 299.1,163.5 H298.4 Q302.4,163.5 302.4,167.5 V176 Z" fill="#E8850C"><title>8 · long-only: 4%</title></path>
+  <path d="M304.4,176 V160.1 Q304.4,156.1 308.4,156.1 H307.7 Q311.7,156.1 311.7,160.1 V176 Z" fill="#3F8E5A"><title>8 · long-only, cap 10%: 7%</title></path>
+  <text x="298.8" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">8</text>
+  <path d="M317.1,176 V164.1 Q317.1,160.1 321.1,160.1 H320.4 Q324.4,160.1 324.4,164.1 V176 Z" fill="#3A56C5"><title>9 · no limits: 5%</title></path>
+  <path d="M326.4,176 V171.5 Q326.4,167.5 330.4,167.5 H329.7 Q333.7,167.5 333.7,171.5 V176 Z" fill="#E8850C"><title>9 · long-only: 3%</title></path>
+  <path d="M335.7,176 V169 Q335.7,165 339.7,165 H339 Q343,165 343,169 V176 Z" fill="#3F8E5A"><title>9 · long-only, cap 10%: 4%</title></path>
+  <text x="330.1" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">9</text>
+  <path d="M348.4,176 V165.6 Q348.4,161.6 352.4,161.6 H351.7 Q355.7,161.6 355.7,165.6 V176 Z" fill="#3A56C5"><title>10 · no limits: 5%</title></path>
+  <path d="M357.7,176 V169.2 Q357.7,165.2 361.7,165.2 H361 Q365,165.2 365,169.2 V176 Z" fill="#E8850C"><title>10 · long-only: 4%</title></path>
+  <path d="M367,176 V158.5 Q367,154.5 371,154.5 H370.3 Q374.3,154.5 374.3,158.5 V176 Z" fill="#3F8E5A"><title>10 · long-only, cap 10%: 7%</title></path>
+  <text x="361.4" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">10</text>
+  <path d="M379.7,176 V165.6 Q379.7,161.6 383.7,161.6 H383 Q387,161.6 387,165.6 V176 Z" fill="#3A56C5"><title>11 · no limits: 5%</title></path>
+  <path d="M389,176 V170.2 Q389,166.2 393,166.2 H392.3 Q396.3,166.2 396.3,170.2 V176 Z" fill="#E8850C"><title>11 · long-only: 3%</title></path>
+  <path d="M398.3,176 V164.2 Q398.3,160.2 402.3,160.2 H401.6 Q405.6,160.2 405.6,164.2 V176 Z" fill="#3F8E5A"><title>11 · long-only, cap 10%: 5%</title></path>
+  <text x="392.7" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">11</text>
+  <path d="M411,176 V166.3 Q411,162.3 415,162.3 H414.3 Q418.3,162.3 418.3,166.3 V176 Z" fill="#3A56C5"><title>12 · no limits: 5%</title></path>
+  <path d="M420.3,176 V172.5 Q420.3,169.1 423.8,169.1 H424.1 Q427.6,169.1 427.6,172.5 V176 Z" fill="#E8850C"><title>12 · long-only: 2%</title></path>
+  <path d="M429.6,176 V160.7 Q429.6,156.7 433.6,156.7 H432.9 Q436.9,156.7 436.9,160.7 V176 Z" fill="#3F8E5A"><title>12 · long-only, cap 10%: 6%</title></path>
+  <text x="423.9" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">12</text>
+  <path d="M442.3,176 V172.4 Q442.3,168.8 445.9,168.8 H446 Q449.6,168.8 449.6,172.4 V176 Z" fill="#3A56C5"><title>13 · no limits: 2%</title></path>
+  <path d="M451.6,176 V174.3 Q451.6,172.6 453.3,172.6 H457.2 Q458.9,172.6 458.9,174.3 V176 Z" fill="#E8850C"><title>13 · long-only: 1%</title></path>
+  <path d="M460.9,176 V170.1 Q460.9,166.1 464.9,166.1 H464.2 Q468.2,166.1 468.2,170.1 V176 Z" fill="#3F8E5A"><title>13 · long-only, cap 10%: 3%</title></path>
+  <text x="455.2" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">13</text>
+  <path d="M473.6,176 V174.5 Q473.6,173.1 475.1,173.1 H479.4 Q480.9,173.1 480.9,174.5 V176 Z" fill="#3A56C5"><title>14 · no limits: 1%</title></path>
+  <path d="M482.9,176 V176 Q482.9,176 482.9,176 H490.2 Q490.2,176 490.2,176 V176 Z" fill="#E8850C"><title>14 · long-only: 0%</title></path>
+  <path d="M492.2,176 V176 Q492.2,176 492.2,176 H499.5 Q499.5,176 499.5,176 V176 Z" fill="#3F8E5A"><title>14 · long-only, cap 10%: 0%</title></path>
+  <text x="486.6" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">14</text>
+  <path d="M504.9,176 V176.4 Q504.9,176.8 505.3,176.8 H511.8 Q512.2,176.8 512.2,176.4 V176 Z" fill="#3A56C5"><title>15 · no limits: 0%</title></path>
+  <path d="M514.2,176 V176 Q514.2,176 514.2,176 H521.5 Q521.5,176 521.5,176 V176 Z" fill="#E8850C"><title>15 · long-only: 0%</title></path>
+  <path d="M523.5,176 V176 Q523.5,176 523.5,176 H530.8 Q530.8,176 530.8,176 V176 Z" fill="#3F8E5A"><title>15 · long-only, cap 10%: 0%</title></path>
+  <text x="517.9" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">15</text>
+  <path d="M536.2,176 V176.8 Q536.2,177.6 537,177.6 H542.7 Q543.5,177.6 543.5,176.8 V176 Z" fill="#3A56C5"><title>16 · no limits: −1%</title></path>
+  <path d="M545.5,176 V176 Q545.5,176 545.5,176 H552.8 Q552.8,176 552.8,176 V176 Z" fill="#E8850C"><title>16 · long-only: 0%</title></path>
+  <path d="M554.8,176 V176 Q554.8,176 554.8,176 H562.1 Q562.1,176 562.1,176 V176 Z" fill="#3F8E5A"><title>16 · long-only, cap 10%: 0%</title></path>
+  <text x="549.2" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">16</text>
+  <path d="M567.5,176 V178.1 Q567.5,180.2 569.6,180.2 H572.7 Q574.8,180.2 574.8,178.1 V176 Z" fill="#3A56C5"><title>17 · no limits: −1%</title></path>
+  <path d="M576.8,176 V176 Q576.8,176 576.8,176 H584.1 Q584.1,176 584.1,176 V176 Z" fill="#E8850C"><title>17 · long-only: 0%</title></path>
+  <path d="M586.1,176 V176 Q586.1,176 586.1,176 H593.4 Q593.4,176 593.4,176 V176 Z" fill="#3F8E5A"><title>17 · long-only, cap 10%: 0%</title></path>
+  <text x="580.5" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">17</text>
+  <path d="M598.8,176 V179.2 Q598.8,182.4 602,182.4 H602.9 Q606.1,182.4 606.1,179.2 V176 Z" fill="#3A56C5"><title>18 · no limits: −2%</title></path>
+  <path d="M608.1,176 V176 Q608.1,176 608.1,176 H615.4 Q615.4,176 615.4,176 V176 Z" fill="#E8850C"><title>18 · long-only: 0%</title></path>
+  <path d="M617.4,176 V176 Q617.4,176 617.4,176 H624.7 Q624.7,176 624.7,176 V176 Z" fill="#3F8E5A"><title>18 · long-only, cap 10%: 0%</title></path>
+  <text x="611.8" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">18</text>
+  <path d="M630.1,176 V189.4 Q630.1,193.4 634.1,193.4 H633.4 Q637.4,193.4 637.4,189.4 V176 Z" fill="#3A56C5"><title>19 · no limits: −6%</title></path>
+  <path d="M639.4,176 V176 Q639.4,176 639.4,176 H646.7 Q646.7,176 646.7,176 V176 Z" fill="#E8850C"><title>19 · long-only: 0%</title></path>
+  <path d="M648.7,176 V176 Q648.7,176 648.7,176 H656 Q656,176 656,176 V176 Z" fill="#3F8E5A"><title>19 · long-only, cap 10%: 0%</title></path>
+  <text x="643.1" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">19</text>
+  <path d="M661.4,176 V190.6 Q661.4,194.6 665.4,194.6 H664.7 Q668.7,194.6 668.7,190.6 V176 Z" fill="#3A56C5"><title>20 · no limits: −6%</title></path>
+  <path d="M670.7,176 V176 Q670.7,176 670.7,176 H678 Q678,176 678,176 V176 Z" fill="#E8850C"><title>20 · long-only: 0%</title></path>
+  <path d="M680,176 V176 Q680,176 680,176 H687.3 Q687.3,176 687.3,176 V176 Z" fill="#3F8E5A"><title>20 · long-only, cap 10%: 0%</title></path>
+  <text x="674.4" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">20</text>
+</svg>

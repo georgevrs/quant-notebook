@@ -1,0 +1,56 @@
+<svg viewBox="0 0 720 260" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Each asset&#x27;s marginal variance vs the budget price (long-only, capped)">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">EACH ASSET&#x27;S MARGINAL VARIANCE VS THE BUDGET PRICE (LONG-ONLY, CAPPED)</text>
+  <line x1="64" y1="216" x2="690" y2="216" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="220" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">−150%</text>
+  <line x1="64" y1="181.6" x2="690" y2="181.6" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="185.6" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">−100%</text>
+  <line x1="64" y1="147.2" x2="690" y2="147.2" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="151.2" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">−50%</text>
+  <line x1="64" y1="112.8" x2="690" y2="112.8" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="116.8" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0%</text>
+  <line x1="64" y1="78.4" x2="690" y2="78.4" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="82.4" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">50%</text>
+  <line x1="64" y1="44" x2="690" y2="44" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="48" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">100%</text>
+  <line x1="64" y1="112.8" x2="690" y2="112.8" stroke="#C9CFC6" stroke-width="1"/>
+  <path d="M70.3,112.8 V168.5 Q70.3,172.5 74.3,172.5 H85 Q89,172.5 89,168.5 V112.8 Z" fill="#3F8E5A"><title>1: −87%</title></path>
+  <text x="79.7" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">1</text>
+  <path d="M101.6,112.8 V141.8 Q101.6,145.8 105.6,145.8 H116.3 Q120.3,145.8 120.3,141.8 V112.8 Z" fill="#3F8E5A"><title>2: −48%</title></path>
+  <text x="111" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">2</text>
+  <path d="M132.9,112.8 V119 Q132.9,123 136.9,123 H147.6 Q151.6,123 151.6,119 V112.8 Z" fill="#3F8E5A"><title>3: −15%</title></path>
+  <text x="142.2" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">3</text>
+  <path d="M164.2,112.8 V118.8 Q164.2,122.8 168.2,122.8 H178.9 Q182.9,122.8 182.9,118.8 V112.8 Z" fill="#3F8E5A"><title>4: −14%</title></path>
+  <text x="173.6" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">4</text>
+  <path d="M195.5,112.8 V117.9 Q195.5,121.9 199.5,121.9 H210.2 Q214.2,121.9 214.2,117.9 V112.8 Z" fill="#3F8E5A"><title>5: −13%</title></path>
+  <text x="204.8" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">5</text>
+  <path d="M226.8,112.8 V112.8 Q226.8,112.8 226.8,112.8 H245.5 Q245.5,112.8 245.5,112.8 V112.8 Z" fill="#3A56C5"><title>6: 0%</title></path>
+  <text x="236.2" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">6</text>
+  <path d="M258.1,112.8 V114.2 Q258.1,115.7 259.5,115.7 H275.4 Q276.8,115.7 276.8,114.2 V112.8 Z" fill="#3F8E5A"><title>7: −4%</title></path>
+  <text x="267.5" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">7</text>
+  <path d="M289.4,112.8 V112.8 Q289.4,112.8 289.4,112.8 H308.1 Q308.1,112.8 308.1,112.8 V112.8 Z" fill="#3A56C5"><title>8: 0%</title></path>
+  <text x="298.8" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">8</text>
+  <path d="M320.7,112.8 V112.8 Q320.7,112.8 320.7,112.8 H339.4 Q339.4,112.8 339.4,112.8 V112.8 Z" fill="#3A56C5"><title>9: 0%</title></path>
+  <text x="330.1" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">9</text>
+  <path d="M352,112.8 V112.8 Q352,112.8 352,112.8 H370.7 Q370.7,112.8 370.7,112.8 V112.8 Z" fill="#3A56C5"><title>10: 0%</title></path>
+  <text x="361.4" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">10</text>
+  <path d="M383.3,112.8 V112.8 Q383.3,112.8 383.3,112.8 H402 Q402,112.8 402,112.8 V112.8 Z" fill="#3A56C5"><title>11: 0%</title></path>
+  <text x="392.7" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">11</text>
+  <path d="M414.6,112.8 V112.8 Q414.6,112.8 414.6,112.8 H433.3 Q433.3,112.8 433.3,112.8 V112.8 Z" fill="#3A56C5"><title>12: 0%</title></path>
+  <text x="423.9" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">12</text>
+  <path d="M445.9,112.8 V112.8 Q445.9,112.8 445.9,112.8 H464.6 Q464.6,112.8 464.6,112.8 V112.8 Z" fill="#3A56C5"><title>13: 0%</title></path>
+  <text x="455.2" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">13</text>
+  <path d="M477.2,112.8 V112.8 Q477.2,112.8 477.2,112.8 H495.9 Q495.9,112.8 495.9,112.8 V112.8 Z" fill="#E8850C"><title>14: 0%</title></path>
+  <text x="486.6" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">14</text>
+  <path d="M508.5,112.8 V109.8 Q508.5,106.8 511.5,106.8 H524.2 Q527.2,106.8 527.2,109.8 V112.8 Z" fill="#E8850C"><title>15: 9%</title></path>
+  <text x="517.9" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">15</text>
+  <path d="M539.8,112.8 V110.3 Q539.8,107.7 542.3,107.7 H556 Q558.5,107.7 558.5,110.3 V112.8 Z" fill="#E8850C"><title>16: 7%</title></path>
+  <text x="549.2" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">16</text>
+  <path d="M571.1,112.8 V107.2 Q571.1,103.2 575.1,103.2 H585.8 Q589.8,103.2 589.8,107.2 V112.8 Z" fill="#E8850C"><title>17: 14%</title></path>
+  <text x="580.5" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">17</text>
+  <path d="M602.4,112.8 V103.8 Q602.4,99.8 606.4,99.8 H617.1 Q621.1,99.8 621.1,103.8 V112.8 Z" fill="#E8850C"><title>18: 19%</title></path>
+  <text x="611.8" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">18</text>
+  <path d="M633.7,112.8 V93.5 Q633.7,89.5 637.7,89.5 H648.4 Q652.4,89.5 652.4,93.5 V112.8 Z" fill="#E8850C"><title>19: 34%</title></path>
+  <text x="643.1" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">19</text>
+  <path d="M665,112.8 V90.4 Q665,86.4 669,86.4 H679.7 Q683.7,86.4 683.7,90.4 V112.8 Z" fill="#E8850C"><title>20: 38%</title></path>
+  <text x="674.4" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">20</text>
+</svg>

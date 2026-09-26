@@ -1,0 +1,85 @@
+<svg viewBox="0 0 720 280" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="GARCH-t daily returns, in standard deviations">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">GARCH-T DAILY RETURNS, IN STANDARD DEVIATIONS</text>
+  <line x1="64" y1="197.7" x2="680" y2="197.7" stroke="#E4E8EC" stroke-width="1"/>
+  <line x1="64" y1="151.4" x2="680" y2="151.4" stroke="#E4E8EC" stroke-width="1"/>
+  <line x1="64" y1="105.1" x2="680" y2="105.1" stroke="#E4E8EC" stroke-width="1"/>
+  <line x1="64" y1="58.8" x2="680" y2="58.8" stroke="#E4E8EC" stroke-width="1"/>
+  <line x1="64" y1="244" x2="680" y2="244" stroke="#C9CFC6" stroke-width="1"/>
+  <line x1="64" y1="244" x2="64" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="64" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">−6σ</text>
+  <line x1="166.7" y1="244" x2="166.7" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="166.7" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">−4σ</text>
+  <line x1="269.3" y1="244" x2="269.3" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="269.3" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">−2σ</text>
+  <line x1="372" y1="244" x2="372" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="372" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">0σ</text>
+  <line x1="474.7" y1="244" x2="474.7" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="474.7" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">2σ</text>
+  <line x1="577.3" y1="244" x2="577.3" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="577.3" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">4σ</text>
+  <line x1="680" y1="244" x2="680" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="680" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">6σ</text>
+  <rect x="64.5" y="243.9" width="9.3" height="0.1" fill="#3A56C5" fill-opacity="0.55"><title>−6σ to −6σ</title></rect>
+  <rect x="74.8" y="243.8" width="9.3" height="0.2" fill="#3A56C5" fill-opacity="0.55"><title>−6σ to −6σ</title></rect>
+  <rect x="85" y="243.8" width="9.3" height="0.2" fill="#3A56C5" fill-opacity="0.55"><title>−6σ to −5σ</title></rect>
+  <rect x="95.3" y="243.8" width="9.3" height="0.2" fill="#3A56C5" fill-opacity="0.55"><title>−5σ to −5σ</title></rect>
+  <rect x="105.6" y="243.7" width="9.3" height="0.3" fill="#3A56C5" fill-opacity="0.55"><title>−5σ to −5σ</title></rect>
+  <rect x="115.8" y="243.6" width="9.3" height="0.4" fill="#3A56C5" fill-opacity="0.55"><title>−5σ to −5σ</title></rect>
+  <rect x="126.1" y="243.6" width="9.3" height="0.4" fill="#3A56C5" fill-opacity="0.55"><title>−5σ to −5σ</title></rect>
+  <rect x="136.4" y="243.5" width="9.3" height="0.5" fill="#3A56C5" fill-opacity="0.55"><title>−5σ to −4σ</title></rect>
+  <rect x="146.6" y="243.4" width="9.3" height="0.6" fill="#3A56C5" fill-opacity="0.55"><title>−4σ to −4σ</title></rect>
+  <rect x="156.9" y="243.2" width="9.3" height="0.8" fill="#3A56C5" fill-opacity="0.55"><title>−4σ to −4σ</title></rect>
+  <rect x="167.2" y="243.1" width="9.3" height="0.9" fill="#3A56C5" fill-opacity="0.55"><title>−4σ to −4σ</title></rect>
+  <rect x="177.4" y="242.8" width="9.3" height="1.2" fill="#3A56C5" fill-opacity="0.55"><title>−4σ to −4σ</title></rect>
+  <rect x="187.7" y="242.6" width="9.3" height="1.4" fill="#3A56C5" fill-opacity="0.55"><title>−4σ to −3σ</title></rect>
+  <rect x="198" y="242.1" width="9.3" height="1.9" fill="#3A56C5" fill-opacity="0.55"><title>−3σ to −3σ</title></rect>
+  <rect x="208.2" y="241.6" width="9.3" height="2.4" fill="#3A56C5" fill-opacity="0.55"><title>−3σ to −3σ</title></rect>
+  <rect x="218.5" y="241" width="9.3" height="3" fill="#3A56C5" fill-opacity="0.55"><title>−3σ to −3σ</title></rect>
+  <rect x="228.8" y="239.9" width="9.3" height="4.1" fill="#3A56C5" fill-opacity="0.55"><title>−3σ to −3σ</title></rect>
+  <rect x="239" y="238.3" width="9.3" height="5.7" fill="#3A56C5" fill-opacity="0.55"><title>−3σ to −2σ</title></rect>
+  <rect x="249.3" y="236.4" width="9.3" height="7.6" fill="#3A56C5" fill-opacity="0.55"><title>−2σ to −2σ</title></rect>
+  <rect x="259.6" y="233.8" width="9.3" height="10.2" fill="#3A56C5" fill-opacity="0.55"><title>−2σ to −2σ</title></rect>
+  <rect x="269.8" y="230.2" width="9.3" height="13.8" fill="#3A56C5" fill-opacity="0.55"><title>−2σ to −2σ</title></rect>
+  <rect x="280.1" y="224.4" width="9.3" height="19.6" fill="#3A56C5" fill-opacity="0.55"><title>−2σ to −2σ</title></rect>
+  <rect x="290.4" y="216.9" width="9.3" height="27.1" fill="#3A56C5" fill-opacity="0.55"><title>−2σ to −1σ</title></rect>
+  <rect x="300.6" y="205.3" width="9.3" height="38.7" fill="#3A56C5" fill-opacity="0.55"><title>−1σ to −1σ</title></rect>
+  <rect x="310.9" y="189.3" width="9.3" height="54.7" fill="#3A56C5" fill-opacity="0.55"><title>−1σ to −1σ</title></rect>
+  <rect x="321.2" y="167.9" width="9.3" height="76.1" fill="#3A56C5" fill-opacity="0.55"><title>−1σ to −1σ</title></rect>
+  <rect x="331.4" y="140.2" width="9.3" height="103.8" fill="#3A56C5" fill-opacity="0.55"><title>−1σ to −1σ</title></rect>
+  <rect x="341.7" y="108.2" width="9.3" height="135.8" fill="#3A56C5" fill-opacity="0.55"><title>−1σ to 0σ</title></rect>
+  <rect x="352" y="78.3" width="9.3" height="165.7" fill="#3A56C5" fill-opacity="0.55"><title>0σ to 0σ</title></rect>
+  <rect x="362.2" y="58.8" width="9.3" height="185.2" fill="#3A56C5" fill-opacity="0.55"><title>0σ to 0σ</title></rect>
+  <rect x="372.5" y="59.8" width="9.3" height="184.2" fill="#3A56C5" fill-opacity="0.55"><title>0σ to 0σ</title></rect>
+  <rect x="382.8" y="77.8" width="9.3" height="166.2" fill="#3A56C5" fill-opacity="0.55"><title>0σ to 0σ</title></rect>
+  <rect x="393" y="108" width="9.3" height="136" fill="#3A56C5" fill-opacity="0.55"><title>0σ to 1σ</title></rect>
+  <rect x="403.3" y="140" width="9.3" height="104" fill="#3A56C5" fill-opacity="0.55"><title>1σ to 1σ</title></rect>
+  <rect x="413.6" y="168.1" width="9.3" height="75.9" fill="#3A56C5" fill-opacity="0.55"><title>1σ to 1σ</title></rect>
+  <rect x="423.8" y="189.4" width="9.3" height="54.6" fill="#3A56C5" fill-opacity="0.55"><title>1σ to 1σ</title></rect>
+  <rect x="434.1" y="206" width="9.3" height="38" fill="#3A56C5" fill-opacity="0.55"><title>1σ to 1σ</title></rect>
+  <rect x="444.4" y="216.9" width="9.3" height="27.1" fill="#3A56C5" fill-opacity="0.55"><title>1σ to 2σ</title></rect>
+  <rect x="454.6" y="224.7" width="9.3" height="19.3" fill="#3A56C5" fill-opacity="0.55"><title>2σ to 2σ</title></rect>
+  <rect x="464.9" y="230.3" width="9.3" height="13.7" fill="#3A56C5" fill-opacity="0.55"><title>2σ to 2σ</title></rect>
+  <rect x="475.2" y="233.8" width="9.3" height="10.2" fill="#3A56C5" fill-opacity="0.55"><title>2σ to 2σ</title></rect>
+  <rect x="485.4" y="236.6" width="9.3" height="7.4" fill="#3A56C5" fill-opacity="0.55"><title>2σ to 2σ</title></rect>
+  <rect x="495.7" y="238.6" width="9.3" height="5.4" fill="#3A56C5" fill-opacity="0.55"><title>2σ to 3σ</title></rect>
+  <rect x="506" y="239.9" width="9.3" height="4.1" fill="#3A56C5" fill-opacity="0.55"><title>3σ to 3σ</title></rect>
+  <rect x="516.2" y="240.8" width="9.3" height="3.2" fill="#3A56C5" fill-opacity="0.55"><title>3σ to 3σ</title></rect>
+  <rect x="526.5" y="241.6" width="9.3" height="2.4" fill="#3A56C5" fill-opacity="0.55"><title>3σ to 3σ</title></rect>
+  <rect x="536.8" y="242.1" width="9.3" height="1.9" fill="#3A56C5" fill-opacity="0.55"><title>3σ to 3σ</title></rect>
+  <rect x="547" y="242.5" width="9.3" height="1.5" fill="#3A56C5" fill-opacity="0.55"><title>3σ to 4σ</title></rect>
+  <rect x="557.3" y="242.8" width="9.3" height="1.2" fill="#3A56C5" fill-opacity="0.55"><title>4σ to 4σ</title></rect>
+  <rect x="567.6" y="243.1" width="9.3" height="0.9" fill="#3A56C5" fill-opacity="0.55"><title>4σ to 4σ</title></rect>
+  <rect x="577.8" y="243.2" width="9.3" height="0.8" fill="#3A56C5" fill-opacity="0.55"><title>4σ to 4σ</title></rect>
+  <rect x="588.1" y="243.3" width="9.3" height="0.7" fill="#3A56C5" fill-opacity="0.55"><title>4σ to 4σ</title></rect>
+  <rect x="598.4" y="243.5" width="9.3" height="0.5" fill="#3A56C5" fill-opacity="0.55"><title>4σ to 5σ</title></rect>
+  <rect x="608.6" y="243.6" width="9.3" height="0.4" fill="#3A56C5" fill-opacity="0.55"><title>5σ to 5σ</title></rect>
+  <rect x="618.9" y="243.7" width="9.3" height="0.3" fill="#3A56C5" fill-opacity="0.55"><title>5σ to 5σ</title></rect>
+  <rect x="629.2" y="243.7" width="9.3" height="0.3" fill="#3A56C5" fill-opacity="0.55"><title>5σ to 5σ</title></rect>
+  <rect x="639.4" y="243.7" width="9.3" height="0.3" fill="#3A56C5" fill-opacity="0.55"><title>5σ to 5σ</title></rect>
+  <rect x="649.7" y="243.8" width="9.3" height="0.2" fill="#3A56C5" fill-opacity="0.55"><title>5σ to 6σ</title></rect>
+  <rect x="660" y="243.8" width="9.3" height="0.2" fill="#3A56C5" fill-opacity="0.55"><title>6σ to 6σ</title></rect>
+  <rect x="670.2" y="243.9" width="9.3" height="0.1" fill="#3A56C5" fill-opacity="0.55"><title>6σ to 6σ</title></rect>
+  <polyline points="64,244 66.6,244 69.1,244 71.7,244 74.3,244 76.8,244 79.4,244 82,244 84.5,244 87.1,244 89.7,244 92.2,244 94.8,244 97.4,244 99.9,244 102.5,244 105.1,244 107.6,244 110.2,244 112.8,244 115.3,244 117.9,244 120.5,244 123,244 125.6,244 128.2,244 130.7,244 133.3,244 135.9,244 138.4,244 141,244 143.6,244 146.1,244 148.7,244 151.3,244 153.8,244 156.4,244 159,244 161.5,244 164.1,244 166.7,244 169.2,243.9 171.8,243.9 174.4,243.9 176.9,243.9 179.5,243.9 182.1,243.9 184.6,243.8 187.2,243.8 189.8,243.7 192.3,243.7 194.9,243.6 197.5,243.6 200,243.5 202.6,243.4 205.2,243.3 207.7,243.2 210.3,243 212.9,242.9 215.4,242.7 218,242.5 220.6,242.2 223.1,241.9 225.7,241.6 228.3,241.3 230.8,240.9 233.4,240.4 236,239.9 238.5,239.3 241.1,238.7 243.7,238 246.2,237.2 248.8,236.3 251.4,235.3 253.9,234.2 256.5,233.1 259.1,231.8 261.6,230.4 264.2,228.8 266.8,227.2 269.3,225.4 271.9,223.5 274.5,221.4 277,219.2 279.6,216.8 282.2,214.3 284.7,211.6 287.3,208.7 289.9,205.8 292.4,202.6 295,199.4 297.6,195.9 300.1,192.4 302.7,188.7 305.3,184.9 307.8,181 310.4,177.1 313,173 315.5,168.9 318.1,164.8 320.7,160.6 323.2,156.4 325.8,152.3 328.4,148.2 330.9,144.1 333.5,140.2 336.1,136.4 338.6,132.7 341.2,129.1 343.8,125.8 346.3,122.6 348.9,119.7 351.5,117.1 354,114.6 356.6,112.5 359.2,110.7 361.7,109.2 364.3,108 366.9,107.2 369.4,106.6 372,106.5 374.6,106.6 377.1,107.2 379.7,108 382.3,109.2 384.8,110.7 387.4,112.5 390,114.6 392.5,117.1 395.1,119.7 397.7,122.6 400.2,125.8 402.8,129.1 405.4,132.7 407.9,136.4 410.5,140.2 413.1,144.1 415.6,148.2 418.2,152.3 420.8,156.4 423.3,160.6 425.9,164.8 428.5,168.9 431,173 433.6,177.1 436.2,181 438.7,184.9 441.3,188.7 443.9,192.4 446.4,195.9 449,199.4 451.6,202.6 454.1,205.8 456.7,208.7 459.3,211.6 461.8,214.3 464.4,216.8 467,219.2 469.5,221.4 472.1,223.5 474.7,225.4 477.2,227.2 479.8,228.8 482.4,230.4 484.9,231.8 487.5,233.1 490.1,234.2 492.6,235.3 495.2,236.3 497.8,237.2 500.3,238 502.9,238.7 505.5,239.3 508,239.9 510.6,240.4 513.2,240.9 515.7,241.3 518.3,241.6 520.9,241.9 523.4,242.2 526,242.5 528.6,242.7 531.1,242.9 533.7,243 536.3,243.2 538.8,243.3 541.4,243.4 544,243.5 546.5,243.6 549.1,243.6 551.7,243.7 554.2,243.7 556.8,243.8 559.4,243.8 561.9,243.9 564.5,243.9 567.1,243.9 569.6,243.9 572.2,243.9 574.8,243.9 577.3,244 579.9,244 582.5,244 585,244 587.6,244 590.2,244 592.7,244 595.3,244 597.9,244 600.4,244 603,244 605.6,244 608.1,244 610.7,244 613.3,244 615.8,244 618.4,244 621,244 623.5,244 626.1,244 628.7,244 631.2,244 633.8,244 636.4,244 638.9,244 641.5,244 644.1,244 646.6,244 649.2,244 651.8,244 654.3,244 656.9,244 659.5,244 662,244 664.6,244 667.2,244 669.7,244 672.3,244 674.9,244 677.4,244 680,244" fill="none" stroke="#1F2C38" stroke-width="2" stroke-linejoin="round"><title>normal, same volatility</title></polyline>
+  <line x1="530" y1="32" x2="546" y2="32" stroke="#1F2C38" stroke-width="2.5"/>
+  <text x="552" y="36" font-size="11" fill="#4A5A68">normal, same volatility</text>
+</svg>

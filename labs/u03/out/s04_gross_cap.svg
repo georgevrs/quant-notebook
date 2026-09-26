@@ -1,0 +1,34 @@
+<svg viewBox="0 0 720 280" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Lowest volatility vs the gross-leverage cap L">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">LOWEST VOLATILITY VS THE GROSS-LEVERAGE CAP L</text>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#3A56C5" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">lowest achievable volatility</text>
+  <line x1="249.20000000000002" y1="32" x2="265.20000000000005" y2="32" stroke="#E8850C" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="271.20000000000005" y="36" font-size="11" fill="#4A5A68">tangent from the multiplier</text>
+  <line x1="64" y1="244" x2="602" y2="244" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="248" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">11.4%</text>
+  <line x1="64" y1="205.6" x2="602" y2="205.6" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="209.6" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">11.5%</text>
+  <line x1="64" y1="167.2" x2="602" y2="167.2" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="171.2" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">11.6%</text>
+  <line x1="64" y1="128.8" x2="602" y2="128.8" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="132.8" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">11.7%</text>
+  <line x1="64" y1="90.4" x2="602" y2="90.4" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="94.4" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">11.8%</text>
+  <line x1="64" y1="52" x2="602" y2="52" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="56" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">11.9%</text>
+  <line x1="64" y1="244" x2="602" y2="244" stroke="#C9CFC6" stroke-width="1"/>
+  <line x1="64" y1="244" x2="64" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="64" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">1</text>
+  <line x1="178.5" y1="244" x2="178.5" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="178.5" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">1.1</text>
+  <line x1="292.9" y1="244" x2="292.9" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="292.9" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">1.2</text>
+  <line x1="407.4" y1="244" x2="407.4" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="407.4" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">1.3</text>
+  <line x1="521.9" y1="244" x2="521.9" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="521.9" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">1.4</text>
+  <polyline points="64,58.3 75.4,68.8 86.9,78.9 98.3,88.5 109.8,97.8 121.2,106.6 132.7,115.1 144.1,123.2 155.6,130.8 167,138.1 178.5,145 189.9,151.4 201.4,157.4 212.8,163.1 224.3,168.3 235.7,173.1 247.1,177.5 258.6,181.5 270,185.2 281.5,188.6 292.9,191.6 304.4,194.4 315.8,196.9 327.3,199.1 338.7,201.1 350.2,202.9 361.6,204.4 373.1,205.7 384.5,206.7 396,207.5 407.4,208.1 418.9,208.5 430.3,208.7 441.7,208.8 453.2,208.8 464.6,208.8 476.1,208.8 487.5,208.8 499,208.8 510.4,208.8 521.9,208.8 533.3,208.8 544.8,208.8 556.2,208.8 567.7,208.8 579.1,208.8 590.6,208.8 602,208.8" fill="none" stroke="#3A56C5" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>lowest achievable volatility</title></polyline>
+  <circle cx="602" cy="208.8" r="4" fill="#3A56C5" stroke="#FBFBF8" stroke-width="2"><title>lowest achievable volatility: 11.5%</title></circle>
+  <polyline points="109.8,127.3 121.2,131.5 132.7,135.7 144.1,139.8 155.6,144 167,148.2 178.5,152.4 189.9,156.6 201.4,160.8 212.8,164.9 224.3,169.1 235.7,173.3 247.1,177.5 258.6,181.7 270,185.9 281.5,190.1 292.9,194.2 304.4,198.4 315.8,202.6 327.3,206.8 338.7,211 350.2,215.2 361.6,219.3 373.1,223.5" fill="none" stroke="#E8850C" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>tangent from the multiplier</title></polyline>
+  <text x="614" y="212.8" font-size="11" fill="#1F2C38">lowest vol: 11.5%</text>
+</svg>

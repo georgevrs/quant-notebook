@@ -1,0 +1,81 @@
+<svg viewBox="0 0 720 320" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="PC1 weight vs the planted market loading, one dot per asset">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">PC1 WEIGHT VS THE PLANTED MARKET LOADING, ONE DOT PER ASSET</text>
+  <line x1="64" y1="272" x2="680" y2="272" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="276" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.05</text>
+  <line x1="64" y1="215" x2="680" y2="215" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="219" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.10</text>
+  <line x1="64" y1="158" x2="680" y2="158" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="162" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.15</text>
+  <line x1="64" y1="101" x2="680" y2="101" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="105" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.20</text>
+  <line x1="64" y1="44" x2="680" y2="44" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="48" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.25</text>
+  <line x1="64" y1="272" x2="680" y2="272" stroke="#C9CFC6" stroke-width="1"/>
+  <line x1="64" y1="272" x2="64" y2="276" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="64" y="290" font-size="11" text-anchor="middle" fill="#4A5A68">0.50</text>
+  <line x1="166.7" y1="272" x2="166.7" y2="276" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="166.7" y="290" font-size="11" text-anchor="middle" fill="#4A5A68">0.75</text>
+  <line x1="269.3" y1="272" x2="269.3" y2="276" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="269.3" y="290" font-size="11" text-anchor="middle" fill="#4A5A68">1.00</text>
+  <line x1="372" y1="272" x2="372" y2="276" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="372" y="290" font-size="11" text-anchor="middle" fill="#4A5A68">1.25</text>
+  <line x1="474.7" y1="272" x2="474.7" y2="276" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="474.7" y="290" font-size="11" text-anchor="middle" fill="#4A5A68">1.50</text>
+  <line x1="577.3" y1="272" x2="577.3" y2="276" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="577.3" y="290" font-size="11" text-anchor="middle" fill="#4A5A68">1.75</text>
+  <line x1="680" y1="272" x2="680" y2="276" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="680" y="290" font-size="11" text-anchor="middle" fill="#4A5A68">2.00</text>
+  <text x="372" y="312" font-size="11" text-anchor="middle" fill="#4A5A68">true market loading (β)</text>
+  <text x="64" y="36" font-size="11" fill="#4A5A68">PC1 weight</text>
+  <circle cx="639.9" cy="67.6" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="95.5" cy="252.5" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="333.8" cy="184.1" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="525" cy="93.5" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="351.7" cy="147.8" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="178.3" cy="231" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="272.6" cy="196.6" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="403.2" cy="142.9" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="241.7" cy="237.8" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="84.3" cy="229.7" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="405.9" cy="116.4" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="223.2" cy="199.3" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="116.6" cy="254.7" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="99.4" cy="267.9" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="255.9" cy="166.2" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="232.4" cy="200" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="188.4" cy="227.7" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="537.8" cy="107.8" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="303" cy="171.4" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="245.2" cy="216.3" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="398.6" cy="161.9" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="253.9" cy="167.8" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="116" cy="224.9" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="409" cy="161.7" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="512.9" cy="113.1" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="535.3" cy="108.6" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="73.1" cy="244.1" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="372.9" cy="129.9" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="104.3" cy="260.1" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="454.3" cy="148" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="101.9" cy="258.6" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="127.8" cy="257.7" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="413.2" cy="150.1" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="184.8" cy="223.7" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="352.8" cy="163.2" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="91.1" cy="267.9" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="281.3" cy="180" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="435.3" cy="129.4" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="384.8" cy="127" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="388.5" cy="158.5" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="230.5" cy="185" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="296" cy="163.4" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="549.8" cy="98.8" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="422.6" cy="126.2" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="103.6" cy="219.4" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="544.4" cy="97.6" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="558.9" cy="106.9" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="289.6" cy="178.7" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="527.6" cy="109.4" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <circle cx="64.4" cy="237.2" r="2.5" fill="#3A56C5" fill-opacity="0.45"/>
+  <line x1="64" y1="257.5" x2="680" y2="53.9" stroke="#1F2C38" stroke-width="2"><title>OLS fit: slope 0.119</title></line>
+</svg>

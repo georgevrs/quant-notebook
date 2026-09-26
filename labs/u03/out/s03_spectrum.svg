@@ -1,0 +1,42 @@
+<svg viewBox="0 0 720 280" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Share of total variance carried by each principal component (50 assets)">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">SHARE OF TOTAL VARIANCE CARRIED BY EACH PRINCIPAL COMPONENT (50 ASSETS)</text>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#3A56C5" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">sample, 10 years of data</text>
+  <line x1="223.60000000000002" y1="32" x2="239.60000000000002" y2="32" stroke="#4A5A68" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="245.60000000000002" y="36" font-size="11" fill="#4A5A68">truth</text>
+  <line x1="64" y1="236" x2="690" y2="236" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="240" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0%</text>
+  <line x1="64" y1="191" x2="690" y2="191" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="195" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">10%</text>
+  <line x1="64" y1="146" x2="690" y2="146" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="150" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">20%</text>
+  <line x1="64" y1="101" x2="690" y2="101" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="105" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">30%</text>
+  <line x1="64" y1="56" x2="690" y2="56" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="60" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">40%</text>
+  <line x1="64" y1="236" x2="690" y2="236" stroke="#C9CFC6" stroke-width="1"/>
+  <path d="M78.1,236 V111.1 Q78.1,107.1 82.1,107.1 H98.1 Q102.1,107.1 102.1,111.1 V236 Z" fill="#3A56C5"><title>PC1 · sample, 10 years of data: 29%</title></path>
+  <path d="M104.1,236 V109.3 Q104.1,105.3 108.1,105.3 H124.1 Q128.1,105.3 128.1,109.3 V236 Z" fill="#4A5A68"><title>PC1 · truth: 29%</title></path>
+  <text x="103.1" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">PC1</text>
+  <path d="M156.4,236 V196.2 Q156.4,192.2 160.4,192.2 H176.4 Q180.4,192.2 180.4,196.2 V236 Z" fill="#3A56C5"><title>PC2 · sample, 10 years of data: 10%</title></path>
+  <path d="M182.4,236 V195.6 Q182.4,191.6 186.4,191.6 H202.4 Q206.4,191.6 206.4,195.6 V236 Z" fill="#4A5A68"><title>PC2 · truth: 10%</title></path>
+  <text x="181.4" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">PC2</text>
+  <path d="M234.6,236 V203.8 Q234.6,199.8 238.6,199.8 H254.6 Q258.6,199.8 258.6,203.8 V236 Z" fill="#3A56C5"><title>PC3 · sample, 10 years of data: 8%</title></path>
+  <path d="M260.6,236 V204.1 Q260.6,200.1 264.6,200.1 H280.6 Q284.6,200.1 284.6,204.1 V236 Z" fill="#4A5A68"><title>PC3 · truth: 8%</title></path>
+  <text x="259.6" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">PC3</text>
+  <path d="M312.9,236 V232.7 Q312.9,229.4 316.2,229.4 H333.6 Q336.9,229.4 336.9,232.7 V236 Z" fill="#3A56C5"><title>PC4 · sample, 10 years of data: 1%</title></path>
+  <path d="M338.9,236 V233.5 Q338.9,230.9 341.4,230.9 H360.3 Q362.9,230.9 362.9,233.5 V236 Z" fill="#4A5A68"><title>PC4 · truth: 1%</title></path>
+  <text x="337.9" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">PC4</text>
+  <path d="M391.1,236 V232.8 Q391.1,229.6 394.3,229.6 H411.9 Q415.1,229.6 415.1,232.8 V236 Z" fill="#3A56C5"><title>PC5 · sample, 10 years of data: 1%</title></path>
+  <path d="M417.1,236 V233.5 Q417.1,230.9 419.7,230.9 H438.6 Q441.1,230.9 441.1,233.5 V236 Z" fill="#4A5A68"><title>PC5 · truth: 1%</title></path>
+  <text x="416.1" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">PC5</text>
+  <path d="M469.4,236 V232.9 Q469.4,229.7 472.5,229.7 H490.2 Q493.4,229.7 493.4,232.9 V236 Z" fill="#3A56C5"><title>PC6 · sample, 10 years of data: 1%</title></path>
+  <path d="M495.4,236 V233.5 Q495.4,230.9 497.9,230.9 H516.8 Q519.4,230.9 519.4,233.5 V236 Z" fill="#4A5A68"><title>PC6 · truth: 1%</title></path>
+  <text x="494.4" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">PC6</text>
+  <path d="M547.6,236 V232.9 Q547.6,229.8 550.7,229.8 H568.5 Q571.6,229.8 571.6,232.9 V236 Z" fill="#3A56C5"><title>PC7 · sample, 10 years of data: 1%</title></path>
+  <path d="M573.6,236 V233.5 Q573.6,230.9 576.2,230.9 H595.1 Q597.6,230.9 597.6,233.5 V236 Z" fill="#4A5A68"><title>PC7 · truth: 1%</title></path>
+  <text x="572.6" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">PC7</text>
+  <path d="M625.9,236 V233 Q625.9,230 628.9,230 H646.9 Q649.9,230 649.9,233 V236 Z" fill="#3A56C5"><title>PC8 · sample, 10 years of data: 1%</title></path>
+  <path d="M651.9,236 V233.5 Q651.9,230.9 654.4,230.9 H673.3 Q675.9,230.9 675.9,233.5 V236 Z" fill="#4A5A68"><title>PC8 · truth: 1%</title></path>
+  <text x="650.9" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">PC8</text>
+</svg>
