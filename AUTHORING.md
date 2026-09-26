@@ -126,6 +126,7 @@ Use the classes exactly as `references/components.md` documents them. Quant Note
 | --- | --- |
 | `\( … \)` inline math, `\[ … \]` display math | TeX → MathML with the TeX kept as an annotation |
 | `<span data-lab="sharpe" data-fmt=".2f">0.37</span>` | fills the text from `results.json` (Python format spec) |
+| `<span data-lab="pnl" data-fmt="$,.2f">−$1.00</span>` | money: a leading `$` in the spec puts the sign first (−$1.00) — never type `$` before a span |
 | `<figure class="diagram chart">` + `<!-- chart:growth --><!-- /chart:growth -->` + `<figcaption>` | injects `labs/uUU/out/sSS_growth.svg` |
 | `<a data-xref="6.3"></a>` / `<a data-xref="6.3#s4"></a>` | "Session 6.3 — Title" link, or a "coming soon" span |
 | `<a data-xref="6.3" data-style="short"></a>` | "Session 6.3" |
@@ -194,9 +195,10 @@ plain words; the chart states what it shows, the caption states the lesson.
 
 | Module | Helpers |
 | --- | --- |
-| `quantnb.synth` | `gbm_prices`, `garch_returns`, `factor_model_returns` |
-| `quantnb.returns` | `simple_returns`, `log_returns`, `cumulative_growth`, `annualised_return`, `annualised_vol`, `sharpe_ratio`, `drawdown`, `max_drawdown`, `volatility_drag`, `leveraged_returns` |
-| `quantnb.stats` | `annual_sharpe` (arrays), `sharpe_se` (Lo 2002, any frequency), `years_needed`, `expected_max_sharpe` (False Strategy Theorem), `oos_r2`, `factor_regression` |
+| `quantnb.synth` | `gbm_prices`, `garch_returns`, `factor_model_returns`, `jump_diffusion_returns` (compensated crashes) |
+| `quantnb.returns` | `simple_returns`, `log_returns`, `cumulative_growth`, `annualised_return`, `annualised_vol`, `sharpe_ratio`, `drawdown`, `max_drawdown`, `max_drawdown_paths` (2-D), `volatility_drag`, `leveraged_returns`, `in_years` (elapsed-time index) |
+| `quantnb.stats` | `annual_sharpe` (arrays), `sharpe_se` (Lo 2002, any frequency), `years_needed`, `expected_max_sharpe` (False Strategy Theorem), `oos_r2`, `factor_regression` (with SEs), `skewness`, `batch_se` (SE of any MC statistic), `p_touch` (GBM barrier probability, up or down, with the discrete-monitoring correction) |
+| `quantnb.options` | `bs_price`, `implied_vol`, `call_payoff`, `put_payoff` — a black box until 10.3 derives it |
 | `quantnb.repro` | `fingerprint` (integer arrays), `content_fingerprint` (DataFrames) |
 | `quantnb.paths` | `data_cache()`, `offline()`, `repo_root()` |
 
@@ -304,7 +306,8 @@ Reserved notation — use these meanings everywhere, or say explicitly that you 
 Every wave is fact-checked and consistency-reviewed. These are the errors they caught in Wave 1;
 avoid them up front.
 
-**Scope and length**
+#### Scope and length
+
 - Aim for **3,000–4,500 words of prose**. Depth on *your* session's topic is the point; length from
   re-teaching other sessions' topics is not. When an idea is owned by another session (see its
   `goal` and `owns` in `course.yaml`), give a one- or two-sentence teaser and a `data-xref` — never
@@ -312,7 +315,8 @@ avoid them up front.
   error of the Sharpe ratio in 1.3/1.4/2.3), point back to it instead of re-deriving it.
 - Cite the same study once, in the session that owns it; elsewhere, one clause plus a link.
 
-**Numbers**
+#### Numbers
+
 - **Never type lab numbers into SVG text** — SVG can't hold `data-lab` spans, so they go stale.
   Keep diagrams conceptual (structure, order, contrast), put the numbers in prose/tables as
   `data-lab` spans, and put quantitative pictures in lab charts. The same goes for numbers in
@@ -321,24 +325,30 @@ avoid them up front.
   it), label it "average (arithmetic) return" and show the CAGR next to it.
 - Say "percentage points" for differences between percentages; "trading days" for business days.
 
-**Labs**
+#### Labs
+
 - **One random stream per experiment**: `rng_a, rng_b, rng_c = lab.rng.spawn(3)`. A shared stream
   means changing one section (or a Try-it exercise) silently changes every later result.
-- **Assert at ≥ 3 standard errors**, and never assert a property of a single random path — assert
-  Monte Carlo averages against theory. Try-it and homework edits must not crash the lab: test the
-  edits you suggest.
+- **Assert Monte Carlo results against theory at 4 standard errors**, never a property of a single
+  random path. A lab has dozens of statistical asserts, and that is a multiple-testing problem: one
+  Wave 2 lab had ~27 asserts at 3 SE and failed on 8% of alternative seeds. At 4 SE the chance of a
+  spurious failure is ~0.2%. Never hunt for a seed that passes — that is p-hacking. Any tolerance
+  beyond 4 SE needs a comment explaining the bias it allows for (e.g. an O(1/n) term).
+- Try-it and homework edits must not crash the lab: test the edits you suggest.
 - **Simulated time is elapsed time**: index simulated series by years (`np.arange(1, n+1)/252`),
   never by calendar dates, and write "after year 8", not "in 2022".
 - A cache key must include **everything** that determines the data — parameters **and the seed**.
 - State the risk-free rate once per lab ("synthetic excess returns, risk-free rate 0").
 
-**Cross-references and terms**
+#### Cross-references and terms
+
 - Every mention of another session is a `data-xref` (never plain "Session 2.3" text).
 - First use of a term owned elsewhere is a `data-term` link (edge, P&L, look-ahead bias, in-sample…).
 - Don't reuse a reserved symbol for something else in the same unit (α is alpha; call a test's
   false-positive rate its *size*). Per-period risk-free rates are \(r_{f,t}\).
 
-**References**
+#### References
+
 - Two lists in the close: `📚 Go deeper` (books and papers to read next) and, when you quote many
   empirical figures, `Sources for the numbers` (the rest). Both use `ol.refs` and ids.
 - When a paper has several versions with different numbers, cite the version you quote from

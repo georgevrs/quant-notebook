@@ -214,7 +214,13 @@ def fmt_pct(decimals: int = 0):
 
 
 def fmt_num(decimals: int = 0, prefix: str = "", suffix: str = ""):
-    return lambda v: _no_neg_zero(f"{prefix}{v:,.{decimals}f}{suffix}")
+    """Thousands-separated number; the sign goes before the prefix (−$20, not $-20)."""
+    def f(v: float) -> str:
+        s = _no_neg_zero(f"{v:,.{decimals}f}")
+        if s.startswith("−"):
+            return "−" + prefix + s[1:] + suffix
+        return prefix + s + suffix
+    return f
 
 
 # ---------------------------------------------------------------------------------------------
@@ -348,13 +354,19 @@ def histogram(values, *, title: str, bins: int = 60, x_fmt=fmt_pct(1), height: i
         keep = (ox >= xlo) & (ox <= xhi)
         pts = " ".join(f"{_r(xscale(a))},{_r(yscale(b))}" for a, b in zip(ox[keep], oy[keep]))
         parts.append(f'  <polyline points="{pts}" fill="none" stroke="{INK}" stroke-width="2" stroke-linejoin="round"><title>{_esc(overlay_label)}</title></polyline>')
-        parts.append(f'  <line x1="{W - 190}" y1="32" x2="{W - 174}" y2="32" stroke="{INK}" stroke-width="2.5"/>')
-        parts.append(f'  <text x="{W - 168}" y="36" font-size="11" fill="{INK_SOFT}">{_esc(overlay_label)}</text>')
+        # legend on the side away from the tail marker, so the two labels never collide
+        tail_right = tail_below is not None and xscale(tail_below) > (f.x0 + f.x1) / 2
+        lx = 26 if tail_right else W - 190
+        parts.append(f'  <line x1="{lx}" y1="32" x2="{lx + 16}" y2="32" stroke="{INK}" stroke-width="2.5"/>')
+        parts.append(f'  <text x="{lx + 22}" y="36" font-size="11" fill="{INK_SOFT}">{_esc(overlay_label)}</text>')
     if tail_below is not None:
         tx = xscale(tail_below)
         parts.append(f'  <line x1="{_r(tx)}" y1="{_r(f.y1 - 2)}" x2="{_r(tx)}" y2="{_r(f.y0)}" stroke="{INK_SOFT}" stroke-width="1"/>')
-        if tail_label:  # above the plot area, never on top of the bars
-            parts.append(f'  <text x="{_r(tx - 5)}" y="{_r(f.y1 - 6)}" font-size="10.5" text-anchor="end" fill="{INK}">{_esc(tail_label)} ←</text>')
+        if tail_label:  # above the plot area, never on top of the bars; flips side near the left edge
+            if tx - f.x0 > 6.5 * (len(tail_label) + 2):
+                parts.append(f'  <text x="{_r(tx - 5)}" y="{_r(f.y1 - 6)}" font-size="10.5" text-anchor="end" fill="{INK}">{_esc(tail_label)} ←</text>')
+            else:
+                parts.append(f'  <text x="{_r(tx + 5)}" y="{_r(f.y1 - 6)}" font-size="10.5" text-anchor="start" fill="{INK}">→ {_esc(tail_label)}</text>')
     parts.append("</svg>")
     return "\n".join(parts)
 

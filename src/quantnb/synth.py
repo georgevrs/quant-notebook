@@ -87,3 +87,23 @@ def factor_model_returns(n_days: int, n_assets: int, n_factors: int = 3,
         "loadings": pd.DataFrame(B, index=assets, columns=factors),
         "alphas": pd.DataFrame({"alpha_annual": a * PERIODS_PER_YEAR}, index=assets),
     }
+
+
+def jump_diffusion_returns(n_days: int, n_paths: int = 1, mu: float = 0.07, sigma: float = 0.15,
+                           jump_rate: float = 0.5, jump_mean: float = -0.10, jump_sd: float = 0.05,
+                           rng: np.random.Generator | None = None, compensate: bool = True) -> np.ndarray:
+    """Merton jump-diffusion daily SIMPLE returns, shape (n_days, n_paths).
+
+    Log returns = diffusion + a Poisson(jump_rate per year) number of normal log-jumps
+    N(jump_mean, jump_sd²). With compensate=True the diffusion drift is lowered so the expected simple
+    growth rate is still mu per year — jumps then change the shape of returns (skew, tails), not their
+    mean. Used for crash-prone strategies (Sessions 2.2, 2.5, 3.2).
+    """
+    rng = rng or np.random.default_rng()
+    dt = 1.0 / PERIODS_PER_YEAR
+    k = np.exp(jump_mean + 0.5 * jump_sd ** 2) - 1.0  # expected simple jump size
+    drift = mu - 0.5 * sigma ** 2 - (jump_rate * k if compensate else 0.0)
+    diff = drift * dt + sigma * np.sqrt(dt) * rng.standard_normal((n_days, n_paths))
+    n_jumps = rng.poisson(jump_rate * dt, (n_days, n_paths))
+    jumps = n_jumps * jump_mean + np.sqrt(n_jumps) * jump_sd * rng.standard_normal((n_days, n_paths))
+    return np.expm1(diff + jumps)

@@ -74,3 +74,18 @@ def volatility_drag(sigma: float) -> float:
 def leveraged_returns(simple: pd.Series, leverage: float, borrow_rate_per_period: float = 0.0) -> pd.Series:
     """Daily-rebalanced leverage L: R_L = L*R - (L-1)*borrow cost."""
     return leverage * simple - (leverage - 1.0) * borrow_rate_per_period
+
+
+def in_years(values, periods_per_year: int = PERIODS_PER_YEAR) -> pd.Series:
+    """Re-index a simulated series by elapsed years (1/periods, 2/periods, …).
+
+    Simulated data must not show calendar dates on charts: they would imply real history.
+    """
+    v = values.to_numpy() if hasattr(values, "to_numpy") else np.asarray(values)
+    return pd.Series(v, index=np.arange(1, len(v) + 1) / periods_per_year)
+
+
+def max_drawdown_paths(simple: np.ndarray) -> np.ndarray:
+    """Maximum drawdown (≤ 0) of each column of a (periods × paths) array of simple returns."""
+    log_w = np.vstack([np.zeros((1, simple.shape[1])), np.log1p(simple).cumsum(axis=0)])
+    return np.expm1((log_w - np.maximum.accumulate(log_w, axis=0)).min(axis=0))

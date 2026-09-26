@@ -116,3 +116,6 @@ def test_fmt_value_no_negative_zero():
     assert build.fmt_value(-0.196, ".1%") == "−19.6%"
     assert build.fmt_value(2000.0, ",.0f") == "2,000"
     assert build.fmt_value("text", None) == "text"
+    assert build.fmt_value(-1.0, "$,.2f") == "−$1.00"
+    assert build.fmt_value(1234.5, "$,.2f") == "$1,234.50"
+    assert build.fmt_value(-0.001, "$.2f") == "$0.00"

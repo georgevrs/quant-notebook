@@ -67,8 +67,13 @@ def run_lab(s: Session) -> bool:
 
 
 def fmt_value(value, spec: str | None) -> str:
+    """Python format spec, plus a leading '$' for money: data-fmt="$,.2f" gives −$1,234.50."""
     if spec is None or isinstance(value, str):
         return str(value)
+    if spec.startswith("$"):
+        body = format(abs(value), spec[1:])
+        neg = value < 0 and any(ch in "123456789" for ch in body)
+        return ("−" if neg else "") + "$" + body
     out = format(value, spec)
     if out.startswith("-") and not any(ch in "123456789" for ch in out):
         out = out[1:]  # "-0.0%" → "0.0%"

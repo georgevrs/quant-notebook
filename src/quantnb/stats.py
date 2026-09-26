@@ -87,3 +87,47 @@ def factor_regression(y, X, periods_per_year: int = PERIODS_PER_YEAR, names: lis
         "r2": float(1.0 - resid @ resid / ss_tot),
         "resid_vol_annual": float(np.sqrt(s2 * periods_per_year)),
     }
+
+
+def skewness(x) -> float:
+    """Sample skewness (population form, third standardised moment) of a pooled array."""
+    x = np.asarray(x, dtype=float).ravel()
+    d = x - x.mean()
+    return float((d ** 3).mean() / (d ** 2).mean() ** 1.5)
+
+
+def batch_se(stat, x, n_batches: int = 50) -> float:
+    """Batch-means standard error of any statistic `stat(array)` computed over Monte Carlo paths.
+
+    Splits the paths (axis 0) into `n_batches` groups, evaluates the statistic in each, and returns
+    std(batch values) / sqrt(n_batches). Use it for statistics with no simple closed-form SE
+    (skewness, quantiles, maximum drawdown).
+    """
+    x = np.asarray(x)
+    vals = np.array([stat(b) for b in np.array_split(x, n_batches, axis=0)], dtype=float)
+    return float(vals.std(ddof=1) / np.sqrt(n_batches))
+
+
+BGK_BETA = 0.5826  # Broadie–Glasserman–Kou continuity-correction constant, −ζ(1/2)/√(2π)
+
+
+def p_touch(barrier_ratio: float, mu: float, sigma: float, tau: float, dt: float | None = None) -> float:
+    """Probability that a GBM price touches barrier_ratio × start before time tau (reflection principle).
+
+    barrier_ratio > 1 is an up-barrier (e.g. 2.0 = "the price doubles"), < 1 a down-barrier (e.g. a
+    margin-call level). mu and sigma are the annual drift and volatility of the price; tau is in years.
+    If `dt` (the monitoring interval in years) is given, the barrier is shifted away from the start by
+    exp(±β σ √dt) — the Broadie–Glasserman–Kou correction for checking only at discrete times.
+    Taught in Sessions 2.4 and 3.5.
+    """
+    if barrier_ratio == 1.0:
+        return 1.0
+    up = barrier_ratio > 1.0
+    h = np.log(barrier_ratio)
+    if dt:
+        h += (1 if up else -1) * BGK_BETA * sigma * np.sqrt(dt)
+    nu = mu - 0.5 * sigma ** 2  # drift of the log price
+    s = sigma * np.sqrt(tau)
+    if up:
+        return float(norm.cdf((-h + nu * tau) / s) + np.exp(2 * nu * h / sigma ** 2) * norm.cdf((-h - nu * tau) / s))
+    return float(norm.cdf((h - nu * tau) / s) + np.exp(2 * nu * h / sigma ** 2) * norm.cdf((h + nu * tau) / s))
