@@ -1,0 +1,58 @@
+<svg viewBox="0 0 720 260" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Sharpe ratio of one strategy under 20 seeds (true Sharpe 0.39, 5 years)">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">SHARPE RATIO OF ONE STRATEGY UNDER 20 SEEDS (TRUE SHARPE 0.39, 5 YEARS)</text>
+  <line x1="64" y1="216" x2="690" y2="216" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="220" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">−1.5</text>
+  <line x1="64" y1="187.3" x2="690" y2="187.3" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="191.3" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">−1.0</text>
+  <line x1="64" y1="158.7" x2="690" y2="158.7" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="162.7" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">−0.5</text>
+  <line x1="64" y1="130" x2="690" y2="130" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="134" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.0</text>
+  <line x1="64" y1="101.3" x2="690" y2="101.3" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="105.3" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.5</text>
+  <line x1="64" y1="72.7" x2="690" y2="72.7" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="76.7" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">1.0</text>
+  <line x1="64" y1="44" x2="690" y2="44" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="48" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">1.5</text>
+  <line x1="64" y1="130" x2="690" y2="130" stroke="#C9CFC6" stroke-width="1"/>
+  <path d="M70.3,130 V137 Q70.3,141 74.3,141 H85 Q89,141 89,137 V130 Z" fill="#3A56C5"><title>0: −0.2</title></path>
+  <text x="79.7" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">0</text>
+  <path d="M101.6,130 V146.2 Q101.6,150.2 105.6,150.2 H116.3 Q120.3,150.2 120.3,146.2 V130 Z" fill="#3A56C5"><title>1: −0.4</title></path>
+  <text x="111" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">1</text>
+  <path d="M132.9,130 V151.9 Q132.9,155.9 136.9,155.9 H147.6 Q151.6,155.9 151.6,151.9 V130 Z" fill="#3A56C5"><title>2: −0.5</title></path>
+  <text x="142.2" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">2</text>
+  <path d="M164.2,130 V77.8 Q164.2,73.8 168.2,73.8 H178.9 Q182.9,73.8 182.9,77.8 V130 Z" fill="#E8850C"><title>3: 1.0</title></path>
+  <text x="173.6" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">3</text>
+  <path d="M195.5,130 V118 Q195.5,114 199.5,114 H210.2 Q214.2,114 214.2,118 V130 Z" fill="#3A56C5"><title>4: 0.3</title></path>
+  <text x="204.8" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">4</text>
+  <path d="M226.8,130 V91.4 Q226.8,87.4 230.8,87.4 H241.5 Q245.5,87.4 245.5,91.4 V130 Z" fill="#3A56C5"><title>5: 0.7</title></path>
+  <text x="236.2" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">5</text>
+  <path d="M258.1,130 V120.1 Q258.1,116.1 262.1,116.1 H272.8 Q276.8,116.1 276.8,120.1 V130 Z" fill="#3A56C5"><title>6: 0.2</title></path>
+  <text x="267.5" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">6</text>
+  <path d="M289.4,130 V170.5 Q289.4,174.5 293.4,174.5 H304.1 Q308.1,174.5 308.1,170.5 V130 Z" fill="#3A56C5"><title>7: −0.8</title></path>
+  <text x="298.8" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">7</text>
+  <path d="M320.7,130 V139.4 Q320.7,143.4 324.7,143.4 H335.4 Q339.4,143.4 339.4,139.4 V130 Z" fill="#3A56C5"><title>8: −0.2</title></path>
+  <text x="330.1" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">8</text>
+  <path d="M352,130 V108.3 Q352,104.3 356,104.3 H366.7 Q370.7,104.3 370.7,108.3 V130 Z" fill="#3A56C5"><title>9: 0.4</title></path>
+  <text x="361.4" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">9</text>
+  <path d="M383.3,130 V168.1 Q383.3,172.1 387.3,172.1 H398 Q402,172.1 402,168.1 V130 Z" fill="#3A56C5"><title>10: −0.7</title></path>
+  <text x="392.7" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">10</text>
+  <path d="M414.6,130 V100.7 Q414.6,96.7 418.6,96.7 H429.3 Q433.3,96.7 433.3,100.7 V130 Z" fill="#3A56C5"><title>11: 0.6</title></path>
+  <text x="423.9" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">11</text>
+  <path d="M445.9,130 V91.6 Q445.9,87.6 449.9,87.6 H460.6 Q464.6,87.6 464.6,91.6 V130 Z" fill="#3A56C5"><title>12: 0.7</title></path>
+  <text x="455.2" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">12</text>
+  <path d="M477.2,130 V113.9 Q477.2,109.9 481.2,109.9 H491.9 Q495.9,109.9 495.9,113.9 V130 Z" fill="#3A56C5"><title>13: 0.4</title></path>
+  <text x="486.6" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">13</text>
+  <path d="M508.5,130 V127.3 Q508.5,124.6 511.2,124.6 H524.5 Q527.2,124.6 527.2,127.3 V130 Z" fill="#3A56C5"><title>14: 0.1</title></path>
+  <text x="517.9" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">14</text>
+  <path d="M539.8,130 V83.3 Q539.8,79.3 543.8,79.3 H554.5 Q558.5,79.3 558.5,83.3 V130 Z" fill="#3A56C5"><title>15: 0.9</title></path>
+  <text x="549.2" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">15</text>
+  <path d="M571.1,130 V130.3 Q571.1,130.6 571.4,130.6 H589.5 Q589.8,130.6 589.8,130.3 V130 Z" fill="#3A56C5"><title>16: 0.0</title></path>
+  <text x="580.5" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">16</text>
+  <path d="M602.4,130 V97 Q602.4,93 606.4,93 H617.1 Q621.1,93 621.1,97 V130 Z" fill="#3A56C5"><title>17: 0.6</title></path>
+  <text x="611.8" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">17</text>
+  <path d="M633.7,130 V128.6 Q633.7,127.2 635,127.2 H651.1 Q652.4,127.2 652.4,128.6 V130 Z" fill="#3A56C5"><title>18: 0.0</title></path>
+  <text x="643.1" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">18</text>
+  <path d="M665,130 V129.8 Q665,129.6 665.1,129.6 H683.6 Q683.7,129.6 683.7,129.8 V130 Z" fill="#3A56C5"><title>19: 0.0</title></path>
+  <text x="674.4" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">19</text>
+</svg>

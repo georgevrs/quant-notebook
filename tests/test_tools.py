@@ -113,6 +113,6 @@ def test_gloss_ids():
 
 def test_fmt_value_no_negative_zero():
     assert build.fmt_value(-1e-17, ".1%") == "0.0%"
-    assert build.fmt_value(-0.196, ".1%") == "-19.6%"
+    assert build.fmt_value(-0.196, ".1%") == "−19.6%"
     assert build.fmt_value(2000.0, ",.0f") == "2,000"
     assert build.fmt_value("text", None) == "text"

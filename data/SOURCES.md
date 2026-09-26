@@ -9,7 +9,7 @@ redistributed, and free sources change without notice. Labs therefore:
    real thing, always guarded by `quantnb.offline()` with a synthetic fallback so CI runs offline.
 
 | Source | Used for | Terms to respect |
-|---|---|---|
+| --- | --- | --- |
 | FRED / ALFRED (St. Louis Fed) | rates, macro, point-in-time vintages | Public-domain series only may be redistributed; series marked "Copyrighted" (e.g. SP500, DJIA, NASDAQCOM, VIXCLS, ICE BofA indices) may not. Cite FRED. |
 | Kenneth French Data Library | factor returns, portfolio sorts | Copyright Fama & French — fetch at runtime, never commit; cite the library. |
 | Open Source Asset Pricing (Chen & Zimmermann) | factor zoo, replication | Cite the authors and data release. |

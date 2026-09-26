@@ -1,0 +1,30 @@
+<svg viewBox="0 0 720 260" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="R² of daily return forecasts: 5 years fitted, 5 unseen, 200 repeats">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">R² OF DAILY RETURN FORECASTS: 5 YEARS FITTED, 5 UNSEEN, 200 REPEATS</text>
+  <line x1="64" y1="216" x2="690" y2="216" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="220" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">−7.50%</text>
+  <line x1="64" y1="187.3" x2="690" y2="187.3" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="191.3" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">−5.00%</text>
+  <line x1="64" y1="158.7" x2="690" y2="158.7" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="162.7" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">−2.50%</text>
+  <line x1="64" y1="130" x2="690" y2="130" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="134" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.00%</text>
+  <line x1="64" y1="101.3" x2="690" y2="101.3" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="105.3" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">2.50%</text>
+  <line x1="64" y1="72.7" x2="690" y2="72.7" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="76.7" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">5.00%</text>
+  <line x1="64" y1="44" x2="690" y2="44" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="48" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">7.50%</text>
+  <line x1="64" y1="130" x2="690" y2="130" stroke="#C9CFC6" stroke-width="1"/>
+  <path d="M130.2,130 V128.1 Q130.2,126.1 132.2,126.1 H152.3 Q154.2,126.1 154.2,128.1 V130 Z" fill="#4A5A68"><title>1 real · past: 0.34%</title></path>
+  <text x="142.2" y="119.1" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.34%</text>
+  <text x="142.2" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">1 real · past</text>
+  <path d="M286.8,130 V128.9 Q286.8,127.8 287.9,127.8 H309.6 Q310.8,127.8 310.8,128.9 V130 Z" fill="#3A56C5"><title>1 real · future: 0.20%</title></path>
+  <text x="298.8" y="120.8" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.20%</text>
+  <text x="298.8" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">1 real · future</text>
+  <path d="M443.2,130 V85.8 Q443.2,81.8 447.2,81.8 H463.2 Q467.2,81.8 467.2,85.8 V130 Z" fill="#4A5A68"><title>+49 junk · past: 4.21%</title></path>
+  <text x="455.2" y="74.8" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">4.21%</text>
+  <text x="455.2" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">+49 junk · past</text>
+  <path d="M599.8,130 V171.1 Q599.8,175.1 603.8,175.1 H619.8 Q623.8,175.1 623.8,171.1 V130 Z" fill="#D64B2A"><title>+49 junk · future: −3.93%</title></path>
+  <text x="611.8" y="190.1" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">−3.93%</text>
+  <text x="611.8" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">+49 junk · future</text>
+</svg>

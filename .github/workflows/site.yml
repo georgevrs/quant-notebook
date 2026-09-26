@@ -18,6 +18,7 @@ concurrency:
 
 env:
   PYTHONUTF8: "1"
+  UV_LOCKED: "1"            # any pyproject/uv.lock drift fails the build instead of re-locking
   QUANTNB_OFFLINE: "1"
 
 jobs:
@@ -37,7 +38,7 @@ jobs:
       - uses: astral-sh/setup-uv@v10
         with:
           enable-cache: true
-      - run: uv sync --frozen
+      - run: uv sync --locked
 
       - name: Unit tests (quantnb, math renderer)
         run: |

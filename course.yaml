@@ -51,18 +51,18 @@ units:
         short: What Quants Do
         goal: Map the roles, the firms and how each one actually makes money — so you know which game you are training for.
         prereqs: []
-        owns: [quant researcher, quant trader, quant developer, buy side, sell side, proprietary trading firm, market maker, hedge fund, asset manager]
+        owns: [quant researcher, quant trader, quant developer, buy side, sell side, proprietary trading firm, market maker, hedge fund, asset manager, portfolio manager, management fee, performance fee, high-water mark]
         deps: [core]
-        status: doing
+        status: published
       - id: "1.2"
         slug: where-returns-come-from
         title: Where Returns Come From
         short: Sources of Return
         goal: The five honest sources of edge — risk premia, behavioural anomalies, liquidity provision, information and speed — and why most apparent edges are none of them.
         prereqs: ["1.1"]
-        owns: [alpha, beta, edge, risk premium, anomaly, liquidity premium, informational edge, latency edge, zero-sum game]
+        owns: [alpha, beta, edge, risk premium, anomaly, liquidity premium, informational edge, latency edge, zero-sum game, equity premium, index fund]
         deps: [core]
-        status: doing
+        status: published
       - id: "1.3"
         slug: research-lifecycle
         title: The Quant Research Lifecycle
@@ -71,7 +71,7 @@ units:
         prereqs: ["1.2"]
         owns: [hypothesis, signal, backtest, out-of-sample, paper trading, alpha decay, research log, pre-registration, kill criterion]
         deps: [core]
-        status: doing
+        status: published
       - id: "1.4"
         slug: engineers-edge-and-odds
         title: The Engineer's Edge, Blind Spots & Honest Odds
@@ -80,16 +80,16 @@ units:
         prereqs: ["1.3"]
         owns: [signal-to-noise ratio, non-stationarity, overfitting, backtest-to-live decay, base rate]
         deps: [core]
-        status: doing
+        status: published
       - id: "1.5"
         slug: quant-lab-setup
         title: Set Up Your Quant Lab
         short: Lab Setup
         goal: A reproducible workbench — uv, Python 3.12, Jupyter, DuckDB, the quantnb package, a research repo layout and a data cache.
         prereqs: ["1.3"]
-        owns: [uv, virtual environment, lockfile, jupytext, research repository, data cache, random seed]
+        owns: [uv, virtual environment, lockfile, jupytext, research repository, data cache, random seed, reproducibility, run manifest]
         deps: [core]
-        status: doing
+        status: published
 
   - id: 2
     slug: markets-instruments
@@ -124,16 +124,16 @@ units:
         prereqs: ["2.2"]
         owns: [simple return, log return, excess return, compounding, annualisation, volatility, volatility drag, Sharpe ratio, drawdown, leverage, P&L]
         deps: [core]
-        status: doing
+        status: published
       - id: "2.4"
         slug: futures
         title: "Futures: Carry, Basis, Roll & Margin"
         short: Futures
         goal: How futures are priced from cost of carry, why curves slope, what roll yield really is, and how margin creates leverage and liquidation risk.
         prereqs: ["2.3"]
-        owns: [futures contract, forward contract, cost of carry, basis, contango, backwardation, roll yield, initial margin, variation margin, mark-to-market, expiry, contract multiplier, notional value]
+        owns: [futures contract, forward contract, cost of carry, basis, contango, backwardation, roll yield, initial margin, variation margin, mark-to-market, expiry, contract multiplier, notional value, maintenance margin, margin call, settlement price, front month, cash-and-carry arbitrage]
         deps: [core]
-        status: doing
+        status: published
       - id: "2.5"
         slug: fx-commodities
         title: FX & Commodities
@@ -370,7 +370,7 @@ units:
         short: What a Backtest Is
         goal: A backtest is a historical simulation under assumptions, not a research tool — what it can prove, what it cannot, and why the gap to live trading exists.
         prereqs: ["1.3", "5.2"]
-        owns: [strategy specification, historical simulation, fill assumption, backtest–live gap, in-sample]
+        owns: [strategy specification, historical simulation, fill assumption, in-sample]
         deps: [core]
         status: planned
       - id: "6.2"

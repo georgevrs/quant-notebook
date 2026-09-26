@@ -72,6 +72,8 @@ def fmt_value(value, spec: str | None) -> str:
     out = format(value, spec)
     if out.startswith("-") and not any(ch in "123456789" for ch in out):
         out = out[1:]  # "-0.0%" → "0.0%"
+    if out.startswith("-"):
+        out = "−" + out[1:]  # typographic minus, matching hand-typed text
     return out
 
 

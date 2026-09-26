@@ -18,6 +18,7 @@ permissions:
 
 env:
   PYTHONUTF8: "1"
+  UV_LOCKED: "1"            # any pyproject/uv.lock drift fails the build instead of re-locking
   QUANTNB_OFFLINE: "1"
   OMP_NUM_THREADS: "1"
   MPLBACKEND: Agg
@@ -33,7 +34,7 @@ jobs:
       - uses: astral-sh/setup-uv@v10
         with:
           enable-cache: true
-      - run: uv sync --frozen --all-extras
+      - run: uv sync --locked --all-extras
       - name: Changed labs (pull requests)
         if: github.event_name == 'pull_request'
         run: uv run python tools/verify_labs.py --changed

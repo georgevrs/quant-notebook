@@ -1,0 +1,30 @@
+<svg viewBox="0 0 720 260" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Market maker&#x27;s annual P&amp;L as the share of informed clients rises">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">MARKET MAKER&#x27;S ANNUAL P&amp;L AS THE SHARE OF INFORMED CLIENTS RISES</text>
+  <line x1="64" y1="216" x2="690" y2="216" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="220" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">−$100k</text>
+  <line x1="64" y1="158.7" x2="690" y2="158.7" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="162.7" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$0</text>
+  <line x1="64" y1="101.3" x2="690" y2="101.3" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="105.3" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$100k</text>
+  <line x1="64" y1="44" x2="690" y2="44" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="48" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$200k</text>
+  <line x1="64" y1="158.7" x2="690" y2="158.7" stroke="#C9CFC6" stroke-width="1"/>
+  <path d="M104.2,158.7 V67.4 Q104.2,63.4 108.2,63.4 H124.2 Q128.2,63.4 128.2,67.4 V158.7 Z" fill="#3A56C5"><title>0%: $166k</title></path>
+  <text x="116.2" y="56.4" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">$166k</text>
+  <text x="116.2" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">0%</text>
+  <path d="M208.5,158.7 V90.3 Q208.5,86.3 212.5,86.3 H228.5 Q232.5,86.3 232.5,90.3 V158.7 Z" fill="#3A56C5"><title>5%: $126k</title></path>
+  <text x="220.5" y="79.3" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">$126k</text>
+  <text x="220.5" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">5%</text>
+  <path d="M312.8,158.7 V113.3 Q312.8,109.3 316.8,109.3 H332.8 Q336.8,109.3 336.8,113.3 V158.7 Z" fill="#3A56C5"><title>10%: $86k</title></path>
+  <text x="324.8" y="102.3" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">$86k</text>
+  <text x="324.8" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">10%</text>
+  <path d="M417.2,158.7 V136.3 Q417.2,132.3 421.2,132.3 H437.2 Q441.2,132.3 441.2,136.3 V158.7 Z" fill="#3A56C5"><title>15%: $46k</title></path>
+  <text x="429.2" y="125.3" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">$46k</text>
+  <text x="429.2" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">15%</text>
+  <path d="M521.5,158.7 V157 Q521.5,155.4 523.1,155.4 H543.9 Q545.5,155.4 545.5,157 V158.7 Z" fill="#3A56C5"><title>20%: $6k</title></path>
+  <text x="533.5" y="148.4" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">$6k</text>
+  <text x="533.5" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">20%</text>
+  <path d="M625.8,158.7 V174.6 Q625.8,178.6 629.8,178.6 H645.8 Q649.8,178.6 649.8,174.6 V158.7 Z" fill="#D64B2A"><title>25%: −$35k</title></path>
+  <text x="637.8" y="193.6" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">−$35k</text>
+  <text x="637.8" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">25%</text>
+</svg>

@@ -35,7 +35,7 @@ You are assigned **one session**, identified by its id (for example `4.2`). You 
 edit only:
 
 | Path | What |
-|---|---|
+| --- | --- |
 | `site/unitUU-<unit-slug>/sessionSS-<slug>.html` | your page (already scaffolded) |
 | `labs/uUU/sSS_<slug>.py` | your lab, percent format (already scaffolded) |
 | `labs/uUU/sSS_<slug>.ipynb` | generated from the `.py` by the build — do not hand-edit |
@@ -79,6 +79,10 @@ Editing from scripts: write the script to a file and run it. Do **not** put TeX 
 `python -c "…"` or `node -e "…"` strings — the shell and Windows argument parsing eat
 backslashes, and `\a` or `\t` silently becomes a control character.
 
+The scratchpad directory is **shared by every agent in the wave**. Keep your scratch files in a
+subfolder named after your session (`<scratchpad>/s2_4/…`) and never run a script you did not
+write — another agent's `fix.py` targets another agent's page.
+
 ## 4. Page anatomy
 
 Start from the scaffolded page (a fork of the skill's session template). Keep this rhythm:
@@ -97,7 +101,7 @@ Start from the scaffolded page (a fork of the skill's session template). Keep th
 ### Minimums (enforced by `tools/check_session.py`)
 
 | Element | Minimum |
-|---|---|
+| --- | --- |
 | Hand-drawn SVG diagrams (`figure.diagram`, not `.chart`) | 3, one of them a **workflow** (3+ boxes, 2+ arrows) |
 | Tables | 2 |
 | Callouts | 4, of at least 3 kinds (`key`, `tip`, `warn`, `lab`, `note`) |
@@ -119,7 +123,7 @@ the lesson`. Refer to them in prose ("see fig 2.3.4") and to sections as `§2.3.
 Use the classes exactly as `references/components.md` documents them. Quant Notebook adds:
 
 | You write | The build does |
-|---|---|
+| --- | --- |
 | `\( … \)` inline math, `\[ … \]` display math | TeX → MathML with the TeX kept as an annotation |
 | `<span data-lab="sharpe" data-fmt=".2f">0.37</span>` | fills the text from `results.json` (Python format spec) |
 | `<figure class="diagram chart">` + `<!-- chart:growth --><!-- /chart:growth -->` + `<figcaption>` | injects `labs/uUU/out/sSS_growth.svg` |
@@ -171,12 +175,34 @@ italic moral under the figure. Hard-won rules:
 
 ### Data charts (`quantnb.charts`)
 
-`line_chart`, `drawdown_chart`, `histogram`, `column_chart` — they return SVG you save with
-`lab.chart(name, svg)`. Roles carry meaning: `strategy` (ultramarine, the subject), `alt1`
-(orange) and `alt2` (green) for compared series, `benchmark` (grey, de-emphasised), `loss`
-(coral). At most three highlighted series. Out-of-sample periods are a shaded band
-(`bands=[(start, end, "out-of-sample")]`), never a line colour. Titles in plain words; the chart
-states what it shows, the caption states the lesson.
+`line_chart`, `drawdown_chart`, `histogram`, `column_chart`, `grouped_column_chart`,
+`scatter_chart` — they return SVG you save with `lab.chart(name, svg)`. Roles carry meaning:
+`strategy` (ultramarine, the subject), `alt1` (orange) and `alt2` (green) for compared series,
+`benchmark` (grey, de-emphasised), `loss` (coral). At most three highlighted series. Out-of-sample
+periods are a shaded band (`bands=[(start, end, "out-of-sample")]`), never a line colour. Titles in
+plain words; the chart states what it shows, the caption states the lesson.
+
+- **Simulated time is not calendar time.** Re-index simulated series by elapsed years
+  (`index = np.arange(1, n + 1) / 252`) so charts don't show fake calendar dates.
+- Two charts meant to be compared share an axis: `column_chart(..., y_min=, y_max=)`.
+- Long series names push end labels off the chart: give `Series(..., end_label="3×")`.
+- `scatter_chart(x, y, diagonal=True)` for QQ plots; `fit_line=True` for a regression line.
+- Formatters: `fmt_pct(d)`, `fmt_num(d, prefix, suffix)`, `fmt_usd_compact(d)` (−$3.2k, $1.5m).
+- Greek letters in titles are fine (only ASCII is uppercased).
+
+### Helpers already in `quantnb` (use them; don't rewrite them)
+
+| Module | Helpers |
+| --- | --- |
+| `quantnb.synth` | `gbm_prices`, `garch_returns`, `factor_model_returns` |
+| `quantnb.returns` | `simple_returns`, `log_returns`, `cumulative_growth`, `annualised_return`, `annualised_vol`, `sharpe_ratio`, `drawdown`, `max_drawdown`, `volatility_drag`, `leveraged_returns` |
+| `quantnb.stats` | `annual_sharpe` (arrays), `sharpe_se` (Lo 2002, any frequency), `years_needed`, `expected_max_sharpe` (False Strategy Theorem), `oos_r2`, `factor_regression` |
+| `quantnb.repro` | `fingerprint` (integer arrays), `content_fingerprint` (DataFrames) |
+| `quantnb.paths` | `data_cache()`, `offline()`, `repo_root()` |
+
+Note the standard error of the Sharpe ratio: Lo's √((1 + SR²/2)/n) uses the **per-period** Sharpe
+over n periods. With daily data the correction is negligible and SE ≈ 1/√years. Use
+`stats.sharpe_se`, which handles the frequency for you.
 
 ## 8. Math and notation
 
@@ -189,7 +215,7 @@ Shared macros (`tools/macros.tex`): `\E` (expectation), `\Prob`, `\Var`, `\Cov`,
 Reserved notation — use these meanings everywhere, or say explicitly that you are overloading:
 
 | Symbol | Meaning | Symbol | Meaning |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | \(P_t\) | price at end of period t | \(w\), \(w_i\) | portfolio weights (vector, element) |
 | \(R_t\) | simple return | \(\Sigma\) | covariance matrix (never a sum) |
 | \(r_t\) | log return | \(\sum\) | summation |
@@ -236,7 +262,7 @@ Reserved notation — use these meanings everywhere, or say explicitly that you 
 ### Library verdicts (2026)
 
 | Use | For | Avoid / flag |
-|---|---|---|
+| --- | --- | --- |
 | pandas 3, polars, numpy, scipy | data, numerics | pandas-datareader (broken), `.asi8` on datetime indexes (unit varies in pandas 3) |
 | DuckDB, Parquet, Arrow | research storage | ArcticDB for business use (BSL licence) |
 | statsmodels, arch | econometrics, GARCH, SPA/MCS | — |
@@ -271,6 +297,54 @@ Reserved notation — use these meanings everywhere, or say explicitly that you 
 - [ ] Every reference verified by web search; each has an id
 - [ ] Cross-references back (prerequisites) and forward (where it returns)
 - [ ] You edited only your own files (§2)
+- [ ] You checked your page against §12a (the mistakes reviewers actually find)
+
+## 12a. Lessons from review — the mistakes independent reviewers actually found
+
+Every wave is fact-checked and consistency-reviewed. These are the errors they caught in Wave 1;
+avoid them up front.
+
+**Scope and length**
+- Aim for **3,000–4,500 words of prose**. Depth on *your* session's topic is the point; length from
+  re-teaching other sessions' topics is not. When an idea is owned by another session (see its
+  `goal` and `owns` in `course.yaml`), give a one- or two-sentence teaser and a `data-xref` — never
+  a second full treatment. If an earlier session already derived something (e.g. the standard
+  error of the Sharpe ratio in 1.3/1.4/2.3), point back to it instead of re-deriving it.
+- Cite the same study once, in the session that owns it; elsewhere, one clause plus a link.
+
+**Numbers**
+- **Never type lab numbers into SVG text** — SVG can't hold `data-lab` spans, so they go stale.
+  Keep diagrams conceptual (structure, order, contrast), put the numbers in prose/tables as
+  `data-lab` spans, and put quantitative pictures in lab charts. The same goes for numbers in
+  questions, captions and tables: if it came from the lab, it is a `data-lab` span.
+- **Growth is CAGR.** If you show an arithmetic mean (e.g. because a regression decomposition needs
+  it), label it "average (arithmetic) return" and show the CAGR next to it.
+- Say "percentage points" for differences between percentages; "trading days" for business days.
+
+**Labs**
+- **One random stream per experiment**: `rng_a, rng_b, rng_c = lab.rng.spawn(3)`. A shared stream
+  means changing one section (or a Try-it exercise) silently changes every later result.
+- **Assert at ≥ 3 standard errors**, and never assert a property of a single random path — assert
+  Monte Carlo averages against theory. Try-it and homework edits must not crash the lab: test the
+  edits you suggest.
+- **Simulated time is elapsed time**: index simulated series by years (`np.arange(1, n+1)/252`),
+  never by calendar dates, and write "after year 8", not "in 2022".
+- A cache key must include **everything** that determines the data — parameters **and the seed**.
+- State the risk-free rate once per lab ("synthetic excess returns, risk-free rate 0").
+
+**Cross-references and terms**
+- Every mention of another session is a `data-xref` (never plain "Session 2.3" text).
+- First use of a term owned elsewhere is a `data-term` link (edge, P&L, look-ahead bias, in-sample…).
+- Don't reuse a reserved symbol for something else in the same unit (α is alpha; call a test's
+  false-positive rate its *size*). Per-period risk-free rates are \(r_{f,t}\).
+
+**References**
+- Two lists in the close: `📚 Go deeper` (books and papers to read next) and, when you quote many
+  empirical figures, `Sources for the numbers` (the rest). Both use `ol.refs` and ids.
+- When a paper has several versions with different numbers, cite the version you quote from
+  ("working paper, version of 13 June 2020").
+- Firm-specific facts are dated and attributed ("reported by Bloomberg, April 2025"); regulatory
+  details are dated and labelled with their jurisdiction.
 
 ## 13. The handoff
 

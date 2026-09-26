@@ -1,26 +1,28 @@
 <svg viewBox="0 0 720 260" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Best in-sample Sharpe among N skill-less strategies (5 years, 200 repeats)">
   <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">BEST IN-SAMPLE SHARPE AMONG N SKILL-LESS STRATEGIES (5 YEARS, 200 REPEATS)</text>
   <line x1="64" y1="216" x2="690" y2="216" stroke="#E4E8EC" stroke-width="1"/>
-  <text x="56" y="220" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.00</text>
-  <line x1="64" y1="173" x2="690" y2="173" stroke="#E4E8EC" stroke-width="1"/>
-  <text x="56" y="177" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.50</text>
-  <line x1="64" y1="130" x2="690" y2="130" stroke="#E4E8EC" stroke-width="1"/>
-  <text x="56" y="134" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">1.00</text>
-  <line x1="64" y1="87" x2="690" y2="87" stroke="#E4E8EC" stroke-width="1"/>
-  <text x="56" y="91" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">1.50</text>
+  <text x="56" y="220" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">−0.50</text>
+  <line x1="64" y1="181.6" x2="690" y2="181.6" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="185.6" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.00</text>
+  <line x1="64" y1="147.2" x2="690" y2="147.2" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="151.2" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.50</text>
+  <line x1="64" y1="112.8" x2="690" y2="112.8" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="116.8" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">1.00</text>
+  <line x1="64" y1="78.4" x2="690" y2="78.4" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="82.4" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">1.50</text>
   <line x1="64" y1="44" x2="690" y2="44" stroke="#E4E8EC" stroke-width="1"/>
   <text x="56" y="48" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">2.00</text>
-  <line x1="64" y1="216" x2="690" y2="216" stroke="#C9CFC6" stroke-width="1"/>
-  <path d="M130.2,216 V214.1 Q130.2,212.2 132.1,212.2 H152.4 Q154.2,212.2 154.2,214.1 V216 Z" fill="#3A56C5"><title>N = 1: 0.04</title></path>
-  <text x="142.2" y="205.2" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.04</text>
+  <line x1="64" y1="181.6" x2="690" y2="181.6" stroke="#C9CFC6" stroke-width="1"/>
+  <path d="M130.2,181.6 V180.1 Q130.2,178.6 131.8,178.6 H152.7 Q154.2,178.6 154.2,180.1 V181.6 Z" fill="#3A56C5"><title>N = 1: 0.04</title></path>
+  <text x="142.2" y="171.6" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.04</text>
   <text x="142.2" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">N = 1</text>
-  <path d="M286.8,216 V158.1 Q286.8,154.1 290.8,154.1 H306.8 Q310.8,154.1 310.8,158.1 V216 Z" fill="#3A56C5"><title>N = 10: 0.72</title></path>
-  <text x="298.8" y="147.1" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.72</text>
+  <path d="M286.8,181.6 V139.1 Q286.8,135.1 290.8,135.1 H306.8 Q310.8,135.1 310.8,139.1 V181.6 Z" fill="#3A56C5"><title>N = 10: 0.68</title></path>
+  <text x="298.8" y="128.1" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.68</text>
   <text x="298.8" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">N = 10</text>
-  <path d="M443.2,216 V123.7 Q443.2,119.7 447.2,119.7 H463.2 Q467.2,119.7 467.2,123.7 V216 Z" fill="#3A56C5"><title>N = 100: 1.12</title></path>
-  <text x="455.2" y="112.7" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">1.12</text>
+  <path d="M443.2,181.6 V108.2 Q443.2,104.2 447.2,104.2 H463.2 Q467.2,104.2 467.2,108.2 V181.6 Z" fill="#3A56C5"><title>N = 100: 1.13</title></path>
+  <text x="455.2" y="97.2" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">1.13</text>
   <text x="455.2" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">N = 100</text>
-  <path d="M599.8,216 V94 Q599.8,90 603.8,90 H619.8 Q623.8,90 623.8,94 V216 Z" fill="#3A56C5"><title>N = 1,000: 1.47</title></path>
-  <text x="611.8" y="83" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">1.47</text>
+  <path d="M599.8,181.6 V87.1 Q599.8,83.1 603.8,83.1 H619.8 Q623.8,83.1 623.8,87.1 V181.6 Z" fill="#3A56C5"><title>N = 1,000: 1.43</title></path>
+  <text x="611.8" y="76.1" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">1.43</text>
   <text x="611.8" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">N = 1,000</text>
 </svg>

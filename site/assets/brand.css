@@ -284,7 +284,8 @@ math{font-size:1.06em}
 /* ---------- references ("📚 Go deeper") ---------- */
 ol.refs{font-size:.92rem;padding-left:1.5em}
 ol.refs li{margin:.55em 0}
-ol.refs .rid{font-family:"IBM Plex Mono",monospace;font-size:.76rem;color:var(--ink-soft);white-space:nowrap}
+ol.refs .rid{font-family:"IBM Plex Mono",monospace;font-size:.76rem;color:var(--ink-soft);overflow-wrap:anywhere}
+ol.refs a{overflow-wrap:anywhere}
 
 /* ---------- disclaimer line under the footer nav ---------- */
 p.legal{font-size:.76rem;color:var(--ink-soft);text-align:center;margin:22px auto 0;max-width:46em}

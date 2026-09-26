@@ -15,6 +15,7 @@ Links to sessions whose status is not "published" render as non-link <span class
 from __future__ import annotations
 
 import argparse
+import html
 import re
 import subprocess
 import sys
@@ -332,7 +333,7 @@ def collect_definitions(c: Course) -> dict[str, tuple[str, Session]]:
         if not m:
             continue
         for term, definition in GLOSS_ENTRY_RE.findall(m.group(1)):
-            defs[re.sub(r"<[^>]+>", "", term).strip().lower()] = (definition.strip(), s)
+            defs[html.unescape(re.sub(r"<[^>]+>", "", term)).strip().lower()] = (definition.strip(), s)
     return defs
 
 
@@ -400,7 +401,7 @@ def resolve_xrefs(c: Course, page_rel: str, text: str, problems: list[str]) -> s
 
 def resolve_terms(c: Course, page_rel: str, text: str, problems: list[str]) -> str:
     def repl(m: re.Match) -> str:
-        term = m.group(3)
+        term = html.unescape(m.group(3))  # attribute may carry entities, e.g. data-term="P&amp;L"
         inner = m.group(5) or esc(term)
         owner = c.term_owner.get(term.lower())
         if owner is None:
@@ -408,17 +409,17 @@ def resolve_terms(c: Course, page_rel: str, text: str, problems: list[str]) -> s
             return m.group(0)
         anchor = term_anchor(term)
         if owner.rel_path == page_rel:
-            return f'<a class="term" href="#{anchor}" data-term="{term}">{inner}</a>'
+            return f'<a class="term" href="#{anchor}" data-term="{esc(term)}">{inner}</a>'
         if owner.published:
-            return f'<a class="term" href="{rel_link(page_rel, owner.rel_path)}#{anchor}" data-term="{term}">{inner}</a>'
-        return f'<span class="term soon" data-term="{term}" title="Defined in Session {owner.id} (coming soon)">{inner}</span>'
+            return f'<a class="term" href="{rel_link(page_rel, owner.rel_path)}#{anchor}" data-term="{esc(term)}">{inner}</a>'
+        return f'<span class="term soon" data-term="{esc(term)}" title="Defined in Session {owner.id} (coming soon)">{inner}</span>'
     return sub_outside_comments(TERM_RE, repl, text)
 
 
 def normalise_gloss_ids(text: str) -> str:
     def fix_block(m: re.Match) -> str:
         body = re.sub(r'<div(?: id="[^"]*")?><b>(.*?)</b>',
-                      lambda e: f'<div id="{term_anchor(re.sub(r"<[^>]+>", "", e.group(1)))}"><b>{e.group(1)}</b>',
+                      lambda e: f'<div id="{term_anchor(html.unescape(re.sub(r"<[^>]+>", "", e.group(1))))}"><b>{e.group(1)}</b>',
                       m.group(2))
         return m.group(1) + body + m.group(3)
     return sub_outside_comments(re.compile(r'(<div class="gloss" id="glossary">)(.*?)(\n</div>)', re.S), fix_block, text)

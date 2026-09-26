@@ -140,6 +140,7 @@ class Series:
     area: bool = False          # 10% wash under the line
     label_end: bool = True      # direct label at the right end
     width: float | None = None
+    end_label: str | None = None  # short text for the end label (defaults to the name)
 
 
 @dataclass
@@ -161,9 +162,14 @@ class _Frame:
     def y1(self): return self.top
 
 
+def _caps(s: str) -> str:
+    """Uppercase ASCII letters only: Greek β/α must not become Β/Α, which read as Latin B/A."""
+    return "".join(ch.upper() if ch.isascii() else ch for ch in s)
+
+
 def _open(height: int, title: str) -> list[str]:
     return [f'<svg viewBox="0 0 {W} {height}" xmlns="http://www.w3.org/2000/svg" style="{FONT}" role="img" aria-label="{_esc(title)}">',
-            f'  <text x="26" y="22" font-size="11" font-weight="600" fill="{INK}">{_esc(title.upper())}</text>']
+            f'  <text x="26" y="22" font-size="11" font-weight="600" fill="{INK}">{_esc(_caps(title))}</text>']
 
 
 def _legend(series: list[Series], y: float = 36) -> list[str]:
@@ -197,7 +203,10 @@ def _x_axis(f: _Frame, ticks: list[tuple[float, str]], scale) -> list[str]:
 
 
 def _no_neg_zero(s: str) -> str:
-    return s[1:] if s.startswith("-") and not any(ch in "123456789" for ch in s) else s
+    """Drop the sign of a negative zero and use a true minus sign (U+2212) for negatives."""
+    if s.startswith("-") and not any(ch in "123456789" for ch in s):
+        return s[1:]
+    return "−" + s[1:] if s.startswith("-") else s
 
 
 def fmt_pct(decimals: int = 0):
@@ -280,7 +289,8 @@ def line_chart(series: list[Series], *, title: str, y_fmt=fmt_num(0), height: in
         if s.label_end:
             ex, ey = xscale(x[-1]), yscale(y[-1])
             parts.append(f'  <circle cx="{_r(ex)}" cy="{_r(ey)}" r="4" fill="{c}" stroke="{SURFACE}" stroke-width="2"><title>{_esc(s.name)}: {_esc(y_fmt(y[-1]))}</title></circle>')
-            end_labels.append([ey, f"{s.name}: {y_fmt(y[-1])}" if len(series) > 1 else y_fmt(y[-1]), ex])
+            short = s.end_label or s.name
+            end_labels.append([ey, f"{short}: {y_fmt(y[-1])}" if len(series) > 1 else y_fmt(y[-1]), ex])
     # end labels: text in ink, de-collided with leader lines if they crowd
     end_labels.sort(key=lambda e: e[0])
     placed = []
@@ -299,7 +309,7 @@ def drawdown_chart(dd: pd.Series, *, title: str, height: int = 220) -> str:
     s = Series("drawdown", dd, role="loss", area=True, label_end=False)
     svg = line_chart([s], title=title, y_fmt=fmt_pct(0), height=height, y_max=0.0)
     worst_i = int(np.argmin(dd.to_numpy()))
-    note = f'  <text x="{W - 26}" y="22" font-size="11" text-anchor="end" fill="{INK}">worst {dd.iloc[worst_i] * 100:.1f}%</text>'
+    note = f'  <text x="{W - 26}" y="22" font-size="11" text-anchor="end" fill="{INK}">worst {fmt_pct(1)(dd.iloc[worst_i])}</text>'
     return svg.replace("\n</svg>", "\n" + note + "\n</svg>")
 
 
@@ -342,7 +352,9 @@ def histogram(values, *, title: str, bins: int = 60, x_fmt=fmt_pct(1), height: i
         parts.append(f'  <text x="{W - 168}" y="36" font-size="11" fill="{INK_SOFT}">{_esc(overlay_label)}</text>')
     if tail_below is not None:
         tx = xscale(tail_below)
-        parts.append(f'  <text x="{_r(max(f.x0 + 4, tx - 6))}" y="{_r(f.y1 + 28)}" font-size="10.5" text-anchor="end" fill="{INK}">{_esc(tail_label)}</text>')
+        parts.append(f'  <line x1="{_r(tx)}" y1="{_r(f.y1 - 2)}" x2="{_r(tx)}" y2="{_r(f.y0)}" stroke="{INK_SOFT}" stroke-width="1"/>')
+        if tail_label:  # above the plot area, never on top of the bars
+            parts.append(f'  <text x="{_r(tx - 5)}" y="{_r(f.y1 - 6)}" font-size="10.5" text-anchor="end" fill="{INK}">{_esc(tail_label)} ←</text>')
     parts.append("</svg>")
     return "\n".join(parts)
 
@@ -351,7 +363,8 @@ def histogram(values, *, title: str, bins: int = 60, x_fmt=fmt_pct(1), height: i
 # column chart
 # ---------------------------------------------------------------------------------------------
 def column_chart(labels: list[str], values: list[float], *, title: str, y_fmt=fmt_num(1), height: int = 260,
-                 roles: list[str] | None = None, value_labels: bool = True) -> str:
+                 roles: list[str] | None = None, value_labels: bool = True,
+                 y_min: float | None = None, y_max: float | None = None) -> str:
     """Vertical columns ≤ 24px wide, 4px rounded data-end, square at the baseline; values on caps."""
     vals = np.asarray(values, dtype=float)
     f = _Frame(height=height, right=30, bottom=44)
@@ -359,6 +372,10 @@ def column_chart(labels: list[str], values: list[float], *, title: str, y_fmt=fm
     span = max(float(vals.max()) - min(0.0, float(vals.min())), 1e-12)
     lo_pad = min(0.0, float(vals.min()) - 0.15 * span) if vals.min() < 0 else 0.0
     hi_pad = max(0.0, float(vals.max()) + 0.15 * span) if vals.max() > 0 else 0.0
+    if y_min is not None:  # a fixed range lets two charts be compared by eye
+        lo_pad = min(lo_pad, y_min)
+    if y_max is not None:
+        hi_pad = max(hi_pad, y_max)
     yt = nice_ticks(lo_pad, hi_pad, 5)
     lo, hi = yt[0], yt[-1]
     yscale = lambda v: f.y0 - (v - lo) / (hi - lo) * (f.y0 - f.y1)  # noqa: E731
@@ -386,5 +403,125 @@ def column_chart(labels: list[str], values: list[float], *, title: str, y_fmt=fm
             ty = top - 7 if v >= 0 else top + 15
             parts.append(f'  <text x="{_r(cx)}" y="{_r(ty)}" font-size="11" text-anchor="middle" fill="{INK}" style="font-variant-numeric:tabular-nums">{_esc(y_fmt(v))}</text>')
         parts.append(f'  <text x="{_r(cx)}" y="{_r(f.y0 + 18)}" font-size="11" text-anchor="middle" fill="{INK_SOFT}">{_esc(lab)}</text>')
+    parts.append("</svg>")
+    return "\n".join(parts)
+
+
+def fmt_usd_compact(decimals: int = 1):
+    """Dollars with a true minus sign and k/m/bn suffixes: −$3.2k, $9.9k, $1.5m."""
+    def f(v: float) -> str:
+        a = abs(v)
+        for div, suf in ((1e9, "bn"), (1e6, "m"), (1e3, "k")):
+            if a >= div:
+                s = f"${a / div:.{decimals}f}{suf}"
+                break
+        else:
+            s = f"${a:,.0f}"
+        return ("−" if v < 0 and a > 0 else "") + s
+    return f
+
+
+# ---------------------------------------------------------------------------------------------
+# grouped columns
+# ---------------------------------------------------------------------------------------------
+def grouped_column_chart(categories: list[str], series: list[tuple[str, list[float], str]], *, title: str,
+                         y_fmt=fmt_pct(0), height: int = 280, value_labels: bool = False,
+                         y_min: float | None = None, y_max: float | None = None) -> str:
+    """Grouped columns: ≤ 3 series of (name, values, role), one group per category, with a legend.
+
+    Same marks as column_chart (≤ 24px, rounded data-end, 2px surface gap between neighbours).
+    """
+    if not 1 <= len(series) <= 3:
+        raise ValueError("grouped_column_chart takes 1–3 series")
+    vals = np.array([v for _, vs, _ in series for v in vs], dtype=float)
+    f = _Frame(height=height, top=56, right=30, bottom=44)
+    span = max(float(vals.max()) - min(0.0, float(vals.min())), 1e-12)
+    lo = min(0.0, float(vals.min()) - 0.12 * span) if vals.min() < 0 else 0.0
+    hi = max(0.0, float(vals.max()) + 0.12 * span) if vals.max() > 0 else 0.0
+    lo = min(lo, y_min) if y_min is not None else lo
+    hi = max(hi, y_max) if y_max is not None else hi
+    yt = nice_ticks(lo, hi, 5)
+    ylo, yhi = yt[0], yt[-1]
+    yscale = lambda v: f.y0 - (v - ylo) / (yhi - ylo) * (f.y0 - f.y1)  # noqa: E731
+    parts = _open(height, title)
+    parts += _legend([Series(name, pd.Series([0.0]), role=role) for name, _, role in series])
+    parts += _y_axis(f, yt, yscale, y_fmt)
+    base = yscale(0.0)
+    parts.append(f'  <line x1="{_r(f.x0)}" y1="{_r(base)}" x2="{_r(f.x1)}" y2="{_r(base)}" stroke="{AXIS}" stroke-width="1"/>')
+    band = (f.x1 - f.x0) / len(categories)
+    k = len(series)
+    bw = min(24.0, band * 0.7 / k)
+    gap = 2.0
+    for i, cat in enumerate(categories):
+        cx = f.x0 + band * (i + 0.5)
+        left = cx - (k * bw + (k - 1) * gap) / 2
+        for j, (name, vs, role) in enumerate(series):
+            v = float(vs[i])
+            x0 = left + j * (bw + gap)
+            x1 = x0 + bw
+            top = yscale(v)
+            rr = min(4.0, abs(base - top) / 2)
+            if v >= 0:
+                d = (f"M{_r(x0)},{_r(base)} V{_r(top + rr)} Q{_r(x0)},{_r(top)} {_r(x0 + rr)},{_r(top)} "
+                     f"H{_r(x1 - rr)} Q{_r(x1)},{_r(top)} {_r(x1)},{_r(top + rr)} V{_r(base)} Z")
+            else:
+                d = (f"M{_r(x0)},{_r(base)} V{_r(top - rr)} Q{_r(x0)},{_r(top)} {_r(x0 + rr)},{_r(top)} "
+                     f"H{_r(x1 - rr)} Q{_r(x1)},{_r(top)} {_r(x1)},{_r(top - rr)} V{_r(base)} Z")
+            parts.append(f'  <path d="{d}" fill="{ROLE_COLOURS[role]}"><title>{_esc(cat)} · {_esc(name)}: {_esc(y_fmt(v))}</title></path>')
+            if value_labels:
+                ty = top - 6 if v >= 0 else top + 13
+                parts.append(f'  <text x="{_r((x0 + x1) / 2)}" y="{_r(ty)}" font-size="10" text-anchor="middle" fill="{INK}" style="font-variant-numeric:tabular-nums">{_esc(y_fmt(v))}</text>')
+        parts.append(f'  <text x="{_r(cx)}" y="{_r(f.y0 + 18)}" font-size="11" text-anchor="middle" fill="{INK_SOFT}">{_esc(cat)}</text>')
+    parts.append("</svg>")
+    return "\n".join(parts)
+
+
+# ---------------------------------------------------------------------------------------------
+# scatter
+# ---------------------------------------------------------------------------------------------
+def scatter_chart(x, y, *, title: str, x_fmt=fmt_num(1), y_fmt=fmt_num(1), height: int = 320,
+                  role: str = "strategy", diagonal: bool = False, fit_line: bool = False,
+                  x_label: str | None = None, y_label: str | None = None, max_points: int = 1500,
+                  rng_seed: int = 0) -> str:
+    """Dots (r=2.5, semi-transparent) with optional y = x diagonal (QQ plots) or OLS fit line.
+
+    More than `max_points` points are thinned by a seeded random subsample so the SVG stays small.
+    """
+    xv = np.asarray(x, dtype=float)
+    yv = np.asarray(y, dtype=float)
+    ok = np.isfinite(xv) & np.isfinite(yv)
+    xv, yv = xv[ok], yv[ok]
+    if len(xv) > max_points:
+        keep = np.sort(np.random.default_rng(rng_seed).choice(len(xv), max_points, replace=False))
+        xs, ys = xv[keep], yv[keep]
+    else:
+        xs, ys = xv, yv
+    f = _Frame(height=height, right=40, bottom=48 if x_label else 36)
+    lo_x, hi_x = float(xv.min()), float(xv.max())
+    lo_y, hi_y = float(yv.min()), float(yv.max())
+    if diagonal:
+        lo_x = lo_y = min(lo_x, lo_y)
+        hi_x = hi_y = max(hi_x, hi_y)
+    xt, yt = nice_ticks(lo_x, hi_x, 6), nice_ticks(lo_y, hi_y, 5)
+    xscale = lambda v: f.x0 + (v - xt[0]) / (xt[-1] - xt[0]) * (f.x1 - f.x0)  # noqa: E731
+    yscale = lambda v: f.y0 - (v - yt[0]) / (yt[-1] - yt[0]) * (f.y0 - f.y1)  # noqa: E731
+    parts = _open(height, title)
+    parts += _y_axis(f, yt, yscale, y_fmt)
+    parts += _x_axis(f, [(t, x_fmt(t)) for t in xt], xscale)
+    if x_label:
+        parts.append(f'  <text x="{_r((f.x0 + f.x1) / 2)}" y="{_r(height - 8)}" font-size="11" text-anchor="middle" fill="{INK_SOFT}">{_esc(x_label)}</text>')
+    if y_label:
+        parts.append(f'  <text x="{_r(f.x0)}" y="{_r(f.y1 - 8)}" font-size="11" fill="{INK_SOFT}">{_esc(y_label)}</text>')
+    if diagonal:
+        a, b = max(xt[0], yt[0]), min(xt[-1], yt[-1])
+        parts.append(f'  <line x1="{_r(xscale(a))}" y1="{_r(yscale(a))}" x2="{_r(xscale(b))}" y2="{_r(yscale(b))}" stroke="{INK_SOFT}" stroke-width="1.5"><title>y = x</title></line>')
+    c = ROLE_COLOURS[role]
+    for a, b in zip(xs, ys):
+        parts.append(f'  <circle cx="{_r(xscale(a))}" cy="{_r(yscale(b))}" r="2.5" fill="{c}" fill-opacity="0.45"/>')
+    if fit_line and len(xv) > 2:
+        slope, icept = np.polyfit(xv, yv, 1)
+        xa, xb = xt[0], xt[-1]
+        ya, yb = icept + slope * xa, icept + slope * xb
+        parts.append(f'  <line x1="{_r(xscale(xa))}" y1="{_r(yscale(ya))}" x2="{_r(xscale(xb))}" y2="{_r(yscale(yb))}" stroke="{INK}" stroke-width="2"><title>OLS fit: slope {slope:.3g}</title></line>')
     parts.append("</svg>")
     return "\n".join(parts)

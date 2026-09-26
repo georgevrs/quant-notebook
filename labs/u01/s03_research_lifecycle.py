@@ -51,6 +51,7 @@ rng = lab.rng
 #
 # Each "strategy" earns daily returns with **zero** true mean and 10% annual volatility — pure
 # noise, like a coin-flip rule applied to a market it cannot predict. Its true Sharpe ratio is 0.
+# (These are excess returns: the risk-free rate is taken as 0 to keep the arithmetic clean.)
 # We give every strategy 5 years of in-sample history to be "discovered" on, and 5 more years it
 # has never seen.
 
@@ -96,17 +97,19 @@ rows = []
 for n in TRIALS:
     best_is, winner_oos = [], []
     for _ in range(REPEATS):
-        is_ret = rng.standard_normal((DAYS * YEARS_IS, n)) * daily_sd
+        # each strategy's full 10-year history: 5 years to be discovered on, 5 it has never seen
+        history = rng.standard_normal((DAYS * (YEARS_IS + YEARS_OOS), n)) * daily_sd
+        is_ret, oos_ret = history[: DAYS * YEARS_IS], history[DAYS * YEARS_IS:]
         sr_is = annual_sharpe(is_ret)
         best = int(np.argmax(sr_is))
         best_is.append(sr_is[best])
-        oos_ret = rng.standard_normal(DAYS * YEARS_OOS) * daily_sd  # the winner, on data it never saw
-        winner_oos.append(annual_sharpe(oos_ret))
+        winner_oos.append(annual_sharpe(oos_ret[:, best]))  # the SAME strategy, on its own unseen years
     rows.append({
         "N": n,
         "best_is_mean": float(np.mean(best_is)),
         "winner_oos_mean": float(np.mean(winner_oos)),
         "p_best_above_1": float(np.mean(np.array(best_is) > 1.0)),
+        "n_best_above_1": int(np.sum(np.array(best_is) > 1.0)),
         "theory": expected_max_sharpe(n, YEARS_IS),
     })
 table = pd.DataFrame(rows).set_index("N")
@@ -116,6 +119,7 @@ for n, row in table.iterrows():
     lab.record(f"best_is_{n}", row["best_is_mean"])
     lab.record(f"winner_oos_{n}", row["winner_oos_mean"])
     lab.record(f"p_above1_{n}", row["p_best_above_1"])
+    lab.record(f"n_above1_{n}", int(row["n_best_above_1"]))
     lab.record(f"theory_{n}", row["theory"])
 lab.record("years_is", YEARS_IS)
 lab.record("years_oos", YEARS_OOS)
@@ -124,7 +128,7 @@ lab.record("repeats", REPEATS)
 # Sanity checks: the winner's out-of-sample Sharpe is ~0 whatever N is, and the in-sample
 # maximum matches the False Strategy Theorem's prediction.
 assert (table["winner_oos_mean"].abs() < 0.15).all()
-assert table.loc[1000, "best_is_mean"] > 1.2
+assert table.loc[1000, "best_is_mean"] > 0.8 * table.loc[1000, "theory"]
 assert (table["best_is_mean"] - table["theory"]).abs().max() < 0.12
 
 # %% [markdown]
@@ -158,7 +162,7 @@ prereg = {
     "signal": "rank of 5-day return, rebalanced weekly, dollar-neutral",
     "primary_metric": "annualised Sharpe ratio after 10 bp one-way costs",
     "variants_allowed": 12,
-    "kill_criterion": "deflated Sharpe ratio below 0.95 on in-sample, OR holdout Sharpe below 0",
+    "kill_criterion": "deflated Sharpe ratio (a probability) below 0.95 in-sample, OR holdout Sharpe below 0",
     "holdout_rule": "evaluated exactly once, after the in-sample decision is frozen",
 }
 print(json.dumps(prereg, indent=2))
@@ -171,11 +175,11 @@ lab.record("prereg_variants_allowed", prereg["variants_allowed"])
 lab.chart("best_of_n", charts.column_chart(
     [f"N = {n:,}" for n in TRIALS], table["best_is_mean"].tolist(),
     title="Best in-sample Sharpe among N skill-less strategies (5 years, 200 repeats)",
-    y_fmt=charts.fmt_num(2)))
+    y_fmt=charts.fmt_num(2), y_min=-0.5, y_max=2.0))  # same axis as the next chart, so bars compare
 lab.chart("winner_oos", charts.column_chart(
     [f"N = {n:,}" for n in TRIALS], table["winner_oos_mean"].tolist(),
-    title="…and the same winner's Sharpe on 5 unseen years",
-    y_fmt=charts.fmt_num(2), roles=["benchmark"] * len(TRIALS)))
+    title="…and the same winner's Sharpe on 5 unseen years (same scale)",
+    y_fmt=charts.fmt_num(2), roles=["benchmark"] * len(TRIALS), y_min=-0.5, y_max=2.0))
 
 # %%
 lab.save()

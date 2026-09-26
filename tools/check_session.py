@@ -208,10 +208,10 @@ class Scan(HTMLParser):
             self.gloss_b = None
         if tag == "li" and self.in_ref_li:
             self.ref_items.append(self.ref_text)
+            self.counts["refs"] += 1  # count each reference once, across every ol.refs list
             self.in_ref_li = False
         if tag == "ol" and self.in_refs:
             self.in_refs = False
-            self.counts["refs"] += len(self.ref_items)
         if tag == "div":
             if self.lab_depth == self.div_depth:
                 if "homework" in self.lab_text.lower():

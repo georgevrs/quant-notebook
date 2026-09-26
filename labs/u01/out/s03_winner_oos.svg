@@ -1,28 +1,28 @@
-<svg viewBox="0 0 720 260" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="…and the same winner&#x27;s Sharpe on 5 unseen years">
-  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">…AND THE SAME WINNER&#x27;S SHARPE ON 5 UNSEEN YEARS</text>
+<svg viewBox="0 0 720 260" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="…and the same winner&#x27;s Sharpe on 5 unseen years (same scale)">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">…AND THE SAME WINNER&#x27;S SHARPE ON 5 UNSEEN YEARS (SAME SCALE)</text>
   <line x1="64" y1="216" x2="690" y2="216" stroke="#E4E8EC" stroke-width="1"/>
-  <text x="56" y="220" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">-0.04</text>
+  <text x="56" y="220" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">−0.50</text>
   <line x1="64" y1="181.6" x2="690" y2="181.6" stroke="#E4E8EC" stroke-width="1"/>
-  <text x="56" y="185.6" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">-0.02</text>
+  <text x="56" y="185.6" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.00</text>
   <line x1="64" y1="147.2" x2="690" y2="147.2" stroke="#E4E8EC" stroke-width="1"/>
-  <text x="56" y="151.2" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.00</text>
+  <text x="56" y="151.2" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.50</text>
   <line x1="64" y1="112.8" x2="690" y2="112.8" stroke="#E4E8EC" stroke-width="1"/>
-  <text x="56" y="116.8" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.02</text>
+  <text x="56" y="116.8" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">1.00</text>
   <line x1="64" y1="78.4" x2="690" y2="78.4" stroke="#E4E8EC" stroke-width="1"/>
-  <text x="56" y="82.4" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.04</text>
+  <text x="56" y="82.4" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">1.50</text>
   <line x1="64" y1="44" x2="690" y2="44" stroke="#E4E8EC" stroke-width="1"/>
-  <text x="56" y="48" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.06</text>
-  <line x1="64" y1="147.2" x2="690" y2="147.2" stroke="#C9CFC6" stroke-width="1"/>
-  <path d="M130.2,147.2 V170.1 Q130.2,174.1 134.2,174.1 H150.2 Q154.2,174.1 154.2,170.1 V147.2 Z" fill="#4A5A68"><title>N = 1: -0.02</title></path>
-  <text x="142.2" y="189.1" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">-0.02</text>
+  <text x="56" y="48" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">2.00</text>
+  <line x1="64" y1="181.6" x2="690" y2="181.6" stroke="#C9CFC6" stroke-width="1"/>
+  <path d="M130.2,181.6 V182.1 Q130.2,182.7 130.8,182.7 H153.7 Q154.2,182.7 154.2,182.1 V181.6 Z" fill="#4A5A68"><title>N = 1: −0.02</title></path>
+  <text x="142.2" y="197.7" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">−0.02</text>
   <text x="142.2" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">N = 1</text>
-  <path d="M286.8,147.2 V103.4 Q286.8,99.4 290.8,99.4 H306.8 Q310.8,99.4 310.8,103.4 V147.2 Z" fill="#4A5A68"><title>N = 10: 0.03</title></path>
-  <text x="298.8" y="92.4" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.03</text>
+  <path d="M286.8,181.6 V182.6 Q286.8,183.7 287.8,183.7 H309.7 Q310.8,183.7 310.8,182.6 V181.6 Z" fill="#4A5A68"><title>N = 10: −0.03</title></path>
+  <text x="298.8" y="198.7" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">−0.03</text>
   <text x="298.8" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">N = 10</text>
-  <path d="M443.2,147.2 V159.3 Q443.2,163.3 447.2,163.3 H463.2 Q467.2,163.3 467.2,159.3 V147.2 Z" fill="#4A5A68"><title>N = 100: -0.01</title></path>
-  <text x="455.2" y="178.3" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">-0.01</text>
+  <path d="M443.2,181.6 V181.9 Q443.2,182.3 443.6,182.3 H466.9 Q467.2,182.3 467.2,181.9 V181.6 Z" fill="#4A5A68"><title>N = 100: −0.01</title></path>
+  <text x="455.2" y="197.3" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">−0.01</text>
   <text x="455.2" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">N = 100</text>
-  <path d="M599.8,147.2 V93.9 Q599.8,89.9 603.8,89.9 H619.8 Q623.8,89.9 623.8,93.9 V147.2 Z" fill="#4A5A68"><title>N = 1,000: 0.03</title></path>
-  <text x="611.8" y="82.9" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.03</text>
+  <path d="M599.8,181.6 V182.3 Q599.8,183 600.4,183 H623.1 Q623.8,183 623.8,182.3 V181.6 Z" fill="#4A5A68"><title>N = 1,000: −0.02</title></path>
+  <text x="611.8" y="198" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">−0.02</text>
   <text x="611.8" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">N = 1,000</text>
 </svg>

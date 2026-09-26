@@ -101,6 +101,7 @@ lab.record("ann_arith", ann_arith)
 lab.record("cagr", cagr)
 lab.record("vol", vol)
 lab.record("sharpe", sr)
+lab.record("sharpe_se", 1 / np.sqrt(YEARS))   # SE of an annualised Sharpe from Y years of daily data
 lab.record("maxdd", mdd)
 lab.record("final_wealth", float(px.iloc[-1] / px.iloc[0]))
 
@@ -172,12 +173,15 @@ for L in levels:
     lev = np.maximum(lev, -1.0)                       # you cannot lose more than everything
     growth = np.log1p(lev).sum(axis=0) / SIM_YEARS   # annual log growth per path
     cagr_paths = np.expm1(growth)
+    # peak-to-trough drawdown of each path's wealth (log wealth, starting at 0)
+    log_w = np.vstack([np.zeros((1, N_PATHS)), np.log1p(lev).cumsum(axis=0)])
+    max_dd = np.expm1((log_w - np.maximum.accumulate(log_w, axis=0)).min(axis=0))
     rows.append({
         "L": L,
         "median_cagr": float(np.median(cagr_paths)),
         "theory_cagr": float(np.expm1(RF + L * (MU - RF) - 0.5 * L ** 2 * SIGMA ** 2)),
         "p_loss": float((cagr_paths < 0).mean()),
-        "p_wipeout": float((np.log1p(lev).cumsum(axis=0).min(axis=0) < np.log(0.1)).mean()),
+        "p_dd90": float((max_dd <= -0.90).mean()),    # P(a 90% peak-to-trough drawdown within 10 years)
     })
 table = pd.DataFrame(rows).set_index("L")
 print(table.round(3))
@@ -188,7 +192,7 @@ for L, row in table.iterrows():
     lab.record(f"lev_{key}_median_cagr", row["median_cagr"])
     lab.record(f"lev_{key}_theory_cagr", row["theory_cagr"])
     lab.record(f"lev_{key}_p_loss", row["p_loss"])
-    lab.record(f"lev_{key}_p_wipeout", row["p_wipeout"])
+    lab.record(f"lev_{key}_p_dd90", row["p_dd90"])
 # the simulation must agree with theory within a percentage point
 assert (table["median_cagr"] - table["theory_cagr"]).abs().max() < 0.01
 
@@ -198,13 +202,21 @@ assert (table["median_cagr"] - table["theory_cagr"]).abs().max() < 0.01
 # %%
 lev_paths = {L: leveraged_returns(r, L, rf_daily).clip(lower=-1.0) for L in (1.0, 2.0, 3.0)}
 growth = {L: (1 + lr_).cumprod() for L, lr_ in lev_paths.items()}
+
+
+def in_years(s: pd.Series) -> pd.Series:
+    """Re-index a simulated daily series by elapsed years, so charts don't imply real calendar dates."""
+    return pd.Series(s.to_numpy(), index=np.arange(1, len(s) + 1) / PERIODS_PER_YEAR)
+
+
 lab.chart("growth", charts.line_chart(
-    [charts.Series("1× unlevered", growth[1.0], role="strategy"),
-     charts.Series("2× daily", growth[2.0], role="alt1"),
-     charts.Series("3× daily", growth[3.0], role="alt2")],
-    title="Growth of $1 on one simulated 20-year path (log scale)", logy=True,
+    [charts.Series("1× unlevered", in_years(growth[1.0]), role="strategy"),
+     charts.Series("2× daily", in_years(growth[2.0]), role="alt1"),
+     charts.Series("3× daily", in_years(growth[3.0]), role="alt2")],
+    title="Growth of $1 over 20 simulated years (log scale)", logy=True,
     y_fmt=charts.fmt_num(2, prefix="$"), hline=1.0))
-lab.chart("drawdown3x", charts.drawdown_chart(drawdown(lev_paths[3.0]), title="Drawdown of the 3× version"))
+lab.chart("drawdown3x", charts.drawdown_chart(in_years(drawdown(lev_paths[3.0])),
+                                              title="Drawdown of the 3× version, by simulated year"))
 lab.chart("cagr_by_leverage", charts.column_chart(
     [f"{L:g}×" for L in levels], table["median_cagr"].tolist(),
     title="Median compound growth by leverage — 2,000 simulated 10-year paths", y_fmt=charts.fmt_pct(1)))
