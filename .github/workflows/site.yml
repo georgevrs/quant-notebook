@@ -35,7 +35,7 @@ jobs:
           cache: npm
       - run: npm ci
 
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.2.0   # no moving major tag is published: pin the release
         with:
           enable-cache: true
       - run: uv sync --locked
