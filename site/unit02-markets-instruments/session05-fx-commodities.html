@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- nav:head -->
+<title>2.5 · FX &amp; Commodities</title>
+<meta name="description" content="Currency quoting, forwards and covered interest parity; commodity term structures, storage and convenience yield.">
+<link rel="canonical" href="https://georgevrs.github.io/quant-notebook/unit02-markets-instruments/session05-fx-commodities.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Quant Notebook">
+<meta property="og:title" content="2.5 · FX &amp; Commodities">
+<meta property="og:description" content="Currency quoting, forwards and covered interest parity; commodity term structures, storage and convenience yield.">
+<meta property="og:url" content="https://georgevrs.github.io/quant-notebook/unit02-markets-instruments/session05-fx-commodities.html">
+<meta name="twitter:card" content="summary">
+<link rel="stylesheet" href="../assets/brand.css">
+<link rel="stylesheet" href="../assets/temml.css">
+<!-- /nav:head -->
+</head>
+<body><div class="page" id="top">
+<!-- Session 2.5 — builds on 2.4 (cost of carry, basis, roll yield). FX carry strategy is 8.4's, UIP is 11.5's. See AUTHORING.md. -->
+<!-- nav:tabs -->
+<nav class="tabs">
+<a href="../index.html">⌂ Course home</a>
+<a href="session01-market-anatomy.html">2.1 · Market Anatomy</a>
+<a href="session02-equities-indices-etfs.html">2.2 · Equities &amp; ETFs</a>
+<a href="session03-returns-pnl-leverage.html">2.3 · Returns &amp; Leverage</a>
+<a href="session04-futures.html">2.4 · Futures</a>
+<a class="active" href="session05-fx-commodities.html">2.5 · FX &amp; Commodities</a>
+<a href="session06-crypto-market-structure.html">2.6 · Crypto</a>
+<a href="session07-options-primer.html">2.7 · Options Primer</a>
+<a href="../roadmap.html">🗺 Roadmap</a>
+</nav>
+<!-- /nav:tabs -->
+
+<header class="cover">
+<!-- nav:heading -->
+<p class="eyebrow">Unit 2 · Markets &amp; Instruments — Session 05 of 07</p>
+<h1>FX &amp; Commodities</h1>
+<!-- /nav:heading -->
+<p class="subtitle">Session 2.4 priced a futures contract as spot plus the cost of carrying the asset. This session runs the same idea through two new markets: for a currency the carry is the gap between two interest rates; for a barrel of oil or a cargo of gas it is storage minus the value of having the thing in hand. <mark>The core move: price every forward from the loop that replicates it, then ask who can actually afford to run that loop — the answer explains the cross-currency basis, the carry trade's crashes and the shape of every commodity curve.</mark></p>
+<div class="meta">
+<span>DURATION <b>1.5 h + lab</b></span>
+<span>LEVEL <b>Foundations</b></span>
+<span>TRACKS <b>QR · QT · QD · IND</b></span>
+<span>HANDS-ON <b>Price CIP net of costs; crash-test carry on <span data-lab="n_paths" data-fmt=",.0f">10,000</span> paths; build curves from storage</b></span>
+</div>
+<!-- nav:labstrip -->
+<div class="labstrip"><b>📓 Companion lab</b>
+<a href="https://colab.research.google.com/github/georgevrs/quant-notebook/blob/main/labs/u02/s05_fx_commodities.ipynb">Open in Colab</a>
+<a href="https://github.com/georgevrs/quant-notebook/blob/main/labs/u02/s05_fx_commodities.ipynb">Notebook on GitHub</a>
+<a href="https://github.com/georgevrs/quant-notebook/blob/main/labs/u02/s05_fx_commodities.py">Source (.py)</a>
+</div>
+<!-- /nav:labstrip -->
+<div class="toc">
+<b>On this page</b>
+<ol>
+<li><a href="#s1">Reading a currency quote</a></li>
+<li><a href="#s2">FX forwards &amp; covered interest parity</a></li>
+<li><a href="#s3">When the loop costs too much to run</a></li>
+<li><a href="#s4">FX carry: steady gains, sudden crashes</a></li>
+<li><a href="#s5">Storage &amp; convenience yield</a></li>
+<li><a href="#s6">Commodity curves: shapes &amp; seasons</a></li>
+<li><a href="#s7">Try it</a></li>
+<li><a href="#s8">Glossary · Check yourself · Go deeper</a></li>
+</ol>
+</div>
+</header>
+
+<main>
+
+<section id="s1">
+<h2><span class="no">2.5.1</span> Reading a currency quote</h2>
+<p class="lede">An exchange rate is the price of one money in another. The quote tells you which is which — get the direction wrong and every number after it flips sign.</p>
+
+<p>A <strong>currency pair</strong> names two currencies as <code>BASE/QUOTE</code>. The price <math><semantics><mi>S</mi><annotation encoding="application/x-tex">S</annotation></semantics></math> is how many units of the quote currency one unit of the base costs. A dealer showing <code>EUR/USD <span data-lab="eurusd_bid" data-fmt=".4f">1.0850</span> / <span data-lab="eurusd_ask" data-fmt=".4f">1.0851</span></code> buys euros from you at <span data-lab="eurusd_bid" data-fmt=".4f">1.0850</span> dollars each (the <a class="term" href="session01-market-anatomy.html#g-bid" data-term="bid">bid</a>) and sells them to you at <span data-lab="eurusd_ask" data-fmt=".4f">1.0851</span> (the <a class="term" href="session01-market-anatomy.html#g-ask" data-term="ask">ask</a>); the gap is the <a class="term" href="session01-market-anatomy.html#g-bid-ask-spread" data-term="bid-ask spread">bid-ask spread</a> you met in <a class="xref" href="session01-market-anatomy.html" data-xref="2.1" data-style="short" data-auto="">Session 2.1</a>. By convention the euro and sterling are quoted against the dollar (<code>EUR/USD</code>, <code>GBP/USD</code>), while the dollar is the base against the yen, the Swiss franc and the Canadian dollar (<code>USD/JPY</code>, <code>USD/CHF</code>, <code>USD/CAD</code>). So "EUR/USD up" means a stronger euro, but "USD/JPY up" means a <em>weaker</em> yen.</p>
+
+<p>A <strong>pip</strong> is the conventional smallest step of a quote: the fourth decimal (0.0001) for most pairs, the second (0.01) for yen pairs. Dealers speak only the last two digits, because the leading ones — the <em>big figure</em> — move far less often than the pips.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 268" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">ANATOMY OF A QUOTE — an illustrative GBP/USD price, as a dealer shows it</text>
+  <rect x="36" y="36" width="100" height="52" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="86" y="70" font-size="22" font-weight="700" text-anchor="middle" fill="#3A56C5" font-family="IBM Plex Mono,monospace">GBP</text>
+  <text x="156" y="72" font-size="26" text-anchor="middle" fill="#4A5A68">/</text>
+  <rect x="176" y="36" width="100" height="52" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="226" y="70" font-size="22" font-weight="700" text-anchor="middle" fill="#1F7A55" font-family="IBM Plex Mono,monospace">USD</text>
+  <rect x="312" y="36" width="164" height="52" rx="9" fill="#fff" stroke="#1F2C38" stroke-width="1.5"/>
+  <text x="394" y="71" text-anchor="middle" font-family="IBM Plex Mono,monospace"><tspan font-size="18" fill="#4A5A68">1.27</tspan><tspan font-size="26" font-weight="700" fill="#1F2C38">45</tspan></text>
+  <text x="496" y="72" font-size="26" text-anchor="middle" fill="#4A5A68">/</text>
+  <rect x="516" y="36" width="164" height="52" rx="9" fill="#fff" stroke="#1F2C38" stroke-width="1.5"/>
+  <text x="598" y="71" text-anchor="middle" font-family="IBM Plex Mono,monospace"><tspan font-size="18" fill="#4A5A68">1.27</tspan><tspan font-size="26" font-weight="700" fill="#1F2C38">47</tspan></text>
+  <path d="M86 90 V100" stroke="#3A56C5" stroke-width="1.4"/>
+  <path d="M226 90 V100" stroke="#1F7A55" stroke-width="1.4"/>
+  <path d="M394 90 V100" stroke="#1F2C38" stroke-width="1.4"/>
+  <path d="M598 90 V100" stroke="#1F2C38" stroke-width="1.4"/>
+  <text x="86" y="115" font-size="11" font-weight="600" text-anchor="middle" fill="#3A56C5">BASE</text>
+  <text x="86" y="130" font-size="9.5" text-anchor="middle" fill="#4A5A68">the unit being priced:</text>
+  <text x="86" y="143" font-size="9.5" text-anchor="middle" fill="#4A5A68">one pound</text>
+  <text x="226" y="115" font-size="11" font-weight="600" text-anchor="middle" fill="#1F7A55">QUOTE</text>
+  <text x="226" y="130" font-size="9.5" text-anchor="middle" fill="#4A5A68">the currency the</text>
+  <text x="226" y="143" font-size="9.5" text-anchor="middle" fill="#4A5A68">price is written in</text>
+  <text x="394" y="115" font-size="11" font-weight="600" text-anchor="middle" fill="#1F2C38">BID</text>
+  <text x="394" y="130" font-size="9.5" text-anchor="middle" fill="#4A5A68">the dealer buys pounds</text>
+  <text x="394" y="143" font-size="9.5" text-anchor="middle" fill="#4A5A68">from you at this price</text>
+  <text x="598" y="115" font-size="11" font-weight="600" text-anchor="middle" fill="#1F2C38">ASK</text>
+  <text x="598" y="130" font-size="9.5" text-anchor="middle" fill="#4A5A68">the dealer sells pounds</text>
+  <text x="598" y="143" font-size="9.5" text-anchor="middle" fill="#4A5A68">to you at this price</text>
+  <rect x="26" y="162" width="210" height="62" rx="8" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="131" y="182" font-size="10.5" font-weight="700" text-anchor="middle" fill="#8A6D00">BIG FIGURE · 1.27</text>
+  <text x="131" y="198" font-size="9.5" text-anchor="middle" fill="#4A5A68">moves far less than the pips,</text>
+  <text x="131" y="211" font-size="9.5" text-anchor="middle" fill="#4A5A68">so dealers say just "45–47"</text>
+  <rect x="255" y="162" width="210" height="62" rx="8" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="360" y="182" font-size="10.5" font-weight="700" text-anchor="middle" fill="#3A56C5">PIP · 0.0001</text>
+  <text x="360" y="198" font-size="9.5" text-anchor="middle" fill="#4A5A68">the 4th decimal for most pairs;</text>
+  <text x="360" y="211" font-size="9.5" text-anchor="middle" fill="#4A5A68">the 2nd (0.01) for yen pairs</text>
+  <rect x="484" y="162" width="210" height="62" rx="8" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="589" y="182" font-size="10.5" font-weight="700" text-anchor="middle" fill="#D64B2A">SPREAD · 2 PIPS</text>
+  <text x="589" y="198" font-size="9.5" text-anchor="middle" fill="#4A5A68">ask − bid: what a round trip costs</text>
+  <text x="589" y="211" font-size="9.5" text-anchor="middle" fill="#4A5A68">(buy at the ask, sell at the bid)</text>
+  <text x="360" y="252" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">GBP/USD rising means one pound buys more dollars: the base currency got stronger.</text>
+</svg>
+<figcaption>fig 2.5.1 — anatomy of a currency quote: base and quote currency, bid and ask, big figure and pips</figcaption>
+</figure>
+
+<p>On one million units of the base currency, one EUR/USD pip is <span data-lab="eurusd_pip_usd_per_mio" data-fmt="$,.0f">$100</span>; one USD/JPY pip is <span data-lab="usdjpy_pip_jpy_per_mio" data-fmt=",.0f">10,000</span> yen, about <span data-lab="usdjpy_pip_usd_per_mio" data-fmt="$.2f">$66.66</span> at a mid of <span data-lab="usdjpy_mid" data-fmt=".2f">150.01</span>. A round trip of €10 million across a one-pip EUR/USD spread costs <span data-lab="roundtrip_10m_usd" data-fmt="$,.0f">$1,000</span> — not small for a strategy that trades daily (<span class="term soon" data-term="transaction cost" title="Defined in Session 6.5 (coming soon)">transaction costs</span> are <span class="xref soon" data-xref="6.5" data-style="short" data-auto="" title="Coming soon">Session 6.5</span>'s subject).</p>
+
+<p>A pair without the dollar, such as EUR/JPY, is a <strong>cross</strong>. Less-traded crosses are priced <em>through</em> the dollar, which sits on one side of 89% of all FX trades (BIS 2025): to buy, say, Norwegian kroner with yen you buy dollars with yen, then kroner with dollars, paying both spreads. The most-traded crosses (EUR/JPY, EUR/GBP) also trade directly, and arbitrage keeps their spread inside the synthetic one. Built through the dollar from the lab's quotes — USD/JPY <span data-lab="usdjpy_bid" data-fmt=".2f">150.00</span> / <span data-lab="usdjpy_ask" data-fmt=".2f">150.02</span> — the cross comes out at <span data-lab="eurjpy_bid" data-fmt=".3f">162.750</span> / <span data-lab="eurjpy_ask" data-fmt=".3f">162.787</span>: a spread of <span data-lab="eurjpy_spread_pips" data-fmt=".2f">3.67</span> pips, or <span data-lab="eurjpy_spread_bp" data-fmt=".2f">2.25</span> bp of the price, the sum of EUR/USD's <span data-lab="eurusd_spread_bp" data-fmt=".2f">0.92</span> bp and USD/JPY's <span data-lab="usdjpy_spread_bp" data-fmt=".2f">1.33</span> bp, and the widest spread a direct EUR/JPY quote could show.</p>
+
+<table>
+<thead><tr><th>Pair</th><th>Read as</th><th>Pip</th><th>One pip on 1 million of the base</th><th>Spot date</th></tr></thead>
+<tbody>
+<tr><td>EUR/USD</td><td>dollars per euro</td><td>0.0001</td><td><span data-lab="eurusd_pip_usd_per_mio" data-fmt="$,.0f">$100</span></td><td>T+2</td></tr>
+<tr><td>USD/JPY</td><td>yen per dollar</td><td>0.01</td><td><span data-lab="usdjpy_pip_jpy_per_mio" data-fmt=",.0f">10,000</span> yen ≈ <span data-lab="usdjpy_pip_usd_per_mio" data-fmt="$.2f">$66.66</span></td><td>T+2</td></tr>
+<tr><td>EUR/JPY (a cross)</td><td>yen per euro</td><td>0.01</td><td><span data-lab="usdjpy_pip_jpy_per_mio" data-fmt=",.0f">10,000</span> yen ≈ <span data-lab="eurjpy_pip_usd_per_mio" data-fmt="$.2f">$66.66</span></td><td>T+2</td></tr>
+<tr><td>USD/CAD</td><td>Canadian dollars per US dollar</td><td>0.0001</td><td><span data-lab="usdcad_pip_cad_per_mio" data-fmt=",.0f">100</span> Canadian dollars</td><td>T+1</td></tr>
+</tbody>
+</table>
+
+<p>That last column is <strong>FX spot</strong>: an exchange of two currencies at an agreed rate, settled on the <em>spot date</em> — two business days after the trade (T+2) for most pairs, one (T+1) for US and Canadian dollars (SIFMA, CCMA &amp; ISDA 2024), and later if a holiday in either currency intervenes. There is no central exchange: the market is over the counter, with dealers — large banks — quoting to clients and to each other, mostly electronically, around the clock on weekdays. The BIS Triennial Survey counted $9.6 trillion of turnover a day in April 2025; 46% of it was between dealers, and sales desks in the United Kingdom booked 38%.</p>
+
+<table>
+<thead><tr><th>Instrument (BIS, April 2025)</th><th>What it is</th><th>Daily turnover</th><th>Share</th></tr></thead>
+<tbody>
+<tr><td>Spot</td><td>exchange on the spot date</td><td>$3 trillion</td><td>31%</td></tr>
+<tr><td>Outright forwards</td><td>exchange on a later date, rate fixed today</td><td>$1.8 trillion</td><td>19%</td></tr>
+<tr><td>FX swaps</td><td>a spot trade plus the opposite forward</td><td>$4 trillion</td><td>42%</td></tr>
+<tr><td>Options</td><td>the right, not the obligation, to exchange</td><td>—</td><td>7%</td></tr>
+<tr><td>Currency swaps</td><td>long-term exchange of interest and principal</td><td>—</td><td>about 2%</td></tr>
+</tbody>
+</table>
+<p>Source: BIS Triennial Survey, published 30 September 2025. The largest instrument, the FX swap, is priced by the loop in §2.5.2.</p>
+
+<div class="co key"><span class="co-t">📌 Key idea — read the pair before the number</span>
+<p><math><semantics><mi>S</mi><annotation encoding="application/x-tex">S</annotation></semantics></math> is units of the quote currency per unit of the base; up means the base strengthened. A pip's money value depends on the pair and your size. <mark>A cross built through the dollar is two trades glued together, and can cost up to two spreads.</mark></p>
+</div>
+
+<div class="co note"><span class="co-t">🧭 Margin note — the two legs of a currency trade</span>
+<p>An FX trade is two payments, often in different time zones. When the German supervisor closed Bankhaus Herstatt mid-day on 26 June 1974, it had received the Deutsche marks it bought but not delivered the dollars it sold, and its counterparties took the loss (ECB 2007). The industry set up CLS in 2002 to settle both legs of a trade together or not at all — payment versus payment (CLS 2023). <a class="term" href="session01-market-anatomy.html#g-settlement" data-term="settlement">Settlement</a> in general is <a class="xref" href="session01-market-anatomy.html" data-xref="2.1" data-style="short" data-auto="">Session 2.1</a>'s subject; <a class="term" href="session06-crypto-market-structure.html#g-counterparty-risk" data-term="counterparty risk">counterparty risk</a> returns in <a class="xref" href="session06-crypto-market-structure.html" data-xref="2.6" data-style="short" data-auto="">Session 2.6</a>.</p>
+</div>
+</section>
+
+<section id="s2">
+<h2><span class="no">2.5.2</span> FX forwards &amp; covered interest parity</h2>
+<p class="lede">A currency forward needs no forecast. One loop through two money markets pins it — the <a class="term" href="session04-futures.html#g-cash-and-carry-arbitrage" data-term="cash-and-carry arbitrage">cash-and-carry</a> argument of <a class="xref" href="session04-futures.html#s2" data-xref="2.4#s2" data-style="short" data-auto="">Session 2.4</a>, with a second interest rate where the storage bill used to be.</p>
+
+<p>An <strong>FX forward</strong> (an <em>outright</em> forward) fixes today the rate at which two currencies will be exchanged on a date beyond spot. A company owed euros in three months sells them forward and knows its dollar revenue today. It is a <a class="term" href="session04-futures.html#g-forward-contract" data-term="forward contract">forward contract</a> in exactly the sense of <a class="xref" href="session04-futures.html" data-xref="2.4" data-style="short" data-auto="">Session 2.4</a>, and it is priced the same way: by building it from things you can already trade.</p>
+
+<p>The loop in words: you hold dollars and want dollars <math><semantics><mi>τ</mi><annotation encoding="application/x-tex">\tau</annotation></semantics></math> years from now. <em>Route A:</em> deposit them at the dollar rate. <em>Route B:</em> buy euros at spot, deposit them at the euro rate, and — today — sell forward the euros that deposit will pay out. Every price in route B is agreed today, so both routes are riskless and must pay the same; if route B paid more, traders would borrow dollars to run it and push the forward down until the gap closed.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 334" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">THE CIP LOOP — two ways to turn dollars today into dollars in τ years, both locked in today</text>
+  <rect x="30" y="36" width="200" height="64" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="130" y="60" font-size="11" font-weight="600" text-anchor="middle" fill="#3A56C5">1 · DOLLARS TODAY</text>
+  <text x="130" y="77" font-size="9.5" text-anchor="middle" fill="#4A5A68">start with $1 (or borrow it)</text>
+  <text x="130" y="90" font-size="9.5" text-anchor="middle" fill="#4A5A68">USD rate i$ · EUR rate i€</text>
+  <rect x="490" y="36" width="200" height="64" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="590" y="60" font-size="11" font-weight="600" text-anchor="middle" fill="#3A56C5">2 · EUROS TODAY</text>
+  <text x="590" y="77" font-size="9.5" text-anchor="middle" fill="#4A5A68">buy at spot S (dollars per euro):</text>
+  <text x="590" y="90" font-size="9.5" text-anchor="middle" fill="#4A5A68">$1 buys 1/S euros</text>
+  <rect x="490" y="196" width="200" height="64" rx="9" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="590" y="220" font-size="11" font-weight="600" text-anchor="middle" fill="#8A6D00">3 · EUROS AT τ</text>
+  <text x="590" y="237" font-size="9.5" text-anchor="middle" fill="#4A5A68">the euro deposit pays out</text>
+  <text x="590" y="250" font-size="9.5" text-anchor="middle" fill="#4A5A68">(1 + i€·τ) / S euros</text>
+  <rect x="30" y="196" width="200" height="64" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="130" y="220" font-size="11" font-weight="600" text-anchor="middle" fill="#1F7A55">4 · DOLLARS AT τ</text>
+  <text x="130" y="237" font-size="9.5" text-anchor="middle" fill="#4A5A68">route A: 1 + i$·τ</text>
+  <text x="130" y="250" font-size="9.5" text-anchor="middle" fill="#4A5A68">route B: F·(1 + i€·τ) / S</text>
+  <path d="M234 64 H484" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <text x="359" y="56" font-size="9.5" text-anchor="middle" fill="#4A5A68">route B · convert at spot</text>
+  <path d="M600 104 V190" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <text x="610" y="146" font-size="9.5" fill="#4A5A68">deposit at</text>
+  <text x="610" y="159" font-size="9.5" fill="#4A5A68">the EUR rate</text>
+  <path d="M486 232 H236" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <text x="359" y="250" font-size="9.5" text-anchor="middle" fill="#4A5A68">deliver into the forward sold today at F</text>
+  <path d="M110 104 V190" stroke="#3A56C5" stroke-width="1.7" stroke-dasharray="5 3" marker-end="url(#s2b)"/>
+  <text x="120" y="146" font-size="9.5" fill="#3A56C5">route A · deposit</text>
+  <text x="120" y="159" font-size="9.5" fill="#3A56C5">at the USD rate</text>
+  <rect x="238" y="112" width="244" height="72" rx="9" fill="#fff" stroke="#1F2C38" stroke-width="1.5"/>
+  <text x="360" y="133" font-size="11" font-weight="600" text-anchor="middle" fill="#1F2C38">NO ARBITRAGE: ROUTE A = ROUTE B</text>
+  <text x="360" y="153" font-size="10" text-anchor="middle" fill="#1F2C38" font-family="IBM Plex Mono,monospace">F = S·(1 + i$·τ) / (1 + i€·τ)</text>
+  <text x="360" y="172" font-size="9.5" text-anchor="middle" fill="#4A5A68">known today · no capital · no currency risk</text>
+  <rect x="30" y="272" width="320" height="40" rx="8" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="190" y="288" font-size="10" font-weight="600" text-anchor="middle" fill="#D64B2A">IF ROUTE B PAYS MORE</text>
+  <text x="190" y="303" font-size="9.5" text-anchor="middle" fill="#4A5A68">borrow $, run 1→4: buying € spot, selling € forward → F falls</text>
+  <rect x="370" y="272" width="320" height="40" rx="8" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="530" y="288" font-size="10" font-weight="600" text-anchor="middle" fill="#3A56C5">IF ROUTE A PAYS MORE</text>
+  <text x="530" y="303" font-size="9.5" text-anchor="middle" fill="#4A5A68">borrow €, run the loop backwards → F rises</text>
+  <text x="360" y="328" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">Every step is agreed today, so the forward is arithmetic, not a forecast.</text>
+  <defs>
+    <marker id="s2a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F2C38"/></marker>
+    <marker id="s2b" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#3A56C5"/></marker>
+  </defs>
+</svg>
+<figcaption>fig 2.5.2 — the covered-interest-parity loop: a dollar deposit (route A) and a hedged euro deposit (route B) must pay the same, which fixes the forward rate F</figcaption>
+</figure>
+
+<p>In symbols, with one convention for the whole session: spot <math><semantics><mi>S</mi><annotation encoding="application/x-tex">S</annotation></semantics></math> and forward <math><semantics><mi>F</mi><annotation encoding="application/x-tex">F</annotation></semantics></math> are units of the quote currency per unit of the base; <math><semantics><msub><mi>i</mi><mi>q</mi></msub><annotation encoding="application/x-tex">i_q</annotation></semantics></math> and <math><semantics><msub><mi>i</mi><mi>b</mi></msub><annotation encoding="application/x-tex">i_b</annotation></semantics></math> are the quote and base currencies' money-market rates for the term — simple, not compounded, as deposits are quoted — and <math><semantics><mi>τ</mi><annotation encoding="application/x-tex">\tau</annotation></semantics></math> is the term in years. For EUR/USD, <math><semantics><msub><mi>i</mi><mi>q</mi></msub><annotation encoding="application/x-tex">i_q</annotation></semantics></math> is the dollar rate, <math><semantics><msub><mi>i</mi><mi>b</mi></msub><annotation encoding="application/x-tex">i_b</annotation></semantics></math> the euro rate, and both markets count <math><semantics><mi>τ</mi><annotation encoding="application/x-tex">\tau</annotation></semantics></math> as <em>actual</em> days/360, so a one-year forward is about 365/360 years (other currencies use other conventions; see <span class="term soon" data-term="day count convention" title="Defined in Session 11.1 (coming soon)">day count conventions</span> in <span class="xref soon" data-xref="11.1" data-style="short" data-auto="" title="Coming soon">Session 11.1</span>). Route A turns $1 into <math><semantics><mrow><mn>1</mn><mo>+</mo><msub><mi>i</mi><mi>q</mi></msub><mi>τ</mi></mrow><annotation encoding="application/x-tex">1 + i_q\tau</annotation></semantics></math>; route B turns it into <math><semantics><mrow><mstyle displaystyle="false" scriptlevel="0"><mfrac><mi>F</mi><mi>S</mi></mfrac></mstyle><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mn>1</mn><mo>+</mo><msub><mi>i</mi><mi>b</mi></msub><mi>τ</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">\tfrac{F}{S}(1 + i_b\tau)</annotation></semantics></math>. Setting them equal gives <strong>covered interest parity</strong> (CIP):</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><mi>F</mi><mo>=</mo><mi>S</mi><mspace width="0.1667em"></mspace><mfrac><mrow><mn>1</mn><mo>+</mo><msub><mi>i</mi><mi>q</mi></msub><mspace width="0.1667em"></mspace><mi>τ</mi></mrow><mrow><mn>1</mn><mo>+</mo><msub><mi>i</mi><mi>b</mi></msub><mspace width="0.1667em"></mspace><mi>τ</mi></mrow></mfrac></mrow><annotation encoding="application/x-tex">F = S\,\frac{1 + i_q\,\tau}{1 + i_b\,\tau}</annotation></semantics></math></div>
+<p><em>The forward is the spot rate scaled by the ratio of the two currencies' growth factors.</em> The higher-rate currency trades at a <em>forward discount</em> — not because anyone expects it to fall, but because the loop demands it. With continuously compounded rates the same argument gives <math><semantics><mrow><mi>F</mi><mo>=</mo><mi>S</mi><mspace width="0.1667em"></mspace><msup><mi>e</mi><mrow class="tml-sml-pad"><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><msub><mi>r</mi><mi>q</mi></msub><mo>−</mo><msub><mi>r</mi><mi>b</mi></msub><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mi>τ</mi></mrow></msup></mrow><annotation encoding="application/x-tex">F = S\,e^{(r_q - r_b)\tau}</annotation></semantics></math>: exactly the <a class="term" href="session04-futures.html#g-cost-of-carry" data-term="cost of carry">cost of carry</a> formula <math><semantics><mrow><msub><mi>F</mi><mn>0</mn></msub><mo>=</mo><msub><mi>S</mi><mn>0</mn></msub><msup><mi>e</mi><mrow class="tml-sml-pad"><mi>c</mi><mi>τ</mi></mrow></msup></mrow><annotation encoding="application/x-tex">F_0 = S_0e^{c\tau}</annotation></semantics></math> of <a class="xref" href="session04-futures.html#s2" data-xref="2.4#s2" data-style="short" data-auto="">Session 2.4</a> with <math><semantics><mrow><mi>c</mi><mo>=</mo><msub><mi>r</mi><mi>f</mi></msub><mo>−</mo><mi>q</mi></mrow><annotation encoding="application/x-tex">c = r_f - q</annotation></semantics></math>, where the financing rate <math><semantics><msub><mi>r</mi><mi>f</mi></msub><annotation encoding="application/x-tex">r_f</annotation></semantics></math> is the quote currency's and the income <math><semantics><mi>q</mi><annotation encoding="application/x-tex">q</annotation></semantics></math> is the base currency's interest rate. A currency is an asset that pays its own interest rate.</p>
+
+<p>Dealers quote forwards as <strong>forward points</strong>: <math><semantics><mrow><mi>F</mi><mo>−</mo><mi>S</mi></mrow><annotation encoding="application/x-tex">F - S</annotation></semantics></math> measured in pips, added to spot. With EUR/USD at <span data-lab="s_eurusd" data-fmt=".5f">1.08505</span> (the mid of the quote above), a dollar rate of <span data-lab="i_usd" data-fmt=".0%">4%</span> and a euro rate of <span data-lab="i_eur" data-fmt=".0%">2%</span> (illustrative):</p>
+
+<table>
+<thead><tr><th>Tenor</th><th>Actual days</th><th>Forward F (CIP)</th><th>Forward points</th></tr></thead>
+<tbody>
+<tr><td>1 month</td><td><span data-lab="fwd_1m_days" data-fmt="d">31</span></td><td><span data-lab="fwd_1m" data-fmt=".5f">1.08692</span></td><td><span data-lab="fwd_1m_points" data-fmt="+.1f">+18.7</span></td></tr>
+<tr><td>3 months</td><td><span data-lab="fwd_3m_days" data-fmt="d">92</span></td><td><span data-lab="fwd_3m" data-fmt=".5f">1.09057</span></td><td><span data-lab="fwd_3m_points" data-fmt="+.1f">+55.2</span></td></tr>
+<tr><td>6 months</td><td><span data-lab="fwd_6m_days" data-fmt="d">183</span></td><td><span data-lab="fwd_6m" data-fmt=".5f">1.09597</span></td><td><span data-lab="fwd_6m_points" data-fmt="+.1f">+109.2</span></td></tr>
+<tr><td>1 year</td><td><span data-lab="fwd_1y_days" data-fmt="d">365</span></td><td><span data-lab="fwd_1y" data-fmt=".5f">1.10662</span></td><td><span data-lab="fwd_1y_points" data-fmt="+.1f">+215.7</span></td></tr>
+</tbody>
+</table>
+
+<p>The euro has the lower rate, so it trades at a forward premium. The rule of thumb, points ≈ <math><semantics><mrow><mi>S</mi><mspace width="0.1667em"></mspace><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><msub><mi>i</mi><mi>q</mi></msub><mo>−</mo><msub><mi>i</mi><mi>b</mi></msub><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mspace width="0.1667em"></mspace><mi>τ</mi></mrow><annotation encoding="application/x-tex">S\,(i_q - i_b)\,\tau</annotation></semantics></math> / pip, gives <span data-lab="fwd_1y_points_approx" data-fmt="+.1f">+220.0</span> at one year; the exact formula's denominator trims it. Mixing conventions is worse: put the same <span data-lab="i_usd" data-fmt=".0%">4%</span> and <span data-lab="i_eur" data-fmt=".0%">2%</span> into the continuous formula and the one-year forward comes out <span data-lab="fwd_1y_cont_error_pips" data-fmt=".1f">6.6</span> pips too high. A rate is not a number until you know its compounding and its day count. The lab's pricer is one line:</p>
+
+<pre><span class="k">def</span> cip_forward(spot: float, i_quote: float, i_base: float, tau: float) -&gt; float:
+    <span class="s">"""Covered-interest-parity forward: QUOTE per 1 BASE, simple money-market rates, tau in years."""</span>
+    <span class="k">return</span> spot * (<span class="p">1</span> + i_quote * tau) / (<span class="p">1</span> + i_base * tau)</pre>
+
+<div class="co key"><span class="co-t">📌 Key idea — the forward is arithmetic, not a forecast</span>
+<p>CIP pins the forward by replication — <span class="term soon" data-term="no-arbitrage pricing" title="Defined in Session 10.1 (coming soon)">no-arbitrage pricing</span>, which <span class="xref soon" data-xref="10.1" data-style="short" data-auto="" title="Coming soon">Session 10.1</span> generalises. A dealer who sells you a forward hedges it by running the loop, so no view on the euro enters the price. Whether the forward also <em>predicts</em> the future spot rate is a different claim, <span class="term soon" data-term="uncovered interest parity" title="Defined in Session 11.5 (coming soon)">uncovered interest parity</span>, in <span class="xref soon" data-xref="11.5" data-style="short" data-auto="" title="Coming soon">Session 11.5</span> — on average it does not, and that failure is where FX carry (§2.5.4) comes from. <mark>Covered parity is enforced by arbitrage; uncovered parity is only a hypothesis.</mark></p>
+</div>
+</section>
+
+<section id="s3">
+<h2><span class="no">2.5.3</span> When the loop costs too much to run</h2>
+<p class="lede">Before the 2008 crisis, covered interest parity held closely. Since then it has not — and the reason is a lesson in who can actually run an arbitrage.</p>
+
+<p>Measure a deviation with the <strong>cross-currency basis</strong> <math><semantics><mi>x</mi><annotation encoding="application/x-tex">x</annotation></semantics></math> (an interest-rate spread — not the futures <a class="term" href="session04-futures.html#g-basis" data-term="basis">basis</a> <math><semantics><mrow><mi>S</mi><mo>−</mo><mi>F</mi></mrow><annotation encoding="application/x-tex">S - F</annotation></semantics></math> of <a class="xref" href="session04-futures.html#s3" data-xref="2.4#s3" data-style="short" data-auto="">Session 2.4</a>): the spread you must add to the non-dollar rate to make CIP hold at market prices. Here the dollar is the quote currency and <math><semantics><mi>x</mi><annotation encoding="application/x-tex">x</annotation></semantics></math> is added to the non-dollar rate, which is Du, Tepper &amp; Verdelhan's (2018) sign convention; they quote foreign currency per dollar, so their formula is the reciprocal of this one:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><mi>F</mi><mo>=</mo><mi>S</mi><mspace width="0.1667em"></mspace><mfrac><mrow><mn>1</mn><mo>+</mo><msub><mi>i</mi><mi>q</mi></msub><mspace width="0.1667em"></mspace><mi>τ</mi></mrow><mrow><mn>1</mn><mo>+</mo><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><msub><mi>i</mi><mi>b</mi></msub><mo>+</mo><mi>x</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mspace width="0.1667em"></mspace><mi>τ</mi></mrow></mfrac></mrow><annotation encoding="application/x-tex">F = S\,\frac{1 + i_q\,\tau}{1 + (i_b + x)\,\tau}</annotation></semantics></math></div>
+<p>A <em>negative</em> basis puts the forward above the CIP price: the direct dollar interest rate is lower than the synthetic one you get by swapping another currency into dollars, so borrowing dollars through FX swaps costs more than borrowing them in the cash market. Whoever borrows dollars that way pays the premium — for instance a non-US bank or investor hedging a dollar asset — and Borio, McCauley, McGuire &amp; Sushko (2016) trace the basis to that hedging demand meeting tighter limits on arbitrage.</p>
+
+<p>The facts, dated. DTV find that since 2008 CIP deviations for G10 currencies are large, persistent and systematic, are not explained away by credit risk or transaction costs, and are strongest for forwards that appear on banks' balance sheets at quarter-end. In the working-paper version (NBER w23170, February 2017), the average absolute basis over 2010–2016 was 24 bp a year at three months and 27 bp at five years; the five-year yen basis was close to −90 bp at the end of 2015, larger than the roughly −70 bp gap between Japanese and US five-year Libor rates. Their explanation combines balance sheets made costly by post-crisis regulation with cross-currency imbalances in hedging and investment demand. On the balance-sheet side, with a 3% Basel III leverage ratio and a 10% required return on equity, a bank needs a basis of at least 3% × 10% = 30 bp before a trade that grows its balance sheet is worth doing.</p>
+
+<p>The lab reproduces the mechanism. It puts the market's 3-month forward <span data-lab="dev_pips" data-fmt=".0f">8</span> pips above CIP (<span data-lab="f_mkt_3m" data-fmt=".5f">1.09137</span> against <span data-lab="f_cip_3m" data-fmt=".5f">1.09057</span>), a basis of <span data-lab="basis_bp" data-fmt=".1f">−28.8</span> bp — DTV's order of magnitude. At mid prices, borrowing <span data-lab="usd_notional" data-fmt="$,.0f">$100,000,000</span> and running the loop locks in <span data-lab="gross_profit" data-fmt="$,.0f">$74,106</span> (<span data-lab="gross_profit_bp_pa" data-fmt=".1f">29.0</span> bp a year) — the same in all <span data-lab="cip_mc_n" data-fmt=",.0f">10,000</span> simulated end-of-period exchange rates, while the position without its forward is a currency bet with a standard deviation of about <span data-lab="uncovered_sd_m" data-fmt="$.1f">$4.0</span> million. Now pay for the trade. Buying at the ask, selling at the bid, borrowing above and lending below mid turns the single CIP price into a <em>no-arbitrage band</em>:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><msup><mi>S</mi><mtext class="tml-med-pad">bid</mtext></msup><mspace width="0.1667em"></mspace><mfrac><mrow><mn>1</mn><mo>+</mo><msubsup><mi>i</mi><mi>q</mi><mtext>lend</mtext></msubsup><mspace width="0.1667em"></mspace><mi>τ</mi></mrow><mrow><mn>1</mn><mo>+</mo><msubsup><mi>i</mi><mi>b</mi><mtext>borrow</mtext></msubsup><mspace width="0.1667em"></mspace><mi>τ</mi></mrow></mfrac><mspace width="0.2778em"></mspace><mo>≤</mo><mspace width="0.2778em"></mspace><mi>F</mi><mspace width="0.2778em"></mspace><mo>≤</mo><mspace width="0.2778em"></mspace><msup><mi>S</mi><mtext class="tml-med-pad">ask</mtext></msup><mspace width="0.1667em"></mspace><mfrac><mrow><mn>1</mn><mo>+</mo><msubsup><mi>i</mi><mi>q</mi><mtext>borrow</mtext></msubsup><mspace width="0.1667em"></mspace><mi>τ</mi></mrow><mrow><mn>1</mn><mo>+</mo><msubsup><mi>i</mi><mi>b</mi><mtext>lend</mtext></msubsup><mspace width="0.1667em"></mspace><mi>τ</mi></mrow></mfrac></mrow><annotation encoding="application/x-tex">S^{\text{bid}}\,\frac{1 + i_q^{\text{lend}}\,\tau}{1 + i_b^{\text{borrow}}\,\tau} \;\le\; F \;\le\; S^{\text{ask}}\,\frac{1 + i_q^{\text{borrow}}\,\tau}{1 + i_b^{\text{lend}}\,\tau}</annotation></semantics></math></div>
+
+<table>
+<thead><tr><th>Who runs the loop (illustrative costs)</th><th>Spot / points half-spread</th><th>Borrow $ above / lend € below mid</th><th>Balance-sheet charge</th><th>Top of the band, pips above CIP</th><th>P&amp;L after costs, 3 months</th></tr></thead>
+<tbody>
+<tr><td>Bank desk</td><td><span data-lab="bank_spot_half" data-fmt=".2f">0.10</span> / <span data-lab="bank_points_half" data-fmt=".2f">0.10</span> pip</td><td><span data-lab="bank_borrow_bp" data-fmt=".0f">2</span> / <span data-lab="bank_lend_bp" data-fmt=".0f">2</span> bp</td><td><span data-lab="bank_balance_sheet_bp" data-fmt=".0f">30</span> bp a year</td><td><span data-lab="bank_upper_pips" data-fmt=".1f">9.5</span></td><td><span data-lab="bank_net" data-fmt="$,.0f">−$15,597</span></td></tr>
+<tr><td>Fund, via a prime broker</td><td><span data-lab="fund_spot_half" data-fmt=".2f">0.25</span> / <span data-lab="fund_points_half" data-fmt=".2f">0.25</span> pip</td><td><span data-lab="fund_borrow_bp" data-fmt=".0f">25</span> / <span data-lab="fund_lend_bp" data-fmt=".0f">10</span> bp</td><td>—</td><td><span data-lab="fund_upper_pips" data-fmt=".1f">9.9</span></td><td><span data-lab="fund_net" data-fmt="$,.0f">−$22,446</span></td></tr>
+<tr><td>Individual, via a broker</td><td><span data-lab="retail_spot_half" data-fmt=".2f">1.00</span> / <span data-lab="retail_points_half" data-fmt=".2f">1.00</span> pip</td><td><span data-lab="retail_borrow_bp" data-fmt=".0f">300</span> / <span data-lab="retail_lend_bp" data-fmt=".0f">150</span> bp</td><td>—</td><td><span data-lab="retail_upper_pips" data-fmt=".1f">125.8</span></td><td><span data-lab="retail_net" data-fmt="$,.0f">−$1,105,861</span></td></tr>
+</tbody>
+</table>
+
+<p>The loop pays only if the forward's <em>bid</em> clears the top of your band (fig 2.5.3). (In practice the loop is done as one FX swap, which pays only the forward-points spread; the lab charges the spot spread twice, which slightly overstates costs without changing who profits.) Look at the bank: its spreads alone would put the top of its band only <span data-lab="bank_upper_pips_no_bs" data-fmt=".1f">1.2</span> pips above CIP, and after spreads the trade still earns <span data-lab="bank_net_spreads" data-fmt="$,.0f">$61,070</span> — then the balance-sheet charge of <span data-lab="bank_bs_cost" data-fmt="$,.0f">$76,667</span> takes it negative. The balance sheet <em>is</em> the cost — DTV's argument in miniature: the institutions best placed to close the gap find it costs about as much as it pays, most of all across quarter-ends. It is the textbook case of <span class="term soon" data-term="limits to arbitrage" title="Defined in Session 7.1 (coming soon)">limits to arbitrage</span>, which <span class="xref soon" data-xref="7.1" data-style="short" data-auto="" title="Coming soon">Session 7.1</span> develops.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 240" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">ONE PRICE BECOMES A BAND — each trader's costs widen CIP into a no-arbitrage zone (not to scale)</text>
+  <text x="26" y="52" font-size="10" font-weight="700" fill="#D64B2A">INDIVIDUAL</text>
+  <text x="26" y="64" font-size="9" fill="#4A5A68">retail spreads and rates</text>
+  <rect x="236" y="40" width="448" height="26" rx="6" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="26" y="94" font-size="10" font-weight="700" fill="#8A6D00">FUND</text>
+  <text x="26" y="106" font-size="9" fill="#4A5A68">prime-broker spreads and rates</text>
+  <rect x="384" y="82" width="152" height="26" rx="6" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="26" y="136" font-size="10" font-weight="700" fill="#1F7A55">BANK DESK</text>
+  <text x="26" y="148" font-size="9" fill="#4A5A68">green: spreads · dashed: + balance sheet</text>
+  <rect x="388" y="124" width="144" height="26" rx="6" fill="#fff" stroke="#1F7A55" stroke-width="1.5" stroke-dasharray="5 3"/>
+  <rect x="448" y="128" width="24" height="18" rx="4" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <line x1="236" y1="172" x2="684" y2="172" stroke="#1F2C38" stroke-width="1.4"/>
+  <path d="M684 172 H690" stroke="#1F2C38" stroke-width="1.4" marker-end="url(#s3a)"/>
+  <line x1="460" y1="34" x2="460" y2="178" stroke="#1F2C38" stroke-width="1.4"/>
+  <text x="460" y="192" font-size="9.5" font-weight="600" text-anchor="middle" fill="#1F2C38">CIP price at mid rates</text>
+  <line x1="518" y1="34" x2="518" y2="178" stroke="#3A56C5" stroke-width="1.6" stroke-dasharray="4 3"/>
+  <text x="560" y="208" font-size="9.5" font-weight="600" text-anchor="middle" fill="#3A56C5">market forward: inside every band</text>
+  <path d="M540 199 L522 182" stroke="#3A56C5" stroke-width="1.2"/>
+  <text x="236" y="192" font-size="9.5" fill="#4A5A68">forward price F →</text>
+  <text x="360" y="232" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">A deviation is an arbitrage only for a trader whose band it escapes.</text>
+  <defs><marker id="s3a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F2C38"/></marker></defs>
+</svg>
+<figcaption>fig 2.5.3 — the no-arbitrage band: costs turn CIP's single price into a zone that differs by trader; for the bank most of the width is the balance-sheet charge (sketch, not to scale)</figcaption>
+</figure>
+
+<pre><span class="k">def</span> no_arb_band(spot_mid: float, t: dict, i_q: float, i_b: float, tau: float) -&gt; tuple[float, float]:
+    <span class="s">"""Lower and upper forward prices between which no covered loop is profitable for this trader."""</span>
+    s_bid = spot_mid - t[<span class="s">"spot_half"</span>] * PIP[<span class="s">"EURUSD"</span>]
+    s_ask = spot_mid + t[<span class="s">"spot_half"</span>] * PIP[<span class="s">"EURUSD"</span>]
+    bs = t[<span class="s">"balance_sheet"</span>]                                   <span class="c"># borrowing expands the balance sheet</span>
+    upper = s_ask * (<span class="p">1</span> + (i_q + t[<span class="s">"borrow"</span>] + bs) * tau) / (<span class="p">1</span> + (i_b - t[<span class="s">"lend"</span>]) * tau)
+    lower = s_bid * (<span class="p">1</span> + (i_q - t[<span class="s">"lend"</span>]) * tau) / (<span class="p">1</span> + (i_b + t[<span class="s">"borrow"</span>] + bs) * tau)
+    <span class="k">return</span> lower, upper</pre>
+
+<div class="co warn"><span class="co-t">⚠️ Pitfall — "the forward is off CIP, so there is free money"</span>
+<p>A deviation is an <span class="term soon" data-term="arbitrage" title="Defined in Session 7.1 (coming soon)">arbitrage</span> only for someone whose costs sit inside it. Price the loop at <em>your</em> bid, ask, borrowing and lending rates, add what your capital costs, and check the dates: DTV find that a one-month deviation widens exactly when the contract starts to span a quarter-end. The same holds for every "riskless" basis trade, including the crypto ones in <a class="xref" href="session06-crypto-market-structure.html" data-xref="2.6" data-style="short" data-auto="">Session 2.6</a>.</p>
+</div>
+</section>
+
+<section id="s4">
+<h2><span class="no">2.5.4</span> FX carry: a first look</h2>
+<p class="lede">Borrow where money is cheap, hold where it pays: the trade collects the interest gap month after month — until the month the currency falls further than a year of carry.</p>
+
+<p><strong>FX carry</strong> is the interest differential you earn by holding a higher-rate currency funded in a lower-rate one. Under CIP the same position is a forward purchase of the high-rate currency at its forward discount, so the carry <em>is</em> the forward discount: the <a class="term" href="session04-futures.html#g-roll-yield" data-term="roll yield">roll yield</a> of <a class="xref" href="session04-futures.html#s5" data-xref="2.4#s5" data-style="short" data-auto="">Session 2.4</a> in FX clothing. If exchange rates moved to cancel the differential on average, as uncovered parity says, carry would earn nothing. That they do not is the <span class="term soon" data-term="forward premium puzzle" title="Defined in Session 11.5 (coming soon)">forward premium puzzle</span> of <span class="xref soon" data-xref="11.5" data-style="short" data-auto="" title="Coming soon">Session 11.5</span> — the "uncovered interest rate puzzle" that Brunnermeier, Nagel &amp; Pedersen (2008) link to crash risk. The <span class="term soon" data-term="carry trade" title="Defined in Session 8.4 (coming soon)">carry trade</span> and its crash risk are <span class="xref soon" data-xref="8.4" data-style="short" data-auto="" title="Coming soon">Session 8.4</span>'s subject; this is a first look at the shape of its returns.</p>
+
+<p>The lab simulates a stylised carry position — a <span data-lab="carry" data-fmt=".0%">5%</span> interest differential, exchange-rate <a class="term" href="session03-returns-pnl-leverage.html#g-volatility" data-term="volatility">volatility</a> of <span data-lab="sigma_fx" data-fmt=".0%">9%</span> a year, and crashes of about <span data-lab="crash_mean" data-fmt=".0%">−10%</span> that arrive on average once every <span data-lab="crash_every" data-fmt=".0f">5</span> years — over <span data-lab="n_paths" data-fmt=",.0f">10,000</span> paths of <span data-lab="years_c" data-fmt="d">20</span> years, next to a <em>Gaussian twin</em> with the same mean and volatility and no crashes. The returns are already <a class="term" href="session03-returns-pnl-leverage.html#g-excess-return" data-term="excess return">excess returns</a> (you borrow one currency to hold the other), so no risk-free rate is subtracted, and every statistic is asserted against its closed form at <span data-lab="se_tol" data-fmt="d">4</span> standard errors (<span class="term soon" data-term="Monte Carlo simulation" title="Defined in Session 3.5 (coming soon)">Monte Carlo</span>, <span class="xref soon" data-xref="3.5" data-style="short" data-auto="" title="Coming soon">Session 3.5</span>).</p>
+
+<table>
+<thead><tr><th>Monthly excess returns</th><th>Carry with crashes</th><th>Gaussian twin</th></tr></thead>
+<tbody>
+<tr><td><a class="term" href="session03-returns-pnl-leverage.html#g-sharpe-ratio" data-term="Sharpe ratio">Sharpe ratio</a> (annualised)</td><td><span data-lab="carry_sharpe" data-fmt=".2f">0.31</span> (theory <span data-lab="carry_sharpe_theory" data-fmt=".2f">0.31</span>)</td><td><span data-lab="twin_sharpe" data-fmt=".2f">0.31</span></td></tr>
+<tr><td><span class="term soon" data-term="skewness" title="Defined in Session 3.2 (coming soon)">Skewness</span></td><td><span data-lab="carry_skew" data-fmt=".2f">−0.74</span> (theory <span data-lab="carry_skew_theory" data-fmt=".2f">−0.73</span>)</td><td><span data-lab="twin_skew" data-fmt=".2f">0.00</span></td></tr>
+<tr><td>Share of months worse than −3 sd (<span data-lab="tail_thresh" data-fmt=".1%">−8.5%</span>)</td><td><span data-lab="p_tail_mc" data-fmt=".2%">0.95%</span> (theory <span data-lab="p_tail_theory" data-fmt=".2%">0.95%</span>)</td><td><span data-lab="p_tail_twin" data-fmt=".2%">0.13%</span></td></tr>
+<tr><td>Median worst month in <span data-lab="years_c" data-fmt="d">20</span> years</td><td><span data-lab="worst_month_median" data-fmt=".1%">−13.2%</span></td><td><span data-lab="worst_month_twin_median" data-fmt=".1%">−7.8%</span></td></tr>
+</tbody>
+</table>
+
+<figure class="diagram chart">
+<!-- chart:carry_tail -->
+<svg viewBox="0 0 720 280" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Months per century worse than each loss: carry with crashes vs its Gaussian twin">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">MONTHS PER CENTURY WORSE THAN EACH LOSS: CARRY WITH CRASHES VS ITS GAUSSIAN TWIN</text>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#3A56C5" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">carry with crashes</text>
+  <line x1="185.2" y1="32" x2="201.2" y2="32" stroke="#4A5A68" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="207.2" y="36" font-size="11" fill="#4A5A68">Gaussian twin</text>
+  <line x1="64" y1="236" x2="690" y2="236" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="240" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.0</text>
+  <line x1="64" y1="200" x2="690" y2="200" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="204" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">20.0</text>
+  <line x1="64" y1="164" x2="690" y2="164" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="168" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">40.0</text>
+  <line x1="64" y1="128" x2="690" y2="128" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="132" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">60.0</text>
+  <line x1="64" y1="92" x2="690" y2="92" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="96" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">80.0</text>
+  <line x1="64" y1="56" x2="690" y2="56" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="60" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">100.0</text>
+  <line x1="64" y1="236" x2="690" y2="236" stroke="#C9CFC6" stroke-width="1"/>
+  <path d="M117.2,236 V117.2 Q117.2,113.2 121.2,113.2 H137.2 Q141.2,113.2 141.2,117.2 V236 Z" fill="#3A56C5"><title>worse than −4% · carry with crashes: 68.2</title></path>
+  <text x="129.2" y="107.2" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">68.2</text>
+  <path d="M143.2,236 V84.4 Q143.2,80.4 147.2,80.4 H163.2 Q167.2,80.4 167.2,84.4 V236 Z" fill="#4A5A68"><title>worse than −4% · Gaussian twin: 86.4</title></path>
+  <text x="155.2" y="74.4" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">86.4</text>
+  <text x="142.2" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">worse than −4%</text>
+  <path d="M273.8,236 V217.5 Q273.8,213.5 277.8,213.5 H293.8 Q297.8,213.5 297.8,217.5 V236 Z" fill="#3A56C5"><title>worse than −8% · carry with crashes: 12.5</title></path>
+  <text x="285.8" y="207.5" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">12.5</text>
+  <path d="M299.8,236 V233.5 Q299.8,231 302.2,231 H321.3 Q323.8,231 323.8,233.5 V236 Z" fill="#4A5A68"><title>worse than −8% · Gaussian twin: 2.8</title></path>
+  <text x="311.8" y="225" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">2.8</text>
+  <text x="298.8" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">worse than −8%</text>
+  <path d="M430.2,236 V230.7 Q430.2,226.7 434.2,226.7 H450.2 Q454.2,226.7 454.2,230.7 V236 Z" fill="#3A56C5"><title>worse than −12% · carry with crashes: 5.2</title></path>
+  <text x="442.2" y="220.7" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">5.2</text>
+  <path d="M456.2,236 V236 Q456.2,236 456.3,236 H480.2 Q480.2,236 480.2,236 V236 Z" fill="#4A5A68"><title>worse than −12% · Gaussian twin: 0.0</title></path>
+  <text x="468.2" y="230" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.0</text>
+  <text x="455.2" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">worse than −12%</text>
+  <path d="M586.8,236 V235 Q586.8,234 587.8,234 H609.7 Q610.8,234 610.8,235 V236 Z" fill="#3A56C5"><title>worse than −16% · carry with crashes: 1.1</title></path>
+  <text x="598.8" y="228" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">1.1</text>
+  <path d="M612.8,236 V236 Q612.8,236 612.8,236 H636.7 Q636.8,236 636.8,236 V236 Z" fill="#4A5A68"><title>worse than −16% · Gaussian twin: 0.0</title></path>
+  <text x="624.8" y="230" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.0</text>
+  <text x="611.8" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">worse than −16%</text>
+</svg>
+<!-- /chart:carry_tail -->
+<figcaption>fig 2.5.4 — months per century worse than each loss: mild losing months are no more common with crashes (<span data-lab="century_4" data-fmt=".0f">68</span> against the twin's <span data-lab="century_4_twin" data-fmt=".0f">86</span> worse than −4%), but months worse than −12% arrive <span data-lab="century_12" data-fmt=".1f">5.2</span> times a century against <span data-lab="century_12_twin" data-fmt=".2f">0.02</span></figcaption>
+</figure>
+
+<p>Same Sharpe ratio, very different danger: the crash model has <em>fewer</em> mildly bad months than its twin and far more severe ones (fig 2.5.4) — a difference that volatility and the Sharpe ratio cannot see but skewness (<span class="xref soon" data-xref="3.2" data-style="short" data-auto="" title="Coming soon">Session 3.2</span>) can. A short track record hides it. A window of <math><semantics><mi>Y</mi><annotation encoding="application/x-tex">Y</annotation></semantics></math> years contains no crash with probability <math><semantics><msup><mi>e</mi><mrow class="tml-sml-pad"><mo form="prefix" stretchy="false" lspace="0em" rspace="0em">−</mo><mi>λ</mi><mi>Y</mi></mrow></msup><annotation encoding="application/x-tex">e^{-\lambda Y}</annotation></semantics></math>, where <math><semantics><mi>λ</mi><annotation encoding="application/x-tex">\lambda</annotation></semantics></math> is the crash rate (a rate here, not Kyle's lambda). For <math><semantics><mi>Y</mi><annotation encoding="application/x-tex">Y</annotation></semantics></math> = <span data-lab="window_y" data-fmt="d">5</span> that is <span data-lab="p_calm_5y_theory" data-fmt=".1%">36.8%</span> (simulated: <span data-lab="p_calm_5y" data-fmt=".1%">36.5%</span>), and in those calm windows the Sharpe ratio is <span data-lab="calm_sharpe" data-fmt=".2f">0.56</span> (theory <span data-lab="calm_sharpe_theory" data-fmt=".2f">0.55</span>), nearly double the true <span data-lab="carry_sharpe" data-fmt=".2f">0.31</span>.</p>
+
+<div class="co warn"><span class="co-t">⚠️ Pitfall — "the currency pays more interest, so I earn the difference"</span>
+<p>The interest is certain; the exchange rate is not, and its losses arrive in lumps. Judge carry by its skewness and worst months rather than a calm-window Sharpe ratio, and size it for the crash you have not yet seen (<a class="term" href="session03-returns-pnl-leverage.html#g-leverage" data-term="leverage">leverage</a>, <a class="xref" href="session03-returns-pnl-leverage.html#s6" data-xref="2.3#s6" data-style="short" data-auto="">Session 2.3</a>). <span class="xref soon" data-xref="8.4" data-style="short" data-auto="" title="Coming soon">Session 8.4</span> returns to carry and its crash risk across asset classes.</p>
+</div>
+</section>
+
+<section id="s5">
+<h2><span class="no">2.5.5</span> Storage &amp; convenience yield</h2>
+<p class="lede">A barrel of oil pays no interest and costs money to keep. So why does anyone hold one when a <a class="term" href="session04-futures.html#g-futures-contract" data-term="futures contract">futures contract</a> would do — and why does the answer bend the whole curve?</p>
+
+<p>Commodities trade in two linked markets: a <em>physical</em> one that moves actual barrels, bushels and cargoes, where grade, location and delivery window matter, and a <em>financial</em> one of standardised futures and swaps, mostly closed or rolled before delivery. Delivery ties the two together — an expiring contract must converge to the physical price at its delivery point (<a class="xref" href="session04-futures.html#s3" data-xref="2.4#s3" data-style="short" data-auto="">Session 2.4</a>) — and storage ties today's physical to every later contract.</p>
+
+<p>The first link is the <strong>storage cost</strong>: tank or warehouse rent, insurance and losses, written <math><semantics><mi>u</mi><annotation encoding="application/x-tex">u</annotation></semantics></math> as a fraction of spot per year or <math><semantics><mi>U</mi><annotation encoding="application/x-tex">U</annotation></semantics></math> in dollars per unit per year. It caps <a class="term" href="session04-futures.html#g-contango" data-term="contango">contango</a>: if a later contract traded above full carry, you would buy spot, store it and deliver — the cash-and-carry of <a class="xref" href="session04-futures.html#s2" data-xref="2.4#s2" data-style="short" data-auto="">Session 2.4</a> — so</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><mi>F</mi><mo>≤</mo><mi>S</mi><mspace width="0.1667em"></mspace><msup><mi>e</mi><mrow class="tml-sml-pad"><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><msub><mi>r</mi><mi>f</mi></msub><mo>+</mo><mi>u</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mi>τ</mi></mrow></msup></mrow><annotation encoding="application/x-tex">F \le S\,e^{(r_f + u)\tau}</annotation></semantics></math></div>
+<p>The second link is the <strong>convenience yield</strong> <math><semantics><mi>y</mi><annotation encoding="application/x-tex">y</annotation></semantics></math>: the benefit of holding the physical rather than a claim on it — a refinery that does not stop, a surprise order you can fill, a shortage you are not caught in. Nobody pays it in cash; you read it off prices:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><mi>y</mi><mo>=</mo><msub><mi>r</mi><mi>f</mi></msub><mo>+</mo><mi>u</mi><mo>−</mo><mfrac><mn>1</mn><mi>τ</mi></mfrac><mspace width="0.1667em"></mspace><mrow><mspace width="0.1667em"></mspace><mi>ln</mi><mo>⁡</mo><mspace width="0.1667em"></mspace></mrow><mfrac><mi>F</mi><mi>S</mi></mfrac></mrow><annotation encoding="application/x-tex">y = r_f + u - \frac{1}{\tau}\,\ln\frac{F}{S}</annotation></semantics></math></div>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">WHY HOLD THE PHYSICAL? — costs against the convenience of having it</text>
+  <rect x="26" y="34" width="200" height="104" rx="9" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="126" y="54" font-size="11" font-weight="600" text-anchor="middle" fill="#8A6D00">COSTS OF HOLDING</text>
+  <rect x="38" y="64" width="176" height="30" rx="6" fill="#fff" stroke="#EAD98A"/>
+  <text x="126" y="77" font-size="9.5" font-weight="600" text-anchor="middle" fill="#1F2C38">financing r_f</text>
+  <text x="126" y="89" font-size="9" text-anchor="middle" fill="#4A5A68">cash tied up in the barrel</text>
+  <rect x="38" y="100" width="176" height="30" rx="6" fill="#fff" stroke="#EAD98A"/>
+  <text x="126" y="113" font-size="9.5" font-weight="600" text-anchor="middle" fill="#1F2C38">storage u</text>
+  <text x="126" y="125" font-size="9" text-anchor="middle" fill="#4A5A68">tanks, insurance, losses</text>
+  <rect x="236" y="34" width="200" height="104" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="336" y="54" font-size="11" font-weight="600" text-anchor="middle" fill="#1F7A55">BENEFIT OF HOLDING</text>
+  <rect x="248" y="64" width="176" height="66" rx="6" fill="#fff" stroke="#BFE0CF"/>
+  <text x="336" y="80" font-size="9.5" font-weight="600" text-anchor="middle" fill="#1F2C38">convenience yield y</text>
+  <text x="336" y="95" font-size="9" text-anchor="middle" fill="#4A5A68">keep the plant running,</text>
+  <text x="336" y="108" font-size="9" text-anchor="middle" fill="#4A5A68">fill a surprise order,</text>
+  <text x="336" y="121" font-size="9" text-anchor="middle" fill="#4A5A68">never be caught short</text>
+  <path d="M126 140 V156 H216" fill="none" stroke="#1F2C38" stroke-width="1.5" marker-end="url(#s5a)"/>
+  <path d="M336 140 V156 H246" fill="none" stroke="#1F2C38" stroke-width="1.5" marker-end="url(#s5a)"/>
+  <rect x="136" y="160" width="200" height="30" rx="7" fill="#fff" stroke="#1F2C38" stroke-width="1.5"/>
+  <text x="236" y="180" font-size="10.5" font-weight="700" text-anchor="middle" fill="#1F2C38" font-family="IBM Plex Mono,monospace">net carry c = r_f + u − y</text>
+  <path d="M190 192 L140 212" stroke="#1F2C38" stroke-width="1.5" marker-end="url(#s5a)"/>
+  <path d="M282 192 L332 212" stroke="#1F2C38" stroke-width="1.5" marker-end="url(#s5a)"/>
+  <rect x="26" y="216" width="200" height="62" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="126" y="235" font-size="10.5" font-weight="700" text-anchor="middle" fill="#3A56C5">c &gt; 0 · CONTANGO</text>
+  <text x="126" y="251" font-size="9" text-anchor="middle" fill="#4A5A68">ample stocks; capped at full carry</text>
+  <text x="126" y="264" font-size="9" text-anchor="middle" fill="#4A5A68">(buy spot, store, sell forward)</text>
+  <rect x="236" y="216" width="200" height="62" rx="9" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="336" y="235" font-size="10.5" font-weight="700" text-anchor="middle" fill="#D64B2A">c &lt; 0 · BACKWARDATION</text>
+  <text x="336" y="251" font-size="9" text-anchor="middle" fill="#4A5A68">scarce stocks; no floor: nobody</text>
+  <text x="336" y="264" font-size="9" text-anchor="middle" fill="#4A5A68">lends you a barrel to sell</text>
+  <rect x="462" y="34" width="232" height="244" rx="10" fill="#fff" stroke="#C9CFC6" stroke-width="1.5"/>
+  <text x="476" y="54" font-size="10.5" font-weight="700" fill="#1F2C38">THE WORKING CURVE</text>
+  <text x="476" y="68" font-size="9" fill="#4A5A68">price of storage (later − nearer)</text>
+  <text x="476" y="80" font-size="9" fill="#4A5A68">against inventories</text>
+  <line x1="494" y1="92" x2="494" y2="252" stroke="#4A5A68" stroke-width="1.2"/>
+  <line x1="494" y1="186" x2="682" y2="186" stroke="#4A5A68" stroke-width="1.2"/>
+  <text x="488" y="190" font-size="9" text-anchor="end" fill="#4A5A68">0</text>
+  <line x1="494" y1="112" x2="682" y2="112" stroke="#9AA6AF" stroke-width="1.2" stroke-dasharray="4 3"/>
+  <text x="682" y="106" font-size="9" text-anchor="end" fill="#4A5A68">full carry r_f + u</text>
+  <path d="M504 250 C520 210 538 186 560 170 C590 146 630 128 680 120" fill="none" stroke="#3A56C5" stroke-width="2.2"/>
+  <text x="600" y="162" font-size="9" fill="#3A56C5">contango, capped</text>
+  <text x="520" y="232" font-size="9" fill="#D64B2A">backwardation,</text>
+  <text x="520" y="244" font-size="9" fill="#D64B2A">no floor</text>
+  <text x="588" y="268" font-size="9" text-anchor="middle" fill="#4A5A68">inventories →</text>
+  <text x="360" y="294" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">Storage caps how steep contango can get; nothing caps backwardation.</text>
+  <defs><marker id="s5a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F2C38"/></marker></defs>
+</svg>
+<figcaption>fig 2.5.5 — storage cost against convenience yield: their balance sets the sign of net carry, and Working's curve shows why contango has a ceiling and backwardation has no floor</figcaption>
+</figure>
+
+<p>This is the <em>theory of storage</em>. Kaldor (1939) introduced the convenience yield. Working (1949) turned it into a "price of storage": when stocks are ample, the later contract sits above the nearer one by about the cost of storage; when they are scarce, the spread goes negative. Brennan (1958) cast it as a supply of storage: firms hold inventory until the spread between later and earlier prices equals the marginal cost of storage net of the convenience yield, plus a risk premium. So the price of storage traces a curve against inventories, capped above at full carry and unbounded below, because reversing cash-and-carry needs someone to lend you a scarce barrel to sell. The evidence fits: Fama &amp; French (1987) find the <a class="term" href="session04-futures.html#g-basis" data-term="basis">basis</a> varies with interest rates and with seasonals in convenience yields, and Gorton, Hayashi &amp; Rouwenhorst (2013), using 31 commodity futures from 1971 to 2010, find the convenience yield is a decreasing, nonlinear function of inventories.</p>
+
+<p>The lab turns that finding into a model: convenience yield falls exponentially with inventory <math><semantics><mi>I</mi><annotation encoding="application/x-tex">I</annotation></semantics></math> (1 = normal), <math><semantics><mrow><mi>y</mi><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>I</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mo>=</mo><msub><mi>y</mi><mrow><mi>max</mi><mo>⁡</mo></mrow></msub><mspace width="0.1667em"></mspace><msup><mi>e</mi><mrow class="tml-sml-pad"><mo form="prefix" stretchy="false" lspace="0em" rspace="0em">−</mo><mi>I</mi><mi>/</mi><msub><mi>I</mi><mn>0</mn></msub></mrow></msup></mrow><annotation encoding="application/x-tex">y(I) = y_{\max}\,e^{-I/I_0}</annotation></semantics></math>, and inventories are expected to drift back to normal with a half-life of <span data-lab="st_half_life" data-fmt=".2f">0.75</span> years. Financing is <span data-lab="st_rf" data-fmt=".0%">4%</span> and storage <span data-lab="st_u" data-fmt=".0%">5%</span>, the same as the crude-oil rows of <a class="xref" href="session04-futures.html#s2" data-xref="2.4#s2" data-style="short" data-auto="">Session 2.4</a>, so full carry is <span data-lab="full_carry" data-fmt=".0%">9%</span>. Each futures price integrates the net carry along the expected inventory path, <math><semantics><mrow><mi>F</mi><mo form="prefix" stretchy="false">(</mo><mi>τ</mi><mo form="postfix" stretchy="false">)</mo><mo>=</mo><mi>S</mi><mrow><mspace width="0.1667em"></mspace><mi>exp</mi><mo>⁡</mo><mspace width="0.1667em"></mspace></mrow><mrow style="margin-left:-0.1667em;"></mrow><mo fence="false" symmetric="true" minsize="1.2em" maxsize="1.2em">(</mo><msubsup><mo movablelimits="false">∫</mo><mn>0</mn><mi>τ</mi></msubsup><mo form="prefix" stretchy="false">[</mo><mspace width="0.1667em"></mspace><msub><mi>r</mi><mi>f</mi></msub><mo>+</mo><mi>u</mi><mo>−</mo><mi>y</mi><mo form="prefix" stretchy="false">(</mo><msub><mi>I</mi><mi>s</mi></msub><mo form="postfix" stretchy="false">)</mo><mspace width="0.1667em"></mspace><mo form="postfix" stretchy="false">]</mo><mspace width="0.1667em"></mspace><mi>d</mi><mi>s</mi><mo fence="false" symmetric="true" minsize="1.2em" maxsize="1.2em">)</mo></mrow><annotation encoding="application/x-tex">F(\tau) = S\exp\!\big(\int_0^\tau [\,r_f + u - y(I_s)\,]\,ds\big)</annotation></semantics></math>:</p>
+
+<pre><span class="k">def</span> convenience_yield(inv: float) -&gt; float:
+    <span class="s">"""Convenience yield per year as a function of inventory relative to normal (Working-curve shape)."""</span>
+    <span class="k">return</span> Y_MAX * np.exp(-inv / I_SCALE)</pre>
+
+<ul>
+<li><strong>Glut</strong> (inventories <span data-lab="st_glut_inv" data-fmt=".1f">1.8</span>× normal): <math><semantics><mi>y</mi><annotation encoding="application/x-tex">y</annotation></semantics></math> = <span data-lab="st_glut_y0" data-fmt=".1%">0.4%</span>, and the front of the curve rises at <span data-lab="st_glut_slope_1m" data-fmt="+.1%">+8.6%</span> a year — nearly full carry.</li>
+<li><strong>Normal</strong>: <math><semantics><mi>y</mi><annotation encoding="application/x-tex">y</annotation></semantics></math> = <span data-lab="st_normal_y0" data-fmt=".1%">3.4%</span>; a steady contango of <span data-lab="st_normal_slope_1m" data-fmt="+.1%">+5.6%</span> a year.</li>
+<li><strong>Scarce</strong> (<span data-lab="st_scarce_inv" data-fmt=".1f">0.3</span>× normal): <math><semantics><mi>y</mi><annotation encoding="application/x-tex">y</annotation></semantics></math> = <span data-lab="st_scarce_y0" data-fmt=".1%">25.5%</span>, and the front falls at <span data-lab="st_scarce_slope_1m" data-fmt="+.1%">−14.6%</span> a year; the curve bottoms at month <span data-lab="st_scarce_bottom_month" data-fmt="d">10</span> and turns up as inventories are expected to recover.</li>
+</ul>
+
+<figure class="diagram chart">
+<!-- chart:storage_curves -->
+<svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Storage model: futures premium over spot by months to expiry, three inventory states">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">STORAGE MODEL: FUTURES PREMIUM OVER SPOT BY MONTHS TO EXPIRY, THREE INVENTORY STATES</text>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#4A5A68" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">full-carry ceiling</text>
+  <line x1="185.2" y1="32" x2="201.2" y2="32" stroke="#3F8E5A" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="207.2" y="36" font-size="11" fill="#4A5A68">glut</text>
+  <line x1="254.79999999999998" y1="32" x2="270.79999999999995" y2="32" stroke="#3A56C5" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="276.79999999999995" y="36" font-size="11" fill="#4A5A68">normal</text>
+  <line x1="337.2" y1="32" x2="353.2" y2="32" stroke="#E8850C" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="359.2" y="36" font-size="11" fill="#4A5A68">scarce</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="268" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">−10%</text>
+  <line x1="64" y1="221.6" x2="602" y2="221.6" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="225.6" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0%</text>
+  <line x1="64" y1="179.2" x2="602" y2="179.2" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="183.2" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">10%</text>
+  <line x1="64" y1="136.8" x2="602" y2="136.8" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="140.8" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">20%</text>
+  <line x1="64" y1="94.4" x2="602" y2="94.4" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="98.4" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">30%</text>
+  <line x1="64" y1="52" x2="602" y2="52" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="56" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">40%</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#C9CFC6" stroke-width="1"/>
+  <line x1="64" y1="264" x2="64" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="64" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">0</text>
+  <line x1="213.4" y1="264" x2="213.4" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="213.4" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">10</text>
+  <line x1="362.9" y1="264" x2="362.9" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="362.9" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">20</text>
+  <line x1="512.3" y1="264" x2="512.3" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="512.3" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">30</text>
+  <line x1="64" y1="221.6" x2="602" y2="221.6" stroke="#4A5A68" stroke-width="1"/>
+  <polyline points="64,221.6 78.9,218.4 93.9,215.2 108.8,212 123.8,208.7 138.7,205.4 153.7,202.1 168.6,198.7 183.6,195.4 198.5,192 213.4,188.6 228.4,185.1 243.3,181.7 258.3,178.2 273.2,174.7 288.2,171.1 303.1,167.5 318.1,163.9 333,160.3 347.9,156.7 362.9,153 377.8,149.3 392.8,145.5 407.7,141.8 422.7,138 437.6,134.2 452.6,130.3 467.5,126.4 482.4,122.5 497.4,118.6 512.3,114.6 527.3,110.6 542.2,106.6 557.2,102.5 572.1,98.4 587.1,94.3 602,90.2" fill="none" stroke="#4A5A68" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><title>full-carry ceiling</title></polyline>
+  <circle cx="602" cy="90.2" r="4" fill="#4A5A68" stroke="#FBFBF8" stroke-width="2"><title>full-carry ceiling: 31%</title></circle>
+  <polyline points="64,221.6 78.9,218.5 93.9,215.5 108.8,212.4 123.8,209.4 138.7,206.4 153.7,203.3 168.6,200.3 183.6,197.3 198.5,194.4 213.4,191.4 228.4,188.5 243.3,185.5 258.3,182.6 273.2,179.7 288.2,176.9 303.1,174 318.1,171.2 333,168.4 347.9,165.6 362.9,162.8 377.8,160 392.8,157.3 407.7,154.5 422.7,151.8 437.6,149.1 452.6,146.4 467.5,143.7 482.4,141.1 497.4,138.4 512.3,135.7 527.3,133.1 542.2,130.4 557.2,127.8 572.1,125.1 587.1,122.5 602,119.9" fill="none" stroke="#3F8E5A" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>glut</title></polyline>
+  <circle cx="602" cy="119.9" r="4" fill="#3F8E5A" stroke="#FBFBF8" stroke-width="2"><title>glut: 24%</title></circle>
+  <polyline points="64,221.6 78.9,219.6 93.9,217.7 108.8,215.7 123.8,213.7 138.7,211.7 153.7,209.7 168.6,207.6 183.6,205.6 198.5,203.6 213.4,201.5 228.4,199.5 243.3,197.4 258.3,195.3 273.2,193.2 288.2,191.1 303.1,189 318.1,186.9 333,184.8 347.9,182.6 362.9,180.5 377.8,178.3 392.8,176.2 407.7,174 422.7,171.8 437.6,169.6 452.6,167.4 467.5,165.2 482.4,162.9 497.4,160.7 512.3,158.4 527.3,156.2 542.2,153.9 557.2,151.6 572.1,149.3 587.1,147 602,144.7" fill="none" stroke="#3A56C5" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>normal</title></polyline>
+  <circle cx="602" cy="144.7" r="4" fill="#3A56C5" stroke="#FBFBF8" stroke-width="2"><title>normal: 18%</title></circle>
+  <polyline points="64,221.6 78.9,226.7 93.9,230.7 108.8,233.8 123.8,236.2 138.7,237.9 153.7,239.2 168.6,240.1 183.6,240.6 198.5,240.9 213.4,240.9 228.4,240.7 243.3,240.3 258.3,239.8 273.2,239.1 288.2,238.3 303.1,237.4 318.1,236.4 333,235.3 347.9,234.1 362.9,232.9 377.8,231.6 392.8,230.2 407.7,228.8 422.7,227.3 437.6,225.8 452.6,224.2 467.5,222.6 482.4,221 497.4,219.3 512.3,217.6 527.3,215.9 542.2,214.2 557.2,212.4 572.1,210.6 587.1,208.8 602,206.9" fill="none" stroke="#E8850C" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>scarce</title></polyline>
+  <circle cx="602" cy="206.9" r="4" fill="#E8850C" stroke="#FBFBF8" stroke-width="2"><title>scarce: 3%</title></circle>
+  <text x="614" y="94.2" font-size="11" fill="#1F2C38">ceiling: 31%</text>
+  <text x="614" y="123.9" font-size="11" fill="#1F2C38">glut: 24%</text>
+  <text x="614" y="148.7" font-size="11" fill="#1F2C38">normal: 18%</text>
+  <text x="614" y="210.9" font-size="11" fill="#1F2C38">scarce: 3%</text>
+</svg>
+<!-- /chart:storage_curves -->
+<figcaption>fig 2.5.6 — the storage model's futures curves (premium over spot by months to expiry): a glut hugs the full-carry ceiling, scarcity inverts the front and the curve recovers as inventories are expected to rebuild</figcaption>
+</figure>
+
+<p>The front inverts once inventories fall below about <span data-lab="inv_star" data-fmt=".2f">0.66</span> of normal, where <math><semantics><mrow><mi>y</mi><mo>=</mo><msub><mi>r</mi><mi>f</mi></msub><mo>+</mo><mi>u</mi></mrow><annotation encoding="application/x-tex">y = r_f + u</annotation></semantics></math> (the one-month spread crosses zero at a slightly lower level, <span data-lab="spread_root_inv" data-fmt=".2f">0.65</span>, because inventories recover a little within the month). <a class="xref" href="session04-futures.html#s2" data-xref="2.4#s2" data-style="short" data-auto="">Session 2.4</a>'s two crude examples, a <span data-lab="y_glut24" data-fmt=".0%">1%</span> and a <span data-lab="y_tight24" data-fmt=".0%">21%</span> convenience yield, are two points on this curve, at inventories of <span data-lab="inv_glut24" data-fmt=".2f">1.43</span> and <span data-lab="inv_tight24" data-fmt=".2f">0.37</span> of normal. Plot the front spread against inventory and you get Working's curve (fig 2.5.7).</p>
+
+<figure class="diagram chart">
+<!-- chart:supply_of_storage -->
+<svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Price of storage vs inventory (1 = normal): annualised 1-month spread, storage model">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">PRICE OF STORAGE VS INVENTORY (1 = NORMAL): ANNUALISED 1-MONTH SPREAD, STORAGE MODEL</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="268" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">−40%</text>
+  <line x1="64" y1="219.2" x2="602" y2="219.2" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="223.2" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">−30%</text>
+  <line x1="64" y1="174.4" x2="602" y2="174.4" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="178.4" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">−20%</text>
+  <line x1="64" y1="129.6" x2="602" y2="129.6" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="133.6" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">−10%</text>
+  <line x1="64" y1="84.8" x2="602" y2="84.8" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="88.8" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0%</text>
+  <line x1="64" y1="40" x2="602" y2="40" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="44" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">10%</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#C9CFC6" stroke-width="1"/>
+  <line x1="153.7" y1="264" x2="153.7" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="153.7" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">0.5</text>
+  <line x1="265.8" y1="264" x2="265.8" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="265.8" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">1</text>
+  <line x1="377.8" y1="264" x2="377.8" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="377.8" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">1.5</text>
+  <line x1="489.9" y1="264" x2="489.9" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="489.9" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">2</text>
+  <line x1="602" y1="264" x2="602" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="602" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">2.5</text>
+  <line x1="64" y1="44.5" x2="602" y2="44.5" stroke="#4A5A68" stroke-width="1"/>
+  <text x="68" y="39.5" font-size="10.5" fill="#4A5A68">full carry (r_f + u)</text>
+  <polyline points="64,228.2 69.6,216 75.2,204.5 80.8,193.9 86.4,184 92,174.7 97.6,166 103.2,157.9 108.8,150.4 114.4,143.4 120,136.8 125.6,130.6 131.2,124.9 136.9,119.6 142.5,114.6 148.1,109.9 153.7,105.6 159.3,101.5 164.9,97.7 170.5,94.2 176.1,90.9 181.7,87.8 187.3,84.9 192.9,82.2 198.5,79.7 204.1,77.4 209.7,75.2 215.3,73.1 220.9,71.2 226.5,69.5 232.1,67.8 237.7,66.3 243.3,64.8 248.9,63.5 254.5,62.2 260.1,61 265.8,59.9 271.4,58.9 277,57.9 282.6,57 288.2,56.2 293.8,55.4 299.4,54.7 305,54 310.6,53.4 316.2,52.8 321.8,52.2 327.4,51.7 333,51.2 338.6,50.8 344.2,50.4 349.8,50 355.4,49.6 361,49.3 366.6,49 372.2,48.7 377.8,48.4 383.4,48.1 389,47.9 394.6,47.7 400.2,47.4 405.9,47.3 411.5,47.1 417.1,46.9 422.7,46.7 428.3,46.6 433.9,46.4 439.5,46.3 445.1,46.2 450.7,46.1 456.3,46 461.9,45.9 467.5,45.8 473.1,45.7 478.7,45.6 484.3,45.5 489.9,45.5 495.5,45.4 501.1,45.3 506.7,45.3 512.3,45.2 517.9,45.2 523.5,45.1 529.1,45.1 534.8,45.1 540.4,45 546,45 551.6,44.9 557.2,44.9 562.8,44.9 568.4,44.9 574,44.8 579.6,44.8 585.2,44.8 590.8,44.8 596.4,44.7 602,44.7" fill="none" stroke="#3A56C5" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>1-month calendar spread</title></polyline>
+</svg>
+<!-- /chart:supply_of_storage -->
+<figcaption>fig 2.5.7 — the price of storage against inventories in the storage model: it approaches full carry when stocks are ample and falls steeply as they run short (the model's exponential bounds it; the real curve has no floor)</figcaption>
+</figure>
+
+<p>Connect this to <a class="xref" href="session04-futures.html#s5" data-xref="2.4#s5" data-style="short" data-auto="">Session 2.4</a>: a long front-month position's roll yield is minus the front spread, <span data-lab="st_scarce_roll_1m" data-fmt="+.1%">+14.6%</span> a year when stocks are scarce and <span data-lab="st_glut_roll_1m" data-fmt="+.1%">−8.6%</span> in a glut. It becomes return only if spot does not move to meet the curve — and scarcity is exactly when spot is high and apt to fall. Gorton, Hayashi and Rouwenhorst find futures <a class="term" href="../unit01-quant-landscape/session02-where-returns-come-from.html#g-risk-premium" data-term="risk premium">risk premiums</a> vary with inventories, so inventory data matter to anyone trading commodity carry.</p>
+
+<div class="co key"><span class="co-t">📌 Key idea — inventories set the slope</span>
+<p>Ample stocks mean contango, capped at full carry by cash-and-carry; scarce stocks mean <a class="term" href="session04-futures.html#g-backwardation" data-term="backwardation">backwardation</a>, with no floor because nobody lends the physical. <mark>A commodity futures curve is a picture of inventories.</mark></p>
+</div>
+</section>
+
+<section id="s6">
+<h2><span class="no">2.5.6</span> Commodity curves: shapes &amp; seasons</h2>
+<p class="lede">Every commodity's curve is the theory of storage run through its own physics: how cheaply it stores, how steadily it is produced and how seasonally it is used.</p>
+
+<p>The <strong>commodity term structure</strong> is the curve of one commodity's futures prices across <a class="term" href="session04-futures.html#g-expiry" data-term="expiry">expiries</a>. Its slope is net carry — financing plus storage minus convenience yield — so it inherits every physical fact about the commodity. Fig 2.5.8 sketches the families.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 262" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">SHAPES BY STORABILITY — typical curves, sketched (price by months to expiry; dashed = spot; not data)</text>
+  <rect x="26" y="32" width="128" height="200" rx="9" fill="#fff" stroke="#C9CFC6" stroke-width="1.5"/>
+  <text x="90" y="50" font-size="10" font-weight="700" text-anchor="middle" fill="#1F2C38">PRECIOUS</text>
+  <text x="90" y="63" font-size="10" font-weight="700" text-anchor="middle" fill="#1F2C38">METALS</text>
+  <line x1="36" y1="118" x2="144" y2="118" stroke="#9AA6AF" stroke-width="1.2" stroke-dasharray="4 3"/>
+  <path d="M36 118 L144 96" fill="none" stroke="#3A56C5" stroke-width="2.2"/>
+  <text x="90" y="160" font-size="9" text-anchor="middle" fill="#4A5A68">gentle contango near</text>
+  <text x="90" y="173" font-size="9" text-anchor="middle" fill="#4A5A68">full carry: stocks are</text>
+  <text x="90" y="186" font-size="9" text-anchor="middle" fill="#4A5A68">huge next to use, and</text>
+  <text x="90" y="199" font-size="9" text-anchor="middle" fill="#4A5A68">storage is cheap</text>
+  <rect x="162" y="32" width="128" height="200" rx="9" fill="#fff" stroke="#C9CFC6" stroke-width="1.5"/>
+  <text x="226" y="50" font-size="10" font-weight="700" text-anchor="middle" fill="#1F2C38">CRUDE OIL,</text>
+  <text x="226" y="63" font-size="10" font-weight="700" text-anchor="middle" fill="#1F2C38">BASE METALS</text>
+  <line x1="172" y1="118" x2="280" y2="118" stroke="#9AA6AF" stroke-width="1.2" stroke-dasharray="4 3"/>
+  <path d="M172 118 Q226 110 280 94" fill="none" stroke="#E8850C" stroke-width="2.2"/>
+  <path d="M172 118 Q210 138 280 144" fill="none" stroke="#3F8E5A" stroke-width="2.2"/>
+  <text x="226" y="160" font-size="9" text-anchor="middle" fill="#4A5A68">flips with inventories:</text>
+  <text x="226" y="173" font-size="9" text-anchor="middle" fill="#4A5A68">contango in a glut</text>
+  <text x="226" y="186" font-size="9" text-anchor="middle" fill="#4A5A68">(orange), backwardation</text>
+  <text x="226" y="199" font-size="9" text-anchor="middle" fill="#4A5A68">in a shortage (green)</text>
+  <rect x="298" y="32" width="128" height="200" rx="9" fill="#fff" stroke="#C9CFC6" stroke-width="1.5"/>
+  <text x="362" y="50" font-size="10" font-weight="700" text-anchor="middle" fill="#1F2C38">NATURAL</text>
+  <text x="362" y="63" font-size="10" font-weight="700" text-anchor="middle" fill="#1F2C38">GAS</text>
+  <line x1="308" y1="118" x2="416" y2="118" stroke="#9AA6AF" stroke-width="1.2" stroke-dasharray="4 3"/>
+  <path d="M308 120 C320 120 326 86 338 86 C350 86 356 122 365 122 C374 122 380 86 392 86 C404 86 408 116 416 118" fill="none" stroke="#3A56C5" stroke-width="2.2"/>
+  <text x="362" y="160" font-size="9" text-anchor="middle" fill="#4A5A68">winter humps: storage</text>
+  <text x="362" y="173" font-size="9" text-anchor="middle" fill="#4A5A68">caps the climb into</text>
+  <text x="362" y="186" font-size="9" text-anchor="middle" fill="#4A5A68">winter, not the fall</text>
+  <text x="362" y="199" font-size="9" text-anchor="middle" fill="#4A5A68">after it</text>
+  <rect x="434" y="32" width="128" height="200" rx="9" fill="#fff" stroke="#C9CFC6" stroke-width="1.5"/>
+  <text x="498" y="50" font-size="10" font-weight="700" text-anchor="middle" fill="#1F2C38">GRAINS</text>
+  <text x="498" y="63" font-size="10" font-weight="700" text-anchor="middle" fill="#1F2C38">(CORN, WHEAT)</text>
+  <line x1="444" y1="118" x2="552" y2="118" stroke="#9AA6AF" stroke-width="1.2" stroke-dasharray="4 3"/>
+  <path d="M444 118 L494 102 L497 128 L552 112" fill="none" stroke="#3A56C5" stroke-width="2.2"/>
+  <text x="498" y="160" font-size="9" text-anchor="middle" fill="#4A5A68">carry within a crop</text>
+  <text x="498" y="173" font-size="9" text-anchor="middle" fill="#4A5A68">year, then a drop at</text>
+  <text x="498" y="186" font-size="9" text-anchor="middle" fill="#4A5A68">the new-crop harvest</text>
+  <rect x="570" y="32" width="128" height="200" rx="9" fill="#fff" stroke="#C9CFC6" stroke-width="1.5"/>
+  <text x="634" y="50" font-size="10" font-weight="700" text-anchor="middle" fill="#1F2C38">POWER &amp;</text>
+  <text x="634" y="63" font-size="10" font-weight="700" text-anchor="middle" fill="#1F2C38">LIVESTOCK</text>
+  <line x1="580" y1="118" x2="688" y2="118" stroke="#9AA6AF" stroke-width="1.2" stroke-dasharray="4 3"/>
+  <polyline points="580,110 592,94 604,124 616,98 628,130 640,92 652,118 664,100 676,134 688,104" fill="none" stroke="#3A56C5" stroke-width="2.2"/>
+  <text x="634" y="160" font-size="9" text-anchor="middle" fill="#4A5A68">barely storable: each</text>
+  <text x="634" y="173" font-size="9" text-anchor="middle" fill="#4A5A68">contract is its own</text>
+  <text x="634" y="186" font-size="9" text-anchor="middle" fill="#4A5A68">forecast, with no</text>
+  <text x="634" y="199" font-size="9" text-anchor="middle" fill="#4A5A68">carry link to spot</text>
+  <text x="360" y="254" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">The cheaper and steadier the storage, the closer the curve sits to full carry.</text>
+</svg>
+<figcaption>fig 2.5.8 — typical term-structure shapes by commodity family, sketched: storability decides how tightly cash-and-carry ties the curve to spot</figcaption>
+</figure>
+
+<table>
+<thead><tr><th>Family</th><th>Storable?</th><th>Typical curve</th><th>Why</th></tr></thead>
+<tbody>
+<tr><td>Precious metals</td><td>cheaply, for years</td><td>close to full carry</td><td>large stocks relative to use make shortages rare, so the convenience yield stays small</td></tr>
+<tr><td>Crude oil, base metals</td><td>yes, at a real cost</td><td>switches between contango and backwardation</td><td>inventories swing between glut and shortage (§2.5.5)</td></tr>
+<tr><td>Natural gas</td><td>yes, but capacity is limited and costly</td><td>seasonal, with a winter premium</td><td>burned mostly in winter, produced all year</td></tr>
+<tr><td>Grains</td><td>within a crop year</td><td>carry within a season, a break at the new harvest</td><td>supply arrives once a year</td></tr>
+<tr><td>Electricity, livestock</td><td>power barely; animals not for long</td><td>each expiry priced on its own</td><td>no cash-and-carry link between dates</td></tr>
+</tbody>
+</table>
+
+<h3>Seasonality: a natural-gas-style curve</h3>
+<p>Natural gas is the cleanest case of seasonality. In the US it is injected into storage from April to October and withdrawn from November to March (EIA 2026), so winter delivery trades at a premium. The lab builds a stylised curve: a deseasonalised level of <span data-lab="gas_base" data-fmt="$.2f">$3.50</span>/MMBtu, a smooth carry of <span data-lab="gas_carry" data-fmt=".0%">2%</span> a year and a seasonal swing of <span data-lab="gas_amp" data-fmt=".0%">7%</span> either way, peaking in January. January delivery comes out at <span data-lab="gas_jan" data-fmt="$.2f">$3.81</span> and July at <span data-lab="gas_jul" data-fmt="$.2f">$3.28</span>.</p>
+
+<figure class="diagram chart">
+<!-- chart:gas_curve -->
+<svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="A natural-gas-style futures curve ($/MMBtu) by months to delivery; front = May">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">A NATURAL-GAS-STYLE FUTURES CURVE ($/MMBTU) BY MONTHS TO DELIVERY; FRONT = MAY</text>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#4A5A68" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">no seasonality</text>
+  <line x1="159.60000000000002" y1="32" x2="175.60000000000002" y2="32" stroke="#3A56C5" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="181.60000000000002" y="36" font-size="11" fill="#4A5A68">futures curve</text>
+  <rect x="163.9" y="52" width="46.1" height="212" fill="#1F7A55" fill-opacity="0.07"/>
+  <text x="169.9" y="65" font-size="10.5" fill="#4A5A68" font-style="italic">winter</text>
+  <rect x="348.4" y="52" width="46.1" height="212" fill="#1F7A55" fill-opacity="0.07"/>
+  <text x="354.4" y="65" font-size="10.5" fill="#4A5A68" font-style="italic">winter</text>
+  <rect x="532.8" y="52" width="46.1" height="212" fill="#1F7A55" fill-opacity="0.07"/>
+  <text x="538.8" y="65" font-size="10.5" fill="#4A5A68" font-style="italic">winter</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="268" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$3.20</text>
+  <line x1="64" y1="211" x2="602" y2="211" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="215" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$3.40</text>
+  <line x1="64" y1="158" x2="602" y2="158" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="162" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$3.60</text>
+  <line x1="64" y1="105" x2="602" y2="105" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="109" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$3.80</text>
+  <line x1="64" y1="52" x2="602" y2="52" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="56" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$4.00</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#C9CFC6" stroke-width="1"/>
+  <line x1="202.3" y1="264" x2="202.3" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="202.3" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">10</text>
+  <line x1="356.1" y1="264" x2="356.1" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="356.1" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">20</text>
+  <line x1="509.8" y1="264" x2="509.8" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="509.8" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">30</text>
+  <polyline points="64,183 79.4,181.4 94.7,179.9 110.1,178.3 125.5,176.7 140.9,175.2 156.2,173.6 171.6,172.1 187,170.5 202.3,168.9 217.7,167.3 233.1,165.8 248.5,164.2 263.8,162.6 279.2,161 294.6,159.4 309.9,157.8 325.3,156.3 340.7,154.7 356.1,153.1 371.4,151.5 386.8,149.9 402.2,148.3 417.5,146.6 432.9,145 448.3,143.4 463.7,141.8 479,140.2 494.4,138.6 509.8,136.9 525.1,135.3 540.5,133.7 555.9,132.1 571.3,130.4 586.6,128.8 602,127.1" fill="none" stroke="#4A5A68" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><title>no seasonality</title></polyline>
+  <polyline points="64,214.9 79.4,236.1 94.7,242.9 110.1,233.2 125.5,208.9 140.9,175.2 156.2,140.2 171.6,113.3 187,102.2 202.3,110 217.7,133.7 233.1,165.8 248.5,196.8 263.8,218.4 279.2,225.3 294.6,215.5 309.9,190.7 325.3,156.3 340.7,120.6 356.1,93.1 371.4,81.8 386.8,89.7 402.2,113.9 417.5,146.6 432.9,178.3 448.3,200.4 463.7,207.4 479,197.4 494.4,172.1 509.8,136.9 525.1,100.5 540.5,72.5 555.9,61 571.3,69.1 586.6,93.8 602,127.1" fill="none" stroke="#3A56C5" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>futures curve</title></polyline>
+  <circle cx="602" cy="127.1" r="4" fill="#3A56C5" stroke="#FBFBF8" stroke-width="2"><title>futures curve: $3.72</title></circle>
+  <text x="614" y="131.1" font-size="11" fill="#1F2C38">curve: $3.72</text>
+</svg>
+<!-- /chart:gas_curve -->
+<figcaption>fig 2.5.9 — a stylised natural-gas curve: winter deliveries (shaded) sit above the smooth carry line, summer deliveries below it</figcaption>
+</figure>
+
+<p>Storage limits how fast such a curve may <em>rise</em>. Buy the month-<math><semantics><mi>i</mi><annotation encoding="application/x-tex">i</annotation></semantics></math> contract, take delivery, store the gas and deliver it into month <math><semantics><mi>j</mi><annotation encoding="application/x-tex">j</annotation></semantics></math>; with <math><semantics><mrow><mrow><mi mathvariant="normal">Δ</mi><mspace></mspace></mrow><mo>=</mo><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>j</mi><mo>−</mo><mi>i</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mi>/</mi><mn>12</mn></mrow><annotation encoding="application/x-tex">\Delta = (j - i)/12</annotation></semantics></math> years and <math><semantics><mi>U</mi><annotation encoding="application/x-tex">U</annotation></semantics></math> the dollar cost of storage per MMBtu per year,</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><msub><mi>F</mi><mi>j</mi></msub><mo>≤</mo><msub><mi>F</mi><mi>i</mi></msub><mspace width="0.1667em"></mspace><msup><mi>e</mi><mrow class="tml-sml-pad"><msub><mi>r</mi><mi>f</mi></msub><mrow><mi mathvariant="normal">Δ</mi><mspace></mspace></mrow></mrow></msup><mo>+</mo><mi>U</mi><mspace width="0.1667em"></mspace><mrow><mi mathvariant="normal">Δ</mi><mspace></mspace></mrow></mrow><annotation encoding="application/x-tex">F_j \le F_i\,e^{r_f\Delta} + U\,\Delta</annotation></semantics></math></div>
+<p>With storage at <span data-lab="gas_storage" data-fmt="$.2f">$1.80</span> per MMBtu a year (illustrative, including the rent on scarce capacity; paid at delivery here, where <a class="xref" href="session04-futures.html#s7" data-xref="2.4#s7" data-style="short" data-auto="">Session 2.4</a>'s <math><semantics><mrow><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><msub><mi>S</mi><mn>0</mn></msub><mo>+</mo><mi>U</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><msup><mi>e</mi><mrow class="tml-sml-pad"><msub><mi>r</mi><mi>f</mi></msub><mi>τ</mi></mrow></msup></mrow><annotation encoding="application/x-tex">(S_0 + U)e^{r_f\tau}</annotation></semantics></math> prepays it) the lab's curve has <span data-lab="gas_violations" data-fmt="d">0</span> violations, and the bound allows a seasonal swing of up to <span data-lab="gas_amp_max" data-fmt=".1%">8.3%</span>. Push past it and the first trade to become riskless is the steepest single step of the autumn climb — buying <span data-lab="gas_bind_from">Oct</span> gas to deliver into <span data-lab="gas_bind_to">Nov</span> — while the July-to-January spread (<span data-lab="gas_js_spread" data-fmt="$.2f">$0.53</span>) stays well inside its own bound (<span data-lab="gas_js_bound" data-fmt="$.2f">$0.97</span>). Nothing limits the <em>fall</em> after winter: you cannot store gas backwards in time. Real storage also has finite capacity and injection limits; when it is full, the marginal cost of storage is the price of scarce capacity, not the tank rent — the lesson of WTI on 20 April 2020 (<a class="xref" href="session04-futures.html#s7" data-xref="2.4#s7" data-style="short" data-auto="">Session 2.4</a>).</p>
+
+<pre><span class="k">def</span> storage_violations(F: np.ndarray, r: float = GAS_RF, U: float = GAS_STORAGE) -&gt; int:
+    <span class="s">"""Pairs (i &lt; j) where buying month i, storing and delivering into month j is a riskless profit."""</span>
+    i, j = np.triu_indices(len(F), k=<span class="p">1</span>)
+    dt = (j - i) / <span class="p">12</span>
+    <span class="k">return</span> int(np.sum(F[j] &gt; F[i] * np.exp(r * dt) + U * dt + <span class="p">1e-12</span>))</pre>
+
+<p>Now read the gas curve through the roll-yield lens of <a class="xref" href="session04-futures.html#s5" data-xref="2.4#s5" data-style="short" data-auto="">Session 2.4</a> and you get nonsense. Month by month, the annualised roll between neighbouring contracts swings from <span data-lab="gas_naive_carry_min" data-fmt="+.0%">−44%</span> to <span data-lab="gas_naive_carry_max" data-fmt="+.0%">+40%</span>. Over any twelve consecutive months the seasonal part cancels exactly, and the average is <span data-lab="gas_naive_carry_mean" data-fmt="+.1%">−2.0%</span> a year: the roll yield of the smooth <span data-lab="gas_carry" data-fmt=".0%">2%</span> contango. The lab asserts that identity for every twelve-month window.</p>
+
+<div class="co warn"><span class="co-t">⚠️ Pitfall — "gas is in steep <a class="term" href="session04-futures.html#g-contango" data-term="contango">contango</a>, so a long position bleeds"</span>
+<p>In October the December contract sits above November because winter is coming, not because the market is glutted or bearish. A seasonal contango is a calendar, not a carry signal: compare a contract with the same month a year later before reading carry into the slope. <span class="xref soon" data-xref="8.4" data-style="short" data-auto="" title="Coming soon">Session 8.4</span> returns to measuring carry across commodities.</p>
+</div>
+</section>
+
+<section id="s7">
+<h2><span class="no">2.5.7</span> Try it</h2>
+<p class="lede">Open the companion lab, predict before you run, and move one number at a time.</p>
+<div class="co lab"><span class="co-t">🔧 Try it (20 min, in the lab)</span>
+<p>1. <strong>A bigger gap.</strong> In section 3 set <code>DEVIATION_PIPS = 12.0</code>. Predict from the band edges in the table (you sell at the forward's bid, below mid) which traders now profit.<br>
+2. <strong>Rarer, bigger crashes.</strong> In section 4 set <code>CRASH_RATE = 0.10</code> and <code>CRASH_MEAN, CRASH_SD = -0.20, 0.04</code>. The expected crash loss per year barely changes; predict the skewness, the Sharpe ratio and the chance of a calm five-year window.<br>
+3. <strong>Too much seasonality.</strong> In section 6 set <code>GAS_AMP = 0.10</code>. How many storage-arbitrage violations appear — on the climb into winter, or the fall after it?<br>
+4. <strong>Slow recovery.</strong> In section 5 set <code>HALF_LIFE = 2.0</code>. The scarce curve bottoms at month <span data-lab="st_scarce_bottom_month" data-fmt="d">10</span> by default; where does it bottom now, and does the lab's analytic check agree?<br>
+Success: in step 1 the bank and the fund profit and the individual does not; in step 2 skewness grows much more negative while the Sharpe ratio barely moves, and the calm-window probability is <math><semantics><msup><mi>e</mi><mrow class="tml-sml-pad"><mo form="prefix" stretchy="false" lspace="0em" rspace="0em">−</mo><mi>λ</mi><mi>Y</mi></mrow></msup><annotation encoding="application/x-tex">e^{-\lambda Y}</annotation></semantics></math>; in step 3 every violation is on a rising stretch; in step 4 the bottom moves out by more than a year.</p>
+</div>
+</section>
+
+<hr>
+
+<section id="s8">
+<h2><span class="no">2.5.8</span> Glossary · Check yourself · Go deeper</h2>
+<div class="gloss" id="glossary">
+<div id="g-currency-pair"><b>Currency pair</b> — two currencies written BASE/QUOTE; the price is how many units of the quote currency one unit of the base costs.</div>
+<div id="g-pip"><b>Pip</b> — the conventional smallest step of an exchange rate: 0.0001 for most pairs, 0.01 for yen pairs.</div>
+<div id="g-fx-spot"><b>FX spot</b> — an exchange of two currencies at an agreed rate, settled on the spot date: T+2 for most pairs, T+1 for USD/CAD.</div>
+<div id="g-fx-forward"><b>FX forward</b> — an agreement today to exchange two currencies at a fixed rate on a date beyond spot; priced by covered interest parity.</div>
+<div id="g-forward-points"><b>Forward points</b> — the forward rate minus spot, <math><semantics><mrow><mi>F</mi><mo>−</mo><mi>S</mi></mrow><annotation encoding="application/x-tex">F - S</annotation></semantics></math>, quoted in pips and added to spot; positive when the base currency has the lower interest rate.</div>
+<div id="g-covered-interest-parity"><b>Covered interest parity</b> — the no-arbitrage rule <math><semantics><mrow><mi>F</mi><mo>=</mo><mi>S</mi><mspace width="0.1667em"></mspace><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mn>1</mn><mo>+</mo><msub><mi>i</mi><mi>q</mi></msub><mi>τ</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mi>/</mi><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mn>1</mn><mo>+</mo><msub><mi>i</mi><mi>b</mi></msub><mi>τ</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">F = S\,(1 + i_q\tau)/(1 + i_b\tau)</annotation></semantics></math>: a deposit in one currency and a hedged deposit in the other must pay the same.</div>
+<div id="g-cross-currency-basis"><b>Cross-currency basis</b> — the spread <math><semantics><mi>x</mi><annotation encoding="application/x-tex">x</annotation></semantics></math> added to the non-dollar interest rate that makes covered interest parity hold at market prices; negative when borrowing dollars through FX swaps costs more than in the cash market.</div>
+<div id="g-fx-carry"><b>FX carry</b> — the interest differential earned by holding a higher-rate currency funded in a lower-rate one; under CIP, the forward discount.</div>
+<div id="g-convenience-yield"><b>Convenience yield</b> — the benefit of holding a physical commodity rather than a futures contract, inferred from prices as <math><semantics><mrow><mi>y</mi><mo>=</mo><msub><mi>r</mi><mi>f</mi></msub><mo>+</mo><mi>u</mi><mo>−</mo><mrow><mi>ln</mi><mo>⁡</mo></mrow><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>F</mi><mi>/</mi><mi>S</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mi>/</mi><mi>τ</mi></mrow><annotation encoding="application/x-tex">y = r_f + u - \ln(F/S)/\tau</annotation></semantics></math>.</div>
+<div id="g-commodity-term-structure"><b>Commodity term structure</b> — one commodity's futures prices across expiries; its slope is net carry, set by inventories, storage and seasonality.</div>
+<div id="g-storage-cost"><b>Storage cost</b> — the cost of keeping a physical commodity (rent, insurance, losses) per unit per year; it caps contango at full carry.</div>
+</div>
+
+<h3>Check yourself</h3>
+<details class="q"><summary>1. A screen shows USD/JPY <span data-lab="usdjpy_bid" data-fmt=".2f">150.00</span> / <span data-lab="usdjpy_ask" data-fmt=".2f">150.02</span>. You must sell <span data-lab="q1_jpy" data-fmt=",.0f">300,000,000</span> yen for dollars. Which side of the quote do you deal on, and what does crossing the spread cost you?</summary><div>Selling yen means buying dollars, and the dollar is the base, so you pay the ask: you receive <span data-lab="q1_usd_at_ask" data-fmt="$,.0f">$1,999,733</span>, about <span data-lab="q1_halfspread_usd" data-fmt="$,.0f">$133</span> less than at mid. The quote prices the base currency: read the pair first.</div></details>
+<details class="q"><summary>2. EUR/USD is <span data-lab="s_eurusd" data-fmt=".5f">1.08505</span>, the dollar rate <span data-lab="i_usd" data-fmt=".0%">4%</span> and the euro rate <span data-lab="i_eur" data-fmt=".0%">2%</span> (simple, ACT/360). A client wants a one-year forward and adds, "we expect the euro to weaken, so quote us lower". What do you quote?</summary><div>The CIP forward, <span data-lab="fwd_1y" data-fmt=".5f">1.10662</span> (<span data-lab="fwd_1y_points" data-fmt="+.1f">+215.7</span> points). You hedge it by running the loop, so no forecast enters the price, and quoting lower hands the client a riskless profit. Whether forwards predict spot is uncovered parity (<span class="xref soon" data-xref="11.5" data-style="short" data-auto="" title="Coming soon">Session 11.5</span>).</div></details>
+<details class="q"><summary>3. The 3-month EUR/USD forward trades <span data-lab="dev_pips" data-fmt=".0f">8</span> pips above CIP, a basis of <span data-lab="basis_bp" data-fmt=".1f">−28.8</span> bp. You run a bank desk whose balance sheet costs <span data-lab="bs_cost_bp_pa" data-fmt=".0f">30</span> bp a year. Do you put the trade on?</summary><div>No. After spreads the loop earns <span data-lab="bank_net_spreads" data-fmt="$,.0f">$61,070</span> on <span data-lab="usd_notional" data-fmt="$,.0f">$100,000,000</span>, but the balance-sheet charge is <span data-lab="bank_bs_cost" data-fmt="$,.0f">$76,667</span>, so the desk ends at <span data-lab="bank_net" data-fmt="$,.0f">−$15,597</span>; the top of its band is <span data-lab="bank_upper_pips" data-fmt=".1f">9.5</span> pips. That is why the basis persists (DTV), and why it widens across quarter-ends.</div></details>
+<details class="q"><summary>4. A currency-carry fund shows <span data-lab="window_y" data-fmt="d">5</span> years with a Sharpe ratio of <span data-lab="calm_sharpe" data-fmt=".2f">0.56</span> and a maximum <a class="term" href="session03-returns-pnl-leverage.html#g-drawdown" data-term="drawdown">drawdown</a> of <span data-lab="mdd_calm5_median" data-fmt=".0%">−13%</span>. What do you ask before you invest?</summary><div>Whether the window contained a crash. In the lab <span data-lab="p_calm_5y" data-fmt=".1%">36.5%</span> of five-year windows are crash-free, and they typically show those numbers while the true Sharpe ratio is <span data-lab="carry_sharpe" data-fmt=".2f">0.31</span> and the same paths' twenty-year maximum drawdown has a median of <span data-lab="mdd_after_calm_median" data-fmt=".0%">−28%</span>. Ask for the skewness, the worst months and the record through known crashes such as October 1998.</div></details>
+<details class="q"><summary>5. Crude's one-month spread is −15%, annualised. Financing costs 4% and storage 5%. What is the implied convenience yield, and why can't cash-and-carry close the gap?</summary><div><math><semantics><mrow><mi>y</mi><mo>=</mo><msub><mi>r</mi><mi>f</mi></msub><mo>+</mo><mi>u</mi><mo>−</mo><mrow><mi>ln</mi><mo>⁡</mo></mrow><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>F</mi><mi>/</mi><mi>S</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mi>/</mi><mi>τ</mi></mrow><annotation encoding="application/x-tex">y = r_f + u - \ln(F/S)/\tau</annotation></semantics></math> = 4% + 5% + 15% = 24% a year: inventories are scarce. Closing a backwardation means running cash-and-carry in reverse — sell the physical now, buy it back forward — which needs someone to lend you a scarce barrel. Contango has a ceiling; backwardation has no floor.</div></details>
+<details class="q"><summary>6. In October the December gas contract trades well above November. A colleague says: "steep contango — longs bleed". What is wrong?</summary><div>The slope is the calendar: December is winter gas. In the lab the month-to-month roll swings from <span data-lab="gas_naive_carry_min" data-fmt="+.0%">−44%</span> to <span data-lab="gas_naive_carry_max" data-fmt="+.0%">+40%</span> a year but averages exactly <span data-lab="gas_naive_carry_mean" data-fmt="+.1%">−2.0%</span> over any twelve months — the roll yield of the smooth <span data-lab="gas_carry" data-fmt=".0%">2%</span> contango. Compare a contract with the same month next year before reading carry.</div></details>
+
+<div class="co lab"><span class="co-t">🔧 Homework (~1 h before Session 2.6)</span>
+<p>1. <strong>Find each trader's break-even.</strong> In section 3, bisect on <code>DEVIATION_PIPS</code> for the smallest deviation at which each tier profits. Show it equals the top of that tier's band plus the forward's two half-spreads, and explain why.<br>
+2. <strong>Same crash loss, different shapes.</strong> In section 4, keep <code>CRASH_RATE × CRASH_MEAN</code> at −2% a year and run (0.4, −0.05), (0.2, −0.10), (0.1, −0.20) and (0.05, −0.40). Tabulate skewness, Sharpe ratio, calm-window Sharpe and P(no crash in five years). Which looks best over five years, and which is most dangerous?<br>
+3. <strong>Imply a convenience yield from real prices.</strong> From the exchange's website take today's settlements for the front and twelfth crude-oil futures (WTI or Brent). With a current Treasury-bill yield as <math><semantics><msub><mi>r</mi><mi>f</mi></msub><annotation encoding="application/x-tex">r_f</annotation></semantics></math> and storage at 5% a year, compute <math><semantics><mi>y</mi><annotation encoding="application/x-tex">y</annotation></semantics></math> and say which inventory state it suggests. Date every number.<br>
+4. <strong>Read</strong> sections I–II of Du, Tepper &amp; Verdelhan (2018), or Borio et al. (2016) for a shorter tour. <a class="xref" href="session06-crypto-market-structure.html" data-xref="2.6" data-style="short" data-auto="">Session 2.6</a> meets <a class="term" href="session06-crypto-market-structure.html#g-perpetual-future" data-term="perpetual future">perpetual futures</a>, which never expire and are tied to spot by a <a class="term" href="session06-crypto-market-structure.html#g-funding-rate" data-term="funding rate">funding rate</a> instead of convergence; keep the CIP loop in mind.</p>
+</div>
+
+<h3>📚 Go deeper</h3>
+<ol class="refs">
+<li>Du, W., Tepper, A. &amp; Verdelhan, A. (2018). "Deviations from Covered Interest Rate Parity." <em>Journal of Finance</em> 73(3), 915–957. Figures quoted here are from the working-paper version, NBER w23170 (February 2017). <span class="rid">doi:10.1111/jofi.12620</span></li>
+<li>Borio, C., McCauley, R. N., McGuire, P. &amp; Sushko, V. (2016). "Covered interest parity lost: understanding the cross-currency basis." <em>BIS Quarterly Review</em>, September 2016, pp. 45–64. <span class="rid">https://www.bis.org/publ/qtrpdf/r_qt1609e.htm</span></li>
+<li>Brunnermeier, M. K., Nagel, S. &amp; Pedersen, L. H. (2008). "Carry Trades and Currency Crashes." <em>NBER Macroeconomics Annual</em> 23, 313–347. <span class="rid">doi:10.1086/593088</span></li>
+<li>Working, H. (1949). "The Theory of Price of Storage." <em>American Economic Review</em> 39(6), 1254–1262. <span class="rid">https://www.jstor.org/stable/1816601</span></li>
+<li>Brennan, M. J. (1958). "The Supply of Storage." <em>American Economic Review</em> 48(1), 50–72. <span class="rid">https://www.jstor.org/stable/1812340</span></li>
+<li>Gorton, G. B., Hayashi, F. &amp; Rouwenhorst, K. G. (2013). "The Fundamentals of Commodity Futures Returns." <em>Review of Finance</em> 17(1), 35–105. <span class="rid">doi:10.1093/rof/rfs019</span></li>
+<li>Geman, H. (2005). <em>Commodities and Commodity Derivatives: Modeling and Pricing for Agriculturals, Metals and Energy</em>. Wiley. <span class="rid">ISBN 978-0-470-01218-5</span></li>
+<li>Hull, J. C. (2021). <em>Options, Futures, and Other Derivatives</em>, 11th ed., ch. 5 "Determination of forward and futures prices" (currencies; commodities, storage costs and convenience yields). Pearson. <span class="rid">ISBN 978-0-13-693997-9</span></li>
+</ol>
+
+<h3>Sources for the numbers</h3>
+<ol class="refs">
+<li>Kaldor, N. (1939). "Speculation and Economic Stability." <em>Review of Economic Studies</em> 7(1), 1–27. <span class="rid">doi:10.2307/2967593</span></li>
+<li>Fama, E. F. &amp; French, K. R. (1987). "Commodity Futures Prices: Some Evidence on Forecast Power, Premiums, and the Theory of Storage." <em>Journal of Business</em> 60(1), 55–73. <span class="rid">doi:10.1086/296385</span></li>
+<li>Bank for International Settlements (2025). "Global FX trading hits $9.6 trillion per day in April 2025 …: Triennial Survey", 30 September 2025, and "OTC foreign exchange turnover in April 2025". <span class="rid">https://www.bis.org/media-releases/20250930-global-fx-trading-hits-96-trillion-day-april-2025-and-otc-interest-rate-derivatives-surge-79</span> · <span class="rid">https://www.bis.org/statistics/rpfx25_fx.htm</span></li>
+<li>SIFMA, CCMA &amp; ISDA (2024). "T+1 Settlement Cycle Booklet" (FX spot convention T+2; CAD/USD T+1). <span class="rid">https://www.isda.org/a/fFwgE/T1-Settlement-Cycle-Booklet.pdf</span></li>
+<li>CLS Group (2023). "FX settlement risk: to PvP or not to PvP?" ShapingFX series, 31 May 2023. <span class="rid">https://www.cls-group.com/insights/the-fx-ecosystem/fx-ecosystem-02-fx-settlement-risk-to-pvp-or-not-to-pvp-shapingfx-series/</span></li>
+<li>European Central Bank (2007). "More than thirty years after the 'Herstatt' case, foreign exchange settlement risk is still an issue." <em>Financial Stability Review</em>, December 2007, Box 19. <span class="rid">https://www.ecb.europa.eu/press/financial-stability-publications/fsr/focus/2007/pdf/ecb~ccda416def.fsrbox200712_19.pdf</span></li>
+<li>U.S. Energy Information Administration (2026). "Natural gas inventories at the end of winter heating season were near five-year average." <em>Today in Energy</em>, 21 April 2026. <span class="rid">https://www.eia.gov/todayinenergy/detail.php?id=67524</span></li>
+</ol>
+</section>
+
+<!-- nav:foot -->
+<div class="foot">
+<a href="session04-futures.html">← Prev: 2.4 · Futures</a>
+<a href="session06-crypto-market-structure.html">Next: 2.6 · Crypto →</a>
+</div>
+<p class="legal">Educational material only — not investment, legal or tax advice. Backtests and simulations are hypothetical. <a href="../start-here.html#disclaimer">Disclaimer</a> · Text CC BY 4.0 · Code MIT.</p>
+<!-- /nav:foot -->
+</main>
+</div></body></html>

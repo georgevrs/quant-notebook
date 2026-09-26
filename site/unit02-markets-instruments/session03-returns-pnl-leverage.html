@@ -22,13 +22,13 @@
 <!-- nav:tabs -->
 <nav class="tabs">
 <a href="../index.html">⌂ Course home</a>
-<span class="soon" title="Coming soon">2.1 · Market Anatomy</span>
-<span class="soon" title="Coming soon">2.2 · Equities &amp; ETFs</span>
+<a href="session01-market-anatomy.html">2.1 · Market Anatomy</a>
+<a href="session02-equities-indices-etfs.html">2.2 · Equities &amp; ETFs</a>
 <a class="active" href="session03-returns-pnl-leverage.html">2.3 · Returns &amp; Leverage</a>
 <a href="session04-futures.html">2.4 · Futures</a>
-<span class="soon" title="Coming soon">2.5 · FX &amp; Commodities</span>
-<span class="soon" title="Coming soon">2.6 · Crypto</span>
-<span class="soon" title="Coming soon">2.7 · Options Primer</span>
+<a href="session05-fx-commodities.html">2.5 · FX &amp; Commodities</a>
+<a href="session06-crypto-market-structure.html">2.6 · Crypto</a>
+<a href="session07-options-primer.html">2.7 · Options Primer</a>
 <a href="../roadmap.html">🗺 Roadmap</a>
 </nav>
 <!-- /nav:tabs -->
@@ -162,7 +162,7 @@
 <figcaption>fig 2.3.2 — the return pipeline, and the classic bug that lives at each stage</figcaption>
 </figure>
 
-<p>Step 1 matters more than it looks: returns must be computed on prices adjusted for splits and dividends, or a 2-for-1 split shows up as a −50% crash. Whether dividends are included is the difference between a price return and a <span class="term soon" data-term="total return" title="Defined in Session 2.2 (coming soon)">total return</span> — you met both in <span class="xref soon" data-xref="2.2" data-auto="" title="Coming soon">Session 2.2 — Equities, Indices &amp; ETFs</span>, and <span class="xref soon" data-xref="4.3" data-auto="" title="Coming soon">Session 4.3 — Corporate Actions, Security Master &amp; Continuous Futures</span> builds the adjustment pipeline properly.</p>
+<p>Step 1 matters more than it looks: returns must be computed on prices adjusted for splits and dividends, or a 2-for-1 split shows up as a −50% crash. Whether dividends are included is the difference between a price return and a <a class="term" href="session02-equities-indices-etfs.html#g-total-return" data-term="total return">total return</a> — you met both in <a class="xref" href="session02-equities-indices-etfs.html" data-xref="2.2" data-auto="">Session 2.2 — Equities, Indices &amp; ETFs</a>, and <span class="xref soon" data-xref="4.3" data-auto="" title="Coming soon">Session 4.3 — Corporate Actions, Security Master &amp; Continuous Futures</span> builds the adjustment pipeline properly.</p>
 
 <table>
 <thead><tr><th>Job</th><th>Use</th><th>Why</th></tr></thead>
@@ -469,7 +469,7 @@ dd     = wealth / wealth.cummax() - <span class="p">1</span>                   <
 <tr><td>Summing simple returns over time</td><td>Lab: sum = <span data-lab="naive_sum_simple" data-fmt=".0%">209%</span>, true total = <span data-lab="total_simple" data-fmt=".0%">442%</span></td><td><code>(1 + r).prod() - 1</code>, or sum <em>log</em> returns</td></tr>
 <tr><td>Weighting log returns across assets</td><td>Lab: +30%/−20% at 50/50 gives <span data-lab="xs_port_log_wrong" data-fmt=".4f">0.0196</span> instead of <span data-lab="xs_port_log_true" data-fmt=".4f">0.0488</span></td><td>Weight simple returns, then take the log</td></tr>
 <tr><td>√252 on weekly or monthly data</td><td>Sharpe inflated by √21 ≈ 4.6× on monthly data</td><td>Annualise with periods per year of <em>that</em> data</td></tr>
-<tr><td>Returns on unadjusted prices</td><td>Fake crashes on splits; dividends missing</td><td>Use adjusted or <span class="term soon" data-term="total return" title="Defined in Session 2.2 (coming soon)">total-return</span> series</td></tr>
+<tr><td>Returns on unadjusted prices</td><td>Fake crashes on splits; dividends missing</td><td>Use adjusted or <a class="term" href="session02-equities-indices-etfs.html#g-total-return" data-term="total return">total-return</a> series</td></tr>
 <tr><td>Forgetting the risk-free rate</td><td>Cash-like strategies look skilful when rates are high</td><td>Always compute on excess returns</td></tr>
 <tr><td>Percent vs percentage points</td><td>"Returns fell 2%" when they fell from 10% to 8%</td><td>Say "2 percentage points"</td></tr>
 </tbody>
@@ -532,7 +532,7 @@ dd     = wealth / wealth.cummax() - <span class="p">1</span>                   <
 
 <!-- nav:foot -->
 <div class="foot">
-<span class="soon" title="Coming soon">← Prev: 2.2 · Equities &amp; ETFs</span>
+<a href="session02-equities-indices-etfs.html">← Prev: 2.2 · Equities &amp; ETFs</a>
 <a href="session04-futures.html">Next: 2.4 · Futures →</a>
 </div>
 <p class="legal">Educational material only — not investment, legal or tax advice. Backtests and simulations are hypothetical. <a href="../start-here.html#disclaimer">Disclaimer</a> · Text CC BY 4.0 · Code MIT.</p>

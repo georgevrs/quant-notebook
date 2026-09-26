@@ -314,6 +314,12 @@ avoid them up front.
   a second full treatment. If an earlier session already derived something (e.g. the standard
   error of the Sharpe ratio in 1.3/1.4/2.3), point back to it instead of re-deriving it.
 - Cite the same study once, in the session that owns it; elsewhere, one clause plus a link.
+- **How length is counted:** body prose of sections 1..n−1 (everything before the close),
+  including tables, excluding SVG, code, figure captions and reference lists; a math expression
+  counts as one word. The close (glossary, questions, homework, references) is extra.
+- Give **Try it** its own section and TOC entry — don't fold it into a content section.
+- Don't borrow a term another session owns as the name of something else (14.3 owns "square-root
+  law", for market impact; the σ√n scaling of sums is "the √n rule").
 
 #### Numbers
 
@@ -324,6 +330,12 @@ avoid them up front.
 - **Growth is CAGR.** If you show an arithmetic mean (e.g. because a regression decomposition needs
   it), label it "average (arithmetic) return" and show the CAGR next to it.
 - Say "percentage points" for differences between percentages; "trading days" for business days.
+- **Money goes in the format spec**, not in front of the span: `data-fmt="$,.0f"` renders −$858,
+  whereas a typed `$` before a negative span renders "$−858". Never type a sign in the HTML next
+  to a span either (`−$<span …>`) — it breaks silently if the lab result changes sign.
+- **Drawdowns are negative numbers** (−44.5%), as 2.3 defines them; losses keep their minus sign.
+- **Every statistical claim about "how many SE" matches the lab** — if prose says "the lab asserts
+  at four standard errors", the lab must.
 
 #### Labs
 
@@ -346,6 +358,10 @@ avoid them up front.
 - First use of a term owned elsewhere is a `data-term` link (edge, P&L, look-ahead bias, in-sample…).
 - Don't reuse a reserved symbol for something else in the same unit (α is alpha; call a test's
   false-positive rate its *size*). Per-period risk-free rates are \(r_{f,t}\).
+- **T is a number of periods; time in years is τ** (or Y for a horizon in years). Unit 2 fixes κ as
+  the borrow fee (2.2); the BGK discrete-monitoring constant is β = 0.5826 (2.1, 2.4).
+- When a term a later reader will meet again is defined in bold but owned by nobody, flag it in your
+  handoff (`new_terms`) so the orchestrator can add it to `owns`.
 
 #### References
 

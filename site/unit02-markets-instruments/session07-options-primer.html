@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- nav:head -->
+<title>2.7 · Options Primer</title>
+<meta name="description" content="Calls, puts, payoffs, put-call parity, intrinsic vs time value, and a first look at implied volatility — enough to read any options discussion.">
+<link rel="canonical" href="https://georgevrs.github.io/quant-notebook/unit02-markets-instruments/session07-options-primer.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Quant Notebook">
+<meta property="og:title" content="2.7 · Options Primer">
+<meta property="og:description" content="Calls, puts, payoffs, put-call parity, intrinsic vs time value, and a first look at implied volatility — enough to read any options discussion.">
+<meta property="og:url" content="https://georgevrs.github.io/quant-notebook/unit02-markets-instruments/session07-options-primer.html">
+<meta name="twitter:card" content="summary">
+<link rel="stylesheet" href="../assets/brand.css">
+<link rel="stylesheet" href="../assets/temml.css">
+<!-- /nav:head -->
+</head>
+<body><div class="page" id="top">
+<!-- Session 2.7 — a primer: Unit 10 owns the deep treatment (10.1 trees, 10.3 BSM, 10.4 Greeks, 10.5 surface, 10.7 trading vol). See AUTHORING.md. -->
+<!-- nav:tabs -->
+<nav class="tabs">
+<a href="../index.html">⌂ Course home</a>
+<a href="session01-market-anatomy.html">2.1 · Market Anatomy</a>
+<a href="session02-equities-indices-etfs.html">2.2 · Equities &amp; ETFs</a>
+<a href="session03-returns-pnl-leverage.html">2.3 · Returns &amp; Leverage</a>
+<a href="session04-futures.html">2.4 · Futures</a>
+<a href="session05-fx-commodities.html">2.5 · FX &amp; Commodities</a>
+<a href="session06-crypto-market-structure.html">2.6 · Crypto</a>
+<a class="active" href="session07-options-primer.html">2.7 · Options Primer</a>
+<a href="../roadmap.html">🗺 Roadmap</a>
+</nav>
+<!-- /nav:tabs -->
+
+<header class="cover">
+<!-- nav:heading -->
+<p class="eyebrow">Unit 2 · Markets &amp; Instruments — Session 07 of 07</p>
+<h1>Options Primer</h1>
+<!-- /nav:heading -->
+<p class="subtitle">An option sells you a right without the obligation that normally comes with it. That one asymmetry turns options into insurance, into leverage, and into a way to trade volatility itself — and it gives you a vocabulary you will hear on every trading floor. This session builds that vocabulary from payoffs up, proves the one identity that ties calls to puts, and shows why professionals quote option prices in volatility. <mark>The core move: think in payoffs at expiry, and read every option price as a volatility.</mark></p>
+<div class="meta">
+<span>DURATION <b>1.5 h + lab</b></span>
+<span>LEVEL <b>Foundations</b></span>
+<span>TRACKS <b>QR · QT · QD · IND</b></span>
+<span>HANDS-ON <b>Parity on <span data-lab="mc_paths" data-fmt=",.0f">400,000</span> paths; implied vol by bisection</b></span>
+</div>
+<!-- nav:labstrip -->
+<div class="labstrip"><b>📓 Companion lab</b>
+<a href="https://colab.research.google.com/github/georgevrs/quant-notebook/blob/main/labs/u02/s07_options_primer.ipynb">Open in Colab</a>
+<a href="https://github.com/georgevrs/quant-notebook/blob/main/labs/u02/s07_options_primer.ipynb">Notebook on GitHub</a>
+<a href="https://github.com/georgevrs/quant-notebook/blob/main/labs/u02/s07_options_primer.py">Source (.py)</a>
+</div>
+<!-- /nav:labstrip -->
+<div class="toc">
+<b>On this page</b>
+<ol>
+<li><a href="#s1">Rights, not obligations: calls and puts</a></li>
+<li><a href="#s2">Moneyness, intrinsic value &amp; time value</a></li>
+<li><a href="#s3">Put-call parity: two portfolios, one payoff</a></li>
+<li><a href="#s4">When parity breaks: the conversion</a></li>
+<li><a href="#s5">Why options exist: structures and views</a></li>
+<li><a href="#s6">Implied volatility: the price, quoted in volatility</a></li>
+<li><a href="#s7">Try it</a></li>
+<li><a href="#s8">Glossary · Check yourself · Go deeper</a></li>
+</ol>
+</div>
+</header>
+
+<main>
+
+<section id="s1">
+<h2><span class="no">2.7.1</span> Rights, not obligations: calls and puts</h2>
+<p class="lede">An option is a contract in which one side buys a right and the other side sells an obligation. Everything in this session — and most of Unit 10 — follows from that asymmetry.</p>
+
+<p>A <strong>call option</strong> gives its buyer the right, but not the obligation, to buy an asset — the <em>underlying</em> — at a fixed price, the <strong>strike price</strong> <math><semantics><mi>K</mi><annotation encoding="application/x-tex">K</annotation></semantics></math>, at or before a fixed date, its <a class="term" href="session04-futures.html#g-expiry" data-term="expiry">expiry</a>. A <strong>put option</strong> gives the right to <em>sell</em> at <math><semantics><mi>K</mi><annotation encoding="application/x-tex">K</annotation></semantics></math>. The buyer pays for the right up front; that price is the <strong>option premium</strong>. The seller, or <em>writer</em>, collects the premium and takes on the obligation: to deliver at <math><semantics><mi>K</mi><annotation encoding="application/x-tex">K</annotation></semantics></math> if a call is exercised, or to buy at <math><semantics><mi>K</mi><annotation encoding="application/x-tex">K</annotation></semantics></math> if a put is. Buying makes you <em>long</em> the option; selling makes you <em>short</em>.</p>
+
+<p>At expiry the holder's decision is mechanical. A call is exercised only when the stock is above the strike, so it pays <math><semantics><mrow><mrow><mi>max</mi><mo>⁡</mo></mrow><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><msub><mi>S</mi><mtext>exp</mtext></msub><mo>−</mo><mi>K</mi><mo separator="true">,</mo><mspace width="0.1667em"></mspace><mn>0</mn><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">\max(S_{\text{exp}} - K,\, 0)</annotation></semantics></math>; a put pays <math><semantics><mrow><mrow><mi>max</mi><mo>⁡</mo></mrow><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>K</mi><mo>−</mo><msub><mi>S</mi><mtext>exp</mtext></msub><mo separator="true">,</mo><mspace width="0.1667em"></mspace><mn>0</mn><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">\max(K - S_{\text{exp}},\, 0)</annotation></semantics></math>. Notation for this session: <math><semantics><mi>S</mi><annotation encoding="application/x-tex">S</annotation></semantics></math> is the underlying's price today and <math><semantics><msub><mi>S</mi><mtext>exp</mtext></msub><annotation encoding="application/x-tex">S_{\text{exp}}</annotation></semantics></math> its price at expiry (as in <a class="xref" href="session04-futures.html" data-xref="2.4" data-style="short" data-auto="">Session 2.4</a>), <math><semantics><mi>C</mi><annotation encoding="application/x-tex">C</annotation></semantics></math> and <math><semantics><mi>P</mi><annotation encoding="application/x-tex">P</annotation></semantics></math> are the call and put premiums (here <math><semantics><mi>P</mi><annotation encoding="application/x-tex">P</annotation></semantics></math> is a put, not the price <math><semantics><msub><mi>P</mi><mi>t</mi></msub><annotation encoding="application/x-tex">P_t</annotation></semantics></math> of <a class="xref" href="session03-returns-pnl-leverage.html" data-xref="2.3" data-style="short" data-auto="">Session 2.3</a>), and <math><semantics><mi>τ</mi><annotation encoding="application/x-tex">\tau</annotation></semantics></math> is the time to expiry in years, because <math><semantics><mi>T</mi><annotation encoding="application/x-tex">T</annotation></semantics></math> stays the number of periods. Drawn against <math><semantics><msub><mi>S</mi><mtext>exp</mtext></msub><annotation encoding="application/x-tex">S_{\text{exp}}</annotation></semantics></math>, these payoffs are the famous hockey sticks — a <strong>payoff diagram</strong>:</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 292" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">THREE POSITIONS, ONE STRIKE K</text>
+  <line x1="420" y1="16" x2="444" y2="16" stroke="#1F2C38" stroke-width="2"/>
+  <text x="450" y="20" font-size="9.5" fill="#4A5A68">payoff</text>
+  <line x1="500" y1="16" x2="524" y2="16" stroke="#3A56C5" stroke-width="2" stroke-dasharray="5 4"/>
+  <text x="530" y="20" font-size="9.5" fill="#4A5A68">P&amp;L = payoff − premium</text>
+  <rect x="20" y="32" width="216" height="230" rx="10" fill="#fff" stroke="#C9CFC6" stroke-width="1.5"/>
+  <text x="128" y="52" font-size="11" font-weight="700" text-anchor="middle" fill="#3A56C5">LONG CALL</text>
+  <line x1="36" y1="70" x2="36" y2="210" stroke="#9AA6AF" stroke-width="1"/>
+  <line x1="36" y1="172" x2="216" y2="172" stroke="#4A5A68" stroke-width="1.2"/>
+  <text x="32" y="175" font-size="9" text-anchor="end" fill="#4A5A68">0</text>
+  <line x1="125" y1="168" x2="125" y2="176" stroke="#1F2C38" stroke-width="1.2"/>
+  <text x="125" y="186" font-size="9" text-anchor="middle" fill="#1F2C38">K</text>
+  <polyline points="36,172 125,172 210,87" fill="none" stroke="#1F2C38" stroke-width="2"/>
+  <polyline points="36,190 125,190 210,105" fill="none" stroke="#3A56C5" stroke-width="2" stroke-dasharray="5 4"/>
+  <circle cx="143" cy="172" r="3" fill="#3A56C5"/>
+  <text x="148" y="186" font-size="9" fill="#4A5A68">breakeven</text>
+  <line x1="52" y1="175" x2="52" y2="187" stroke="#4A5A68" stroke-width="1"/>
+  <line x1="48" y1="175" x2="56" y2="175" stroke="#4A5A68" stroke-width="1"/>
+  <line x1="48" y1="187" x2="56" y2="187" stroke="#4A5A68" stroke-width="1"/>
+  <text x="60" y="184" font-size="9" fill="#4A5A68">premium</text>
+  <text x="212" y="203" font-size="9" text-anchor="end" fill="#4A5A68">S at expiry →</text>
+  <text x="128" y="224" font-size="9.5" text-anchor="middle" fill="#4A5A68">the right to buy at K</text>
+  <text x="128" y="239" font-size="9.5" text-anchor="middle" fill="#4A5A68">loss capped at the premium</text>
+  <text x="128" y="254" font-size="9.5" text-anchor="middle" fill="#4A5A68">upside unlimited</text>
+  <rect x="252" y="32" width="216" height="230" rx="10" fill="#fff" stroke="#C9CFC6" stroke-width="1.5"/>
+  <text x="360" y="52" font-size="11" font-weight="700" text-anchor="middle" fill="#3A56C5">LONG PUT</text>
+  <line x1="268" y1="70" x2="268" y2="210" stroke="#9AA6AF" stroke-width="1"/>
+  <line x1="268" y1="172" x2="448" y2="172" stroke="#4A5A68" stroke-width="1.2"/>
+  <text x="264" y="175" font-size="9" text-anchor="end" fill="#4A5A68">0</text>
+  <line x1="357" y1="168" x2="357" y2="176" stroke="#1F2C38" stroke-width="1.2"/>
+  <text x="357" y="186" font-size="9" text-anchor="middle" fill="#1F2C38">K</text>
+  <polyline points="272,87 357,172 442,172" fill="none" stroke="#1F2C38" stroke-width="2"/>
+  <polyline points="272,105 357,190 442,190" fill="none" stroke="#3A56C5" stroke-width="2" stroke-dasharray="5 4"/>
+  <circle cx="339" cy="172" r="3" fill="#3A56C5"/>
+  <text x="334" y="186" font-size="9" text-anchor="end" fill="#4A5A68">breakeven</text>
+  <line x1="428" y1="175" x2="428" y2="187" stroke="#4A5A68" stroke-width="1"/>
+  <line x1="424" y1="175" x2="432" y2="175" stroke="#4A5A68" stroke-width="1"/>
+  <line x1="424" y1="187" x2="432" y2="187" stroke="#4A5A68" stroke-width="1"/>
+  <text x="420" y="184" font-size="9" text-anchor="end" fill="#4A5A68">premium</text>
+  <text x="444" y="203" font-size="9" text-anchor="end" fill="#4A5A68">S at expiry →</text>
+  <text x="360" y="224" font-size="9.5" text-anchor="middle" fill="#4A5A68">the right to sell at K</text>
+  <text x="360" y="239" font-size="9.5" text-anchor="middle" fill="#4A5A68">loss capped at the premium</text>
+  <text x="360" y="254" font-size="9.5" text-anchor="middle" fill="#4A5A68">gain at most K − premium</text>
+  <rect x="484" y="32" width="216" height="230" rx="10" fill="#fff" stroke="#C9CFC6" stroke-width="1.5"/>
+  <text x="592" y="52" font-size="11" font-weight="700" text-anchor="middle" fill="#D64B2A">SHORT PUT</text>
+  <line x1="500" y1="66" x2="500" y2="206" stroke="#9AA6AF" stroke-width="1"/>
+  <line x1="500" y1="112" x2="680" y2="112" stroke="#4A5A68" stroke-width="1.2"/>
+  <text x="496" y="115" font-size="9" text-anchor="end" fill="#4A5A68">0</text>
+  <line x1="589" y1="108" x2="589" y2="116" stroke="#1F2C38" stroke-width="1.2"/>
+  <text x="589" y="127" font-size="9" text-anchor="middle" fill="#1F2C38">K</text>
+  <polyline points="504,197 589,112 674,112" fill="none" stroke="#1F2C38" stroke-width="2"/>
+  <polyline points="504,179 589,94 674,94" fill="none" stroke="#3A56C5" stroke-width="2" stroke-dasharray="5 4"/>
+  <circle cx="571" cy="112" r="3" fill="#3A56C5"/>
+  <text x="566" y="104" font-size="9" text-anchor="end" fill="#4A5A68">breakeven</text>
+  <line x1="660" y1="97" x2="660" y2="109" stroke="#4A5A68" stroke-width="1"/>
+  <line x1="656" y1="97" x2="664" y2="97" stroke="#4A5A68" stroke-width="1"/>
+  <line x1="656" y1="109" x2="664" y2="109" stroke="#4A5A68" stroke-width="1"/>
+  <text x="652" y="106" font-size="9" text-anchor="end" fill="#4A5A68">premium</text>
+  <text x="676" y="127" font-size="9" text-anchor="end" fill="#4A5A68">S at expiry →</text>
+  <text x="592" y="224" font-size="9.5" text-anchor="middle" fill="#4A5A68">the obligation to buy at K</text>
+  <text x="592" y="239" font-size="9.5" text-anchor="middle" fill="#4A5A68">keeps the premium if S ≥ K</text>
+  <text x="592" y="254" font-size="9.5" text-anchor="middle" fill="#4A5A68">loses up to K − premium</text>
+  <text x="360" y="282" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">A buyer pays the premium for a right; a seller is paid it for taking on an obligation.</text>
+</svg>
+<figcaption>fig 2.7.1 — payoff (solid) and P&amp;L at expiry (dashed) for a long call, a long put and a short put on the same strike: the buyer's worst case is the premium, the seller's best case is the premium</figcaption>
+</figure>
+
+<p>The <em>payoff</em> ignores what you paid; the <a class="term" href="session03-returns-pnl-leverage.html#g-p-l" data-term="P&amp;L">P&amp;L</a> at expiry subtracts the premium (like most payoff diagrams, we ignore the interest on it). The lab's running example is a <span data-lab="S0" data-fmt="$,.0f">$100</span> stock with <span data-lab="tau_months" data-fmt=".0f">3</span>-month options, a <span data-lab="r_f" data-fmt=".0%">4%</span> risk-free rate and a <span data-lab="sigma" data-fmt=".0%">20%</span> <a class="term" href="session03-returns-pnl-leverage.html#g-volatility" data-term="volatility">volatility</a> — §2.7.6 explains where the premiums come from. The 100-strike call costs <span data-lab="C_atm" data-fmt="$.2f">$4.49</span> and the 100-strike put <span data-lab="P_atm" data-fmt="$.2f">$3.49</span>, so the call buyer breaks even at <span data-lab="call_breakeven" data-fmt=".2f">104.49</span> and the put buyer at <span data-lab="put_breakeven" data-fmt=".2f">96.51</span>:</p>
+
+<table>
+<thead><tr><th>Stock at expiry</th><th>Own the stock (bought at 100)</th><th>Long 100 call</th><th>Long 100 put</th><th>Short 100 put</th></tr></thead>
+<tbody>
+<tr><td>80</td><td><span data-lab="pnl_stock_80" data-fmt="+.2f">−20.00</span></td><td><span data-lab="pnl_long_call_80" data-fmt="+.2f">−4.49</span></td><td><span data-lab="pnl_long_put_80" data-fmt="+.2f">+16.51</span></td><td><span data-lab="pnl_short_put_80" data-fmt="+.2f">−16.51</span></td></tr>
+<tr><td>90</td><td><span data-lab="pnl_stock_90" data-fmt="+.2f">−10.00</span></td><td><span data-lab="pnl_long_call_90" data-fmt="+.2f">−4.49</span></td><td><span data-lab="pnl_long_put_90" data-fmt="+.2f">+6.51</span></td><td><span data-lab="pnl_short_put_90" data-fmt="+.2f">−6.51</span></td></tr>
+<tr><td>100</td><td><span data-lab="pnl_stock_100" data-fmt="+.2f">+0.00</span></td><td><span data-lab="pnl_long_call_100" data-fmt="+.2f">−4.49</span></td><td><span data-lab="pnl_long_put_100" data-fmt="+.2f">−3.49</span></td><td><span data-lab="pnl_short_put_100" data-fmt="+.2f">+3.49</span></td></tr>
+<tr><td>110</td><td><span data-lab="pnl_stock_110" data-fmt="+.2f">+10.00</span></td><td><span data-lab="pnl_long_call_110" data-fmt="+.2f">+5.51</span></td><td><span data-lab="pnl_long_put_110" data-fmt="+.2f">−3.49</span></td><td><span data-lab="pnl_short_put_110" data-fmt="+.2f">+3.49</span></td></tr>
+<tr><td>120</td><td><span data-lab="pnl_stock_120" data-fmt="+.2f">+20.00</span></td><td><span data-lab="pnl_long_call_120" data-fmt="+.2f">+15.51</span></td><td><span data-lab="pnl_long_put_120" data-fmt="+.2f">−3.49</span></td><td><span data-lab="pnl_short_put_120" data-fmt="+.2f">+3.49</span></td></tr>
+</tbody>
+</table>
+
+<p>Two things jump out. The short put column is the long put column with the sign flipped: before costs, options are a <a class="term" href="../unit01-quant-landscape/session02-where-returns-come-from.html#g-zero-sum-game" data-term="zero-sum game">zero-sum game</a>. And the call is <a class="term" href="session03-returns-pnl-leverage.html#g-leverage" data-term="leverage">leverage</a> without a loan: if the stock rises <span data-lab="lev_stock_ret" data-fmt=".0%">10%</span> by expiry, the call returns <span data-lab="lev_call_ret" data-fmt="+.0%">+123%</span>; if it does not move at all, the call returns <span data-lab="lev_call_ret_flat" data-fmt=".0%">−100%</span>.</p>
+
+<div class="co key"><span class="co-t">📌 Key idea — the buyer's risk is known; the seller's is not</span>
+<p>An option buyer can lose the premium and no more. The seller's best case is keeping the premium, and the worst case is large: a short put loses up to <math><semantics><mi>K</mi><annotation encoding="application/x-tex">K</annotation></semantics></math> minus the premium, a short call without the stock has no upper limit. <mark>Buying an option buys a known worst case; selling one sells it — and gets paid for the risk.</mark></p>
+</div>
+
+<h3>Reading a contract</h3>
+<p>Listed options are standardised and cleared by a <a class="term" href="session01-market-anatomy.html#g-clearing-house" data-term="clearing house">clearing house</a> — in the US, the Options Clearing Corporation (OCC). A standard US equity option covers 100 shares, and premiums are quoted per share, so a <span data-lab="C_atm" data-fmt="$.2f">$4.49</span> call costs <span data-lab="C_atm_contract" data-fmt="$,.0f">$449</span> per contract. There are two exercise styles. <strong>American</strong> options can be exercised on any business day up to expiry; <strong>European</strong> options only at expiry. At expiry, the OCC's exercise-by-exception procedure exercises any equity option that is at least $0.01 in the money unless the holder instructs otherwise; your broker may use a different threshold (Options Industry Council, as of 2026). Two ways to trade S&amp;P 500 options — through an <a class="term" href="session02-equities-indices-etfs.html#g-etf" data-term="ETF">ETF</a> or on the <a class="term" href="session02-equities-indices-etfs.html#g-index" data-term="index">index</a> itself — show both conventions for exercise and <a class="term" href="session01-market-anatomy.html#g-settlement" data-term="settlement">settlement</a> (Cboe fact sheet, 2026; US examples):</p>
+
+<table>
+<thead><tr><th></th><th>SPY option (an ETF)</th><th>SPX option (the index itself)</th></tr></thead>
+<tbody>
+<tr><td>One contract is</td><td>100 shares of the SPDR S&amp;P 500 ETF</td><td>$100 × the index level</td></tr>
+<tr><td>Exercise style</td><td>American — any business day</td><td>European — only at expiry</td></tr>
+<tr><td>Settlement</td><td>physical: ETF shares change hands at <math><semantics><mi>K</mi><annotation encoding="application/x-tex">K</annotation></semantics></math></td><td>cash: the in-the-money amount × $100</td></tr>
+<tr><td>Settlement value</td><td>none needed: the shares are delivered</td><td>opening prices on the third Friday for standard monthlies (AM); closing prices for weeklies (PM)</td></tr>
+</tbody>
+</table>
+
+<p>Does the exercise style matter? For a call on a stock that pays no <a class="term" href="session02-equities-indices-etfs.html#g-dividend" data-term="dividend">dividends</a>, no: early exercise throws away time value and pays the strike sooner, so an American call is worth no more than a European one (Merton 1973). For puts, and for calls just before a dividend, early exercise can pay; <span class="xref soon" data-xref="10.1" data-auto="" title="Coming soon">Session 10.1 — No-Arbitrage &amp; Binomial Trees</span> prices that extra right on a binomial tree. Everything else in this session uses European options.</p>
+</section>
+
+<section id="s2">
+<h2><span class="no">2.7.2</span> Moneyness, intrinsic value &amp; time value</h2>
+<p class="lede">An option's price splits into what it would pay if exercised right now and what the remaining time is worth. Where the stock sits relative to the strike decides the split.</p>
+
+<p><strong>Moneyness</strong> describes where today's price sits relative to the strike. A call is <em>in the money</em> (ITM) when <math><semantics><mrow><mi>S</mi><mo>&gt;</mo><mi>K</mi></mrow><annotation encoding="application/x-tex">S \gt K</annotation></semantics></math> — exercising now would pay — <em>at the money</em> (ATM) when <math><semantics><mrow><mi>S</mi><mo>≈</mo><mi>K</mi></mrow><annotation encoding="application/x-tex">S \approx K</annotation></semantics></math>, and <em>out of the money</em> (OTM) when <math><semantics><mrow><mi>S</mi><mo>&lt;</mo><mi>K</mi></mrow><annotation encoding="application/x-tex">S \lt K</annotation></semantics></math>. For a put, the labels swap sides:</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 280" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">MONEYNESS — where the stock price S sits relative to the strike K</text>
+  <rect x="26" y="36" width="74" height="56" rx="8" fill="#F5F6F2" stroke="#4A5A68" stroke-width="1.5"/>
+  <text x="63" y="61" font-size="11" font-weight="700" text-anchor="middle" fill="#1F2C38">CALL</text>
+  <text x="63" y="77" font-size="9" text-anchor="middle" fill="#4A5A68">right to buy</text>
+  <rect x="108" y="36" width="227" height="56" rx="8" fill="#F5F6F2" stroke="#9AA6AF" stroke-width="1.5"/>
+  <text x="221.5" y="58" font-size="10.5" font-weight="700" text-anchor="middle" fill="#4A5A68">OUT OF THE MONEY · S &lt; K</text>
+  <text x="221.5" y="76" font-size="9.5" text-anchor="middle" fill="#4A5A68">intrinsic 0 · price is all time value</text>
+  <rect x="339" y="36" width="52" height="56" rx="8" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="365" y="58" font-size="10.5" font-weight="700" text-anchor="middle" fill="#8A6D00">ATM</text>
+  <text x="365" y="76" font-size="9" text-anchor="middle" fill="#4A5A68">S ≈ K</text>
+  <rect x="395" y="36" width="299" height="56" rx="8" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="544.5" y="58" font-size="10.5" font-weight="700" text-anchor="middle" fill="#1F7A55">IN THE MONEY · S &gt; K</text>
+  <text x="544.5" y="76" font-size="9.5" text-anchor="middle" fill="#4A5A68">intrinsic S − K, plus some time value</text>
+  <rect x="26" y="100" width="74" height="56" rx="8" fill="#F5F6F2" stroke="#4A5A68" stroke-width="1.5"/>
+  <text x="63" y="125" font-size="11" font-weight="700" text-anchor="middle" fill="#1F2C38">PUT</text>
+  <text x="63" y="141" font-size="9" text-anchor="middle" fill="#4A5A68">right to sell</text>
+  <rect x="108" y="100" width="227" height="56" rx="8" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="221.5" y="122" font-size="10.5" font-weight="700" text-anchor="middle" fill="#1F7A55">IN THE MONEY · S &lt; K</text>
+  <text x="221.5" y="140" font-size="9.5" text-anchor="middle" fill="#4A5A68">intrinsic K − S, plus some time value</text>
+  <rect x="339" y="100" width="52" height="56" rx="8" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="365" y="122" font-size="10.5" font-weight="700" text-anchor="middle" fill="#8A6D00">ATM</text>
+  <text x="365" y="140" font-size="9" text-anchor="middle" fill="#4A5A68">S ≈ K</text>
+  <rect x="395" y="100" width="299" height="56" rx="8" fill="#F5F6F2" stroke="#9AA6AF" stroke-width="1.5"/>
+  <text x="544.5" y="122" font-size="10.5" font-weight="700" text-anchor="middle" fill="#4A5A68">OUT OF THE MONEY · S &gt; K</text>
+  <text x="544.5" y="140" font-size="9.5" text-anchor="middle" fill="#4A5A68">intrinsic 0 · price is all time value</text>
+  <path d="M108,226 C250,224 300,188 365,188 C430,188 480,224 694,226 Z" fill="#EDF0FC" stroke="none"/>
+  <path d="M108,226 C250,224 300,188 365,188 C430,188 480,224 694,226" fill="none" stroke="#3A56C5" stroke-width="2"/>
+  <text x="365" y="180" font-size="9.5" text-anchor="middle" fill="#3A56C5">time value: largest near the money (a call's sits above the put's by the interest on K)</text>
+  <line x1="108" y1="228" x2="694" y2="228" stroke="#1F2C38" stroke-width="1.5" marker-end="url(#s2a)"/>
+  <line x1="365" y1="224" x2="365" y2="232" stroke="#1F2C38" stroke-width="1.5"/>
+  <text x="365" y="244" font-size="10" font-weight="600" text-anchor="middle" fill="#1F2C38">K</text>
+  <text x="108" y="244" font-size="9.5" fill="#4A5A68">← lower S</text>
+  <text x="690" y="244" font-size="9.5" text-anchor="end" fill="#4A5A68">higher S, today →</text>
+  <text x="360" y="268" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">On one strike, a call's in-the-money side is the put's out-of-the-money side.</text>
+  <defs><marker id="s2a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F2C38"/></marker></defs>
+</svg>
+<figcaption>fig 2.7.2 — the moneyness map: in, at or out of the money for a call (top) and a put (bottom); time value, sketched below, peaks near the strike</figcaption>
+</figure>
+
+<p><strong>Intrinsic value</strong> is what the option would pay if exercised now: <math><semantics><mrow><mrow><mi>max</mi><mo>⁡</mo></mrow><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>S</mi><mo>−</mo><mi>K</mi><mo separator="true">,</mo><mn>0</mn><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">\max(S - K, 0)</annotation></semantics></math> for a call, <math><semantics><mrow><mrow><mi>max</mi><mo>⁡</mo></mrow><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>K</mi><mo>−</mo><mi>S</mi><mo separator="true">,</mo><mn>0</mn><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">\max(K - S, 0)</annotation></semantics></math> for a put. <strong>Time value</strong> is everything else in the price. With the stock at <span data-lab="S0" data-fmt="$,.0f">$100</span>, three strikes from the lab:</p>
+
+<table>
+<thead><tr><th>Strike</th><th>Call: moneyness</th><th>Call price = intrinsic + time value</th><th>Put: moneyness</th><th>Put price = intrinsic + time value</th></tr></thead>
+<tbody>
+<tr><td>90</td><td>ITM</td><td><span data-lab="k90_call" data-fmt=".2f">11.48</span> = <span data-lab="k90_call_intr" data-fmt=".2f">10.00</span> + <span data-lab="k90_call_tv" data-fmt=".2f">1.48</span></td><td>OTM</td><td><span data-lab="k90_put" data-fmt=".2f">0.58</span> = <span data-lab="k90_put_intr" data-fmt=".2f">0.00</span> + <span data-lab="k90_put_tv" data-fmt=".2f">0.58</span></td></tr>
+<tr><td>100</td><td>ATM</td><td><span data-lab="k100_call" data-fmt=".2f">4.49</span> = <span data-lab="k100_call_intr" data-fmt=".2f">0.00</span> + <span data-lab="k100_call_tv" data-fmt=".2f">4.49</span></td><td>ATM</td><td><span data-lab="k100_put" data-fmt=".2f">3.49</span> = <span data-lab="k100_put_intr" data-fmt=".2f">0.00</span> + <span data-lab="k100_put_tv" data-fmt=".2f">3.49</span></td></tr>
+<tr><td>110</td><td>OTM</td><td><span data-lab="k110_call" data-fmt=".2f">1.14</span> = <span data-lab="k110_call_intr" data-fmt=".2f">0.00</span> + <span data-lab="k110_call_tv" data-fmt=".2f">1.14</span></td><td>ITM</td><td><span data-lab="k110_put" data-fmt=".2f">10.05</span> = <span data-lab="k110_put_intr" data-fmt=".2f">10.00</span> + <span data-lab="k110_put_tv" data-fmt=".2f">0.05</span></td></tr>
+</tbody>
+</table>
+
+<figure class="diagram chart">
+<!-- chart:time_value -->
+<svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Value of a 100-strike call against the stock price (x = stock price, $)">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">VALUE OF A 100-STRIKE CALL AGAINST THE STOCK PRICE (X = STOCK PRICE, $)</text>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#3A56C5" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">3 months to expiry</text>
+  <line x1="185.2" y1="32" x2="201.2" y2="32" stroke="#E8850C" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="207.2" y="36" font-size="11" fill="#4A5A68">1 month to expiry</text>
+  <line x1="338.0" y1="32" x2="354.0" y2="32" stroke="#4A5A68" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="360.0" y="36" font-size="11" fill="#4A5A68">at expiry = intrinsic value</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="268" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$0</text>
+  <line x1="64" y1="221.6" x2="602" y2="221.6" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="225.6" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$5</text>
+  <line x1="64" y1="179.2" x2="602" y2="179.2" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="183.2" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$10</text>
+  <line x1="64" y1="136.8" x2="602" y2="136.8" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="140.8" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$15</text>
+  <line x1="64" y1="94.4" x2="602" y2="94.4" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="98.4" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$20</text>
+  <line x1="64" y1="52" x2="602" y2="52" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="56" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$25</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#C9CFC6" stroke-width="1"/>
+  <line x1="64" y1="264" x2="64" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="64" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">80</text>
+  <line x1="198.5" y1="264" x2="198.5" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="198.5" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">90</text>
+  <line x1="333" y1="264" x2="333" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="333" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">100</text>
+  <line x1="467.5" y1="264" x2="467.5" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="467.5" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">110</text>
+  <line x1="602" y1="264" x2="602" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="602" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">120</text>
+  <polyline points="64,263.6 67.4,263.5 70.7,263.5 74.1,263.4 77.5,263.4 80.8,263.3 84.2,263.3 87.5,263.2 90.9,263.1 94.3,263 97.6,263 101,262.9 104.3,262.8 107.7,262.7 111.1,262.6 114.4,262.5 117.8,262.4 121.2,262.3 124.5,262.1 127.9,262 131.2,261.8 134.6,261.7 138,261.5 141.3,261.4 144.7,261.2 148.1,261 151.4,260.8 154.8,260.6 158.1,260.4 161.5,260.1 164.9,259.9 168.2,259.6 171.6,259.4 175,259.1 178.3,258.8 181.7,258.5 185.1,258.2 188.4,257.8 191.8,257.5 195.1,257.1 198.5,256.7 201.9,256.3 205.2,255.9 208.6,255.5 212,255 215.3,254.6 218.7,254.1 222,253.6 225.4,253.1 228.8,252.6 232.1,252 235.5,251.4 238.8,250.8 242.2,250.2 245.6,249.6 248.9,249 252.3,248.3 255.7,247.6 259,246.9 262.4,246.2 265.8,245.4 269.1,244.7 272.5,243.9 275.8,243.1 279.2,242.2 282.6,241.4 285.9,240.5 289.3,239.6 292.6,238.7 296,237.7 299.4,236.8 302.7,235.8 306.1,234.8 309.5,233.8 312.8,232.7 316.2,231.6 319.5,230.5 322.9,229.4 326.3,228.3 329.6,227.1 333,226 336.4,224.8 339.7,223.6 343.1,222.3 346.4,221.1 349.8,219.8 353.2,218.5 356.5,217.2 359.9,215.8 363.3,214.5 366.6,213.1 370,211.7 373.3,210.3 376.7,208.8 380.1,207.4 383.4,205.9 386.8,204.4 390.2,202.9 393.5,201.4 396.9,199.9 400.2,198.3 403.6,196.7 407,195.1 410.3,193.5 413.7,191.9 417.1,190.3 420.4,188.6 423.8,187 427.2,185.3 430.5,183.6 433.9,181.9 437.2,180.2 440.6,178.4 444,176.7 447.3,174.9 450.7,173.1 454.1,171.4 457.4,169.6 460.8,167.8 464.1,165.9 467.5,164.1 470.9,162.3 474.2,160.4 477.6,158.6 480.9,156.7 484.3,154.8 487.7,152.9 491,151 494.4,149.1 497.8,147.2 501.1,145.3 504.5,143.4 507.8,141.4 511.2,139.5 514.6,137.5 517.9,135.6 521.3,133.6 524.7,131.6 528,129.7 531.4,127.7 534.8,125.7 538.1,123.7 541.5,121.7 544.8,119.7 548.2,117.7 551.6,115.7 554.9,113.7 558.3,111.6 561.7,109.6 565,107.6 568.4,105.5 571.7,103.5 575.1,101.5 578.5,99.4 581.8,97.4 585.2,95.3 588.5,93.3 591.9,91.2 595.3,89.1 598.6,87.1 602,85" fill="none" stroke="#3A56C5" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>3 months to expiry</title></polyline>
+  <circle cx="602" cy="85" r="4" fill="#3A56C5" stroke="#FBFBF8" stroke-width="2"><title>3 months to expiry: $21</title></circle>
+  <polyline points="64,264 67.4,264 70.7,264 74.1,264 77.5,264 80.8,264 84.2,264 87.5,264 90.9,264 94.3,264 97.6,264 101,264 104.3,264 107.7,264 111.1,264 114.4,264 117.8,264 121.2,264 124.5,264 127.9,264 131.2,264 134.6,264 138,263.9 141.3,263.9 144.7,263.9 148.1,263.9 151.4,263.9 154.8,263.9 158.1,263.9 161.5,263.8 164.9,263.8 168.2,263.8 171.6,263.7 175,263.7 178.3,263.7 181.7,263.6 185.1,263.6 188.4,263.5 191.8,263.4 195.1,263.4 198.5,263.3 201.9,263.2 205.2,263.1 208.6,263 212,262.9 215.3,262.7 218.7,262.6 222,262.4 225.4,262.2 228.8,262 232.1,261.8 235.5,261.6 238.8,261.4 242.2,261.1 245.6,260.8 248.9,260.5 252.3,260.2 255.7,259.8 259,259.4 262.4,259 265.8,258.6 269.1,258.1 272.5,257.6 275.8,257.1 279.2,256.6 282.6,256 285.9,255.4 289.3,254.7 292.6,254 296,253.3 299.4,252.6 302.7,251.8 306.1,250.9 309.5,250.1 312.8,249.2 316.2,248.3 319.5,247.3 322.9,246.3 326.3,245.3 329.6,244.2 333,243.1 336.4,241.9 339.7,240.7 343.1,239.5 346.4,238.2 349.8,236.9 353.2,235.6 356.5,234.3 359.9,232.9 363.3,231.4 366.6,230 370,228.5 373.3,227 376.7,225.4 380.1,223.8 383.4,222.2 386.8,220.6 390.2,218.9 393.5,217.2 396.9,215.5 400.2,213.8 403.6,212 407,210.2 410.3,208.4 413.7,206.6 417.1,204.8 420.4,202.9 423.8,201 427.2,199.2 430.5,197.2 433.9,195.3 437.2,193.4 440.6,191.4 444,189.5 447.3,187.5 450.7,185.5 454.1,183.5 457.4,181.5 460.8,179.5 464.1,177.5 467.5,175.5 470.9,173.4 474.2,171.4 477.6,169.3 480.9,167.3 484.3,165.2 487.7,163.1 491,161.1 494.4,159 497.8,156.9 501.1,154.8 504.5,152.8 507.8,150.7 511.2,148.6 514.6,146.5 517.9,144.4 521.3,142.3 524.7,140.2 528,138.1 531.4,136 534.8,133.9 538.1,131.8 541.5,129.6 544.8,127.5 548.2,125.4 551.6,123.3 554.9,121.2 558.3,119.1 561.7,117 565,114.9 568.4,112.7 571.7,110.6 575.1,108.5 578.5,106.4 581.8,104.3 585.2,102.2 588.5,100 591.9,97.9 595.3,95.8 598.6,93.7 602,91.6" fill="none" stroke="#E8850C" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>1 month to expiry</title></polyline>
+  <circle cx="602" cy="91.6" r="4" fill="#E8850C" stroke="#FBFBF8" stroke-width="2"><title>1 month to expiry: $20</title></circle>
+  <polyline points="64,264 67.4,264 70.7,264 74.1,264 77.5,264 80.8,264 84.2,264 87.5,264 90.9,264 94.3,264 97.6,264 101,264 104.3,264 107.7,264 111.1,264 114.4,264 117.8,264 121.2,264 124.5,264 127.9,264 131.2,264 134.6,264 138,264 141.3,264 144.7,264 148.1,264 151.4,264 154.8,264 158.1,264 161.5,264 164.9,264 168.2,264 171.6,264 175,264 178.3,264 181.7,264 185.1,264 188.4,264 191.8,264 195.1,264 198.5,264 201.9,264 205.2,264 208.6,264 212,264 215.3,264 218.7,264 222,264 225.4,264 228.8,264 232.1,264 235.5,264 238.8,264 242.2,264 245.6,264 248.9,264 252.3,264 255.7,264 259,264 262.4,264 265.8,264 269.1,264 272.5,264 275.8,264 279.2,264 282.6,264 285.9,264 289.3,264 292.6,264 296,264 299.4,264 302.7,264 306.1,264 309.5,264 312.8,264 316.2,264 319.5,264 322.9,264 326.3,264 329.6,264 333,264 336.4,261.9 339.7,259.8 343.1,257.6 346.4,255.5 349.8,253.4 353.2,251.3 356.5,249.2 359.9,247 363.3,244.9 366.6,242.8 370,240.7 373.3,238.6 376.7,236.4 380.1,234.3 383.4,232.2 386.8,230.1 390.2,228 393.5,225.8 396.9,223.7 400.2,221.6 403.6,219.5 407,217.4 410.3,215.2 413.7,213.1 417.1,211 420.4,208.9 423.8,206.8 427.2,204.6 430.5,202.5 433.9,200.4 437.2,198.3 440.6,196.2 444,194 447.3,191.9 450.7,189.8 454.1,187.7 457.4,185.6 460.8,183.4 464.1,181.3 467.5,179.2 470.9,177.1 474.2,175 477.6,172.8 480.9,170.7 484.3,168.6 487.7,166.5 491,164.4 494.4,162.2 497.8,160.1 501.1,158 504.5,155.9 507.8,153.8 511.2,151.6 514.6,149.5 517.9,147.4 521.3,145.3 524.7,143.2 528,141 531.4,138.9 534.8,136.8 538.1,134.7 541.5,132.6 544.8,130.4 548.2,128.3 551.6,126.2 554.9,124.1 558.3,122 561.7,119.8 565,117.7 568.4,115.6 571.7,113.5 575.1,111.4 578.5,109.2 581.8,107.1 585.2,105 588.5,102.9 591.9,100.8 595.3,98.6 598.6,96.5 602,94.4" fill="none" stroke="#4A5A68" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><title>at expiry = intrinsic value</title></polyline>
+  <circle cx="602" cy="94.4" r="4" fill="#4A5A68" stroke="#FBFBF8" stroke-width="2"><title>at expiry = intrinsic value: $20</title></circle>
+  <text x="614" y="89" font-size="11" fill="#1F2C38">3 months: $21</text>
+  <line x1="607" y1="91.6" x2="614" y2="95" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="614" y="103" font-size="11" fill="#1F2C38">1 month: $20</text>
+  <line x1="607" y1="94.4" x2="614" y2="109" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="614" y="117" font-size="11" fill="#1F2C38">expiry: $20</text>
+</svg>
+<!-- /chart:time_value -->
+<figcaption>fig 2.7.3 — a 100-strike call's value against the stock price: three months out, one month out, and at expiry; the gap above the hockey stick is time value, largest at the strike and shrinking as expiry nears</figcaption>
+</figure>
+
+<p>Why does time value exist? Because the payoff is lopsided: below the strike, bad outcomes are floored at zero; above it, good outcomes count in full. Average that hockey stick over every price the stock might reach by expiry and the floor is worth money — more the wider the spread of possible prices, so more with higher volatility and more time. That is <em>optionality under uncertainty</em>. The lab checks it by switching the uncertainty off: at <math><semantics><mrow><mi>σ</mi><mo>→</mo><mn>0</mn></mrow><annotation encoding="application/x-tex">\sigma \to 0</annotation></semantics></math> the at-the-money call is worth only <span data-lab="C_atm_novol" data-fmt="$.3f">$0.995</span>, which is <math><semantics><mrow><mi>S</mi><mo>−</mo><mi>K</mi><msup><mi>e</mi><mrow class="tml-sml-pad"><mo form="prefix" stretchy="false" lspace="0em" rspace="0em">−</mo><msub><mi>r</mi><mi>f</mi></msub><mi>τ</mi></mrow></msup></mrow><annotation encoding="application/x-tex">S - K e^{-r_f \tau}</annotation></semantics></math> — the interest saved by paying the strike later — against <span data-lab="C_atm" data-fmt="$.2f">$4.49</span> at <span data-lab="sigma" data-fmt=".0%">20%</span> volatility. The other <span data-lab="C_atm_optionality" data-fmt="$.2f">$3.49</span> is optionality. With less time left there is less room to move, so time value decays: with one month to go the ATM call is worth <span data-lab="C_atm_1m" data-fmt="$.2f">$2.47</span> (fig 2.7.3). The rate of that decay is <span class="term soon" data-term="theta" title="Defined in Session 10.4 (coming soon)">theta</span>, one of the Greeks of <span class="xref soon" data-xref="10.4" data-auto="" title="Coming soon">Session 10.4 — The Greeks &amp; Hedging P&amp;L</span>.</p>
+
+<div class="co note"><span class="co-t">🧭 Margin note — time value can be negative</span>
+<p>A European put deep in the money pays <math><semantics><mi>K</mi><annotation encoding="application/x-tex">K</annotation></semantics></math> only at expiry, so it is worth about <math><semantics><mrow><mi>K</mi><msup><mi>e</mi><mrow class="tml-sml-pad"><mo form="prefix" stretchy="false" lspace="0em" rspace="0em">−</mo><msub><mi>r</mi><mi>f</mi></msub><mi>τ</mi></mrow></msup><mo>−</mo><mi>S</mi></mrow><annotation encoding="application/x-tex">K e^{-r_f \tau} - S</annotation></semantics></math>, less than its intrinsic value <math><semantics><mrow><mi>K</mi><mo>−</mo><mi>S</mi></mrow><annotation encoding="application/x-tex">K - S</annotation></semantics></math>. In the lab, with the stock at <span data-lab="deep_put_S" data-fmt="$.0f">$60</span> the 100 put is worth <span data-lab="deep_put_price" data-fmt="$.2f">$39.00</span> against an intrinsic <span data-lab="deep_put_intr" data-fmt="$.2f">$40.00</span>: a time value of <span data-lab="deep_put_tv" data-fmt="$.2f">−$1.00</span>. An American holder would exercise instead and earn interest on the strike — one reason American puts are worth more than European ones. The table shows a milder version: the in-the-money 110 put has almost no time value. Practitioners also measure moneyness as <math><semantics><mrow><mi>K</mi><mi>/</mi><mi>S</mi></mrow><annotation encoding="application/x-tex">K/S</annotation></semantics></math>, against the forward price, or by the option's <span class="term soon" data-term="delta" title="Defined in Session 10.4 (coming soon)">delta</span> (<span class="xref soon" data-xref="10.4" data-style="short" data-auto="" title="Coming soon">Session 10.4</span>).</p>
+</div>
+</section>
+
+<section id="s3">
+<h2><span class="no">2.7.3</span> Put-call parity: two portfolios, one payoff</h2>
+<p class="lede">You can build a call out of a put, a share and a bond. That single fact pins the price of every European call to the price of the put with the same strike and expiry — no model, no forecast, no volatility required.</p>
+
+<p>Compare two portfolios. <strong>A</strong> holds one call and a zero-coupon bond that pays <math><semantics><mi>K</mi><annotation encoding="application/x-tex">K</annotation></semantics></math> at expiry, which costs <math><semantics><mrow><mi>K</mi><msup><mi>e</mi><mrow class="tml-sml-pad"><mo form="prefix" stretchy="false" lspace="0em" rspace="0em">−</mo><msub><mi>r</mi><mi>f</mi></msub><mi>τ</mi></mrow></msup></mrow><annotation encoding="application/x-tex">K e^{-r_f \tau}</annotation></semantics></math> today. <strong>B</strong> holds one put and one share. If the stock ends below the strike, A's call is worthless and the bond pays <math><semantics><mi>K</mi><annotation encoding="application/x-tex">K</annotation></semantics></math>, while B's put pays <math><semantics><mrow><mi>K</mi><mo>−</mo><msub><mi>S</mi><mtext>exp</mtext></msub></mrow><annotation encoding="application/x-tex">K - S_{\text{exp}}</annotation></semantics></math>, which with the share makes <math><semantics><mi>K</mi><annotation encoding="application/x-tex">K</annotation></semantics></math>. If it ends above, both are worth <math><semantics><msub><mi>S</mi><mtext>exp</mtext></msub><annotation encoding="application/x-tex">S_{\text{exp}}</annotation></semantics></math>. In every state both portfolios are worth <math><semantics><mrow><mrow><mi>max</mi><mo>⁡</mo></mrow><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><msub><mi>S</mi><mtext>exp</mtext></msub><mo separator="true">,</mo><mi>K</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">\max(S_{\text{exp}}, K)</annotation></semantics></math>:</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 298" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">TWO PORTFOLIOS, ONE PAYOFF — the replication behind put-call parity</text>
+  <rect x="26" y="34" width="240" height="90" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="146" y="54" font-size="11" font-weight="700" text-anchor="middle" fill="#3A56C5">PORTFOLIO A</text>
+  <rect x="40" y="64" width="212" height="24" rx="5" fill="#fff" stroke="#C9D2F1"/>
+  <text x="50" y="80" font-size="9.5" fill="#1F2C38">1 call, strike K · costs C</text>
+  <rect x="40" y="94" width="212" height="24" rx="5" fill="#fff" stroke="#C9D2F1"/>
+  <text x="50" y="110" font-size="9.5" fill="#1F2C38">1 bond paying K · costs K·e^(−r_f τ)</text>
+  <rect x="26" y="140" width="240" height="90" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="146" y="160" font-size="11" font-weight="700" text-anchor="middle" fill="#3A56C5">PORTFOLIO B</text>
+  <rect x="40" y="170" width="212" height="24" rx="5" fill="#fff" stroke="#C9D2F1"/>
+  <text x="50" y="186" font-size="9.5" fill="#1F2C38">1 put, strike K · costs P</text>
+  <rect x="40" y="200" width="212" height="24" rx="5" fill="#fff" stroke="#C9D2F1"/>
+  <text x="50" y="216" font-size="9.5" fill="#1F2C38">1 share · costs S</text>
+  <path d="M268,112 H286" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s3a)"/>
+  <path d="M268,182 H286" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s3a)"/>
+  <rect x="290" y="34" width="404" height="196" rx="9" fill="#fff" stroke="#4A5A68" stroke-width="1.5"/>
+  <text x="304" y="54" font-size="11" font-weight="700" fill="#1F2C38">WORTH AT EXPIRY</text>
+  <text x="545" y="74" font-size="9.5" font-weight="600" text-anchor="middle" fill="#4A5A68">if S_exp &lt; K</text>
+  <text x="640" y="74" font-size="9.5" font-weight="600" text-anchor="middle" fill="#4A5A68">if S_exp ≥ K</text>
+  <text x="306" y="94" font-size="9.5" fill="#1F2C38">call</text>
+  <text x="545" y="94" font-size="9.5" text-anchor="middle" fill="#1F2C38">0</text>
+  <text x="640" y="94" font-size="9.5" text-anchor="middle" fill="#1F2C38">S_exp − K</text>
+  <text x="306" y="110" font-size="9.5" fill="#1F2C38">bond</text>
+  <text x="545" y="110" font-size="9.5" text-anchor="middle" fill="#1F2C38">K</text>
+  <text x="640" y="110" font-size="9.5" text-anchor="middle" fill="#1F2C38">K</text>
+  <rect x="298" y="117" width="388" height="20" rx="4" fill="#E9F5EF"/>
+  <text x="306" y="131" font-size="9.5" font-weight="700" fill="#1F7A55">A in total</text>
+  <text x="545" y="131" font-size="9.5" font-weight="700" text-anchor="middle" fill="#1F7A55">K</text>
+  <text x="640" y="131" font-size="9.5" font-weight="700" text-anchor="middle" fill="#1F7A55">S_exp</text>
+  <line x1="298" y1="147" x2="686" y2="147" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="306" y="164" font-size="9.5" fill="#1F2C38">put</text>
+  <text x="545" y="164" font-size="9.5" text-anchor="middle" fill="#1F2C38">K − S_exp</text>
+  <text x="640" y="164" font-size="9.5" text-anchor="middle" fill="#1F2C38">0</text>
+  <text x="306" y="180" font-size="9.5" fill="#1F2C38">share</text>
+  <text x="545" y="180" font-size="9.5" text-anchor="middle" fill="#1F2C38">S_exp</text>
+  <text x="640" y="180" font-size="9.5" text-anchor="middle" fill="#1F2C38">S_exp</text>
+  <rect x="298" y="187" width="388" height="20" rx="4" fill="#E9F5EF"/>
+  <text x="306" y="201" font-size="9.5" font-weight="700" fill="#1F7A55">B in total</text>
+  <text x="545" y="201" font-size="9.5" font-weight="700" text-anchor="middle" fill="#1F7A55">K</text>
+  <text x="640" y="201" font-size="9.5" font-weight="700" text-anchor="middle" fill="#1F7A55">S_exp</text>
+  <text x="492" y="222" font-size="9.5" text-anchor="middle" fill="#4A5A68" font-style="italic">both are worth max(S_exp, K) in every state</text>
+  <rect x="130" y="242" width="460" height="44" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="360" y="260" font-size="11" font-weight="700" text-anchor="middle" fill="#1F7A55">SAME PAYOFF IN EVERY STATE → SAME PRICE TODAY</text>
+  <text x="360" y="277" font-size="9.5" text-anchor="middle" fill="#1F2C38" font-family="IBM Plex Mono,monospace">C + K·e^(−r_f τ) = P + S, so C − P = S − K·e^(−r_f τ)</text>
+  <defs><marker id="s3a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F2C38"/></marker></defs>
+</svg>
+<figcaption>fig 2.7.4 — the replication argument: a call plus a bond and a put plus a share pay the same in every state at expiry, so they must cost the same today</figcaption>
+</figure>
+
+<p>Two things with identical payoffs must have identical prices; otherwise you buy the cheap one, sell the dear one, and keep the difference with nothing at risk — an <span class="term soon" data-term="arbitrage" title="Defined in Session 7.1 (coming soon)">arbitrage</span>. Ruling that out is the <span class="term soon" data-term="law of one price" title="Defined in Session 10.1 (coming soon)">law of one price</span>, and here it gives <strong>put-call parity</strong> (Stoll 1969):</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><mi>C</mi><mo>+</mo><mi>K</mi><msup><mi>e</mi><mrow class="tml-sml-pad"><mo form="prefix" stretchy="false" lspace="0em" rspace="0em">−</mo><msub><mi>r</mi><mi>f</mi></msub><mi>τ</mi></mrow></msup><mo>=</mo><mi>P</mi><mo>+</mo><mi>S</mi><mspace width="2em"></mspace><mo stretchy="false">⟺</mo><mspace width="2em"></mspace><mi>C</mi><mo>−</mo><mi>P</mi><mo>=</mo><mi>S</mi><mo>−</mo><mi>K</mi><msup><mi>e</mi><mrow class="tml-sml-pad"><mo form="prefix" stretchy="false" lspace="0em" rspace="0em">−</mo><msub><mi>r</mi><mi>f</mi></msub><mi>τ</mi></mrow></msup></mrow><annotation encoding="application/x-tex">C + K e^{-r_f \tau} = P + S \qquad\Longleftrightarrow\qquad C - P = S - K e^{-r_f \tau}</annotation></semantics></math></div>
+<p>If the stock pays a continuous dividend yield <math><semantics><mi>q</mi><annotation encoding="application/x-tex">q</annotation></semantics></math>, start portfolio B with <math><semantics><msup><mi>e</mi><mrow class="tml-sml-pad"><mo form="prefix" stretchy="false" lspace="0em" rspace="0em">−</mo><mi>q</mi><mi>τ</mi></mrow></msup><annotation encoding="application/x-tex">e^{-q\tau}</annotation></semantics></math> shares, so that the reinvested dividends grow it to one share by expiry. Then</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><mi>C</mi><mo>−</mo><mi>P</mi><mo>=</mo><mi>S</mi><msup><mi>e</mi><mrow class="tml-sml-pad"><mo form="prefix" stretchy="false" lspace="0em" rspace="0em">−</mo><mi>q</mi><mi>τ</mi></mrow></msup><mo>−</mo><mi>K</mi><msup><mi>e</mi><mrow class="tml-sml-pad"><mo form="prefix" stretchy="false" lspace="0em" rspace="0em">−</mo><msub><mi>r</mi><mi>f</mi></msub><mi>τ</mi></mrow></msup><mo>=</mo><msup><mi>e</mi><mrow class="tml-sml-pad"><mo form="prefix" stretchy="false" lspace="0em" rspace="0em">−</mo><msub><mi>r</mi><mi>f</mi></msub><mi>τ</mi></mrow></msup><mspace width="0.1667em"></mspace><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>F</mi><mo>−</mo><mi>K</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mo separator="true">,</mo><mspace width="2em"></mspace><mi>F</mi><mo>=</mo><mi>S</mi><msup><mi>e</mi><mrow class="tml-sml-pad"><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><msub><mi>r</mi><mi>f</mi></msub><mo>−</mo><mi>q</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mi>τ</mi></mrow></msup></mrow><annotation encoding="application/x-tex">C - P = S e^{-q\tau} - K e^{-r_f \tau} = e^{-r_f \tau}\,(F - K), \qquad F = S e^{(r_f - q)\tau}</annotation></semantics></math></div>
+<p>where <math><semantics><mi>F</mi><annotation encoding="application/x-tex">F</annotation></semantics></math> is the forward price of <a class="xref" href="session04-futures.html#s2" data-xref="2.4#s2" data-style="short" data-auto="">Session 2.4</a> with net carry <math><semantics><mrow><mi>c</mi><mo>=</mo><msub><mi>r</mi><mi>f</mi></msub><mo>−</mo><mi>q</mi></mrow><annotation encoding="application/x-tex">c = r_f - q</annotation></semantics></math>. For discrete, known dividends, replace <math><semantics><mrow><mi>S</mi><msup><mi>e</mi><mrow class="tml-sml-pad"><mo form="prefix" stretchy="false" lspace="0em" rspace="0em">−</mo><mi>q</mi><mi>τ</mi></mrow></msup></mrow><annotation encoding="application/x-tex">S e^{-q\tau}</annotation></semantics></math> by <math><semantics><mi>S</mi><annotation encoding="application/x-tex">S</annotation></semantics></math> minus the present value of the dividends. The forward form says it all: a long call plus a short put at the same strike <em>is</em> a <a class="term" href="session04-futures.html#g-forward-contract" data-term="forward contract">forward contract</a> to buy at <math><semantics><mi>K</mi><annotation encoding="application/x-tex">K</annotation></semantics></math>, and an at-the-money-forward call (<math><semantics><mrow><mi>K</mi><mo>=</mo><mi>F</mi></mrow><annotation encoding="application/x-tex">K = F</annotation></semantics></math>) costs exactly as much as the put.</p>
+
+<p>Notice what the argument did not use: a model of how the stock moves, a volatility, anyone's forecast. Parity is <em>model-free</em>. The lab illustrates that claim by pricing each option on its own, by <span class="term soon" data-term="Monte Carlo simulation" title="Defined in Session 3.5 (coming soon)">Monte Carlo</span>: <span data-lab="mc_paths" data-fmt=",.0f">400,000</span> simulated prices at expiry from a <span class="term soon" data-term="geometric Brownian motion" title="Defined in Session 3.5 (coming soon)">geometric Brownian motion</span> drifting at the risk-free rate (why that drift is <span class="xref soon" data-xref="10.1" data-style="short" data-auto="" title="Coming soon">Session 10.1</span>'s story), each option priced as its average payoff discounted at <math><semantics><msub><mi>r</mi><mi>f</mi></msub><annotation encoding="application/x-tex">r_f</annotation></semantics></math>:</p>
+
+<pre>S_exp = terminal_gbm(N_PATHS, S0, TAU, R_F, SIGMA, q, rng_parity)
+C, P, C_se, P_se, diff_se = mc_prices(S_exp, STRIKES, TAU, R_F)
+rhs = S0 * np.exp(-q * TAU) - STRIKES * np.exp(-R_F * TAU)
+<span class="c"># The payoff identity behind parity holds path by path, whatever the model:</span>
+<span class="k">assert</span> np.allclose(call_payoff(S_exp, <span class="p">100.0</span>) - put_payoff(S_exp, <span class="p">100.0</span>), S_exp - <span class="p">100.0</span>)
+<span class="c"># ... so the simulated C − P matches S·e^{−qτ} − K·e^{−rτ} within Monte Carlo error (4 standard errors),</span>
+<span class="k">assert</span> (parity.z.abs() &lt; PARITY_TOL_SE).all()</pre>
+
+<p>At the 100 strike the simulation prices the call at <span data-lab="mc_C_atm" data-fmt="$.3f">$4.489</span> (<a class="term" href="../unit03-math-toolkit/session01-probability-expected-value.html#g-standard-error" data-term="standard error">standard error</a> <span data-lab="mc_C_atm_se" data-fmt=".3f">0.010</span>) and the put at <span data-lab="mc_P_atm" data-fmt="$.3f">$3.496</span>, so <math><semantics><mrow><mi>C</mi><mo>−</mo><mi>P</mi><mo>=</mo></mrow><annotation encoding="application/x-tex">C - P =</annotation></semantics></math> <span data-lab="mc_lhs_atm" data-fmt=".4f">0.9933</span> against parity's <span data-lab="mc_rhs_atm" data-fmt=".4f">0.9950</span> — <span data-lab="mc_z_q0" data-fmt=".2f">−0.11</span> standard errors away. With a <span data-lab="div_q" data-fmt=".0%">2%</span> dividend yield it is <span data-lab="mc_lhs_atm_q2" data-fmt=".4f">0.4764</span> against <span data-lab="mc_rhs_atm_q2" data-fmt=".4f">0.4963</span> (<span data-lab="mc_z_q2" data-fmt=".2f">−1.26</span> standard errors); the lab asserts agreement within <span data-lab="parity_tol_se" data-fmt=".0f">4</span> standard errors at all <span data-lab="mc_n_strikes" data-fmt="d">7</span> strikes, with and without dividends (<span class="xref soon" data-xref="3.5" data-style="short" data-auto="" title="Coming soon">Session 3.5</span> covers the <span class="term soon" data-term="Monte Carlo standard error" title="Defined in Session 3.5 (coming soon)">Monte Carlo standard error</span>). The gap is identical at every strike, which is instructive: path by path, call payoff minus put payoff is <math><semantics><mrow><msub><mi>S</mi><mtext>exp</mtext></msub><mo>−</mo><mi>K</mi></mrow><annotation encoding="application/x-tex">S_{\text{exp}} - K</annotation></semantics></math>, so all a simulation can get wrong is the average of <math><semantics><msub><mi>S</mi><mtext>exp</mtext></msub><annotation encoding="application/x-tex">S_{\text{exp}}</annotation></semantics></math> — the forward. Swap the <span class="term soon" data-term="lognormal distribution" title="Defined in Session 3.2 (coming soon)">lognormal</span> world for one with crash risk (an <span data-lab="crash_p" data-fmt=".0%">8%</span> chance of a <span data-lab="crash_jump_pct" data-fmt=".0%">−22%</span> gap over the three months, rescaled so the average <math><semantics><msub><mi>S</mi><mtext>exp</mtext></msub><annotation encoding="application/x-tex">S_{\text{exp}}</annotation></semantics></math> is still the forward) and individual prices move — out-of-the-money puts get dearer (§2.7.6) — but <math><semantics><mrow><mi>C</mi><mo>−</mo><mi>P</mi></mrow><annotation encoding="application/x-tex">C - P</annotation></semantics></math> still matches parity, within <span data-lab="crash_max_abs_z" data-fmt=".2f">0.64</span> standard errors. The forward is the only property of the distribution that parity uses, and a model that got it wrong could be arbitraged with the stock and a bond alone.</p>
+
+<p>Rearranging parity gives every position a <strong>synthetic</strong> twin — useful because traders use whichever is cheaper, and because it shows what a structure really is:</p>
+
+<table>
+<thead><tr><th>You want</th><th>Build it from</th><th>Read it as</th></tr></thead>
+<tbody>
+<tr><td>A long call</td><td>long put + long share + borrow <math><semantics><mrow><mi>K</mi><msup><mi>e</mi><mrow class="tml-sml-pad"><mo form="prefix" stretchy="false" lspace="0em" rspace="0em">−</mo><msub><mi>r</mi><mi>f</mi></msub><mi>τ</mi></mrow></msup></mrow><annotation encoding="application/x-tex">K e^{-r_f \tau}</annotation></semantics></math></td><td>a call is a levered share with a put for insurance</td></tr>
+<tr><td>A long put</td><td>long call + short share + lend <math><semantics><mrow><mi>K</mi><msup><mi>e</mi><mrow class="tml-sml-pad"><mo form="prefix" stretchy="false" lspace="0em" rspace="0em">−</mo><msub><mi>r</mi><mi>f</mi></msub><mi>τ</mi></mrow></msup></mrow><annotation encoding="application/x-tex">K e^{-r_f \tau}</annotation></semantics></math></td><td>a put is a short sale with a call for insurance</td></tr>
+<tr><td>A long share</td><td>long call + short put + lend <math><semantics><mrow><mi>K</mi><msup><mi>e</mi><mrow class="tml-sml-pad"><mo form="prefix" stretchy="false" lspace="0em" rspace="0em">−</mo><msub><mi>r</mi><mi>f</mi></msub><mi>τ</mi></mrow></msup></mrow><annotation encoding="application/x-tex">K e^{-r_f \tau}</annotation></semantics></math></td><td>call minus put is a forward; add cash to own the share</td></tr>
+<tr><td>A covered call (share − call)</td><td>short put + lend <math><semantics><mrow><mi>K</mi><msup><mi>e</mi><mrow class="tml-sml-pad"><mo form="prefix" stretchy="false" lspace="0em" rspace="0em">−</mo><msub><mi>r</mi><mi>f</mi></msub><mi>τ</mi></mrow></msup></mrow><annotation encoding="application/x-tex">K e^{-r_f \tau}</annotation></semantics></math></td><td>a covered call is a short put in disguise</td></tr>
+<tr><td>A protective put (share + put)</td><td>long call + lend <math><semantics><mrow><mi>K</mi><msup><mi>e</mi><mrow class="tml-sml-pad"><mo form="prefix" stretchy="false" lspace="0em" rspace="0em">−</mo><msub><mi>r</mi><mi>f</mi></msub><mi>τ</mi></mrow></msup></mrow><annotation encoding="application/x-tex">K e^{-r_f \tau}</annotation></semantics></math></td><td>an insured share is a call plus cash</td></tr>
+</tbody>
+</table>
+
+<div class="co tip"><span class="co-t">💡 Looking ahead</span>
+<p>Parity replicates a call with a <em>put</em>. <span class="xref soon" data-xref="10.1" data-auto="" title="Coming soon">Session 10.1 — No-Arbitrage &amp; Binomial Trees</span> goes further and replicates a call with nothing but the stock and a bond, traded as the price moves — a <span class="term soon" data-term="replicating portfolio" title="Defined in Session 10.1 (coming soon)">replicating portfolio</span> — which prices a single option on its own. <span class="xref soon" data-xref="10.3" data-auto="" title="Coming soon">Session 10.3 — Black-Scholes-Merton</span> takes that idea to continuous time and derives the <span class="term soon" data-term="Black-Scholes-Merton model" title="Defined in Session 10.3 (coming soon)">Black-Scholes-Merton</span> formula.</p>
+</div>
+</section>
+
+<section id="s4">
+<h2><span class="no">2.7.4</span> When parity breaks: the conversion</h2>
+<p class="lede">If quotes ever violate parity, the replication argument turns into a trade. Whether that trade is an arbitrage for <em>you</em> depends on your costs.</p>
+
+<p>Parity is enforced by traders who check it constantly and trade any gap — the same logic as the <a class="term" href="session04-futures.html#g-cash-and-carry-arbitrage" data-term="cash-and-carry arbitrage">cash-and-carry arbitrage</a> of <a class="xref" href="session04-futures.html#s2" data-xref="2.4#s2" data-style="short" data-auto="">Session 2.4</a>. The loop has five steps:</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 264" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">PARITY AS A TRADE — the conversion loop that keeps C − P honest</text>
+  <rect x="25" y="34" width="118" height="64" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="84" y="56" font-size="11" font-weight="600" text-anchor="middle" fill="#3A56C5">1 · QUOTE</text>
+  <text x="84" y="73" font-size="9.5" text-anchor="middle" fill="#4A5A68">read C, P and S,</text>
+  <text x="84" y="86" font-size="9.5" text-anchor="middle" fill="#4A5A68">r_f and τ</text>
+  <rect x="163" y="34" width="118" height="64" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="222" y="56" font-size="11" font-weight="600" text-anchor="middle" fill="#3A56C5">2 · COMPARE</text>
+  <text x="222" y="73" font-size="9.5" text-anchor="middle" fill="#4A5A68">C − P against</text>
+  <text x="222" y="86" font-size="9.5" text-anchor="middle" fill="#4A5A68">S − K·e^(−r_f τ)</text>
+  <rect x="301" y="34" width="118" height="64" rx="9" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="360" y="56" font-size="11" font-weight="600" text-anchor="middle" fill="#8A6D00">3 · COSTS?</text>
+  <text x="360" y="73" font-size="9.5" text-anchor="middle" fill="#4A5A68">is the gap bigger</text>
+  <text x="360" y="86" font-size="9.5" text-anchor="middle" fill="#4A5A68">than all costs?</text>
+  <rect x="439" y="34" width="118" height="64" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="498" y="56" font-size="11" font-weight="600" text-anchor="middle" fill="#3A56C5">4 · BUILD</text>
+  <text x="498" y="73" font-size="9.5" text-anchor="middle" fill="#4A5A68">sell the rich side,</text>
+  <text x="498" y="86" font-size="9.5" text-anchor="middle" fill="#4A5A68">buy the cheap side</text>
+  <rect x="577" y="34" width="118" height="64" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="636" y="53" font-size="11" font-weight="600" text-anchor="middle" fill="#1F7A55">5 · EXPIRY</text>
+  <text x="636" y="69" font-size="9.5" text-anchor="middle" fill="#4A5A68">legs net to ±K;</text>
+  <text x="636" y="81" font-size="9.5" text-anchor="middle" fill="#4A5A68">the loan settles it;</text>
+  <text x="636" y="93" font-size="9.5" text-anchor="middle" fill="#4A5A68">keep the gap</text>
+  <path d="M145 66 H159" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s4a)"/>
+  <path d="M283 66 H297" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s4a)"/>
+  <path d="M421 66 H435" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s4a)"/>
+  <path d="M559 66 H573" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s4a)"/>
+  <path d="M330 100 L252 126" stroke="#D64B2A" stroke-width="1.7" marker-end="url(#s4c)"/>
+  <text x="300" y="124" font-size="10" font-weight="600" text-anchor="middle" fill="#D64B2A">no</text>
+  <path d="M498 100 V124" stroke="#3A56C5" stroke-width="1.7" marker-end="url(#s4b)"/>
+  <rect x="25" y="128" width="245" height="88" rx="9" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="147.5" y="150" font-size="11" font-weight="600" text-anchor="middle" fill="#D64B2A">NO TRADE</text>
+  <text x="147.5" y="168" font-size="9.5" text-anchor="middle" fill="#4A5A68">the gap is smaller than your</text>
+  <text x="147.5" y="184" font-size="9.5" text-anchor="middle" fill="#4A5A68">spreads, fees and borrow cost:</text>
+  <text x="147.5" y="200" font-size="9.5" text-anchor="middle" fill="#4A5A68">a quote, not an arbitrage</text>
+  <rect x="290" y="128" width="405" height="40" rx="8" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="304" y="144" font-size="10.5" font-weight="700" fill="#3A56C5">C − P TOO HIGH → CONVERSION</text>
+  <text x="304" y="160" font-size="9.5" fill="#1F2C38">sell the call · buy the put · buy the share · borrow K·e^(−r_f τ)</text>
+  <rect x="290" y="176" width="405" height="40" rx="8" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="304" y="192" font-size="10.5" font-weight="700" fill="#3A56C5">C − P TOO LOW → REVERSAL</text>
+  <text x="304" y="208" font-size="9.5" fill="#1F2C38">buy the call · sell the put · short the share · lend K·e^(−r_f τ)</text>
+  <text x="360" y="246" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">Traders who run this loop enforce parity — but only to within their own costs.</text>
+  <defs>
+    <marker id="s4a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F2C38"/></marker>
+    <marker id="s4b" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#3A56C5"/></marker>
+    <marker id="s4c" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#D64B2A"/></marker>
+  </defs>
+</svg>
+<figcaption>fig 2.7.5 — the parity-arbitrage workflow: quote, compare, check costs, build the conversion or reversal, collect at expiry</figcaption>
+</figure>
+
+<p>A worked example from the lab. The market quotes the 3-month 100 call at <span data-lab="arb_C_mkt" data-fmt="$.2f">$5.09</span>, <span data-lab="arb_mispricing" data-fmt="$.2f">$0.60</span> above the price parity allows, with the put fairly priced at <span data-lab="P_atm" data-fmt="$.2f">$3.49</span>. Then <math><semantics><mrow><mi>C</mi><mo>−</mo><mi>P</mi><mo>=</mo></mrow><annotation encoding="application/x-tex">C - P =</annotation></semantics></math> <span data-lab="arb_lhs" data-fmt=".3f">1.595</span> but <math><semantics><mrow><mi>S</mi><mo>−</mo><mi>K</mi><msup><mi>e</mi><mrow class="tml-sml-pad"><mo form="prefix" stretchy="false" lspace="0em" rspace="0em">−</mo><msub><mi>r</mi><mi>f</mi></msub><mi>τ</mi></mrow></msup><mo>=</mo></mrow><annotation encoding="application/x-tex">S - K e^{-r_f \tau} =</annotation></semantics></math> <span data-lab="arb_rhs" data-fmt=".3f">0.995</span>: the call side is rich. The <strong>conversion</strong> sells the call, buys the put, buys the share for $100 and borrows <span data-lab="arb_loan" data-fmt="$.2f">$99.00</span>, which leaves <span data-lab="arb_cash_today" data-fmt="$.2f">$0.60</span> per share — <span data-lab="arb_cash_today_contract" data-fmt="$,.0f">$60</span> per contract — in your pocket today. At expiry the short call, long put and share are worth exactly <math><semantics><mrow><mi>K</mi><mo>=</mo><mn>100</mn></mrow><annotation encoding="application/x-tex">K = 100</annotation></semantics></math> wherever the stock ends, which repays the loan. Across <span data-lab="arb_n_scen" data-fmt=",.0f">10,000</span> simulated endings the lab finds the same profit every time: <span data-lab="arb_profit_expiry" data-fmt="$.3f">$0.606</span> per share at expiry, the <span data-lab="arb_cash_today" data-fmt="$.2f">$0.60</span> plus three months' interest.</p>
+
+<p>Now the costs. You sell at the <a class="term" href="session01-market-anatomy.html#g-bid" data-term="bid">bid</a> and buy at the <a class="term" href="session01-market-anatomy.html#g-ask" data-term="ask">ask</a>, so each leg costs half its <a class="term" href="session01-market-anatomy.html#g-bid-ask-spread" data-term="bid-ask spread">bid-ask spread</a>, plus <span class="term soon" data-term="commission" title="Defined in Session 6.5 (coming soon)">commissions</span>. With illustrative half-spreads of <span data-lab="arb_half_spread_opt" data-fmt="$.2f">$0.05</span> per option and <span data-lab="arb_half_spread_stk" data-fmt="$.2f">$0.01</span> per share, and <span data-lab="arb_commission" data-fmt="$.2f">$0.65</span> per option contract, the package costs <span data-lab="arb_costs_contract" data-fmt="$.2f">$12.30</span> per contract and the net profit is <span data-lab="arb_net_contract" data-fmt="$.2f">$47.70</span>. These costs assume you borrow the <span data-lab="arb_loan" data-fmt="$.2f">$99.00</span> a share at the risk-free rate, as a dealer can. Every extra percentage point of financing costs <span data-lab="arb_fin_1pp_contract" data-fmt="$.2f">$24.78</span> per contract over three months — enough to erase the <span data-lab="arb_gap_25" data-fmt="$.2f">$0.25</span> row below — and two points (<span data-lab="arb_fin_2pp_contract" data-fmt="$.2f">$49.63</span>) erase the <span data-lab="arb_gap_60" data-fmt="$.2f">$0.60</span> row too. Smaller gaps do not survive even at dealer rates:</p>
+
+<table>
+<thead><tr><th>Parity gap (per share)</th><th>Before costs, per contract</th><th>After <span data-lab="arb_costs_contract" data-fmt="$.2f">$12.30</span> of costs</th><th>Verdict</th></tr></thead>
+<tbody>
+<tr><td><span data-lab="arb_gap_05" data-fmt="$.2f">$0.05</span></td><td><span data-lab="arb_gross_05" data-fmt="$.0f">$5</span></td><td><span data-lab="arb_net_05" data-fmt=".2f">−7.30</span></td><td>a quote, not an arbitrage</td></tr>
+<tr><td><span data-lab="arb_gap_10" data-fmt="$.2f">$0.10</span></td><td><span data-lab="arb_gross_10" data-fmt="$.0f">$10</span></td><td><span data-lab="arb_net_10" data-fmt=".2f">−2.30</span></td><td>a quote, not an arbitrage</td></tr>
+<tr><td><span data-lab="arb_gap_25" data-fmt="$.2f">$0.25</span></td><td><span data-lab="arb_gross_25" data-fmt="$.0f">$25</span></td><td><span data-lab="arb_net_25" data-fmt=".2f">12.70</span></td><td>trade it — only if you finance near r<sub>f</sub></td></tr>
+<tr><td><span data-lab="arb_gap_60" data-fmt="$.2f">$0.60</span></td><td><span data-lab="arb_gross_60" data-fmt="$.0f">$60</span></td><td><span data-lab="arb_net_60" data-fmt=".2f">47.70</span></td><td>trade it — if it is real and your financing is cheap</td></tr>
+</tbody>
+</table>
+
+<div class="co warn"><span class="co-t">⚠️ Pitfall — "a parity gap on my screen is free money"</span>
+<p>Usually it is a cost you have not counted. <strong>Quotes</strong>: a gap computed from mid prices disappears at the bid and ask. <strong>Borrowing</strong>: the reversal needs <a class="term" href="session02-equities-indices-etfs.html#g-short-selling" data-term="short selling">short selling</a>, and a hard-to-borrow stock charges a <a class="term" href="session02-equities-indices-etfs.html#g-borrow-fee" data-term="borrow fee">borrow fee</a> and can be recalled. Ofek, Richardson and Whitelaw (2004) find that parity violations on individual stocks lean in the direction of short-sale constraints, grow with the cost of borrowing, and persist after <span class="term soon" data-term="transaction cost" title="Defined in Session 6.5 (coming soon)">transaction costs</span>: much of the "violation" is the price of the borrow. <strong>Early exercise</strong>: American options can be exercised early, so a short leg can be assigned before expiry (a short call just before a dividend, for instance). For American options on a stock with no dividends, parity weakens to a band, <math><semantics><mrow><mi>S</mi><mo>−</mo><mi>K</mi><mo>≤</mo><mi>C</mi><mo>−</mo><mi>P</mi><mo>≤</mo><mi>S</mi><mo>−</mo><mi>K</mi><msup><mi>e</mi><mrow class="tml-sml-pad"><mo form="prefix" stretchy="false" lspace="0em" rspace="0em">−</mo><msub><mi>r</mi><mi>f</mi></msub><mi>τ</mi></mrow></msup></mrow><annotation encoding="application/x-tex">S - K \le C - P \le S - K e^{-r_f \tau}</annotation></semantics></math> (Hull, ch. 11). <strong>Inputs</strong>: the wrong dividend or financing rate manufactures gaps that are not there.</p>
+</div>
+</section>
+
+<section id="s5">
+<h2><span class="no">2.7.5</span> Why options exist: structures and views</h2>
+<p class="lede">People buy and sell options for three different reasons: insurance, leverage and volatility. Each has a classic structure, and every structure is a sum of pieces you already know.</p>
+
+<p><strong>Insurance.</strong> A shareholder who fears a fall buys a put: a <strong>protective put</strong> caps the loss at a known amount for a premium, like an insurance policy with a deductible; the put's seller is the insurer. <strong>Leverage.</strong> A call buys a large exposure for a small premium (§2.7.1). A <strong>vertical spread</strong> — buy one strike, sell another with the same expiry — cuts the cost by giving up the move beyond the second strike: the bull call spread below buys the 100 call and sells the 110. <strong>Volatility.</strong> A long <span class="term soon" data-term="straddle" title="Defined in Session 10.7 (coming soon)">straddle</span> — a call and a put on one strike — profits from a big move either way: a bet on the size of the move, not its sign. On the other side sit the sellers; their classic structure is the <strong>covered call</strong>, shares plus a short call, which collects a premium in exchange for the upside above the strike.</p>
+
+<figure class="diagram chart">
+<!-- chart:hedges -->
+<svg viewBox="0 0 720 320" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="P&amp;L at expiry per share: stock with a covered call or a protective put (x = stock price, $)">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">P&amp;L AT EXPIRY PER SHARE: STOCK WITH A COVERED CALL OR A PROTECTIVE PUT (X = STOCK PRICE, $)</text>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#4A5A68" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">stock alone</text>
+  <line x1="140.4" y1="32" x2="156.4" y2="32" stroke="#3A56C5" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="162.4" y="36" font-size="11" fill="#4A5A68">covered call (sell the 105 call)</text>
+  <line x1="389.20000000000005" y1="32" x2="405.20000000000005" y2="32" stroke="#E8850C" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="411.20000000000005" y="36" font-size="11" fill="#4A5A68">protective put (buy the 95 put)</text>
+  <line x1="64" y1="284" x2="602" y2="284" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="288" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">−$40</text>
+  <line x1="64" y1="226" x2="602" y2="226" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="230" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">−$20</text>
+  <line x1="64" y1="168" x2="602" y2="168" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="172" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$0</text>
+  <line x1="64" y1="110" x2="602" y2="110" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="114" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$20</text>
+  <line x1="64" y1="52" x2="602" y2="52" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="56" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$40</text>
+  <line x1="64" y1="284" x2="602" y2="284" stroke="#C9CFC6" stroke-width="1"/>
+  <line x1="64" y1="284" x2="64" y2="288" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="64" y="302" font-size="11" text-anchor="middle" fill="#4A5A68">70</text>
+  <line x1="153.7" y1="284" x2="153.7" y2="288" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="153.7" y="302" font-size="11" text-anchor="middle" fill="#4A5A68">80</text>
+  <line x1="243.3" y1="284" x2="243.3" y2="288" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="243.3" y="302" font-size="11" text-anchor="middle" fill="#4A5A68">90</text>
+  <line x1="333" y1="284" x2="333" y2="288" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="333" y="302" font-size="11" text-anchor="middle" fill="#4A5A68">100</text>
+  <line x1="422.7" y1="284" x2="422.7" y2="288" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="422.7" y="302" font-size="11" text-anchor="middle" fill="#4A5A68">110</text>
+  <line x1="512.3" y1="284" x2="512.3" y2="288" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="512.3" y="302" font-size="11" text-anchor="middle" fill="#4A5A68">120</text>
+  <line x1="602" y1="284" x2="602" y2="288" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="602" y="302" font-size="11" text-anchor="middle" fill="#4A5A68">130</text>
+  <line x1="64" y1="168" x2="602" y2="168" stroke="#4A5A68" stroke-width="1"/>
+  <polyline points="64,255 66.2,254.3 68.5,253.6 70.7,252.8 73,252.1 75.2,251.4 77.5,250.7 79.7,249.9 81.9,249.2 84.2,248.5 86.4,247.8 88.7,247 90.9,246.3 93.1,245.6 95.4,244.8 97.6,244.1 99.9,243.4 102.1,242.7 104.3,241.9 106.6,241.2 108.8,240.5 111.1,239.8 113.3,239.1 115.6,238.3 117.8,237.6 120,236.9 122.3,236.2 124.5,235.4 126.8,234.7 129,234 131.2,233.2 133.5,232.5 135.7,231.8 138,231.1 140.2,230.3 142.5,229.6 144.7,228.9 146.9,228.2 149.2,227.4 151.4,226.7 153.7,226 155.9,225.3 158.1,224.6 160.4,223.8 162.6,223.1 164.9,222.4 167.1,221.7 169.4,220.9 171.6,220.2 173.8,219.5 176.1,218.8 178.3,218 180.6,217.3 182.8,216.6 185.1,215.8 187.3,215.1 189.5,214.4 191.8,213.7 194,212.9 196.3,212.2 198.5,211.5 200.7,210.8 203,210.1 205.2,209.3 207.5,208.6 209.7,207.9 212,207.2 214.2,206.4 216.4,205.7 218.7,205 220.9,204.2 223.2,203.5 225.4,202.8 227.6,202.1 229.9,201.3 232.1,200.6 234.4,199.9 236.6,199.2 238.8,198.4 241.1,197.7 243.3,197 245.6,196.3 247.8,195.6 250.1,194.8 252.3,194.1 254.5,193.4 256.8,192.7 259,191.9 261.3,191.2 263.5,190.5 265.8,189.8 268,189 270.2,188.3 272.5,187.6 274.7,186.8 277,186.1 279.2,185.4 281.4,184.7 283.7,183.9 285.9,183.2 288.2,182.5 290.4,181.8 292.6,181.1 294.9,180.3 297.1,179.6 299.4,178.9 301.6,178.2 303.9,177.4 306.1,176.7 308.3,176 310.6,175.2 312.8,174.5 315.1,173.8 317.3,173.1 319.5,172.3 321.8,171.6 324,170.9 326.3,170.2 328.5,169.4 330.8,168.7 333,168 335.2,167.3 337.5,166.6 339.7,165.8 342,165.1 344.2,164.4 346.4,163.6 348.7,162.9 350.9,162.2 353.2,161.5 355.4,160.8 357.7,160 359.9,159.3 362.1,158.6 364.4,157.9 366.6,157.1 368.9,156.4 371.1,155.7 373.3,154.9 375.6,154.2 377.8,153.5 380.1,152.8 382.3,152.1 384.6,151.3 386.8,150.6 389,149.9 391.3,149.1 393.5,148.4 395.8,147.7 398,147 400.2,146.2 402.5,145.5 404.7,144.8 407,144.1 409.2,143.4 411.5,142.6 413.7,141.9 415.9,141.2 418.2,140.4 420.4,139.7 422.7,139 424.9,138.3 427.2,137.6 429.4,136.8 431.6,136.1 433.9,135.4 436.1,134.6 438.4,133.9 440.6,133.2 442.8,132.5 445.1,131.8 447.3,131 449.6,130.3 451.8,129.6 454.1,128.9 456.3,128.1 458.5,127.4 460.8,126.7 463,125.9 465.3,125.2 467.5,124.5 469.7,123.8 472,123.1 474.2,122.3 476.5,121.6 478.7,120.9 480.9,120.1 483.2,119.4 485.4,118.7 487.7,118 489.9,117.2 492.2,116.5 494.4,115.8 496.6,115.1 498.9,114.4 501.1,113.6 503.4,112.9 505.6,112.2 507.8,111.4 510.1,110.7 512.3,110 514.6,109.3 516.8,108.6 519.1,107.8 521.3,107.1 523.5,106.4 525.8,105.6 528,104.9 530.3,104.2 532.5,103.5 534.8,102.8 537,102 539.2,101.3 541.5,100.6 543.7,99.9 546,99.1 548.2,98.4 550.4,97.7 552.7,96.9 554.9,96.2 557.2,95.5 559.4,94.8 561.7,94.1 563.9,93.3 566.1,92.6 568.4,91.9 570.6,91.1 572.9,90.4 575.1,89.7 577.3,89 579.6,88.2 581.8,87.5 584.1,86.8 586.3,86.1 588.5,85.4 590.8,84.6 593,83.9 595.3,83.2 597.5,82.4 599.8,81.7 602,81" fill="none" stroke="#4A5A68" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><title>stock alone</title></polyline>
+  <circle cx="602" cy="81" r="4" fill="#4A5A68" stroke="#FBFBF8" stroke-width="2"><title>stock alone: $30</title></circle>
+  <polyline points="64,248.1 66.2,247.3 68.5,246.6 70.7,245.9 73,245.2 75.2,244.4 77.5,243.7 79.7,243 81.9,242.3 84.2,241.5 86.4,240.8 88.7,240.1 90.9,239.4 93.1,238.6 95.4,237.9 97.6,237.2 99.9,236.5 102.1,235.7 104.3,235 106.6,234.3 108.8,233.6 111.1,232.8 113.3,232.1 115.6,231.4 117.8,230.7 120,229.9 122.3,229.2 124.5,228.5 126.8,227.8 129,227 131.2,226.3 133.5,225.6 135.7,224.9 138,224.1 140.2,223.4 142.5,222.7 144.7,222 146.9,221.2 149.2,220.5 151.4,219.8 153.7,219.1 155.9,218.3 158.1,217.6 160.4,216.9 162.6,216.2 164.9,215.4 167.1,214.7 169.4,214 171.6,213.3 173.8,212.5 176.1,211.8 178.3,211.1 180.6,210.4 182.8,209.6 185.1,208.9 187.3,208.2 189.5,207.5 191.8,206.7 194,206 196.3,205.3 198.5,204.6 200.7,203.8 203,203.1 205.2,202.4 207.5,201.7 209.7,200.9 212,200.2 214.2,199.5 216.4,198.8 218.7,198 220.9,197.3 223.2,196.6 225.4,195.9 227.6,195.1 229.9,194.4 232.1,193.7 234.4,193 236.6,192.2 238.8,191.5 241.1,190.8 243.3,190.1 245.6,189.3 247.8,188.6 250.1,187.9 252.3,187.2 254.5,186.4 256.8,185.7 259,185 261.3,184.3 263.5,183.5 265.8,182.8 268,182.1 270.2,181.4 272.5,180.6 274.7,179.9 277,179.2 279.2,178.5 281.4,177.7 283.7,177 285.9,176.3 288.2,175.6 290.4,174.8 292.6,174.1 294.9,173.4 297.1,172.7 299.4,171.9 301.6,171.2 303.9,170.5 306.1,169.8 308.3,169 310.6,168.3 312.8,167.6 315.1,166.9 317.3,166.1 319.5,165.4 321.8,164.7 324,164 326.3,163.2 328.5,162.5 330.8,161.8 333,161.1 335.2,160.3 337.5,159.6 339.7,158.9 342,158.2 344.2,157.4 346.4,156.7 348.7,156 350.9,155.3 353.2,154.5 355.4,153.8 357.7,153.1 359.9,152.4 362.1,151.6 364.4,150.9 366.6,150.2 368.9,149.5 371.1,148.7 373.3,148 375.6,147.3 377.8,146.6 380.1,146.6 382.3,146.6 384.6,146.6 386.8,146.6 389,146.6 391.3,146.6 393.5,146.6 395.8,146.6 398,146.6 400.2,146.6 402.5,146.6 404.7,146.6 407,146.6 409.2,146.6 411.5,146.6 413.7,146.6 415.9,146.6 418.2,146.6 420.4,146.6 422.7,146.6 424.9,146.6 427.2,146.6 429.4,146.6 431.6,146.6 433.9,146.6 436.1,146.6 438.4,146.6 440.6,146.6 442.8,146.6 445.1,146.6 447.3,146.6 449.6,146.6 451.8,146.6 454.1,146.6 456.3,146.6 458.5,146.6 460.8,146.6 463,146.6 465.3,146.6 467.5,146.6 469.7,146.6 472,146.6 474.2,146.6 476.5,146.6 478.7,146.6 480.9,146.6 483.2,146.6 485.4,146.6 487.7,146.6 489.9,146.6 492.2,146.6 494.4,146.6 496.6,146.6 498.9,146.6 501.1,146.6 503.4,146.6 505.6,146.6 507.8,146.6 510.1,146.6 512.3,146.6 514.6,146.6 516.8,146.6 519.1,146.6 521.3,146.6 523.5,146.6 525.8,146.6 528,146.6 530.3,146.6 532.5,146.6 534.8,146.6 537,146.6 539.2,146.6 541.5,146.6 543.7,146.6 546,146.6 548.2,146.6 550.4,146.6 552.7,146.6 554.9,146.6 557.2,146.6 559.4,146.6 561.7,146.6 563.9,146.6 566.1,146.6 568.4,146.6 570.6,146.6 572.9,146.6 575.1,146.6 577.3,146.6 579.6,146.6 581.8,146.6 584.1,146.6 586.3,146.6 588.5,146.6 590.8,146.6 593,146.6 595.3,146.6 597.5,146.6 599.8,146.6 602,146.6" fill="none" stroke="#3A56C5" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>covered call (sell the 105 call)</title></polyline>
+  <circle cx="602" cy="146.6" r="4" fill="#3A56C5" stroke="#FBFBF8" stroke-width="2"><title>covered call (sell the 105 call): $7</title></circle>
+  <polyline points="64,187.1 66.2,187.1 68.5,187.1 70.7,187.1 73,187.1 75.2,187.1 77.5,187.1 79.7,187.1 81.9,187.1 84.2,187.1 86.4,187.1 88.7,187.1 90.9,187.1 93.1,187.1 95.4,187.1 97.6,187.1 99.9,187.1 102.1,187.1 104.3,187.1 106.6,187.1 108.8,187.1 111.1,187.1 113.3,187.1 115.6,187.1 117.8,187.1 120,187.1 122.3,187.1 124.5,187.1 126.8,187.1 129,187.1 131.2,187.1 133.5,187.1 135.7,187.1 138,187.1 140.2,187.1 142.5,187.1 144.7,187.1 146.9,187.1 149.2,187.1 151.4,187.1 153.7,187.1 155.9,187.1 158.1,187.1 160.4,187.1 162.6,187.1 164.9,187.1 167.1,187.1 169.4,187.1 171.6,187.1 173.8,187.1 176.1,187.1 178.3,187.1 180.6,187.1 182.8,187.1 185.1,187.1 187.3,187.1 189.5,187.1 191.8,187.1 194,187.1 196.3,187.1 198.5,187.1 200.7,187.1 203,187.1 205.2,187.1 207.5,187.1 209.7,187.1 212,187.1 214.2,187.1 216.4,187.1 218.7,187.1 220.9,187.1 223.2,187.1 225.4,187.1 227.6,187.1 229.9,187.1 232.1,187.1 234.4,187.1 236.6,187.1 238.8,187.1 241.1,187.1 243.3,187.1 245.6,187.1 247.8,187.1 250.1,187.1 252.3,187.1 254.5,187.1 256.8,187.1 259,187.1 261.3,187.1 263.5,187.1 265.8,187.1 268,187.1 270.2,187.1 272.5,187.1 274.7,187.1 277,187.1 279.2,187.1 281.4,187.1 283.7,187.1 285.9,187.1 288.2,187.1 290.4,186.4 292.6,185.7 294.9,185 297.1,184.2 299.4,183.5 301.6,182.8 303.9,182.1 306.1,181.3 308.3,180.6 310.6,179.9 312.8,179.2 315.1,178.4 317.3,177.7 319.5,177 321.8,176.3 324,175.5 326.3,174.8 328.5,174.1 330.8,173.4 333,172.6 335.2,171.9 337.5,171.2 339.7,170.5 342,169.7 344.2,169 346.4,168.3 348.7,167.6 350.9,166.8 353.2,166.1 355.4,165.4 357.7,164.7 359.9,163.9 362.1,163.2 364.4,162.5 366.6,161.8 368.9,161 371.1,160.3 373.3,159.6 375.6,158.9 377.8,158.1 380.1,157.4 382.3,156.7 384.6,156 386.8,155.2 389,154.5 391.3,153.8 393.5,153.1 395.8,152.3 398,151.6 400.2,150.9 402.5,150.2 404.7,149.4 407,148.7 409.2,148 411.5,147.3 413.7,146.5 415.9,145.8 418.2,145.1 420.4,144.4 422.7,143.6 424.9,142.9 427.2,142.2 429.4,141.5 431.6,140.7 433.9,140 436.1,139.3 438.4,138.6 440.6,137.8 442.8,137.1 445.1,136.4 447.3,135.7 449.6,134.9 451.8,134.2 454.1,133.5 456.3,132.8 458.5,132 460.8,131.3 463,130.6 465.3,129.9 467.5,129.1 469.7,128.4 472,127.7 474.2,127 476.5,126.2 478.7,125.5 480.9,124.8 483.2,124.1 485.4,123.3 487.7,122.6 489.9,121.9 492.2,121.2 494.4,120.4 496.6,119.7 498.9,119 501.1,118.3 503.4,117.5 505.6,116.8 507.8,116.1 510.1,115.4 512.3,114.6 514.6,113.9 516.8,113.2 519.1,112.5 521.3,111.7 523.5,111 525.8,110.3 528,109.6 530.3,108.8 532.5,108.1 534.8,107.4 537,106.7 539.2,105.9 541.5,105.2 543.7,104.5 546,103.8 548.2,103 550.4,102.3 552.7,101.6 554.9,100.9 557.2,100.1 559.4,99.4 561.7,98.7 563.9,98 566.1,97.2 568.4,96.5 570.6,95.8 572.9,95.1 575.1,94.3 577.3,93.6 579.6,92.9 581.8,92.2 584.1,91.4 586.3,90.7 588.5,90 590.8,89.3 593,88.5 595.3,87.8 597.5,87.1 599.8,86.4 602,85.6" fill="none" stroke="#E8850C" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>protective put (buy the 95 put)</title></polyline>
+  <circle cx="602" cy="85.6" r="4" fill="#E8850C" stroke="#FBFBF8" stroke-width="2"><title>protective put (buy the 95 put): $28</title></circle>
+  <text x="614" y="85" font-size="11" fill="#1F2C38">stock: $30</text>
+  <line x1="607" y1="85.6" x2="614" y2="91" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="614" y="99" font-size="11" fill="#1F2C38">protective put: $28</text>
+  <text x="614" y="150.6" font-size="11" fill="#1F2C38">covered call: $7</text>
+</svg>
+<!-- /chart:hedges -->
+<figcaption>fig 2.7.6 — owning the stock with a sold 105 call (covered call) or a bought 95 put (protective put), P&amp;L per share at expiry: the covered call trades the right tail for a premium, the protective put trades a premium for a floor</figcaption>
+</figure>
+
+<figure class="diagram chart">
+<!-- chart:views -->
+<svg viewBox="0 0 720 320" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="P&amp;L at expiry per share: straddle, bull call spread and a plain call (x = stock price, $)">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">P&amp;L AT EXPIRY PER SHARE: STRADDLE, BULL CALL SPREAD AND A PLAIN CALL (X = STOCK PRICE, $)</text>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#4A5A68" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">long 100 call</text>
+  <line x1="153.2" y1="32" x2="169.2" y2="32" stroke="#3A56C5" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="175.2" y="36" font-size="11" fill="#4A5A68">long straddle (100 call + 100 put)</text>
+  <line x1="414.8" y1="32" x2="430.8" y2="32" stroke="#E8850C" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="436.8" y="36" font-size="11" fill="#4A5A68">bull call spread (100/110)</text>
+  <line x1="64" y1="284" x2="602" y2="284" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="288" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">−$10</text>
+  <line x1="64" y1="226" x2="602" y2="226" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="230" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$0</text>
+  <line x1="64" y1="168" x2="602" y2="168" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="172" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$10</text>
+  <line x1="64" y1="110" x2="602" y2="110" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="114" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$20</text>
+  <line x1="64" y1="52" x2="602" y2="52" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="56" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$30</text>
+  <line x1="64" y1="284" x2="602" y2="284" stroke="#C9CFC6" stroke-width="1"/>
+  <line x1="64" y1="284" x2="64" y2="288" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="64" y="302" font-size="11" text-anchor="middle" fill="#4A5A68">70</text>
+  <line x1="153.7" y1="284" x2="153.7" y2="288" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="153.7" y="302" font-size="11" text-anchor="middle" fill="#4A5A68">80</text>
+  <line x1="243.3" y1="284" x2="243.3" y2="288" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="243.3" y="302" font-size="11" text-anchor="middle" fill="#4A5A68">90</text>
+  <line x1="333" y1="284" x2="333" y2="288" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="333" y="302" font-size="11" text-anchor="middle" fill="#4A5A68">100</text>
+  <line x1="422.7" y1="284" x2="422.7" y2="288" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="422.7" y="302" font-size="11" text-anchor="middle" fill="#4A5A68">110</text>
+  <line x1="512.3" y1="284" x2="512.3" y2="288" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="512.3" y="302" font-size="11" text-anchor="middle" fill="#4A5A68">120</text>
+  <line x1="602" y1="284" x2="602" y2="288" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="602" y="302" font-size="11" text-anchor="middle" fill="#4A5A68">130</text>
+  <line x1="64" y1="226" x2="602" y2="226" stroke="#4A5A68" stroke-width="1"/>
+  <polyline points="64,252 66.2,252 68.5,252 70.7,252 73,252 75.2,252 77.5,252 79.7,252 81.9,252 84.2,252 86.4,252 88.7,252 90.9,252 93.1,252 95.4,252 97.6,252 99.9,252 102.1,252 104.3,252 106.6,252 108.8,252 111.1,252 113.3,252 115.6,252 117.8,252 120,252 122.3,252 124.5,252 126.8,252 129,252 131.2,252 133.5,252 135.7,252 138,252 140.2,252 142.5,252 144.7,252 146.9,252 149.2,252 151.4,252 153.7,252 155.9,252 158.1,252 160.4,252 162.6,252 164.9,252 167.1,252 169.4,252 171.6,252 173.8,252 176.1,252 178.3,252 180.6,252 182.8,252 185.1,252 187.3,252 189.5,252 191.8,252 194,252 196.3,252 198.5,252 200.7,252 203,252 205.2,252 207.5,252 209.7,252 212,252 214.2,252 216.4,252 218.7,252 220.9,252 223.2,252 225.4,252 227.6,252 229.9,252 232.1,252 234.4,252 236.6,252 238.8,252 241.1,252 243.3,252 245.6,252 247.8,252 250.1,252 252.3,252 254.5,252 256.8,252 259,252 261.3,252 263.5,252 265.8,252 268,252 270.2,252 272.5,252 274.7,252 277,252 279.2,252 281.4,252 283.7,252 285.9,252 288.2,252 290.4,252 292.6,252 294.9,252 297.1,252 299.4,252 301.6,252 303.9,252 306.1,252 308.3,252 310.6,252 312.8,252 315.1,252 317.3,252 319.5,252 321.8,252 324,252 326.3,252 328.5,252 330.8,252 333,252 335.2,250.6 337.5,249.1 339.7,247.7 342,246.2 344.2,244.8 346.4,243.3 348.7,241.9 350.9,240.4 353.2,239 355.4,237.5 357.7,236.1 359.9,234.6 362.1,233.2 364.4,231.7 366.6,230.3 368.9,228.8 371.1,227.4 373.3,225.9 375.6,224.5 377.8,223 380.1,221.6 382.3,220.1 384.6,218.7 386.8,217.2 389,215.8 391.3,214.3 393.5,212.9 395.8,211.4 398,210 400.2,208.5 402.5,207.1 404.7,205.6 407,204.2 409.2,202.7 411.5,201.3 413.7,199.8 415.9,198.4 418.2,196.9 420.4,195.5 422.7,194 424.9,192.6 427.2,191.1 429.4,189.7 431.6,188.2 433.9,186.8 436.1,185.3 438.4,183.9 440.6,182.4 442.8,181 445.1,179.5 447.3,178.1 449.6,176.6 451.8,175.2 454.1,173.7 456.3,172.3 458.5,170.8 460.8,169.4 463,167.9 465.3,166.5 467.5,165 469.7,163.6 472,162.1 474.2,160.7 476.5,159.2 478.7,157.8 480.9,156.3 483.2,154.9 485.4,153.4 487.7,152 489.9,150.5 492.2,149.1 494.4,147.6 496.6,146.2 498.9,144.7 501.1,143.3 503.4,141.8 505.6,140.4 507.8,138.9 510.1,137.5 512.3,136 514.6,134.6 516.8,133.1 519.1,131.7 521.3,130.2 523.5,128.8 525.8,127.3 528,125.9 530.3,124.4 532.5,123 534.8,121.5 537,120.1 539.2,118.6 541.5,117.2 543.7,115.7 546,114.3 548.2,112.8 550.4,111.4 552.7,109.9 554.9,108.5 557.2,107 559.4,105.6 561.7,104.1 563.9,102.7 566.1,101.2 568.4,99.8 570.6,98.3 572.9,96.9 575.1,95.4 577.3,94 579.6,92.5 581.8,91.1 584.1,89.6 586.3,88.2 588.5,86.7 590.8,85.3 593,83.8 595.3,82.4 597.5,80.9 599.8,79.5 602,78" fill="none" stroke="#4A5A68" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><title>long 100 call</title></polyline>
+  <circle cx="602" cy="78" r="4" fill="#4A5A68" stroke="#FBFBF8" stroke-width="2"><title>long 100 call: $26</title></circle>
+  <polyline points="64,98.3 66.2,99.7 68.5,101.2 70.7,102.6 73,104.1 75.2,105.5 77.5,107 79.7,108.4 81.9,109.9 84.2,111.3 86.4,112.8 88.7,114.2 90.9,115.7 93.1,117.1 95.4,118.6 97.6,120 99.9,121.5 102.1,122.9 104.3,124.4 106.6,125.8 108.8,127.3 111.1,128.7 113.3,130.2 115.6,131.6 117.8,133.1 120,134.5 122.3,136 124.5,137.4 126.8,138.9 129,140.3 131.2,141.8 133.5,143.2 135.7,144.7 138,146.1 140.2,147.6 142.5,149 144.7,150.5 146.9,151.9 149.2,153.4 151.4,154.8 153.7,156.3 155.9,157.7 158.1,159.2 160.4,160.6 162.6,162.1 164.9,163.5 167.1,165 169.4,166.4 171.6,167.9 173.8,169.3 176.1,170.8 178.3,172.2 180.6,173.7 182.8,175.1 185.1,176.6 187.3,178 189.5,179.5 191.8,180.9 194,182.4 196.3,183.8 198.5,185.3 200.7,186.7 203,188.2 205.2,189.6 207.5,191.1 209.7,192.5 212,194 214.2,195.4 216.4,196.9 218.7,198.3 220.9,199.8 223.2,201.2 225.4,202.7 227.6,204.1 229.9,205.6 232.1,207 234.4,208.5 236.6,209.9 238.8,211.4 241.1,212.8 243.3,214.3 245.6,215.7 247.8,217.2 250.1,218.6 252.3,220.1 254.5,221.5 256.8,223 259,224.4 261.3,225.9 263.5,227.3 265.8,228.8 268,230.2 270.2,231.7 272.5,233.1 274.7,234.6 277,236 279.2,237.5 281.4,238.9 283.7,240.4 285.9,241.8 288.2,243.3 290.4,244.7 292.6,246.2 294.9,247.6 297.1,249.1 299.4,250.5 301.6,252 303.9,253.4 306.1,254.9 308.3,256.3 310.6,257.8 312.8,259.2 315.1,260.7 317.3,262.1 319.5,263.6 321.8,265 324,266.5 326.3,267.9 328.5,269.4 330.8,270.8 333,272.3 335.2,270.8 337.5,269.4 339.7,267.9 342,266.5 344.2,265 346.4,263.6 348.7,262.1 350.9,260.7 353.2,259.2 355.4,257.8 357.7,256.3 359.9,254.9 362.1,253.4 364.4,252 366.6,250.5 368.9,249.1 371.1,247.6 373.3,246.2 375.6,244.7 377.8,243.3 380.1,241.8 382.3,240.4 384.6,238.9 386.8,237.5 389,236 391.3,234.6 393.5,233.1 395.8,231.7 398,230.2 400.2,228.8 402.5,227.3 404.7,225.9 407,224.4 409.2,223 411.5,221.5 413.7,220.1 415.9,218.6 418.2,217.2 420.4,215.7 422.7,214.3 424.9,212.8 427.2,211.4 429.4,209.9 431.6,208.5 433.9,207 436.1,205.6 438.4,204.1 440.6,202.7 442.8,201.2 445.1,199.8 447.3,198.3 449.6,196.9 451.8,195.4 454.1,194 456.3,192.5 458.5,191.1 460.8,189.6 463,188.2 465.3,186.7 467.5,185.3 469.7,183.8 472,182.4 474.2,180.9 476.5,179.5 478.7,178 480.9,176.6 483.2,175.1 485.4,173.7 487.7,172.2 489.9,170.8 492.2,169.3 494.4,167.9 496.6,166.4 498.9,165 501.1,163.5 503.4,162.1 505.6,160.6 507.8,159.2 510.1,157.7 512.3,156.3 514.6,154.8 516.8,153.4 519.1,151.9 521.3,150.5 523.5,149 525.8,147.6 528,146.1 530.3,144.7 532.5,143.2 534.8,141.8 537,140.3 539.2,138.9 541.5,137.4 543.7,136 546,134.5 548.2,133.1 550.4,131.6 552.7,130.2 554.9,128.7 557.2,127.3 559.4,125.8 561.7,124.4 563.9,122.9 566.1,121.5 568.4,120 570.6,118.6 572.9,117.1 575.1,115.7 577.3,114.2 579.6,112.8 581.8,111.3 584.1,109.9 586.3,108.4 588.5,107 590.8,105.5 593,104.1 595.3,102.6 597.5,101.2 599.8,99.7 602,98.3" fill="none" stroke="#3A56C5" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>long straddle (100 call + 100 put)</title></polyline>
+  <circle cx="602" cy="98.3" r="4" fill="#3A56C5" stroke="#FBFBF8" stroke-width="2"><title>long straddle (100 call + 100 put): $22</title></circle>
+  <polyline points="64,245.4 66.2,245.4 68.5,245.4 70.7,245.4 73,245.4 75.2,245.4 77.5,245.4 79.7,245.4 81.9,245.4 84.2,245.4 86.4,245.4 88.7,245.4 90.9,245.4 93.1,245.4 95.4,245.4 97.6,245.4 99.9,245.4 102.1,245.4 104.3,245.4 106.6,245.4 108.8,245.4 111.1,245.4 113.3,245.4 115.6,245.4 117.8,245.4 120,245.4 122.3,245.4 124.5,245.4 126.8,245.4 129,245.4 131.2,245.4 133.5,245.4 135.7,245.4 138,245.4 140.2,245.4 142.5,245.4 144.7,245.4 146.9,245.4 149.2,245.4 151.4,245.4 153.7,245.4 155.9,245.4 158.1,245.4 160.4,245.4 162.6,245.4 164.9,245.4 167.1,245.4 169.4,245.4 171.6,245.4 173.8,245.4 176.1,245.4 178.3,245.4 180.6,245.4 182.8,245.4 185.1,245.4 187.3,245.4 189.5,245.4 191.8,245.4 194,245.4 196.3,245.4 198.5,245.4 200.7,245.4 203,245.4 205.2,245.4 207.5,245.4 209.7,245.4 212,245.4 214.2,245.4 216.4,245.4 218.7,245.4 220.9,245.4 223.2,245.4 225.4,245.4 227.6,245.4 229.9,245.4 232.1,245.4 234.4,245.4 236.6,245.4 238.8,245.4 241.1,245.4 243.3,245.4 245.6,245.4 247.8,245.4 250.1,245.4 252.3,245.4 254.5,245.4 256.8,245.4 259,245.4 261.3,245.4 263.5,245.4 265.8,245.4 268,245.4 270.2,245.4 272.5,245.4 274.7,245.4 277,245.4 279.2,245.4 281.4,245.4 283.7,245.4 285.9,245.4 288.2,245.4 290.4,245.4 292.6,245.4 294.9,245.4 297.1,245.4 299.4,245.4 301.6,245.4 303.9,245.4 306.1,245.4 308.3,245.4 310.6,245.4 312.8,245.4 315.1,245.4 317.3,245.4 319.5,245.4 321.8,245.4 324,245.4 326.3,245.4 328.5,245.4 330.8,245.4 333,245.4 335.2,244 337.5,242.5 339.7,241.1 342,239.6 344.2,238.2 346.4,236.7 348.7,235.3 350.9,233.8 353.2,232.4 355.4,230.9 357.7,229.5 359.9,228 362.1,226.6 364.4,225.1 366.6,223.7 368.9,222.2 371.1,220.8 373.3,219.3 375.6,217.9 377.8,216.4 380.1,215 382.3,213.5 384.6,212.1 386.8,210.6 389,209.2 391.3,207.7 393.5,206.3 395.8,204.8 398,203.4 400.2,201.9 402.5,200.5 404.7,199 407,197.6 409.2,196.1 411.5,194.7 413.7,193.2 415.9,191.8 418.2,190.3 420.4,188.9 422.7,187.4 424.9,187.4 427.2,187.4 429.4,187.4 431.6,187.4 433.9,187.4 436.1,187.4 438.4,187.4 440.6,187.4 442.8,187.4 445.1,187.4 447.3,187.4 449.6,187.4 451.8,187.4 454.1,187.4 456.3,187.4 458.5,187.4 460.8,187.4 463,187.4 465.3,187.4 467.5,187.4 469.7,187.4 472,187.4 474.2,187.4 476.5,187.4 478.7,187.4 480.9,187.4 483.2,187.4 485.4,187.4 487.7,187.4 489.9,187.4 492.2,187.4 494.4,187.4 496.6,187.4 498.9,187.4 501.1,187.4 503.4,187.4 505.6,187.4 507.8,187.4 510.1,187.4 512.3,187.4 514.6,187.4 516.8,187.4 519.1,187.4 521.3,187.4 523.5,187.4 525.8,187.4 528,187.4 530.3,187.4 532.5,187.4 534.8,187.4 537,187.4 539.2,187.4 541.5,187.4 543.7,187.4 546,187.4 548.2,187.4 550.4,187.4 552.7,187.4 554.9,187.4 557.2,187.4 559.4,187.4 561.7,187.4 563.9,187.4 566.1,187.4 568.4,187.4 570.6,187.4 572.9,187.4 575.1,187.4 577.3,187.4 579.6,187.4 581.8,187.4 584.1,187.4 586.3,187.4 588.5,187.4 590.8,187.4 593,187.4 595.3,187.4 597.5,187.4 599.8,187.4 602,187.4" fill="none" stroke="#E8850C" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>bull call spread (100/110)</title></polyline>
+  <circle cx="602" cy="187.4" r="4" fill="#E8850C" stroke="#FBFBF8" stroke-width="2"><title>bull call spread (100/110): $7</title></circle>
+  <text x="614" y="82" font-size="11" fill="#1F2C38">long call: $26</text>
+  <text x="614" y="102.3" font-size="11" fill="#1F2C38">straddle: $22</text>
+  <text x="614" y="191.4" font-size="11" fill="#1F2C38">bull spread: $7</text>
+</svg>
+<!-- /chart:views -->
+<figcaption>fig 2.7.7 — three views in one picture: a plain call (up, strongly), a bull call spread (up, moderately, for less money) and a straddle (a big move, either way)</figcaption>
+</figure>
+
+<table>
+<thead><tr><th>Structure</th><th>Built from</th><th>The view</th><th>Max gain</th><th>Max loss</th><th>Breakeven</th></tr></thead>
+<tbody>
+<tr><td>Covered call</td><td>share + short 105 call (receive <span data-lab="cc_premium" data-fmt=".2f">2.39</span>)</td><td>flat to mildly up; happy to sell at 105</td><td><span data-lab="cc_max_gain" data-fmt=".2f">7.39</span></td><td><span data-lab="cc_breakeven" data-fmt=".2f">97.61</span> (stock to zero)</td><td><span data-lab="cc_breakeven" data-fmt=".2f">97.61</span></td></tr>
+<tr><td>Protective put</td><td>share + long 95 put (pay <span data-lab="pp_premium" data-fmt=".2f">1.60</span>)</td><td>up, but insure against a fall</td><td>unlimited</td><td><span data-lab="pp_max_loss" data-fmt=".2f">6.60</span></td><td><span data-lab="pp_breakeven" data-fmt=".2f">101.60</span></td></tr>
+<tr><td>Long straddle</td><td>100 call + 100 put (pay <span data-lab="straddle_cost" data-fmt=".2f">7.98</span>)</td><td>a big move, either way</td><td>unlimited</td><td><span data-lab="straddle_cost" data-fmt=".2f">7.98</span></td><td><span data-lab="straddle_be_lo" data-fmt=".2f">92.02</span> and <span data-lab="straddle_be_hi" data-fmt=".2f">107.98</span></td></tr>
+<tr><td>Bull call spread</td><td>long 100 call + short 110 call (pay <span data-lab="spread_cost" data-fmt=".2f">3.34</span>)</td><td>up, moderately</td><td><span data-lab="spread_max_gain" data-fmt=".2f">6.66</span></td><td><span data-lab="spread_cost" data-fmt=".2f">3.34</span></td><td><span data-lab="spread_breakeven" data-fmt=".2f">103.34</span></td></tr>
+</tbody>
+</table>
+<p>All figures are per share, at expiry, from the lab. The table hides the most important dimension: buying an option pays off when the stock moves <em>more</em> than the option's price implied, selling one when it moves <em>less</em>. So every structure is a view on direction and a view on volatility:</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 316" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">WHICH STRUCTURE FOR WHICH VIEW — answer two questions</text>
+  <rect x="26" y="30" width="104" height="26" rx="6" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="78" y="47" font-size="10" font-weight="700" text-anchor="middle" fill="#8A6D00">Q1 · WHICH WAY?</text>
+  <rect x="138" y="30" width="556" height="26" rx="6" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="416" y="47" font-size="10" font-weight="700" text-anchor="middle" fill="#8A6D00">Q2 · WILL THE MOVE BE BIGGER OR SMALLER THAN THE OPTION PRICE IMPLIES?</text>
+  <rect x="138" y="62" width="272" height="34" rx="6" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="274" y="77" font-size="10.5" font-weight="700" text-anchor="middle" fill="#3A56C5">BIGGER → BUY OPTIONS</text>
+  <text x="274" y="90" font-size="9" text-anchor="middle" fill="#4A5A68">you pay the premium; the loss is capped</text>
+  <rect x="422" y="62" width="272" height="34" rx="6" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="558" y="77" font-size="10.5" font-weight="700" text-anchor="middle" fill="#8A6D00">SMALLER → SELL OPTIONS</text>
+  <text x="558" y="90" font-size="9" text-anchor="middle" fill="#4A5A68">you keep the premium; the loss can be large</text>
+  <rect x="26" y="104" width="104" height="52" rx="8" fill="#F5F6F2" stroke="#4A5A68" stroke-width="1.5"/>
+  <text x="78" y="126" font-size="11" font-weight="700" text-anchor="middle" fill="#1F2C38">UP</text>
+  <text x="78" y="142" font-size="9" text-anchor="middle" fill="#4A5A68">expect a rise</text>
+  <rect x="26" y="164" width="104" height="52" rx="8" fill="#F5F6F2" stroke="#4A5A68" stroke-width="1.5"/>
+  <text x="78" y="186" font-size="11" font-weight="700" text-anchor="middle" fill="#1F2C38">NO VIEW</text>
+  <text x="78" y="202" font-size="9" text-anchor="middle" fill="#4A5A68">either way</text>
+  <rect x="26" y="224" width="104" height="52" rx="8" fill="#F5F6F2" stroke="#4A5A68" stroke-width="1.5"/>
+  <text x="78" y="246" font-size="11" font-weight="700" text-anchor="middle" fill="#1F2C38">DOWN</text>
+  <text x="78" y="262" font-size="9" text-anchor="middle" fill="#4A5A68">expect a fall</text>
+  <rect x="138" y="104" width="272" height="52" rx="8" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="274" y="126" font-size="11" font-weight="700" text-anchor="middle" fill="#3A56C5">LONG CALL</text>
+  <text x="274" y="142" font-size="9" text-anchor="middle" fill="#4A5A68">moderate view? bull call spread: cheaper, capped</text>
+  <rect x="422" y="104" width="272" height="52" rx="8" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="558" y="126" font-size="11" font-weight="700" text-anchor="middle" fill="#8A6D00">SHORT PUT</text>
+  <text x="558" y="142" font-size="9" text-anchor="middle" fill="#4A5A68">own the stock? a covered call is the same payoff</text>
+  <rect x="138" y="164" width="272" height="52" rx="8" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="274" y="186" font-size="11" font-weight="700" text-anchor="middle" fill="#3A56C5">LONG STRADDLE</text>
+  <text x="274" y="202" font-size="9" text-anchor="middle" fill="#4A5A68">call + put on one strike: pays on a big move</text>
+  <rect x="422" y="164" width="272" height="52" rx="8" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="558" y="186" font-size="11" font-weight="700" text-anchor="middle" fill="#D64B2A">SHORT STRADDLE</text>
+  <text x="558" y="202" font-size="9" text-anchor="middle" fill="#4A5A68">paid for calm; a big move either way hurts</text>
+  <rect x="138" y="224" width="272" height="52" rx="8" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="274" y="246" font-size="11" font-weight="700" text-anchor="middle" fill="#3A56C5">LONG PUT</text>
+  <text x="274" y="262" font-size="9" text-anchor="middle" fill="#4A5A68">own the stock and fear a fall? protective put</text>
+  <rect x="422" y="224" width="272" height="52" rx="8" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="558" y="246" font-size="11" font-weight="700" text-anchor="middle" fill="#D64B2A">SHORT CALL</text>
+  <text x="558" y="262" font-size="9" text-anchor="middle" fill="#4A5A68">unlimited loss in a rally; cap it with a spread</text>
+  <text x="360" y="302" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">Every option position is a view on direction and on volatility — know which one you are paying for.</text>
+</svg>
+<figcaption>fig 2.7.8 — choosing a structure: which way (rows) and whether the move will beat what the option price implies (columns); coral cells carry open-ended losses</figcaption>
+</figure>
+
+<div class="co key"><span class="co-t">📌 Key idea — two views in every option trade</span>
+<p>A share is a bet on direction only. An option is a bet on direction <em>and</em> on the size of the move relative to what its price already assumes. <mark>If you buy options, you need the stock to move more than the market expects; if you sell them, less.</mark> Getting the direction right and still losing money is the classic beginner's surprise — see question 1 below.</p>
+</div>
+
+<h3>The covered call, honestly</h3>
+<p>Covered calls are sold as "income", so look at the whole distribution. The lab simulates <span data-lab="dist_n" data-fmt=",.0f">200,000</span> three-month outcomes for the stock, now in the real world: it drifts at <span data-lab="dist_mu" data-fmt=".0%">8%</span> a year with <span data-lab="sigma" data-fmt=".0%">20%</span> volatility — the drift and volatility of <a class="xref" href="session03-returns-pnl-leverage.html" data-xref="2.3" data-style="short" data-auto="">Session 2.3</a>'s asset, with this session's <span data-lab="r_f" data-fmt=".0%">4%</span> risk-free rate. You either hold it, or hold it and sell the 105 call at the model price.</p>
+
+<figure class="diagram chart">
+<!-- chart:cc_hist -->
+<svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="P&amp;L after 3 months per share, $5 buckets (200,000 simulated paths)">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">P&amp;L AFTER 3 MONTHS PER SHARE, $5 BUCKETS (200,000 SIMULATED PATHS)</text>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#4A5A68" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">hold the stock</text>
+  <line x1="159.60000000000002" y1="32" x2="175.60000000000002" y2="32" stroke="#3A56C5" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="181.60000000000002" y="36" font-size="11" fill="#4A5A68">covered call (short the 105 call)</text>
+  <line x1="64" y1="256" x2="690" y2="256" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="260" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0%</text>
+  <line x1="64" y1="189.3" x2="690" y2="189.3" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="193.3" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">20%</text>
+  <line x1="64" y1="122.7" x2="690" y2="122.7" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="126.7" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">40%</text>
+  <line x1="64" y1="56" x2="690" y2="56" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="60" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">60%</text>
+  <line x1="64" y1="256" x2="690" y2="256" stroke="#C9CFC6" stroke-width="1"/>
+  <path d="M78.1,256 V247.6 Q78.1,243.6 82.1,243.6 H98.1 Q102.1,243.6 102.1,247.6 V256 Z" fill="#4A5A68"><title>&lt; −15 · hold the stock: 4%</title></path>
+  <path d="M104.1,256 V252.8 Q104.1,249.6 107.3,249.6 H124.9 Q128.1,249.6 128.1,252.8 V256 Z" fill="#3A56C5"><title>&lt; −15 · covered call (short the 105 call): 2%</title></path>
+  <text x="103.1" y="274" font-size="11" text-anchor="middle" fill="#4A5A68">&lt; −15</text>
+  <path d="M156.4,256 V234.3 Q156.4,230.3 160.4,230.3 H176.4 Q180.4,230.3 180.4,234.3 V256 Z" fill="#4A5A68"><title>−15 to −10 · hold the stock: 8%</title></path>
+  <path d="M182.4,256 V243 Q182.4,239 186.4,239 H202.4 Q206.4,239 206.4,243 V256 Z" fill="#3A56C5"><title>−15 to −10 · covered call (short the 105 call): 5%</title></path>
+  <text x="181.4" y="274" font-size="11" text-anchor="middle" fill="#4A5A68">−15 to −10</text>
+  <path d="M234.6,256 V213.5 Q234.6,209.5 238.6,209.5 H254.6 Q258.6,209.5 258.6,213.5 V256 Z" fill="#4A5A68"><title>−10 to −5 · hold the stock: 14%</title></path>
+  <path d="M260.6,256 V223.5 Q260.6,219.5 264.6,219.5 H280.6 Q284.6,219.5 284.6,223.5 V256 Z" fill="#3A56C5"><title>−10 to −5 · covered call (short the 105 call): 11%</title></path>
+  <text x="259.6" y="274" font-size="11" text-anchor="middle" fill="#4A5A68">−10 to −5</text>
+  <path d="M312.9,256 V197.9 Q312.9,193.9 316.9,193.9 H332.9 Q336.9,193.9 336.9,197.9 V256 Z" fill="#4A5A68"><title>−5 to 0 · hold the stock: 19%</title></path>
+  <path d="M338.9,256 V204.1 Q338.9,200.1 342.9,200.1 H358.9 Q362.9,200.1 362.9,204.1 V256 Z" fill="#3A56C5"><title>−5 to 0 · covered call (short the 105 call): 17%</title></path>
+  <text x="337.9" y="274" font-size="11" text-anchor="middle" fill="#4A5A68">−5 to 0</text>
+  <path d="M391.1,256 V195.7 Q391.1,191.7 395.1,191.7 H411.1 Q415.1,191.7 415.1,195.7 V256 Z" fill="#4A5A68"><title>0 to 5 · hold the stock: 19%</title></path>
+  <path d="M417.1,256 V194.7 Q417.1,190.7 421.1,190.7 H437.1 Q441.1,190.7 441.1,194.7 V256 Z" fill="#3A56C5"><title>0 to 5 · covered call (short the 105 call): 20%</title></path>
+  <text x="416.1" y="274" font-size="11" text-anchor="middle" fill="#4A5A68">0 to 5</text>
+  <path d="M469.4,256 V207.7 Q469.4,203.7 473.4,203.7 H489.4 Q493.4,203.7 493.4,207.7 V256 Z" fill="#4A5A68"><title>5 to 10 · hold the stock: 16%</title></path>
+  <path d="M495.4,256 V107.7 Q495.4,103.7 499.4,103.7 H515.4 Q519.4,103.7 519.4,107.7 V256 Z" fill="#3A56C5"><title>5 to 10 · covered call (short the 105 call): 46%</title></path>
+  <text x="494.4" y="274" font-size="11" text-anchor="middle" fill="#4A5A68">5 to 10</text>
+  <path d="M547.6,256 V225.4 Q547.6,221.4 551.6,221.4 H567.6 Q571.6,221.4 571.6,225.4 V256 Z" fill="#4A5A68"><title>10 to 15 · hold the stock: 10%</title></path>
+  <path d="M573.6,256 V256 Q573.6,256 573.6,256 H597.6 Q597.6,256 597.6,256 V256 Z" fill="#3A56C5"><title>10 to 15 · covered call (short the 105 call): 0%</title></path>
+  <text x="572.6" y="274" font-size="11" text-anchor="middle" fill="#4A5A68">10 to 15</text>
+  <path d="M625.9,256 V224.7 Q625.9,220.7 629.9,220.7 H645.9 Q649.9,220.7 649.9,224.7 V256 Z" fill="#4A5A68"><title>&gt; 15 · hold the stock: 11%</title></path>
+  <path d="M651.9,256 V256 Q651.9,256 651.9,256 H675.9 Q675.9,256 675.9,256 V256 Z" fill="#3A56C5"><title>&gt; 15 · covered call (short the 105 call): 0%</title></path>
+  <text x="650.9" y="274" font-size="11" text-anchor="middle" fill="#4A5A68">&gt; 15</text>
+</svg>
+<!-- /chart:cc_hist -->
+<figcaption>fig 2.7.9 — P&amp;L after three months, per share, in $5 buckets: the covered call piles its outcomes into the capped bucket and gives up the right tail, while its left tail is the stock's, shifted by the premium</figcaption>
+</figure>
+
+<table>
+<thead><tr><th>Per share, over 3 months</th><th>Hold the stock</th><th>Covered call</th></tr></thead>
+<tbody>
+<tr><td>Average P&amp;L</td><td><span data-lab="dist_stock_mean" data-fmt=".2f">2.01</span></td><td><span data-lab="dist_cc_mean" data-fmt=".2f">1.60</span></td></tr>
+<tr><td>Standard deviation</td><td><span data-lab="dist_stock_sd" data-fmt=".2f">10.22</span></td><td><span data-lab="dist_cc_sd" data-fmt=".2f">6.61</span></td></tr>
+<tr><td>Chance of a profit</td><td><span data-lab="dist_stock_p_profit" data-fmt=".0%">56%</span></td><td><span data-lab="dist_cc_p_profit" data-fmt=".0%">65%</span></td></tr>
+<tr><td>Bad case (5th percentile)</td><td><span data-lab="dist_stock_p05" data-fmt=".2f">−13.83</span></td><td><span data-lab="dist_cc_p05" data-fmt=".2f">−11.44</span></td></tr>
+<tr><td>Good case (95th percentile)</td><td><span data-lab="dist_stock_p95" data-fmt=".2f">19.72</span></td><td><span data-lab="dist_cc_p95" data-fmt=".2f">7.39</span></td></tr>
+</tbody>
+</table>
+
+<p>The covered call wins more often and swings less, but it earns less on average: it gives away the right tail (the call is exercised in <span data-lab="dist_p_called" data-fmt=".0%">37%</span> of paths) and keeps nearly all of the left tail — its bad case is the stock's plus the <span data-lab="cc_premium" data-fmt="$.2f">$2.39</span> premium, exactly. The average shortfall, <span data-lab="dist_mean_gap" data-fmt="$.2f">$0.41</span>, matches the theoretical <span data-lab="dist_mean_gap_theory" data-fmt="$.2f">$0.42</span>: when the stock is expected to beat the risk-free rate, a fairly priced call pays out more on average than its price, so selling it gives up expected return. Here the call is priced at the stock's true volatility, so it carries no volatility risk premium: selling it simply hands the buyer part of the stock's equity premium. Real index options differ, because implied volatility has tended to exceed the volatility that followed (§2.7.6); Israelov and Nielsen (2015) find that index covered calls have historically earned attractive risk-adjusted returns by collecting that <span class="term soon" data-term="volatility risk premium" title="Defined in Session 10.7 (coming soon)">volatility risk premium</span> along with the <a class="term" href="../unit01-quant-landscape/session02-where-returns-come-from.html#g-equity-premium" data-term="equity premium">equity premium</a> — together with a risk they argue is not compensated. <span class="xref soon" data-xref="10.7" data-auto="" title="Coming soon">Session 10.7 — Trading Volatility</span> takes that trade apart.</p>
+</section>
+
+<section id="s6">
+<h2><span class="no">2.7.6</span> Implied volatility: the price, quoted in volatility</h2>
+<p class="lede">Option prices cannot be compared directly: options differ in strike, expiry and underlying. Professionals convert every price into one comparable number — its implied volatility — and quote and trade that.</p>
+
+<p>So far the premiums came from a black box, the <span class="term soon" data-term="Black-Scholes-Merton model" title="Defined in Session 10.3 (coming soon)">Black-Scholes-Merton</span> formula, written in the lab as a single function and clearly flagged: <span class="xref soon" data-xref="10.3" data-auto="" title="Coming soon">Session 10.3 — Black-Scholes-Merton</span> derives it and <span class="xref soon" data-xref="10.4" data-auto="" title="Coming soon">Session 10.4 — The Greeks &amp; Hedging P&amp;L</span> takes it apart. It turns six inputs into a price: spot, strike, time to expiry, the risk-free rate, the dividend yield and the <a class="term" href="session03-returns-pnl-leverage.html#g-volatility" data-term="volatility">volatility</a> <math><semantics><mi>σ</mi><annotation encoding="application/x-tex">\sigma</annotation></semantics></math> of the stock until expiry. You can look up the first five. The sixth cannot be observed in advance, and it matters most: higher volatility means a wider spread of outcomes and, through the hockey stick, more time value (§2.7.2). The price rises with <math><semantics><mi>σ</mi><annotation encoding="application/x-tex">\sigma</annotation></semantics></math> for every call and every put:</p>
+
+<table>
+<thead><tr><th>Volatility <math><semantics><mi>σ</mi><annotation encoding="application/x-tex">\sigma</annotation></semantics></math></th><th><span data-lab="vol_10" data-fmt=".0%">10%</span></th><th><span data-lab="vol_20" data-fmt=".0%">20%</span></th><th><span data-lab="vol_30" data-fmt=".0%">30%</span></th><th><span data-lab="vol_40" data-fmt=".0%">40%</span></th></tr></thead>
+<tbody>
+<tr><td>3-month 100 call on a $100 stock</td><td><span data-lab="C_vol_10" data-fmt=".2f">2.52</span></td><td><span data-lab="C_vol_20" data-fmt=".2f">4.49</span></td><td><span data-lab="C_vol_30" data-fmt=".2f">6.46</span></td><td><span data-lab="C_vol_40" data-fmt=".2f">8.43</span></td></tr>
+</tbody>
+</table>
+
+<p>Because price is strictly increasing in <math><semantics><mi>σ</mi><annotation encoding="application/x-tex">\sigma</annotation></semantics></math>, the map can be run backwards: for any market price there is exactly one volatility that makes the model reproduce it. That number is the option's <strong>implied volatility</strong>. It is not a forecast somebody typed in; it is a <em>unit of quotation</em>, the way a bond price is quoted as a yield. Traders say "the 3-month at-the-money calls are trading at 25 vol" and mean an implied volatility of 25%. Finding it is a one-dimensional root-find, and bisection is the most robust way to do it — the same halving you know from <code>git bisect</code>:</p>
+
+<pre><span class="k">def</span> implied_vol(price, S, K, tau, r_f, q=<span class="p">0.0</span>, kind=<span class="s">"call"</span>, lo=<span class="p">1e-4</span>, hi=<span class="p">5.0</span>, tol=<span class="p">1e-8</span>):
+    <span class="s">"""Bisection: the σ at which bs_price(σ) = price. Returns (σ, iterations)."""</span>
+    f = <span class="k">lambda</span> s: bs_price(S, K, tau, r_f, s, q, kind) - price   <span class="c"># noqa: E731 — increasing in s</span>
+    <span class="k">if not</span> f(lo) &lt;= <span class="p">0</span> &lt;= f(hi):
+        <span class="k">raise</span> ValueError(<span class="s">"price outside the range the model can produce: check no-arbitrage bounds"</span>)
+    n = <span class="p">0</span>
+    <span class="k">while</span> hi - lo &gt; tol:
+        mid = <span class="p">0.5</span> * (lo + hi)
+        <span class="k">if</span> f(mid) &gt; <span class="p">0</span>:
+            hi = mid          <span class="c"># model price too high → the answer is below mid</span>
+        <span class="k">else</span>:
+            lo = mid
+        n += <span class="p">1</span>
+    <span class="k">return</span> <span class="p">0.5</span> * (lo + hi), n</pre>
+
+<p>A made-up market quote of <span data-lab="iv_quote" data-fmt="$.2f">$5.25</span> for the 3-month 100 call (<span data-lab="iv_quote_contract" data-fmt="$,.0f">$525</span> a contract) implies a volatility of <span data-lab="iv" data-fmt=".2%">23.88%</span>, found in <span data-lab="iv_iters" data-fmt="d">29</span> halvings to a tolerance of one millionth of a volatility point. For a check in your head, use the rule of thumb that follows from Brenner and Subrahmanyam (1988): an at-the-money straddle costs about <math><semantics><mrow><mn>0.8</mn><mspace width="0.1667em"></mspace><mi>S</mi><mi>σ</mi><msqrt><mrow><mi>τ</mi><mspace width="0pt" height="0.5em"></mspace></mrow></msqrt></mrow><annotation encoding="application/x-tex">0.8\, S \sigma \sqrt{\tau}</annotation></semantics></math> (0.8 ≈ <math><semantics><msqrt><mrow><mn>2</mn><mi>/</mi><mi>π</mi></mrow></msqrt><annotation encoding="application/x-tex">\sqrt{2/\pi}</annotation></semantics></math>. Brenner and Subrahmanyam's formula is for a single option at the money forward, <math><semantics><mrow><mi>S</mi><mo>=</mo><mi>K</mi><msup><mi>e</mi><mrow class="tml-sml-pad"><mo form="prefix" stretchy="false" lspace="0em" rspace="0em">−</mo><msub><mi>r</mi><mi>f</mi></msub><mi>τ</mi></mrow></msup></mrow><annotation encoding="application/x-tex">S = K e^{-r_f \tau}</annotation></semantics></math>; a straddle barely notices the difference, a single at-the-money-spot call does, and the rule loosens as <math><semantics><mrow><mi>σ</mi><msqrt><mrow><mi>τ</mi><mspace width="0pt" height="0.5em"></mspace></mrow></msqrt></mrow><annotation encoding="application/x-tex">\sigma\sqrt{\tau}</annotation></semantics></math> grows). Here that gives <span data-lab="straddle_rule" data-fmt="$.2f">$8.00</span> against the lab's <span data-lab="straddle_cost" data-fmt="$.2f">$7.98</span>, and running it backwards recovers <span data-lab="straddle_rule_iv" data-fmt=".1%">19.9%</span>. It also says what a straddle price <em>means</em>: roughly the size of move the market is pricing in — a risk-neutral average, not a forecast (see the pitfall below) — here about <span data-lab="straddle_move" data-fmt=".0%">8%</span> of the stock price, either way.</p>
+
+<p>Now the payoff of the quote convention. Which is dearer: a 1-month at-the-money call at <span data-lab="cmp_short_price" data-fmt="$.2f">$2.60</span>, or a 1-year one at <span data-lab="cmp_long_price" data-fmt="$.2f">$9.90</span>? By price the question makes no sense. By implied volatility it is easy: <span data-lab="cmp_short_iv" data-fmt=".1%">21.1%</span> against <span data-lab="cmp_long_iv" data-fmt=".1%">19.9%</span>, so the cheap-looking option is the expensive one.</p>
+
+<figure class="diagram chart">
+<!-- chart:smile -->
+<svg viewBox="0 0 720 280" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Implied volatility by strike, 3-month options (x = strike, $; spot = $100)">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">IMPLIED VOLATILITY BY STRIKE, 3-MONTH OPTIONS (X = STRIKE, $; SPOT = $100)</text>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#4A5A68" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">lognormal world (GBM, σ = 20%)</text>
+  <line x1="262.0" y1="32" x2="278.0" y2="32" stroke="#3A56C5" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="284.0" y="36" font-size="11" fill="#4A5A68">crash-risk world</text>
+  <line x1="64" y1="244" x2="602" y2="244" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="248" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">10%</text>
+  <line x1="64" y1="196" x2="602" y2="196" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="200" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">15%</text>
+  <line x1="64" y1="148" x2="602" y2="148" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="152" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">20%</text>
+  <line x1="64" y1="100" x2="602" y2="100" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="104" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">25%</text>
+  <line x1="64" y1="52" x2="602" y2="52" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="56" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">30%</text>
+  <line x1="64" y1="244" x2="602" y2="244" stroke="#C9CFC6" stroke-width="1"/>
+  <line x1="64" y1="244" x2="64" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="64" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">85</text>
+  <line x1="153.7" y1="244" x2="153.7" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="153.7" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">90</text>
+  <line x1="243.3" y1="244" x2="243.3" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="243.3" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">95</text>
+  <line x1="333" y1="244" x2="333" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="333" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">100</text>
+  <line x1="422.7" y1="244" x2="422.7" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="422.7" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">105</text>
+  <line x1="512.3" y1="244" x2="512.3" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="512.3" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">110</text>
+  <line x1="602" y1="244" x2="602" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="602" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">115</text>
+  <polyline points="64,147.8 153.7,147.9 243.3,147.8 333,147.8 422.7,147.9 512.3,148.1 602,148.3" fill="none" stroke="#4A5A68" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><title>lognormal world (GBM, σ = 20%)</title></polyline>
+  <circle cx="602" cy="148.3" r="4" fill="#4A5A68" stroke="#FBFBF8" stroke-width="2"><title>lognormal world (GBM, σ = 20%): 20%</title></circle>
+  <polyline points="64,97.1 153.7,119.3 243.3,142.7 333,159.7 422.7,170.3 512.3,176.7 602,180.7" fill="none" stroke="#3A56C5" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>crash-risk world</title></polyline>
+  <circle cx="602" cy="180.7" r="4" fill="#3A56C5" stroke="#FBFBF8" stroke-width="2"><title>crash-risk world: 17%</title></circle>
+  <text x="614" y="152.3" font-size="11" fill="#1F2C38">lognormal: 20%</text>
+  <text x="614" y="184.7" font-size="11" fill="#1F2C38">crash risk: 17%</text>
+</svg>
+<!-- /chart:smile -->
+<figcaption>fig 2.7.10 — implied volatility by strike for 3-month options in two simulated worlds: flat where the stock really is lognormal, tilted where it can crash — a first look at the volatility skew</figcaption>
+</figure>
+
+<p>One more experiment, as a teaser. Invert the crash-world prices of §2.7.3 strike by strike. In the lognormal world every strike implies <span data-lab="sigma" data-fmt=".0%">20%</span>, within <span data-lab="smile_gbm_max_dev_pp" data-fmt=".2f">0.03</span> percentage points. In the crash world no single volatility fits: the 85 put implies <span data-lab="smile_iv_85" data-fmt=".1%">25.3%</span>, the at-the-money option <span data-lab="smile_iv_100" data-fmt=".1%">18.8%</span> and the 115 call <span data-lab="smile_iv_115" data-fmt=".1%">16.6%</span>. The formula assumes lognormal prices with one volatility; when the real distribution has a <span class="term soon" data-term="fat tails" title="Defined in Session 3.2 (coming soon)">fatter left tail</span>, the market has to use a different volatility at each strike to get the prices right. S&amp;P 500 index options have shown this downward slope ever since the 1987 crash (Rubinstein 1994): the <span class="term soon" data-term="volatility skew" title="Defined in Session 10.5 (coming soon)">volatility skew</span>; laid out across strikes and expiries it becomes the <span class="term soon" data-term="volatility surface" title="Defined in Session 10.5 (coming soon)">volatility surface</span> of <span class="xref soon" data-xref="10.5" data-auto="" title="Coming soon">Session 10.5 — The Implied Volatility Surface</span>.</p>
+
+<div class="co warn"><span class="co-t">⚠️ Pitfall — "implied volatility is the market's forecast of volatility"</span>
+<p>It is a price, and prices contain <a class="term" href="../unit01-quant-landscape/session02-where-returns-come-from.html#g-risk-premium" data-term="risk premium">risk premia</a>. Option sellers carry crash risk and want to be paid for it, so implied volatility tends to sit above the volatility that follows: Carr and Wu (2009) find that for the S&amp;P 500 the variance implied by options has on average exceeded the variance later realized — a strongly negative variance risk premium in their convention (realized minus implied), which buyers accept to hedge against rising volatility. Option sellers collect the same thing as a positive premium: the volatility risk premium of §2.7.5. Compare implied volatility with a forecast of <span class="term soon" data-term="realized volatility" title="Defined in Session 5.5 (coming soon)">realized volatility</span> (<span class="xref soon" data-xref="5.5" data-style="short" data-auto="" title="Coming soon">Session 5.5</span>), and treat the gap as the thing you trade (<span class="xref soon" data-xref="10.7" data-style="short" data-auto="" title="Coming soon">Session 10.7</span>) rather than as a free prediction.</p>
+</div>
+
+<div class="co tip"><span class="co-t">💡 Looking ahead</span>
+<p>The rest of the options story lives in Unit 10: <span class="xref soon" data-xref="10.3" data-auto="" title="Coming soon">Session 10.3 — Black-Scholes-Merton</span> opens the black box, <span class="xref soon" data-xref="10.4" data-auto="" title="Coming soon">Session 10.4 — The Greeks &amp; Hedging P&amp;L</span> measures how the price responds to spot, time and volatility (<span class="term soon" data-term="delta" title="Defined in Session 10.4 (coming soon)">delta</span>, <span class="term soon" data-term="theta" title="Defined in Session 10.4 (coming soon)">theta</span>, <span class="term soon" data-term="vega" title="Defined in Session 10.4 (coming soon)">vega</span>) and hedges it, <span class="xref soon" data-xref="10.5" data-auto="" title="Coming soon">Session 10.5 — The Implied Volatility Surface</span> fits the surface, and <span class="xref soon" data-xref="10.7" data-auto="" title="Coming soon">Session 10.7 — Trading Volatility</span> trades implied against realized volatility.</p>
+</div>
+</section>
+
+<section id="s7">
+<h2><span class="no">2.7.7</span> Try it</h2>
+<p class="lede">Open the companion lab, predict before you run, and break things on purpose.</p>
+<div class="co lab"><span class="co-t">🔧 Try it (15 min, in the lab)</span>
+<p>1. In section 4, set <code>MISPRICING = 0.10</code>. Before running, predict the net profit per contract after costs; then run and read <code>arb_net_contract</code>. What is the smallest gap worth trading at these costs?<br>
+2. In section 3, set <code>CRASH_P = 0</code>. Predict the implied volatility at every strike in the smile chart, then run it. (The lab switches to asserting a flat curve at <code>CRASH_SIGMA</code>.) Then try <code>CRASH_P = 0.15</code>: what happens to the level of the curve, and what to its slope?<br>
+3. In section 5, move the covered call's strike <code>K_CC</code> from 105 to 110. Predict how the premium, the maximum gain and the chance of a profit change; check them against the new histogram.<br>
+Success: your predictions for steps 1 and 2 land within a few cents and a few tenths of a volatility point, and you can say in one sentence why each changed.</p>
+</div>
+</section>
+
+<hr>
+
+<section id="s8">
+<h2><span class="no">2.7.8</span> Glossary · Check yourself · Go deeper</h2>
+<div class="gloss" id="glossary">
+<div id="g-call-option"><b>Call option</b> — the right, not the obligation, to buy the underlying at the strike price, at or before expiry.</div>
+<div id="g-put-option"><b>Put option</b> — the right, not the obligation, to sell the underlying at the strike price, at or before expiry.</div>
+<div id="g-strike-price"><b>Strike price</b> — the fixed price <math><semantics><mi>K</mi><annotation encoding="application/x-tex">K</annotation></semantics></math> at which an option lets its holder buy (call) or sell (put).</div>
+<div id="g-option-premium"><b>Option premium</b> — the price the buyer pays the seller for an option; quoted per share, × 100 for a standard US equity contract.</div>
+<div id="g-payoff-diagram"><b>Payoff diagram</b> — a plot of a position's value (or P&amp;L) at expiry against the underlying's price at expiry.</div>
+<div id="g-moneyness"><b>Moneyness</b> — where the underlying's price sits relative to the strike: in, at or out of the money.</div>
+<div id="g-intrinsic-value"><b>Intrinsic value</b> — what an option would pay if exercised now: <math><semantics><mrow><mrow><mi>max</mi><mo>⁡</mo></mrow><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>S</mi><mo>−</mo><mi>K</mi><mo separator="true">,</mo><mn>0</mn><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">\max(S - K, 0)</annotation></semantics></math> for a call, <math><semantics><mrow><mrow><mi>max</mi><mo>⁡</mo></mrow><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>K</mi><mo>−</mo><mi>S</mi><mo separator="true">,</mo><mn>0</mn><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">\max(K - S, 0)</annotation></semantics></math> for a put.</div>
+<div id="g-time-value"><b>Time value</b> — option price minus intrinsic value: what the remaining time and uncertainty are worth (plus an interest effect).</div>
+<div id="g-put-call-parity"><b>Put-call parity</b> — for European options, <math><semantics><mrow><mi>C</mi><mo>−</mo><mi>P</mi><mo>=</mo><mi>S</mi><msup><mi>e</mi><mrow class="tml-sml-pad"><mo form="prefix" stretchy="false" lspace="0em" rspace="0em">−</mo><mi>q</mi><mi>τ</mi></mrow></msup><mo>−</mo><mi>K</mi><msup><mi>e</mi><mrow class="tml-sml-pad"><mo form="prefix" stretchy="false" lspace="0em" rspace="0em">−</mo><msub><mi>r</mi><mi>f</mi></msub><mi>τ</mi></mrow></msup></mrow><annotation encoding="application/x-tex">C - P = S e^{-q\tau} - K e^{-r_f \tau}</annotation></semantics></math>: a call minus a put is a forward, enforced by replication.</div>
+<div id="g-european-option"><b>European option</b> — an option that can be exercised only at expiry (SPX index options, for example).</div>
+<div id="g-american-option"><b>American option</b> — an option that can be exercised on any business day up to expiry (US single-stock and ETF options).</div>
+<div id="g-covered-call"><b>Covered call</b> — owning the shares and selling a call on them: a premium now in exchange for the upside above the strike; by parity, a short put plus cash.</div>
+<div id="g-protective-put"><b>Protective put</b> — owning the shares and buying a put on them: a floor under the loss, paid for with the premium; by parity, a call plus cash.</div>
+<div id="g-vertical-spread"><b>Vertical spread</b> — buying an option at one strike and selling the same type at another strike with the same expiry: cheaper than the single option, with the gain capped.</div>
+<div id="g-implied-volatility"><b>Implied volatility</b> — the volatility that, plugged into a pricing model (usually Black-Scholes-Merton), reproduces an option's market price.</div>
+</div>
+
+<h3>Check yourself</h3>
+<details class="q"><summary>1. You buy the 3-month 100 call for <span data-lab="C_atm" data-fmt="$.2f">$4.49</span> with the stock at $100. At expiry the stock is at <span data-lab="q1_S" data-fmt="$.0f">$103</span>. What is the payoff, what is your P&amp;L, and was the call a good idea?</summary><div>The payoff is <span data-lab="q1_payoff" data-fmt="$.2f">$3.00</span> (buy at 100 a share worth 103), but the P&amp;L is <span data-lab="q1_payoff" data-fmt="$.2f">$3.00</span> − <span data-lab="C_atm" data-fmt="$.2f">$4.49</span> = <span data-lab="q1_pnl" data-fmt="$.2f">−$1.49</span> per share. The stock rose, you were right on direction, and you still lost: it needed to pass the <span data-lab="call_breakeven" data-fmt=".2f">104.49</span> breakeven — to move more than the premium had priced in.</div></details>
+<details class="q"><summary>2. The stock is at $100. The 110 call costs <span data-lab="k110_call" data-fmt="$.2f">$1.14</span> and the 110 put <span data-lab="k110_put" data-fmt="$.2f">$10.05</span>. Which is in the money, what are their intrinsic and time values, and why is the put's time value so small?</summary><div>The put is in the money (the right to sell at 110 is worth <span data-lab="k110_put_intr" data-fmt="$.2f">$10.00</span> now); the call is out of the money, so its <span data-lab="k110_call" data-fmt="$.2f">$1.14</span> is all time value. The put's time value is only <span data-lab="k110_put_tv" data-fmt="$.2f">$0.05</span>: its optionality is partly offset by the interest lost waiting three months to receive the strike. Deep enough in the money, a European put's time value turns negative (§2.7.2).</div></details>
+<details class="q"><summary>3. Stock $100, 3-month 100 call quoted at <span data-lab="arb_C_mkt" data-fmt="$.2f">$5.09</span>, 100 put at <span data-lab="P_atm" data-fmt="$.2f">$3.49</span>, risk-free rate <span data-lab="r_f" data-fmt=".0%">4%</span>, no dividends. Is there an arbitrage, and what do you trade?</summary><div>Parity says <math><semantics><mrow><mi>C</mi><mo>−</mo><mi>P</mi></mrow><annotation encoding="application/x-tex">C - P</annotation></semantics></math> should be <math><semantics><mrow><mn>100</mn><mo>−</mo><mn>100</mn><msup><mi>e</mi><mrow class="tml-sml-pad"><mo form="prefix" stretchy="false" lspace="0em" rspace="0em">−</mo><mn>0.04</mn><mo>×</mo><mn>0.25</mn></mrow></msup><mo>≈</mo></mrow><annotation encoding="application/x-tex">100 - 100e^{-0.04 \times 0.25} \approx</annotation></semantics></math> <span data-lab="arb_rhs" data-fmt=".3f">0.995</span>; the quotes give <span data-lab="arb_lhs" data-fmt=".3f">1.595</span>, so the call side is rich. Run a conversion: sell the call, buy the put, buy the share, borrow <span data-lab="arb_loan" data-fmt=".2f">99.00</span>. You pocket <span data-lab="arb_cash_today_contract" data-fmt="$,.0f">$60</span> per contract today and the legs repay the loan at expiry — <span data-lab="arb_net_contract" data-fmt="$.2f">$47.70</span> after the lab's illustrative costs, if the quotes are real and tradable.</div></details>
+<details class="q"><summary>4. A stock is hard to borrow. Its puts look expensive relative to its calls, and the parity arithmetic says: sell the put, buy the call, short the stock. Why might this "arbitrage" not be one?</summary><div>The reversal needs a short sale, and the borrow fee (plus the risk of a recall) is exactly what the gap is paying for. Ofek, Richardson and Whitelaw (2004) find parity violations line up with short-sale costs and persist after transaction costs. A gap that exists because one leg is hard to trade is a price, not free money.</div></details>
+<details class="q"><summary>5. You own a stock at $100, expect it to drift sideways for three months, and would happily sell it at $105. Which structure fits, and what do you give up?</summary><div>A covered call: sell the 105 call for about <span data-lab="cc_premium" data-fmt="$.2f">$2.39</span>. You keep the premium and, if the stock ends above 105, sell it there: your gain is capped at <span data-lab="cc_max_gain" data-fmt="$.2f">$7.39</span> per share. You keep almost all the downside, and by parity your position is a short put plus cash — you are selling volatility, not buying income.</div></details>
+<details class="q"><summary>6. A colleague says the 1-month at-the-money call at <span data-lab="cmp_short_price" data-fmt="$.2f">$2.60</span> is "cheap" next to the 1-year one at <span data-lab="cmp_long_price" data-fmt="$.2f">$9.90</span>. Is it?</summary><div>No — convert both to implied volatility. The 1-month call implies <span data-lab="cmp_short_iv" data-fmt=".1%">21.1%</span>, the 1-year <span data-lab="cmp_long_iv" data-fmt=".1%">19.9%</span>: per unit of time and uncertainty, the short-dated option is the dearer one. Prices of different options are not comparable; implied volatilities are.</div></details>
+
+<div class="co lab"><span class="co-t">🔧 Homework (~1 h before Session 3.1)</span>
+<p>1. <strong>A box of parities.</strong> Add a bear put spread (long 110 put, short 100 put) to section 5, and combine it with the bull call spread into a <em>box</em>. Show that its payoff is <span data-lab="box_width" data-fmt="$.0f">$10</span> in every state and that the black box prices it at <math><semantics><mrow><mn>10</mn><msup><mi>e</mi><mrow class="tml-sml-pad"><mo form="prefix" stretchy="false" lspace="0em" rspace="0em">−</mo><msub><mi>r</mi><mi>f</mi></msub><mi>τ</mi></mrow></msup></mrow><annotation encoding="application/x-tex">10 e^{-r_f \tau}</annotation></semantics></math> = <span data-lab="box_price" data-fmt="$.2f">$9.90</span>. Explain in two sentences why that is put-call parity applied twice.<br>
+2. <strong>Newton vs bisection.</strong> Write <code>implied_vol_newton</code> using a numerical derivative of <code>bs_price</code> with respect to σ. Check it matches <code>implied_vol</code> to 1e-8 on the <span data-lab="iv_quote" data-fmt="$.2f">$5.25</span> quote and count its iterations. Then call both on a price of $0.50 for the 100 call: why should both refuse? (Hint: the lower bound <math><semantics><mrow><mi>S</mi><mo>−</mo><mi>K</mi><msup><mi>e</mi><mrow class="tml-sml-pad"><mo form="prefix" stretchy="false" lspace="0em" rspace="0em">−</mo><msub><mi>r</mi><mi>f</mi></msub><mi>τ</mi></mrow></msup></mrow><annotation encoding="application/x-tex">S - K e^{-r_f \tau}</annotation></semantics></math>.)<br>
+3. <strong>Read a real chain.</strong> On a public delayed-quote page, pick one SPY expiry and one strike near the money, and compute <math><semantics><mrow><mi>C</mi><mo>−</mo><mi>P</mi></mrow><annotation encoding="application/x-tex">C - P</annotation></semantics></math> from mid prices and from bid/ask. SPY options are American and SPY pays dividends, so expect a band rather than an equality: is the gap inside the spread? Record the date and time of the quotes.<br>
+4. <strong>Read</strong> Hull, chapters 10–12 (mechanics, properties of stock options, trading strategies).</p>
+</div>
+
+<h3>📚 Go deeper</h3>
+<ol class="refs">
+<li>Hull, J. C. (2021). <em>Options, Futures, and Other Derivatives</em>, 11th ed., ch. 10 "Mechanics of options markets", ch. 11 "Properties of stock options" and ch. 12 "Trading strategies involving options". Pearson. <span class="rid">ISBN 978-0-13-693997-9</span></li>
+<li>Natenberg, S. (2015). <em>Option Volatility and Pricing: Advanced Trading Strategies and Techniques</em>, 2nd ed. McGraw-Hill. <span class="rid">ISBN 978-0-07-181877-3</span></li>
+<li>Stoll, H. R. (1969). "The Relationship Between Put and Call Option Prices." <em>Journal of Finance</em> 24(5), 801–824. <span class="rid">doi:10.1111/j.1540-6261.1969.tb01694.x</span></li>
+<li>Black, F. &amp; Scholes, M. (1973). "The Pricing of Options and Corporate Liabilities." <em>Journal of Political Economy</em> 81(3), 637–654. <span class="rid">doi:10.1086/260062</span></li>
+<li>Merton, R. C. (1973). "Theory of Rational Option Pricing." <em>Bell Journal of Economics and Management Science</em> 4(1), 141–183. <span class="rid">doi:10.2307/3003143</span></li>
+</ol>
+
+<h3>Sources for the numbers</h3>
+<ol class="refs">
+<li>Ofek, E., Richardson, M. &amp; Whitelaw, R. F. (2004). "Limited Arbitrage and Short Sales Restrictions: Evidence from the Options Markets." <em>Journal of Financial Economics</em> 74(2), 305–342. <span class="rid">doi:10.1016/j.jfineco.2003.05.008</span></li>
+<li>Israelov, R. &amp; Nielsen, L. N. (2015). "Covered Calls Uncovered." <em>Financial Analysts Journal</em> 71(6), 44–57. <span class="rid">doi:10.2469/faj.v71.n6.1</span></li>
+<li>Brenner, M. &amp; Subrahmanyam, M. G. (1988). "A Simple Formula to Compute the Implied Standard Deviation." <em>Financial Analysts Journal</em> 44(5), 80–83. <span class="rid">doi:10.2469/faj.v44.n5.80</span></li>
+<li>Carr, P. &amp; Wu, L. (2009). "Variance Risk Premiums." <em>Review of Financial Studies</em> 22(3), 1311–1341. <span class="rid">doi:10.1093/rfs/hhn038</span></li>
+<li>Rubinstein, M. (1994). "Implied Binomial Trees." <em>Journal of Finance</em> 49(3), 771–818. <span class="rid">doi:10.1111/j.1540-6261.1994.tb00079.x</span></li>
+<li>Cboe (2026). "SPX Index Options" fact sheet and S&amp;P 500 Index Options product specifications. <span class="rid">https://cdn.cboe.com/resources/spx/spx-fact-sheet.pdf</span> · <span class="rid">https://www.cboe.com/tradable_products/sp_500/spx_options/specifications/</span></li>
+<li>Options Clearing Corporation. Equity options product specifications (contract size), and <em>Characteristics and Risks of Standardized Options</em> (June 2024). <span class="rid">https://www.theocc.com/clearance-and-settlement/clearing/equity-options-product-specifications</span> · <span class="rid">https://www.theocc.com/getcontentasset/a151a9ae-d784-4a15-bdeb-23a029f50b70/dfc3d011-8f63-43f6-9ed8-4b444333a1d0/riskstoc.pdf</span></li>
+<li>Options Industry Council. "Options Exercise" FAQ (automatic exercise thresholds; American and European style). <span class="rid">https://www.optionseducation.org/referencelibrary/faq/options-exercise</span></li>
+</ol>
+</section>
+
+<!-- nav:foot -->
+<div class="foot">
+<a href="session06-crypto-market-structure.html">← Prev: 2.6 · Crypto</a>
+<a href="../unit03-math-toolkit/session01-probability-expected-value.html">Next: 3.1 · Probability &amp; EV →</a>
+</div>
+<p class="legal">Educational material only — not investment, legal or tax advice. Backtests and simulations are hypothetical. <a href="../start-here.html#disclaimer">Disclaimer</a> · Text CC BY 4.0 · Code MIT.</p>
+<!-- /nav:foot -->
+</main>
+</div></body></html>

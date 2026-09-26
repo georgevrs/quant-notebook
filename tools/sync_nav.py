@@ -496,9 +496,10 @@ def sitemap(c: Course) -> str:
 
 
 def run(check: bool, only: list[str] | None = None) -> int:
-    """Sync every page, or — with `only` — just those session pages (no hubs, no sitemap).
+    """Sync every page, or — with `only` — just those session pages (no sitemap).
 
-    `only` exists for parallel authors: each rewrites nothing but their own page.
+    `only` exists for parallel authors: each rewrites nothing but their own page. The special id
+    `hubs` adds the hub pages, so the orchestrator can refresh hubs while authors are mid-edit.
     """
     c = Course()
     changed, failed = [], False
@@ -506,10 +507,11 @@ def run(check: bool, only: list[str] | None = None) -> int:
     for s in c.sessions:
         if s.path.exists() and (not only or s.id in only):
             targets.append((s.path, s.rel_path))
-    if not only:
+    if not only or "hubs" in only:
         for rel in HUB_PAGES:
             if (SITE / rel).exists():
                 targets.append((SITE / rel, rel))
+    if not only:
         # any stray html page under site/ that is neither a session nor a hub is a mistake
         known = {t[0].resolve() for t in targets}
         for p in SITE.rglob("*.html"):
@@ -547,7 +549,7 @@ def run(check: bool, only: list[str] | None = None) -> int:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--check", action="store_true", help="exit 1 if anything would change")
-    ap.add_argument("--only", nargs="*", help="session ids: sync only these pages (no hubs, no sitemap)")
+    ap.add_argument("--only", nargs="*", help="session ids (and/or 'hubs'): sync only these pages (no sitemap)")
     a = ap.parse_args()
     sys.exit(run(a.check, a.only))
 

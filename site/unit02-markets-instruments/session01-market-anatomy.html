@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- nav:head -->
+<title>2.1 · Market Anatomy &amp; the Life of an Order</title>
+<meta name="description" content="Follow one order from your code through broker, venue, clearing house and custodian — and see where every fee and risk sits.">
+<link rel="canonical" href="https://georgevrs.github.io/quant-notebook/unit02-markets-instruments/session01-market-anatomy.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Quant Notebook">
+<meta property="og:title" content="2.1 · Market Anatomy &amp; the Life of an Order">
+<meta property="og:description" content="Follow one order from your code through broker, venue, clearing house and custodian — and see where every fee and risk sits.">
+<meta property="og:url" content="https://georgevrs.github.io/quant-notebook/unit02-markets-instruments/session01-market-anatomy.html">
+<meta name="twitter:card" content="summary">
+<link rel="stylesheet" href="../assets/brand.css">
+<link rel="stylesheet" href="../assets/temml.css">
+<!-- /nav:head -->
+</head>
+<body><div class="page" id="top">
+<!-- Session 2.1 — the plumbing session of Unit 2: participants, the order's path, venues, the book, order types, post-trade, costs. See AUTHORING.md. -->
+<!-- nav:tabs -->
+<nav class="tabs">
+<a href="../index.html">⌂ Course home</a>
+<a class="active" href="session01-market-anatomy.html">2.1 · Market Anatomy</a>
+<a href="session02-equities-indices-etfs.html">2.2 · Equities &amp; ETFs</a>
+<a href="session03-returns-pnl-leverage.html">2.3 · Returns &amp; Leverage</a>
+<a href="session04-futures.html">2.4 · Futures</a>
+<a href="session05-fx-commodities.html">2.5 · FX &amp; Commodities</a>
+<a href="session06-crypto-market-structure.html">2.6 · Crypto</a>
+<a href="session07-options-primer.html">2.7 · Options Primer</a>
+<a href="../roadmap.html">🗺 Roadmap</a>
+</nav>
+<!-- /nav:tabs -->
+
+<header class="cover">
+<!-- nav:heading -->
+<p class="eyebrow">Unit 2 · Markets &amp; Instruments — Session 01 of 07</p>
+<h1>Market Anatomy &amp; the Life of an Order</h1>
+<!-- /nav:heading -->
+<p class="subtitle">Your strategy ends in one line of code that sends an order. After that, half a dozen firms touch it — a broker, a venue, a clearing house, a depository, a custodian — and each one takes a risk off your hands and charges for it. Learn the path once and you know where every cost and every failure lives. <mark>The core move: follow the order hop by hop, and put a price on each one — the fees you are billed, the spread you are not, and the risks the plumbing carries for you.</mark></p>
+<div class="meta">
+<span>DURATION <b>1.5 h + lab</b></span>
+<span>LEVEL <b>Foundations</b></span>
+<span>TRACKS <b>QR · QT · QD · IND</b></span>
+<span>HANDS-ON <b>Walk an order book; fire stops on <span data-lab="stop_n_paths" data-fmt=",d">20,000</span> gapping paths; net <span data-lab="net_total_trades" data-fmt=",d">10,000,000</span> trades</b></span>
+</div>
+<!-- nav:labstrip -->
+<div class="labstrip"><b>📓 Companion lab</b>
+<a href="https://colab.research.google.com/github/georgevrs/quant-notebook/blob/main/labs/u02/s01_market_anatomy.ipynb">Open in Colab</a>
+<a href="https://github.com/georgevrs/quant-notebook/blob/main/labs/u02/s01_market_anatomy.ipynb">Notebook on GitHub</a>
+<a href="https://github.com/georgevrs/quant-notebook/blob/main/labs/u02/s01_market_anatomy.py">Source (.py)</a>
+</div>
+<!-- /nav:labstrip -->
+<div class="toc">
+<b>On this page</b>
+<ol>
+<li><a href="#s1">Who touches your order</a></li>
+<li><a href="#s2">The life of an order, hop by hop</a></li>
+<li><a href="#s3">Where orders trade</a></li>
+<li><a href="#s4">The book: bid, ask &amp; the price of now</a></li>
+<li><a href="#s5">Order types &amp; the gap</a></li>
+<li><a href="#s6">After the fill: clearing, settlement &amp; custody</a></li>
+<li><a href="#s7">Where every fee and risk sits</a></li>
+<li><a href="#s8">Try it</a></li>
+<li><a href="#s9">Glossary · Check yourself · Go deeper</a></li>
+</ol>
+</div>
+</header>
+
+<main>
+
+<!-- ============ §1 — the mental model ============ -->
+<section id="s1">
+<h2><span class="no">2.1.1</span> Who touches your order</h2>
+<p class="lede">Between your <code>submit()</code> call and shares that are legally yours stand at least five firms. None of them is there by accident: each removes a risk you could not carry alone.</p>
+
+<p>In <a class="xref" href="../unit01-quant-landscape/session01-what-quants-do.html" data-xref="1.1" data-style="short" data-auto="">Session 1.1</a> you met the <a class="term" href="../unit01-quant-landscape/session01-what-quants-do.html#g-buy-side" data-term="buy side">buy side</a>, which decides what to own, and the <a class="term" href="../unit01-quant-landscape/session01-what-quants-do.html#g-sell-side" data-term="sell side">sell side</a>, which sells it the service of trading. This session follows what happens when the buy side acts: one <span class="term soon" data-term="order" title="Defined in Session 6.3 (coming soon)">order</span>, from your code to a line in a ledger — every intermediary, what it charges, and what breaks when it fails. Realistic backtests, execution algorithms and live systems all sit on this plumbing.</p>
+
+<p>The cast: an <strong>exchange</strong> is a regulated venue that runs a public order book and matches buyers with sellers under published rules; only its members may send it orders. A <strong>broker</strong> is the member that does so for you: it accepts, checks and routes your orders, reports fills and holds your account. After the trade a <strong>clearing house</strong> confirms, nets and guarantees it; when it becomes buyer to every seller and seller to every buyer it is a <strong>central counterparty</strong> (CCP). <strong>Settlement</strong> — securities delivered against cash — happens in the books of a <strong>central securities depository</strong> (CSD), and a <strong>custodian</strong> holds the securities for you, apart from its own assets.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 336" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">WHO TOUCHES YOUR ORDER — and the problem each one solves for you</text>
+  <rect x="20" y="32" width="216" height="266" rx="12" fill="#F5F6F2" stroke="#4A5A68" stroke-width="1.2"/>
+  <rect x="252" y="32" width="216" height="266" rx="12" fill="#F5F6F2" stroke="#4A5A68" stroke-width="1.2"/>
+  <rect x="484" y="32" width="216" height="266" rx="12" fill="#F5F6F2" stroke="#4A5A68" stroke-width="1.2"/>
+  <text x="128" y="52" font-size="10.5" font-weight="700" text-anchor="middle" fill="#1F2C38">1 · BEFORE THE TRADE</text>
+  <text x="360" y="52" font-size="10.5" font-weight="700" text-anchor="middle" fill="#1F2C38">2 · WHERE IT TRADES</text>
+  <text x="592" y="52" font-size="10.5" font-weight="700" text-anchor="middle" fill="#1F2C38">3 · AFTER THE TRADE</text>
+  <rect x="34" y="64" width="188" height="64" rx="8" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="128" y="86" font-size="11" font-weight="600" text-anchor="middle" fill="#3A56C5">YOU · YOUR CODE</text>
+  <text x="128" y="103" font-size="9.5" text-anchor="middle" fill="#4A5A68">decides what to trade and</text>
+  <text x="128" y="116" font-size="9.5" text-anchor="middle" fill="#4A5A68">sends an order to the broker</text>
+  <rect x="34" y="140" width="188" height="64" rx="8" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="128" y="162" font-size="11" font-weight="600" text-anchor="middle" fill="#3A56C5">BROKER</text>
+  <text x="128" y="179" font-size="9.5" text-anchor="middle" fill="#4A5A68">checks, routes, reports fills;</text>
+  <text x="128" y="192" font-size="9.5" text-anchor="middle" fill="#4A5A68">rents you its venue access</text>
+  <rect x="34" y="216" width="188" height="64" rx="8" fill="#fff" stroke="#4A5A68" stroke-width="1.2" stroke-dasharray="4 3"/>
+  <text x="128" y="238" font-size="11" font-weight="600" text-anchor="middle" fill="#1F2C38">REGULATORS · RULES, FEES</text>
+  <text x="128" y="255" font-size="9.5" text-anchor="middle" fill="#4A5A68">SEC, FINRA (US); FCA (UK);</text>
+  <text x="128" y="268" font-size="9.5" text-anchor="middle" fill="#4A5A68">national regulators, ESMA (EU)</text>
+  <rect x="266" y="64" width="188" height="64" rx="8" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="360" y="86" font-size="11" font-weight="600" text-anchor="middle" fill="#1F7A55">LIT EXCHANGE</text>
+  <text x="360" y="103" font-size="9.5" text-anchor="middle" fill="#4A5A68">public book of bids and asks;</text>
+  <text x="360" y="116" font-size="9.5" text-anchor="middle" fill="#4A5A68">matches buyers with sellers</text>
+  <rect x="266" y="140" width="188" height="64" rx="8" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="360" y="162" font-size="11" font-weight="600" text-anchor="middle" fill="#1F7A55">DARK POOL · ATS</text>
+  <text x="360" y="179" font-size="9.5" text-anchor="middle" fill="#4A5A68">orders hidden until they trade,</text>
+  <text x="360" y="192" font-size="9.5" text-anchor="middle" fill="#4A5A68">often crossed at the mid</text>
+  <rect x="266" y="216" width="188" height="64" rx="8" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="360" y="238" font-size="11" font-weight="600" text-anchor="middle" fill="#1F7A55">WHOLESALER · INTERNALISER</text>
+  <text x="360" y="255" font-size="9.5" text-anchor="middle" fill="#4A5A68">a dealer fills you itself,</text>
+  <text x="360" y="268" font-size="9.5" text-anchor="middle" fill="#4A5A68">off-exchange, from inventory</text>
+  <rect x="498" y="64" width="188" height="64" rx="8" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="592" y="86" font-size="11" font-weight="600" text-anchor="middle" fill="#8A6D00">CLEARING HOUSE · CCP</text>
+  <text x="592" y="103" font-size="9.5" text-anchor="middle" fill="#4A5A68">buyer to every seller and</text>
+  <text x="592" y="116" font-size="9.5" text-anchor="middle" fill="#4A5A68">seller to every buyer; nets</text>
+  <rect x="498" y="140" width="188" height="64" rx="8" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="592" y="162" font-size="11" font-weight="600" text-anchor="middle" fill="#8A6D00">CSD · SETTLEMENT</text>
+  <text x="592" y="179" font-size="9.5" text-anchor="middle" fill="#4A5A68">delivers shares against cash:</text>
+  <text x="592" y="192" font-size="9.5" text-anchor="middle" fill="#4A5A68">DTC, Euroclear, Clearstream</text>
+  <rect x="498" y="216" width="188" height="64" rx="8" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="592" y="238" font-size="11" font-weight="600" text-anchor="middle" fill="#1F7A55">CUSTODIAN</text>
+  <text x="592" y="255" font-size="9.5" text-anchor="middle" fill="#4A5A68">holds your securities, kept</text>
+  <text x="592" y="268" font-size="9.5" text-anchor="middle" fill="#4A5A68">apart from the broker's own</text>
+  <path d="M128 129 V136" stroke="#3A56C5" stroke-width="1.7" marker-end="url(#s1a)"/>
+  <path d="M223 166 L260 102" stroke="#3A56C5" stroke-width="1.5" marker-end="url(#s1a)"/>
+  <path d="M223 172 H260" stroke="#3A56C5" stroke-width="1.5" marker-end="url(#s1a)"/>
+  <path d="M223 178 L260 242" stroke="#3A56C5" stroke-width="1.5" marker-end="url(#s1a)"/>
+  <path d="M455 96 H492" stroke="#1F7A55" stroke-width="1.5" marker-end="url(#s1b)"/>
+  <path d="M455 172 L492 102" stroke="#1F7A55" stroke-width="1.5" marker-end="url(#s1b)"/>
+  <path d="M455 248 L492 108" stroke="#1F7A55" stroke-width="1.5" marker-end="url(#s1b)"/>
+  <path d="M592 129 V136" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s1c)"/>
+  <path d="M592 205 V212" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s1c)"/>
+  <text x="360" y="322" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">Each hop takes a risk off your hands, and each one is paid for it.</text>
+  <defs>
+    <marker id="s1a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#3A56C5"/></marker>
+    <marker id="s1b" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F7A55"/></marker>
+    <marker id="s1c" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F2C38"/></marker>
+  </defs>
+</svg>
+<figcaption>fig 2.1.1 — the participants map: your broker routes the order to one of several kinds of venue, and everything after the match runs through a clearing house, a depository and a custodian</figcaption>
+</figure>
+
+<table>
+<thead><tr><th>Participant</th><th>US example</th><th>EU / UK example</th><th>The risk it takes off you</th></tr></thead>
+<tbody>
+<tr><td>Broker</td><td>a registered broker-dealer</td><td>an authorised investment firm</td><td>needing your own exchange membership</td></tr>
+<tr><td>Exchange</td><td>NYSE, Nasdaq, Cboe</td><td>Euronext, Xetra, London Stock Exchange</td><td>finding someone to trade with</td></tr>
+<tr><td>Clearing house (CCP)</td><td>NSCC (part of DTCC)</td><td>LCH, Eurex Clearing</td><td>the other side failing to pay or deliver</td></tr>
+<tr><td>Depository (CSD)</td><td>DTC (part of DTCC)</td><td>Euroclear, Clearstream; CREST in the UK</td><td>paying cash and never getting the shares</td></tr>
+<tr><td>Custodian</td><td>a custodian bank or the broker's custody arm</td><td>the same</td><td>your assets vanishing with a failed broker</td></tr>
+</tbody>
+</table>
+
+<div class="co key"><span class="co-t">📌 Key idea — every intermediary sells a risk transfer</span>
+<p>The broker sells access, the exchange a counterparty, the clearing house certainty that the counterparty pays, the depository finality, the custodian safekeeping. Even the <a class="term" href="../unit01-quant-landscape/session01-what-quants-do.html#g-market-maker" data-term="market maker">market maker</a> quoting on the exchange is selling something: immediacy. <mark>Every cost in trading is the price of a risk someone else agreed to carry for you.</mark></p>
+</div>
+</section>
+
+<!-- ============ §2 — the workflow ============ -->
+<section id="s2">
+<h2><span class="no">2.1.2</span> The life of an order, hop by hop</h2>
+<p class="lede">Seven hops, two clocks. The trade itself takes well under a second. Making it final takes until the next business day in the US (two in the EU and UK until October 2027) — and most of the plumbing exists to make that gap safe.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 278" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="30" font-size="10.5" font-weight="600" fill="#1F2C38">THE TRADE · on trade date T, in well under a second</text>
+  <rect x="30" y="44" width="150" height="66" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="105" y="68" font-size="11" font-weight="600" text-anchor="middle" fill="#3A56C5">1 · YOUR CODE</text>
+  <text x="105" y="85" font-size="9" text-anchor="middle" fill="#4A5A68">an order: side, size,</text>
+  <text x="105" y="98" font-size="9" text-anchor="middle" fill="#4A5A68">type, price, time in force</text>
+  <rect x="200" y="44" width="150" height="66" rx="9" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="275" y="68" font-size="11" font-weight="600" text-anchor="middle" fill="#8A6D00">2 · BROKER CHECKS</text>
+  <text x="275" y="85" font-size="9" text-anchor="middle" fill="#4A5A68">logs it in the OMS, runs</text>
+  <text x="275" y="98" font-size="9" text-anchor="middle" fill="#4A5A68">pre-trade risk checks</text>
+  <rect x="370" y="44" width="150" height="66" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="445" y="68" font-size="11" font-weight="600" text-anchor="middle" fill="#3A56C5">3 · ROUTE</text>
+  <text x="445" y="85" font-size="9" text-anchor="middle" fill="#4A5A68">the order router picks an</text>
+  <text x="445" y="98" font-size="9" text-anchor="middle" fill="#4A5A68">exchange, pool or dealer</text>
+  <rect x="540" y="44" width="150" height="66" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="615" y="68" font-size="11" font-weight="600" text-anchor="middle" fill="#3A56C5">4 · MATCH</text>
+  <text x="615" y="85" font-size="9" text-anchor="middle" fill="#4A5A68">the venue fills it; a fill</text>
+  <text x="615" y="98" font-size="9" text-anchor="middle" fill="#4A5A68">report flows back to you</text>
+  <path d="M182 77 H196" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M352 77 H366" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M522 77 H536" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <text x="26" y="146" font-size="10.5" font-weight="600" fill="#1F2C38">AFTER THE TRADE · from the evening of T to settlement</text>
+  <path d="M615 112 V156" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <rect x="490" y="160" width="200" height="66" rx="9" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="590" y="184" font-size="11" font-weight="600" text-anchor="middle" fill="#8A6D00">5 · CLEAR</text>
+  <text x="590" y="201" font-size="9" text-anchor="middle" fill="#4A5A68">the CCP becomes the other side</text>
+  <text x="590" y="214" font-size="9" text-anchor="middle" fill="#4A5A68">(novation), nets, calls margin</text>
+  <rect x="260" y="160" width="200" height="66" rx="9" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="360" y="184" font-size="11" font-weight="600" text-anchor="middle" fill="#8A6D00">6 · SETTLE</text>
+  <text x="360" y="201" font-size="9" text-anchor="middle" fill="#4A5A68">shares move against cash at the</text>
+  <text x="360" y="214" font-size="9" text-anchor="middle" fill="#4A5A68">CSD: delivery versus payment</text>
+  <rect x="30" y="160" width="200" height="66" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="130" y="184" font-size="11" font-weight="600" text-anchor="middle" fill="#1F7A55">7 · CUSTODY</text>
+  <text x="130" y="201" font-size="9" text-anchor="middle" fill="#4A5A68">the shares sit in your account,</text>
+  <text x="130" y="214" font-size="9" text-anchor="middle" fill="#4A5A68">held by the broker's custodian</text>
+  <path d="M488 193 H465" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M258 193 H235" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <text x="360" y="260" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">A fill is an acknowledgement; settlement is the commit.</text>
+  <defs><marker id="s2a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F2C38"/></marker></defs>
+</svg>
+<figcaption>fig 2.1.2 — the life of an order: four fast hops on trade date, then clearing, settlement and custody, which take until the settlement date</figcaption>
+</figure>
+
+<p>Your code sends the order — side, quantity, type, limit price, time in force (§2.1.5) — through the broker's API. The broker's <span class="term soon" data-term="order management system" title="Defined in Session 15.1 (coming soon)">order management system</span> tracks its state (new, acknowledged, partly filled, filled, cancelled, rejected), and <span class="term soon" data-term="pre-trade risk check" title="Defined in Session 15.4 (coming soon)">pre-trade risk checks</span> ask whether you can afford it, whether it breaches a limit, and whether its price is absurd; in the US the SEC's <span class="term soon" data-term="Market Access Rule" title="Defined in Session 15.4 (coming soon)">Market Access Rule</span> requires them. A <strong>smart order router</strong> then picks the venue (§2.1.3). There an order that can trade does; one that cannot waits in the book, and each execution comes back as a fill report. Now you own a promise, not yet a position: the clearing house nets it and holds margin against it (§2.1.6), and on the settlement date the depository swaps shares for cash.</p>
+
+<table>
+<thead><tr><th>Hop</th><th>Who</th><th>When</th><th>What can go wrong</th></tr></thead>
+<tbody>
+<tr><td>1 · order</td><td>your code</td><td>t = 0</td><td>a bug sends the wrong size, twice, or forever</td></tr>
+<tr><td>2 · checks</td><td>broker OMS</td><td>microseconds to milliseconds</td><td>rejection; a broker outage</td></tr>
+<tr><td>3 · route</td><td>broker's router</td><td>milliseconds</td><td>a venue that suits the broker, not you</td></tr>
+<tr><td>4 · match</td><td>venue</td><td>microseconds, or never (resting limit)</td><td>partial fill; a price far from the one you saw</td></tr>
+<tr><td>5 · clear</td><td>CCP</td><td>trade date, into the evening</td><td>a <a class="term" href="session04-futures.html#g-margin-call" data-term="margin call">margin call</a>, passed on to you</td></tr>
+<tr><td>6 · settle</td><td>CSD</td><td>T+1 in the US; T+2 in the EU and UK until October 2027</td><td>a failed delivery</td></tr>
+<tr><td>7 · custody</td><td>custodian</td><td>from settlement on</td><td>the broker fails</td></tr>
+</tbody>
+</table>
+
+<div class="co note"><span class="co-t">🧭 Margin note — the systems view</span>
+<p>Read fig 2.1.2 as a distributed transaction: the fill is the acknowledgement, settlement the commit, the depository the database of record — and the clearing house guarantees the commit even if one side crashes.</p>
+</div>
+
+<div class="co tip"><span class="co-t">💡 Looking ahead</span>
+<p>Each hop returns as engineering: the order state machine in <span class="xref soon" data-xref="15.1" data-style="short" data-auto="" title="Coming soon">Session 15.1</span>, the <span class="term soon" data-term="broker API" title="Defined in Session 15.3 (coming soon)">broker API</span> and the <span class="term soon" data-term="FIX protocol" title="Defined in Session 15.3 (coming soon)">FIX protocol</span> in <span class="xref soon" data-xref="15.3" data-style="short" data-auto="" title="Coming soon">Session 15.3</span>, pre-trade checks and the <span class="term soon" data-term="kill switch" title="Defined in Session 15.4 (coming soon)">kill switch</span> in <span class="xref soon" data-xref="15.4" data-style="short" data-auto="" title="Coming soon">Session 15.4</span>, and the data every hop emits in <span class="xref soon" data-xref="4.1" data-style="short" data-auto="" title="Coming soon">Session 4.1</span>.</p>
+</div>
+</section>
+
+<!-- ============ §3 — venues ============ -->
+<section id="s3">
+<h2><span class="no">2.1.3</span> Where orders trade</h2>
+<p class="lede">"The stock market" is dozens of venues competing for your order. Which one fills it decides your price — and a US retail order is often filled by no exchange at all.</p>
+
+<p>A <strong>lit</strong> venue displays its orders: anyone can see the best bids and offers, and the exchange matches them by price, then by time of arrival (<span class="term soon" data-term="price-time priority" title="Defined in Session 14.1 (coming soon)">price-time priority</span>, <span class="xref soon" data-xref="14.1" data-style="short" data-auto="" title="Coming soon">Session 14.1</span>). But a fund showing a two-million-share sell order tells everyone a seller is coming. A <strong>dark pool</strong> hides orders until they trade, often crossing them at the midpoint of the public quotes; in the US such systems operate as <strong>alternative trading systems</strong> (ATSs) and disclose their workings on Form ATS-N (SEC 2018), while EU dark trading runs on venues under capped waivers from pre-trade transparency.</p>
+
+<p>The third route is a dealer trading against you from its own inventory. US retail brokers send most orders to a handful of off-exchange market makers, the <strong>wholesalers</strong>; off-exchange activity, a partial proxy for retail trading, first passed 50% of US equity volume on a single day on 23 December 2020 (SEC staff report, October 2021). The EU cousin is the <strong>systematic internaliser</strong>, a firm dealing on its own account with client orders outside a venue "on an organised, frequent systematic and substantial basis" (MiFID II, Article 4(1)(20)).</p>
+
+<table>
+<thead><tr><th>Venue</th><th>What others see</th><th>Who is on the other side</th><th>Why you would use it</th><th>What it costs you</th></tr></thead>
+<tbody>
+<tr><td>Lit exchange</td><td>your order, while it rests</td><td>anyone: market makers, funds, algorithms</td><td>the public price; the deepest pool</td><td>a taker fee; leakage for big orders</td></tr>
+<tr><td>Dark pool / ATS</td><td>nothing, until the trade prints</td><td>other hidden orders</td><td>size without moving the price</td><td>uncertain fills; better-informed traders</td></tr>
+<tr><td>Wholesaler / SI</td><td>nothing beforehand</td><td>the dealer itself</td><td>small orders filled at once</td><td>a conflict if the dealer pays your broker</td></tr>
+</tbody>
+</table>
+
+<h3>Payment for order flow: the debated practice</h3>
+<p>Why would a wholesaler pay to trade with you? Small retail orders are on average uninformed, so filling them carries little <span class="term soon" data-term="adverse selection" title="Defined in Session 14.2 (coming soon)">adverse selection</span> (<a class="xref" href="../unit01-quant-landscape/session01-what-quants-do.html" data-xref="1.1" data-style="short" data-auto="">Session 1.1</a>). The wholesaler shares that value with the broker as <strong>payment for order flow</strong> (PFOF), which is how many US brokers charge zero commission. Critics see a conflict; defenders point to price improvement. Execution quality does differ: Battalio, Corwin and Jennings (2016) found limit orders did worse on venues paying the highest rebates, and Schwarz, Barber, Huang, Jorion and Odean (2025), sending 85,000 simultaneous market orders through six accounts at five brokers, found mean round-trip costs from 0.07% to 0.46%, excluding commissions — the same wholesalers gave different prices to different brokers, and differences in PFOF did not explain the gap.</p>
+
+<div class="co note"><span class="co-t">🧭 Margin note — the rules, dated and by jurisdiction (as of September 2026)</span>
+<p><strong>PFOF.</strong> US: legal, with quarterly routing disclosure (Rule 606); the SEC's proposed Order Competition Rule, which would have sent certain retail orders to auctions before internalisation, was withdrawn on 12 June 2025. UK: effectively banned since the FSA's 2012 guidance (FG12/13). EU: banned by Regulation (EU) 2024/791, Article 39a; the last national exemption (Germany's) expired on 30 June 2026.</p>
+<p><strong>Order protection and best execution.</strong> US: Regulation NMS's Order Protection Rule (Rule 611, 2005) bars trading centres, wholesalers included, from trading through better protected quotes elsewhere, which ties prices to the national best bid and offer (<strong>NBBO</strong>); the SEC proposed rescinding it on 11 June 2026, still pending as of September 2026. Best execution itself is a broker's duty of "reasonable diligence" under FINRA Rule 5310. EU: MiFID II, Article 27 (from 3 January 2018), requires "all sufficient steps" towards the best result. <span class="term soon" data-term="best execution" title="Defined in Session 15.6 (coming soon)">Best execution</span> as a duty is <span class="xref soon" data-xref="15.6" data-style="short" data-auto="" title="Coming soon">Session 15.6</span>'s.</p>
+</div>
+</section>
+
+<!-- ============ §4 — the book ============ -->
+<section id="s4">
+<h2><span class="no">2.1.4</span> The book: bid, ask &amp; the price of now</h2>
+<p class="lede">Every lit venue shows two numbers first: the most anyone will pay and the least anyone will accept. The gap is what it costs to trade right now — and it grows with the size you want.</p>
+
+<p>The <strong>bid</strong> is the highest price at which someone will buy right now, with the size; the <strong>ask</strong> (or offer) is the lowest price at which someone will sell. The <strong>bid-ask spread</strong> is ask minus bid; halfway between sits the <strong>mid price</strong>. Behind the best prices sit worse ones, level by level: the <span class="term soon" data-term="limit order book" title="Defined in Session 14.1 (coming soon)">limit order book</span>. A <strong>limit order</strong> — trade at a stated price or better — that cannot trade at once joins the book and <em>provides</em> liquidity; a <strong>market order</strong> — trade now at the best prices available — <em>takes</em> it.</p>
+
+<p>The lab builds a small synthetic book for a <span data-lab="rt_price" data-fmt="$.0f">$50</span> stock quoted in one-cent <span class="term soon" data-term="tick size" title="Defined in Session 14.1 (coming soon)">ticks</span> (illustrative sizes, not market data). The top five of its <span data-lab="book_levels" data-fmt="d">20</span> levels a side:</p>
+
+<table>
+<thead><tr><th>Level</th><th>Bid size</th><th>Bid</th><th>Ask</th><th>Ask size</th></tr></thead>
+<tbody>
+<tr><td>best</td><td><span data-lab="bid_sz_0" data-fmt=",d">1,000</span></td><td><span data-lab="bid_px_0" data-fmt=".2f">49.99</span></td><td><span data-lab="ask_px_0" data-fmt=".2f">50.01</span></td><td><span data-lab="ask_sz_0" data-fmt=",d">1,100</span></td></tr>
+<tr><td>2</td><td><span data-lab="bid_sz_1" data-fmt=",d">1,200</span></td><td><span data-lab="bid_px_1" data-fmt=".2f">49.98</span></td><td><span data-lab="ask_px_1" data-fmt=".2f">50.02</span></td><td><span data-lab="ask_sz_1" data-fmt=",d">600</span></td></tr>
+<tr><td>3</td><td><span data-lab="bid_sz_2" data-fmt=",d">1,700</span></td><td><span data-lab="bid_px_2" data-fmt=".2f">49.97</span></td><td><span data-lab="ask_px_2" data-fmt=".2f">50.03</span></td><td><span data-lab="ask_sz_2" data-fmt=",d">1,200</span></td></tr>
+<tr><td>4</td><td><span data-lab="bid_sz_3" data-fmt=",d">2,600</span></td><td><span data-lab="bid_px_3" data-fmt=".2f">49.96</span></td><td><span data-lab="ask_px_3" data-fmt=".2f">50.04</span></td><td><span data-lab="ask_sz_3" data-fmt=",d">1,400</span></td></tr>
+<tr><td>5</td><td><span data-lab="bid_sz_4" data-fmt=",d">2,200</span></td><td><span data-lab="bid_px_4" data-fmt=".2f">49.95</span></td><td><span data-lab="ask_px_4" data-fmt=".2f">50.05</span></td><td><span data-lab="ask_sz_4" data-fmt=",d">1,500</span></td></tr>
+</tbody>
+</table>
+
+<p>The spread is <span data-lab="spread" data-fmt="$.2f">$0.02</span> around a mid of <span data-lab="mid" data-fmt="$.2f">$50.00</span>: <span data-lab="spread_bps" data-fmt=".1f">4.0</span> basis points. A market buy takes the best ask first and, when that level runs out, the next — it <strong>walks the book</strong>. Measured against the mid, the cost of its volume-weighted average price splits exactly in two. With ask <math><semantics><mi>a</mi><annotation encoding="application/x-tex">a</annotation></semantics></math>, mid <math><semantics><mi>m</mi><annotation encoding="application/x-tex">m</annotation></semantics></math>, and <math><semantics><msub><mi>q</mi><mi>k</mi></msub><annotation encoding="application/x-tex">q_k</annotation></semantics></math> shares filled at price <math><semantics><msub><mi>p</mi><mi>k</mi></msub><annotation encoding="application/x-tex">p_k</annotation></semantics></math> on level <math><semantics><mi>k</mi><annotation encoding="application/x-tex">k</annotation></semantics></math>, for an order of <math><semantics><mrow><mi>Q</mi><mo>=</mo><msub><mo movablelimits="false">∑</mo><mi>k</mi></msub><msub><mi>q</mi><mi>k</mi></msub></mrow><annotation encoding="application/x-tex">Q = \sum_k q_k</annotation></semantics></math> shares:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><mover><mi>p</mi><mo stretchy="false" class="chr-med wbk-med-acc" style="math-depth:0;">‾</mo></mover><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>Q</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mo>=</mo><mfrac><mn>1</mn><mi>Q</mi></mfrac><mrow><munder><mo movablelimits="false">∑</mo><mi>k</mi></munder></mrow><msub><mi>p</mi><mi>k</mi></msub><mspace width="0.1667em"></mspace><msub><mi>q</mi><mi>k</mi></msub><mo separator="true">,</mo><mspace width="2em"></mspace><mfrac><mrow><mover><mi>p</mi><mo stretchy="false" class="chr-med wbk-med-acc" style="math-depth:0;">‾</mo></mover><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>Q</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mo>−</mo><mi>m</mi></mrow><mi>m</mi></mfrac><mspace width="0.2778em"></mspace><mo>=</mo><mspace width="0.2778em"></mspace><mrow><munder><munder><mfrac><mrow><mi>a</mi><mo>−</mo><mi>m</mi></mrow><mi>m</mi></mfrac><mo stretchy="true" style="math-depth:0;">⏟</mo></munder><mtext>half-spread</mtext></munder></mrow><mspace width="0.2778em"></mspace><mo>+</mo><mspace width="0.2778em"></mspace><mrow><munder><munder><mfrac><mrow><mover><mi>p</mi><mo stretchy="false" class="chr-med wbk-med-acc" style="math-depth:0;">‾</mo></mover><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>Q</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mo>−</mo><mi>a</mi></mrow><mi>m</mi></mfrac><mo stretchy="true" style="math-depth:0;">⏟</mo></munder><mtext>walking the book</mtext></munder></mrow></mrow><annotation encoding="application/x-tex">\bar p(Q) = \frac{1}{Q}\sum_k p_k\, q_k, \qquad \frac{\bar p(Q) - m}{m} \;=\; \underbrace{\frac{a - m}{m}}_{\text{half-spread}} \;+\; \underbrace{\frac{\bar p(Q) - a}{m}}_{\text{walking the book}}</annotation></semantics></math></div>
+<p>For a sell, the bid replaces the ask and the signs flip. The lab's sweep is three lines of array arithmetic:</p>
+
+<pre>size = levels[<span class="s">"size"</span>].to_numpy()
+before = np.concatenate([[<span class="p">0</span>], np.cumsum(size)[:-<span class="p">1</span>]])      <span class="c"># shares resting ahead of each level</span>
+take = np.clip(qty - before, <span class="p">0</span>, size)                     <span class="c"># shares taken at each level</span></pre>
+
+<figure class="diagram chart">
+<!-- chart:book_walk -->
+<svg viewBox="0 0 720 260" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Cost of a market buy against the mid, by order size in shares (synthetic book)">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">COST OF A MARKET BUY AGAINST THE MID, BY ORDER SIZE IN SHARES (SYNTHETIC BOOK)</text>
+  <line x1="64" y1="216" x2="690" y2="216" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="220" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.0 bp</text>
+  <line x1="64" y1="173" x2="690" y2="173" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="177" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">5.0 bp</text>
+  <line x1="64" y1="130" x2="690" y2="130" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="134" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">10.0 bp</text>
+  <line x1="64" y1="87" x2="690" y2="87" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="91" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">15.0 bp</text>
+  <line x1="64" y1="44" x2="690" y2="44" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="48" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">20.0 bp</text>
+  <line x1="64" y1="216" x2="690" y2="216" stroke="#C9CFC6" stroke-width="1"/>
+  <path d="M104.2,216 V202.8 Q104.2,198.8 108.2,198.8 H124.2 Q128.2,198.8 128.2,202.8 V216 Z" fill="#3A56C5"><title>100: 2.0 bp</title></path>
+  <text x="116.2" y="191.8" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">2.0 bp</text>
+  <text x="116.2" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">100</text>
+  <path d="M208.5,216 V202.8 Q208.5,198.8 212.5,198.8 H228.5 Q232.5,198.8 232.5,202.8 V216 Z" fill="#3A56C5"><title>1,000: 2.0 bp</title></path>
+  <text x="220.5" y="191.8" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">2.0 bp</text>
+  <text x="220.5" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">1,000</text>
+  <path d="M312.8,216 V187.7 Q312.8,183.7 316.8,183.7 H332.8 Q336.8,183.7 336.8,187.7 V216 Z" fill="#3A56C5"><title>2,500: 3.8 bp</title></path>
+  <text x="324.8" y="176.7" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">3.8 bp</text>
+  <text x="324.8" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">2,500</text>
+  <path d="M417.2,216 V168.4 Q417.2,164.4 421.2,164.4 H437.2 Q441.2,164.4 441.2,168.4 V216 Z" fill="#3A56C5"><title>5,000: 6.0 bp</title></path>
+  <text x="429.2" y="157.4" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">6.0 bp</text>
+  <text x="429.2" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">5,000</text>
+  <path d="M521.5,216 V141.4 Q521.5,137.4 525.5,137.4 H541.5 Q545.5,137.4 545.5,141.4 V216 Z" fill="#3A56C5"><title>10,000: 9.1 bp</title></path>
+  <text x="533.5" y="130.4" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">9.1 bp</text>
+  <text x="533.5" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">10,000</text>
+  <path d="M625.8,216 V85.8 Q625.8,81.8 629.8,81.8 H645.8 Q649.8,81.8 649.8,85.8 V216 Z" fill="#3A56C5"><title>25,000: 15.6 bp</title></path>
+  <text x="637.8" y="74.8" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">15.6 bp</text>
+  <text x="637.8" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">25,000</text>
+</svg>
+<!-- /chart:book_walk -->
+<figcaption>fig 2.1.3 — the cost of a market buy grows with its size: small orders pay only the half-spread, big ones also pay for every level of the book they empty</figcaption>
+</figure>
+
+<p>An order of <span data-lab="walk_1000_qty" data-fmt=",d">1,000</span> shares fits on the best ask and pays only the half-spread, <span data-lab="walk_1000_cost_bps" data-fmt=".1f">2.0</span> basis points. One of <span data-lab="walk_10000_qty" data-fmt=",d">10,000</span> shares (<span data-lab="walk_10000_notional" data-fmt="$,.0f">$500,000</span>) reaches <span data-lab="walk_10000_levels" data-fmt="d">7</span> levels (emptying <span data-lab="walk_10000_emptied" data-fmt="d">6</span>), pays up to <span data-lab="walk_10000_worst" data-fmt="$.2f">$50.07</span>, averages <span data-lab="walk_10000_vwap" data-fmt="$.4f">$50.0457</span> and costs <span data-lab="walk_10000_cost_bps" data-fmt=".1f">9.1</span> basis points — <span data-lab="walk_10000_cost_usd" data-fmt="$,.0f">$457</span> above the mid. At <span data-lab="walk_25000_qty" data-fmt=",d">25,000</span> shares the cost reaches <span data-lab="walk_25000_cost_bps" data-fmt=".1f">15.6</span> basis points. Twice the distance from the mid is the trade's <span class="term soon" data-term="effective spread" title="Defined in Session 14.2 (coming soon)">effective spread</span> — <span data-lab="walk_10000_eff_spread_bps" data-fmt=".1f">18.3</span> basis points here — which <span class="xref soon" data-xref="14.2" data-style="short" data-auto="" title="Coming soon">Session 14.2</span> explains as the price of adverse selection.</p>
+
+<p>Treat the walk as a first estimate of <span class="term soon" data-term="slippage" title="Defined in Session 6.5 (coming soon)">slippage</span>: hidden orders may add depth, but others also see you coming and the book does not refill for free — <span class="term soon" data-term="market impact" title="Defined in Session 6.5 (coming soon)">market impact</span>, which <span class="xref soon" data-xref="14.3" data-style="short" data-auto="" title="Coming soon">Session 14.3</span> measures.</p>
+
+<div class="co key"><span class="co-t">📌 Key idea — the spread is the fee for immediacy</span>
+<p>A market order buys certainty and pays in price; a resting limit order saves the price and pays in uncertainty. <mark>The cost of a market order is half the spread plus the depth it eats, and neither appears on any bill.</mark> Measure every fill against the mid when you decided to trade.</p>
+</div>
+</section>
+
+<!-- ============ §5 — order types ============ -->
+<section id="s5">
+<h2><span class="no">2.1.5</span> Order types &amp; the gap</h2>
+<p class="lede">Order types are not a menu of features. They are one trade-off — certainty of execution against certainty of price — asked twice, and then given a lifetime.</p>
+
+<p>A <strong>stop order</strong> is dormant until the market trades at or through its <em>stop price</em>; then it becomes a market order (FINRA). A sell stop below the market is the classic "stop-loss". A <strong>stop-limit order</strong> becomes a limit order instead, so it may not trade at all. Fig 2.1.4 puts the four together; a <strong>time in force</strong> then says how long the order lives.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 424" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">CHOOSING AN ORDER TYPE — one trade-off, asked twice</text>
+  <rect x="270" y="30" width="180" height="32" rx="8" fill="#fff" stroke="#1F2C38" stroke-width="1.5"/>
+  <text x="360" y="51" font-size="11" font-weight="600" text-anchor="middle" fill="#1F2C38">YOU WANT TO TRADE</text>
+  <path d="M360 62 V70" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s5a)"/>
+  <polygon points="360,74 480,110 360,146 240,110" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="360" y="106" font-size="10" font-weight="700" text-anchor="middle" fill="#8A6D00">TRADE NOW, OR ONLY</text>
+  <text x="360" y="120" font-size="10" font-weight="700" text-anchor="middle" fill="#8A6D00">IF A TRIGGER IS HIT?</text>
+  <path d="M240 110 H170 V150" fill="none" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s5a)"/>
+  <text x="205" y="102" font-size="10" font-weight="600" text-anchor="middle" fill="#1F2C38">now</text>
+  <path d="M480 110 H550 V150" fill="none" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s5a)"/>
+  <text x="515" y="102" font-size="10" font-weight="600" text-anchor="middle" fill="#1F2C38">on a trigger</text>
+  <polygon points="170,154 280,190 170,226 60,190" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="170" y="187" font-size="9.5" font-weight="700" text-anchor="middle" fill="#8A6D00">MUST IT FILL,</text>
+  <text x="170" y="200" font-size="9.5" font-weight="700" text-anchor="middle" fill="#8A6D00">WHATEVER THE PRICE?</text>
+  <polygon points="550,154 660,190 550,226 440,190" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="550" y="187" font-size="9.5" font-weight="700" text-anchor="middle" fill="#8A6D00">MUST IT FILL,</text>
+  <text x="550" y="200" font-size="9.5" font-weight="700" text-anchor="middle" fill="#8A6D00">WHATEVER THE PRICE?</text>
+  <path d="M170 226 V238 H95 V249" fill="none" stroke="#3A56C5" stroke-width="1.7" marker-end="url(#s5b)"/>
+  <path d="M170 238 H257 V249" fill="none" stroke="#1F7A55" stroke-width="1.7" marker-end="url(#s5c)"/>
+  <text x="128" y="233" font-size="10" font-weight="600" text-anchor="middle" fill="#3A56C5">yes</text>
+  <text x="216" y="233" font-size="10" font-weight="600" text-anchor="middle" fill="#1F7A55">no</text>
+  <path d="M550 226 V238 H463 V249" fill="none" stroke="#3A56C5" stroke-width="1.7" marker-end="url(#s5b)"/>
+  <path d="M550 238 H625 V249" fill="none" stroke="#1F7A55" stroke-width="1.7" marker-end="url(#s5c)"/>
+  <text x="503" y="233" font-size="10" font-weight="600" text-anchor="middle" fill="#3A56C5">yes</text>
+  <text x="590" y="233" font-size="10" font-weight="600" text-anchor="middle" fill="#1F7A55">no</text>
+  <rect x="20" y="254" width="150" height="80" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="95" y="274" font-size="11" font-weight="600" text-anchor="middle" fill="#3A56C5">MARKET ORDER</text>
+  <text x="95" y="291" font-size="9" text-anchor="middle" fill="#4A5A68">fills now, best price first;</text>
+  <text x="95" y="304" font-size="9" text-anchor="middle" fill="#4A5A68">pays the spread and depth</text>
+  <text x="95" y="322" font-size="9" font-weight="600" text-anchor="middle" fill="#D64B2A">risk: the price you get</text>
+  <rect x="182" y="254" width="150" height="80" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="257" y="274" font-size="11" font-weight="600" text-anchor="middle" fill="#1F7A55">LIMIT ORDER</text>
+  <text x="257" y="291" font-size="9" text-anchor="middle" fill="#4A5A68">your price or better, or it</text>
+  <text x="257" y="304" font-size="9" text-anchor="middle" fill="#4A5A68">waits in the book</text>
+  <text x="257" y="322" font-size="9" font-weight="600" text-anchor="middle" fill="#D64B2A">risk: it never fills</text>
+  <rect x="388" y="254" width="150" height="80" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="463" y="274" font-size="11" font-weight="600" text-anchor="middle" fill="#3A56C5">STOP ORDER</text>
+  <text x="463" y="291" font-size="9" text-anchor="middle" fill="#4A5A68">dormant until the stop price</text>
+  <text x="463" y="304" font-size="9" text-anchor="middle" fill="#4A5A68">trades; then a market order</text>
+  <text x="463" y="322" font-size="9" font-weight="600" text-anchor="middle" fill="#D64B2A">risk: gaps blow through it</text>
+  <rect x="550" y="254" width="150" height="80" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="625" y="274" font-size="11" font-weight="600" text-anchor="middle" fill="#1F7A55">STOP-LIMIT ORDER</text>
+  <text x="625" y="291" font-size="9" text-anchor="middle" fill="#4A5A68">dormant until the stop price</text>
+  <text x="625" y="304" font-size="9" text-anchor="middle" fill="#4A5A68">trades; then a limit order</text>
+  <text x="625" y="322" font-size="9" font-weight="600" text-anchor="middle" fill="#D64B2A">risk: gaps leave it unfilled</text>
+  <rect x="20" y="350" width="680" height="34" rx="8" fill="#F5F6F2" stroke="#C9CFC6" stroke-width="1.2"/>
+  <text x="36" y="371" font-size="10" font-weight="700" fill="#1F2C38">THEN SAY HOW LONG IT LIVES:</text>
+  <text x="236" y="371" font-size="10" fill="#1F2C38" font-family="IBM Plex Mono,monospace">DAY · GTC · IOC · FOK · AT THE CLOSE (MOC / LOC)</text>
+  <text x="360" y="410" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">Every order type trades certainty of execution against certainty of price.</text>
+  <defs>
+    <marker id="s5a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F2C38"/></marker>
+    <marker id="s5b" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#3A56C5"/></marker>
+    <marker id="s5c" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F7A55"/></marker>
+  </defs>
+</svg>
+<figcaption>fig 2.1.4 — the order-type decision: blue orders are certain to execute at an uncertain price, green ones certain of their price but not of executing; then a time in force says how long the order lives</figcaption>
+</figure>
+
+<table>
+<thead><tr><th>Time in force</th><th>The order lives…</th><th>Typical use</th></tr></thead>
+<tbody>
+<tr><td><code>DAY</code></td><td>until the end of today's session, then expires</td><td>the default for most orders</td></tr>
+<tr><td><code>GTC</code> — good till cancelled</td><td>until it fills or you cancel it (brokers often cap how long)</td><td>a limit or stop you want to leave working</td></tr>
+<tr><td><code>IOC</code> — immediate or cancel</td><td>for an instant: fills what it can now, cancels the rest</td><td>taking liquidity without leaving a visible order behind</td></tr>
+<tr><td><code>FOK</code> — fill or kill</td><td>for an instant: fills in full now, or not at all</td><td>when a partial fill is worse than none</td></tr>
+<tr><td><code>MOC</code> / <code>LOC</code> — market / limit on close</td><td>until the closing auction, which sets the official closing price (a LOC trades only within its limit)</td><td>funds that are valued at the close; the <span class="term soon" data-term="closing auction" title="Defined in Session 14.1 (coming soon)">closing auction</span> is <span class="xref soon" data-xref="14.1" data-style="short" data-auto="" title="Coming soon">Session 14.1</span>'s</td></tr>
+</tbody>
+</table>
+
+<p>In US equities your stop usually lives at your broker, not the exchange: NYSE stopped accepting new stop and GTC orders on 26 February 2016 (NYSE client notice, November 2015). The broker watches the trigger and sends the market order — one more system that must be up when it matters.</p>
+
+<h3>The gap: a Monte Carlo</h3>
+<p>You buy at <span data-lab="stop_entry" data-fmt="$.0f">$100</span> and place a sell stop at <span data-lab="stop_price" data-fmt="$.0f">$95</span>, believing your loss is capped at <span data-lab="stop_pct" data-fmt=".0%">5%</span>. The lab tests the belief with a <span class="term soon" data-term="Monte Carlo simulation" title="Defined in Session 3.5 (coming soon)">Monte Carlo simulation</span>: <span data-lab="stop_n_paths" data-fmt=",d">20,000</span> paths of a stock with <span data-lab="stop_sigma" data-fmt=".0%">30%</span> annual <a class="term" href="session03-returns-pnl-leverage.html#g-volatility" data-term="volatility">volatility</a> and no drift, watched every five minutes for <span data-lab="stop_horizon_days" data-fmt="d">63</span> trading days. Overnight, news arrives <span data-lab="stop_news_per_year" data-fmt="d">12</span> times a year on average, gapping the price up or down by an exponentially distributed amount with mean <span data-lab="stop_gap_mean" data-fmt=".0%">3%</span> (log terms; all parameters illustrative). The stop fills at the first price at or below <span data-lab="stop_price" data-fmt="$.0f">$95</span>, before any spread.</p>
+
+<p>Theory checks the simulation twice. An intraday trigger overshoots by part of one small step: for a Gaussian random walk the expected overshoot of a distant barrier is about <math><semantics><mrow><mi>β</mi><mspace width="0.1667em"></mspace><mi>σ</mi><msqrt><mrow><mrow><mi mathvariant="normal">Δ</mi><mspace></mspace></mrow><mi>t</mi></mrow></msqrt></mrow><annotation encoding="application/x-tex">\beta\,\sigma\sqrt{\Delta t}</annotation></semantics></math>, with <math><semantics><mrow><mi>β</mi><mo>=</mo><mo form="prefix" stretchy="false">−</mo><mi>ζ</mi><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mn>1</mn><mi>/</mi><mn>2</mn><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mi>/</mi><msqrt><mrow><mn>2</mn><mi>π</mi></mrow></msqrt><mo>≈</mo></mrow><annotation encoding="application/x-tex">\beta = -\zeta(1/2)/\sqrt{2\pi} \approx</annotation></semantics></math> <span data-lab="stop_beta" data-fmt=".4f">0.5826</span> — Siegmund's (1985) overshoot result, which is the Broadie–Glasserman–Kou correction for daily monitoring used in <a class="xref" href="session04-futures.html#s7" data-xref="2.4#s7" data-style="short" data-auto="">Session 2.4</a>. Gaps are different: exponential gaps are memoryless, so given that one crossed the stop, the distance it went past, <math><semantics><mi>O</mi><annotation encoding="application/x-tex">O</annotation></semantics></math>, is again exponential with mean <math><semantics><mi>η</mi><annotation encoding="application/x-tex">\eta</annotation></semantics></math>. A stop-limit whose limit sits a log distance <math><semantics><mi>d</mi><annotation encoding="application/x-tex">d</annotation></semantics></math> below the stop therefore fails to fill with probability</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><mi>ℙ</mi><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>O</mi><mo>&gt;</mo><mi>d</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mo>=</mo><msup><mi>e</mi><mrow class="tml-sml-pad"><mo form="prefix" stretchy="false" lspace="0em" rspace="0em">−</mo><mi>d</mi><mi>/</mi><mi>η</mi></mrow></msup><mi>.</mi></mrow><annotation encoding="application/x-tex">\Prob(O \gt d) = e^{-d/\eta}.</annotation></semantics></math></div>
+
+<table>
+<thead><tr><th>Within one quarter</th><th>Triggered intraday</th><th>Triggered by an overnight gap</th></tr></thead>
+<tbody>
+<tr><td>Share of all triggers</td><td><span data-lab="stop_share_intra" data-fmt=".0%">92%</span></td><td><span data-lab="stop_share_gap" data-fmt=".0%">8%</span></td></tr>
+<tr><td>Average fill below the stop price</td><td><span data-lab="stop_intra_shortfall" data-fmt=".2%">0.12%</span> (theory <span data-lab="stop_intra_theory" data-fmt=".2%">0.12%</span>)</td><td><span data-lab="stop_gap_shortfall" data-fmt=".2%">2.98%</span> (theory <span data-lab="stop_gap_shortfall_theory" data-fmt=".2%">2.91%</span>)</td></tr>
+<tr><td>Worst 5% of fills: below the stop by at least</td><td><span data-lab="stop_intra_shortfall_p95" data-fmt=".2%">0.34%</span></td><td><span data-lab="stop_gap_shortfall_p95" data-fmt=".1%">9.0%</span></td></tr>
+<tr><td>Average loss from the <span data-lab="stop_entry" data-fmt="$.0f">$100</span> entry</td><td><span data-lab="stop_intra_loss" data-fmt=".1%">5.1%</span></td><td><span data-lab="stop_gap_loss" data-fmt=".1%">7.8%</span></td></tr>
+<tr><td>Stop-limit at <span data-lab="stop_limit_price" data-fmt="$.0f">$93</span>: not fillable at the open</td><td>never</td><td><span data-lab="stop_p_nofill_gap" data-fmt=".1%">49.5%</span> (theory <span data-lab="stop_p_nofill_gap_theory" data-fmt=".1%">49.2%</span>)</td></tr>
+</tbody>
+</table>
+
+<figure class="diagram chart">
+<!-- chart:stop_gap_fills -->
+<svg viewBox="0 0 720 280" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Fill vs stop price after an overnight gap (1,222 paths) — coral: stop-limit unfilled">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">FILL VS STOP PRICE AFTER AN OVERNIGHT GAP (1,222 PATHS) — CORAL: STOP-LIMIT UNFILLED</text>
+  <line x1="64" y1="197.7" x2="680" y2="197.7" stroke="#E4E8EC" stroke-width="1"/>
+  <line x1="64" y1="151.4" x2="680" y2="151.4" stroke="#E4E8EC" stroke-width="1"/>
+  <line x1="64" y1="105.1" x2="680" y2="105.1" stroke="#E4E8EC" stroke-width="1"/>
+  <line x1="64" y1="58.8" x2="680" y2="58.8" stroke="#E4E8EC" stroke-width="1"/>
+  <line x1="64" y1="244" x2="680" y2="244" stroke="#C9CFC6" stroke-width="1"/>
+  <line x1="104.2" y1="244" x2="104.2" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="104.2" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">−15.0%</text>
+  <line x1="296.1" y1="244" x2="296.1" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="296.1" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">−10.0%</text>
+  <line x1="488.1" y1="244" x2="488.1" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="488.1" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">−5.0%</text>
+  <line x1="680" y1="244" x2="680" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="680" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">0.0%</text>
+  <rect x="64.5" y="242.7" width="11.3" height="1.3" fill="#D64B2A" fill-opacity="0.55"><title>−16.0% to −15.7%</title></rect>
+  <rect x="76.8" y="242.7" width="11.3" height="1.3" fill="#D64B2A" fill-opacity="0.55"><title>−15.7% to −15.4%</title></rect>
+  <rect x="89.1" y="242.7" width="11.3" height="1.3" fill="#D64B2A" fill-opacity="0.55"><title>−15.4% to −15.1%</title></rect>
+  <rect x="113.8" y="242.7" width="11.3" height="1.3" fill="#D64B2A" fill-opacity="0.55"><title>−14.8% to −14.4%</title></rect>
+  <rect x="126.1" y="241.4" width="11.3" height="2.6" fill="#D64B2A" fill-opacity="0.55"><title>−14.4% to −14.1%</title></rect>
+  <rect x="138.4" y="238.7" width="11.3" height="5.3" fill="#D64B2A" fill-opacity="0.55"><title>−14.1% to −13.8%</title></rect>
+  <rect x="150.7" y="241.4" width="11.3" height="2.6" fill="#D64B2A" fill-opacity="0.55"><title>−13.8% to −13.5%</title></rect>
+  <rect x="175.4" y="241.4" width="11.3" height="2.6" fill="#D64B2A" fill-opacity="0.55"><title>−13.2% to −12.8%</title></rect>
+  <rect x="187.7" y="238.7" width="11.3" height="5.3" fill="#D64B2A" fill-opacity="0.55"><title>−12.8% to −12.5%</title></rect>
+  <rect x="212.3" y="240" width="11.3" height="4" fill="#D64B2A" fill-opacity="0.55"><title>−12.2% to −11.9%</title></rect>
+  <rect x="224.7" y="237.4" width="11.3" height="6.6" fill="#D64B2A" fill-opacity="0.55"><title>−11.9% to −11.6%</title></rect>
+  <rect x="237" y="237.4" width="11.3" height="6.6" fill="#D64B2A" fill-opacity="0.55"><title>−11.6% to −11.2%</title></rect>
+  <rect x="249.3" y="241.4" width="11.3" height="2.6" fill="#D64B2A" fill-opacity="0.55"><title>−11.2% to −10.9%</title></rect>
+  <rect x="261.6" y="237.4" width="11.3" height="6.6" fill="#D64B2A" fill-opacity="0.55"><title>−10.9% to −10.6%</title></rect>
+  <rect x="273.9" y="240" width="11.3" height="4" fill="#D64B2A" fill-opacity="0.55"><title>−10.6% to −10.3%</title></rect>
+  <rect x="298.6" y="233.4" width="11.3" height="10.6" fill="#D64B2A" fill-opacity="0.55"><title>−9.9% to −9.6%</title></rect>
+  <rect x="310.9" y="233.4" width="11.3" height="10.6" fill="#D64B2A" fill-opacity="0.55"><title>−9.6% to −9.3%</title></rect>
+  <rect x="323.2" y="236.1" width="11.3" height="7.9" fill="#D64B2A" fill-opacity="0.55"><title>−9.3% to −9.0%</title></rect>
+  <rect x="335.5" y="237.4" width="11.3" height="6.6" fill="#D64B2A" fill-opacity="0.55"><title>−9.0% to −8.7%</title></rect>
+  <rect x="347.9" y="232.1" width="11.3" height="11.9" fill="#D64B2A" fill-opacity="0.55"><title>−8.7% to −8.3%</title></rect>
+  <rect x="360.2" y="233.4" width="11.3" height="10.6" fill="#D64B2A" fill-opacity="0.55"><title>−8.3% to −8.0%</title></rect>
+  <rect x="372.5" y="229.4" width="11.3" height="14.6" fill="#D64B2A" fill-opacity="0.55"><title>−8.0% to −7.7%</title></rect>
+  <rect x="384.8" y="228.1" width="11.3" height="15.9" fill="#D64B2A" fill-opacity="0.55"><title>−7.7% to −7.4%</title></rect>
+  <rect x="397.1" y="229.4" width="11.3" height="14.6" fill="#D64B2A" fill-opacity="0.55"><title>−7.4% to −7.1%</title></rect>
+  <rect x="409.5" y="228.1" width="11.3" height="15.9" fill="#D64B2A" fill-opacity="0.55"><title>−7.1% to −6.7%</title></rect>
+  <rect x="421.8" y="222.8" width="11.3" height="21.2" fill="#D64B2A" fill-opacity="0.55"><title>−6.7% to −6.4%</title></rect>
+  <rect x="434.1" y="220.2" width="11.3" height="23.8" fill="#D64B2A" fill-opacity="0.55"><title>−6.4% to −6.1%</title></rect>
+  <rect x="446.4" y="221.5" width="11.3" height="22.5" fill="#D64B2A" fill-opacity="0.55"><title>−6.1% to −5.8%</title></rect>
+  <rect x="458.7" y="220.2" width="11.3" height="23.8" fill="#D64B2A" fill-opacity="0.55"><title>−5.8% to −5.5%</title></rect>
+  <rect x="471.1" y="220.2" width="11.3" height="23.8" fill="#D64B2A" fill-opacity="0.55"><title>−5.5% to −5.1%</title></rect>
+  <rect x="483.4" y="209.6" width="11.3" height="34.4" fill="#D64B2A" fill-opacity="0.55"><title>−5.1% to −4.8%</title></rect>
+  <rect x="495.7" y="203" width="11.3" height="41" fill="#D64B2A" fill-opacity="0.55"><title>−4.8% to −4.5%</title></rect>
+  <rect x="508" y="196.4" width="11.3" height="47.6" fill="#D64B2A" fill-opacity="0.55"><title>−4.5% to −4.2%</title></rect>
+  <rect x="520.3" y="201.7" width="11.3" height="42.3" fill="#D64B2A" fill-opacity="0.55"><title>−4.2% to −3.9%</title></rect>
+  <rect x="532.7" y="196.4" width="11.3" height="47.6" fill="#D64B2A" fill-opacity="0.55"><title>−3.9% to −3.5%</title></rect>
+  <rect x="545" y="183.2" width="11.3" height="60.8" fill="#D64B2A" fill-opacity="0.55"><title>−3.5% to −3.2%</title></rect>
+  <rect x="557.3" y="191.1" width="11.3" height="52.9" fill="#D64B2A" fill-opacity="0.55"><title>−3.2% to −2.9%</title></rect>
+  <rect x="569.6" y="185.8" width="11.3" height="58.2" fill="#D64B2A" fill-opacity="0.55"><title>−2.9% to −2.6%</title></rect>
+  <rect x="581.9" y="167.3" width="11.3" height="76.7" fill="#D64B2A" fill-opacity="0.55"><title>−2.6% to −2.2%</title></rect>
+  <rect x="594.3" y="144.8" width="11.3" height="99.2" fill="#3A56C5" fill-opacity="0.55"><title>−2.2% to −1.9%</title></rect>
+  <rect x="606.6" y="136.9" width="11.3" height="107.1" fill="#3A56C5" fill-opacity="0.55"><title>−1.9% to −1.6%</title></rect>
+  <rect x="618.9" y="143.5" width="11.3" height="100.5" fill="#3A56C5" fill-opacity="0.55"><title>−1.6% to −1.3%</title></rect>
+  <rect x="631.2" y="134.2" width="11.3" height="109.8" fill="#3A56C5" fill-opacity="0.55"><title>−1.3% to −1.0%</title></rect>
+  <rect x="643.5" y="117" width="11.3" height="127" fill="#3A56C5" fill-opacity="0.55"><title>−1.0% to −0.6%</title></rect>
+  <rect x="655.9" y="106.4" width="11.3" height="137.6" fill="#3A56C5" fill-opacity="0.55"><title>−0.6% to −0.3%</title></rect>
+  <rect x="668.2" y="58.8" width="11.3" height="185.2" fill="#3A56C5" fill-opacity="0.55"><title>−0.3% to 0.0%</title></rect>
+  <polyline points="64,243.4 65.5,243.4 67.1,243.4 68.6,243.4 70.2,243.4 71.7,243.3 73.3,243.3 74.8,243.3 76.4,243.3 77.9,243.3 79.4,243.3 81,243.3 82.5,243.3 84.1,243.3 85.6,243.2 87.2,243.2 88.7,243.2 90.2,243.2 91.8,243.2 93.3,243.2 94.9,243.2 96.4,243.2 98,243.2 99.5,243.1 101.1,243.1 102.6,243.1 104.1,243.1 105.7,243.1 107.2,243.1 108.8,243.1 110.3,243 111.9,243 113.4,243 114.9,243 116.5,243 118,243 119.6,242.9 121.1,242.9 122.7,242.9 124.2,242.9 125.8,242.9 127.3,242.9 128.8,242.8 130.4,242.8 131.9,242.8 133.5,242.8 135,242.8 136.6,242.8 138.1,242.7 139.7,242.7 141.2,242.7 142.7,242.7 144.3,242.7 145.8,242.6 147.4,242.6 148.9,242.6 150.5,242.6 152,242.6 153.5,242.5 155.1,242.5 156.6,242.5 158.2,242.5 159.7,242.4 161.3,242.4 162.8,242.4 164.4,242.4 165.9,242.3 167.4,242.3 169,242.3 170.5,242.3 172.1,242.2 173.6,242.2 175.2,242.2 176.7,242.2 178.3,242.1 179.8,242.1 181.3,242.1 182.9,242 184.4,242 186,242 187.5,242 189.1,241.9 190.6,241.9 192.1,241.9 193.7,241.8 195.2,241.8 196.8,241.8 198.3,241.7 199.9,241.7 201.4,241.7 203,241.6 204.5,241.6 206,241.6 207.6,241.5 209.1,241.5 210.7,241.4 212.2,241.4 213.8,241.4 215.3,241.3 216.8,241.3 218.4,241.3 219.9,241.2 221.5,241.2 223,241.1 224.6,241.1 226.1,241 227.7,241 229.2,241 230.7,240.9 232.3,240.9 233.8,240.8 235.4,240.8 236.9,240.7 238.5,240.7 240,240.6 241.6,240.6 243.1,240.5 244.6,240.5 246.2,240.4 247.7,240.4 249.3,240.3 250.8,240.3 252.4,240.2 253.9,240.1 255.4,240.1 257,240 258.5,240 260.1,239.9 261.6,239.9 263.2,239.8 264.7,239.7 266.3,239.7 267.8,239.6 269.3,239.5 270.9,239.5 272.4,239.4 274,239.3 275.5,239.3 277.1,239.2 278.6,239.1 280.1,239.1 281.7,239 283.2,238.9 284.8,238.8 286.3,238.8 287.9,238.7 289.4,238.6 291,238.5 292.5,238.5 294,238.4 295.6,238.3 297.1,238.2 298.7,238.1 300.2,238 301.8,238 303.3,237.9 304.9,237.8 306.4,237.7 307.9,237.6 309.5,237.5 311,237.4 312.6,237.3 314.1,237.2 315.7,237.1 317.2,237 318.7,236.9 320.3,236.8 321.8,236.7 323.4,236.6 324.9,236.5 326.5,236.4 328,236.3 329.6,236.2 331.1,236.1 332.6,235.9 334.2,235.8 335.7,235.7 337.3,235.6 338.8,235.5 340.4,235.4 341.9,235.2 343.5,235.1 345,235 346.5,234.8 348.1,234.7 349.6,234.6 351.2,234.4 352.7,234.3 354.3,234.2 355.8,234 357.3,233.9 358.9,233.7 360.4,233.6 362,233.4 363.5,233.3 365.1,233.1 366.6,233 368.2,232.8 369.7,232.7 371.2,232.5 372.8,232.3 374.3,232.2 375.9,232 377.4,231.8 379,231.7 380.5,231.5 382,231.3 383.6,231.1 385.1,231 386.7,230.8 388.2,230.6 389.8,230.4 391.3,230.2 392.9,230 394.4,229.8 395.9,229.6 397.5,229.4 399,229.2 400.6,229 402.1,228.8 403.7,228.6 405.2,228.3 406.8,228.1 408.3,227.9 409.8,227.7 411.4,227.4 412.9,227.2 414.5,227 416,226.7 417.6,226.5 419.1,226.2 420.6,226 422.2,225.7 423.7,225.5 425.3,225.2 426.8,225 428.4,224.7 429.9,224.4 431.5,224.1 433,223.9 434.5,223.6 436.1,223.3 437.6,223 439.2,222.7 440.7,222.4 442.3,222.1 443.8,221.8 445.3,221.5 446.9,221.2 448.4,220.9 450,220.6 451.5,220.2 453.1,219.9 454.6,219.6 456.2,219.2 457.7,218.9 459.2,218.5 460.8,218.2 462.3,217.8 463.9,217.5 465.4,217.1 467,216.7 468.5,216.3 470.1,215.9 471.6,215.6 473.1,215.2 474.7,214.8 476.2,214.4 477.8,214 479.3,213.5 480.9,213.1 482.4,212.7 483.9,212.3 485.5,211.8 487,211.4 488.6,210.9 490.1,210.5 491.7,210 493.2,209.5 494.8,209.1 496.3,208.6 497.8,208.1 499.4,207.6 500.9,207.1 502.5,206.6 504,206.1 505.6,205.6 507.1,205 508.7,204.5 510.2,204 511.7,203.4 513.3,202.9 514.8,202.3 516.4,201.7 517.9,201.1 519.5,200.6 521,200 522.5,199.4 524.1,198.8 525.6,198.1 527.2,197.5 528.7,196.9 530.3,196.2 531.8,195.6 533.4,194.9 534.9,194.3 536.4,193.6 538,192.9 539.5,192.2 541.1,191.5 542.6,190.8 544.2,190.1 545.7,189.3 547.2,188.6 548.8,187.8 550.3,187.1 551.9,186.3 553.4,185.5 555,184.7 556.5,183.9 558.1,183.1 559.6,182.3 561.1,181.5 562.7,180.6 564.2,179.8 565.8,178.9 567.3,178 568.9,177.1 570.4,176.2 572,175.3 573.5,174.4 575,173.5 576.6,172.5 578.1,171.5 579.7,170.6 581.2,169.6 582.8,168.6 584.3,167.6 585.8,166.5 587.4,165.5 588.9,164.5 590.5,163.4 592,162.3 593.6,161.2 595.1,160.1 596.7,159 598.2,157.8 599.7,156.7 601.3,155.5 602.8,154.3 604.4,153.1 605.9,151.9 607.5,150.7 609,149.5 610.5,148.2 612.1,146.9 613.6,145.6 615.2,144.3 616.7,143 618.3,141.6 619.8,140.3 621.4,138.9 622.9,137.5 624.4,136.1 626,134.7 627.5,133.2 629.1,131.7 630.6,130.3 632.2,128.7 633.7,127.2 635.3,125.7 636.8,124.1 638.3,122.5 639.9,120.9 641.4,119.3 643,117.6 644.5,116 646.1,114.3 647.6,112.6 649.1,110.8 650.7,109.1 652.2,107.3 653.8,105.5 655.3,103.7 656.9,101.8 658.4,99.9 660,98 661.5,96.1 663,94.2 664.6,92.2 666.1,90.2 667.7,88.2 669.2,86.2 670.8,84.1 672.3,82 673.8,79.9 675.4,77.7 676.9,75.5 678.5,73.3" fill="none" stroke="#1F2C38" stroke-width="2" stroke-linejoin="round"><title>theory (memoryless gap)</title></polyline>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#1F2C38" stroke-width="2.5"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">theory (memoryless gap)</text>
+  <line x1="599.2" y1="42" x2="599.2" y2="244" stroke="#4A5A68" stroke-width="1"/>
+</svg>
+<!-- /chart:stop_gap_fills -->
+<figcaption>fig 2.1.5 — where stops fill after an overnight gap: the histogram follows the memoryless theory curve, and the coral tail is every case in which a stop-limit at <span data-lab="stop_limit_price" data-fmt="$.0f">$93</span> could not have sold at the open</figcaption>
+</figure>
+
+<p>Three lessons. A <span data-lab="stop_pct" data-fmt=".0%">5%</span> stop on a <span data-lab="stop_sigma" data-fmt=".0%">30%</span>-volatility stock sits inside ordinary noise: it fired on <span data-lab="stop_p_trigger" data-fmt=".0%">75%</span> of paths within a quarter, with no drift at all. Gaps are rare but decisive: <span data-lab="stop_share_gap" data-fmt=".0%">8%</span> of triggers produced <span data-lab="stop_share_shortfall_from_gaps" data-fmt=".0%">68%</span> of all the slippage past the stop, each landing on average <span data-lab="stop_gap_vs_intra" data-fmt=".0f">24</span> times further away than an intraday fill. And the stop-limit swaps one risk for another: after <span data-lab="stop_p_nofill_gap" data-fmt=".0%">50%</span> of gaps it could not sell at the open — it rests at <span data-lab="stop_limit_price" data-fmt="$.0f">$93</span> while the stock trades below it, and a day order may expire unfilled, leaving you holding the stock you wanted out of.</p>
+
+<p>The extreme case came on 6 May 2010: in the "flash crash", sell orders "including many retail stop-loss orders" met vanishing bids, and over 20,000 trades in more than 300 securities executed more than 60% away from their values moments before, some at a penny or less; the exchanges and FINRA later cancelled them (SEC &amp; CFTC 2010).</p>
+
+<div class="co warn"><span class="co-t">⚠️ Pitfall — "my stop caps my loss at <span data-lab="stop_pct" data-fmt=".0%">5%</span>"</span>
+<p>A stop fixes where your exit <em>starts</em>, not where it ends: in the lab, positions stopped out by a gap lost <span data-lab="stop_gap_loss" data-fmt=".1%">7.8%</span> on average and one in twenty lost more than <span data-lab="stop_gap_loss_p95" data-fmt=".1%">13.6%</span>. Cap risk with position size, assuming the gap will happen, and treat a stop as an exit rule, not insurance.</p>
+</div>
+</section>
+
+<!-- ============ §6 — post-trade ============ -->
+<section id="s6">
+<h2><span class="no">2.1.6</span> After the fill: clearing, settlement &amp; custody</h2>
+<p class="lede">A fill is a promise — shares against cash, one business day later in the US (two in the EU and UK until October 2027). Clearing makes the promise safe, settlement keeps it, custody guards what you received.</p>
+
+<p>Without a clearing house, every firm is exposed to every firm it traded with until settlement. With one, the contract between buyer and seller is replaced by two — buyer with CCP, CCP with seller — a step called <strong>novation</strong>. In US equities the CCP is NSCC, which in DTCC's words "becomes the legal counterparty to every trade, guaranteeing settlement and mitigating counterparty risk". Your clearing broker's <a class="term" href="session06-crypto-market-structure.html#g-counterparty-risk" data-term="counterparty risk">counterparty risk</a> becomes risk on one institution, backed mainly by its members' margin and a mutualised default fund — you still face your broker — and a web of promises becomes a star, which, crucially, can be netted.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 284" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">NOVATION — the clearing house steps into the middle of every trade</text>
+  <rect x="26" y="32" width="326" height="210" rx="12" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="189" y="54" font-size="11" font-weight="700" text-anchor="middle" fill="#D64B2A">WITHOUT A CCP — everyone faces everyone</text>
+  <path d="M92 90 H286 M92 190 H286 M92 90 V190 M286 90 V190 M92 90 L286 190 M286 90 L92 190" stroke="#D64B2A" stroke-width="1.5" fill="none"/>
+  <rect x="60" y="76" width="64" height="28" rx="6" fill="#fff" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="92" y="94" font-size="10" font-weight="700" text-anchor="middle" fill="#1F2C38">FIRM A</text>
+  <rect x="254" y="76" width="64" height="28" rx="6" fill="#fff" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="286" y="94" font-size="10" font-weight="700" text-anchor="middle" fill="#1F2C38">FIRM B</text>
+  <rect x="60" y="176" width="64" height="28" rx="6" fill="#fff" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="92" y="194" font-size="10" font-weight="700" text-anchor="middle" fill="#1F2C38">FIRM C</text>
+  <rect x="254" y="176" width="64" height="28" rx="6" fill="#fff" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="286" y="194" font-size="10" font-weight="700" text-anchor="middle" fill="#1F2C38">FIRM D</text>
+  <text x="189" y="226" font-size="9.5" text-anchor="middle" fill="#4A5A68">n(n−1)/2 exposures · at best netted pair by pair</text>
+  <rect x="368" y="32" width="326" height="210" rx="12" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="531" y="54" font-size="11" font-weight="700" text-anchor="middle" fill="#1F7A55">WITH A CCP — one counterparty for all</text>
+  <path d="M434 90 L531 140 M628 90 L531 140 M434 190 L531 140 M628 190 L531 140" stroke="#1F7A55" stroke-width="1.5" fill="none"/>
+  <rect x="402" y="76" width="64" height="28" rx="6" fill="#fff" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="434" y="94" font-size="10" font-weight="700" text-anchor="middle" fill="#1F2C38">FIRM A</text>
+  <rect x="596" y="76" width="64" height="28" rx="6" fill="#fff" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="628" y="94" font-size="10" font-weight="700" text-anchor="middle" fill="#1F2C38">FIRM B</text>
+  <rect x="402" y="176" width="64" height="28" rx="6" fill="#fff" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="434" y="194" font-size="10" font-weight="700" text-anchor="middle" fill="#1F2C38">FIRM C</text>
+  <rect x="596" y="176" width="64" height="28" rx="6" fill="#fff" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="628" y="194" font-size="10" font-weight="700" text-anchor="middle" fill="#1F2C38">FIRM D</text>
+  <rect x="481" y="120" width="100" height="40" rx="8" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="531" y="137" font-size="11" font-weight="700" text-anchor="middle" fill="#8A6D00">CCP</text>
+  <text x="531" y="151" font-size="9" text-anchor="middle" fill="#4A5A68">nets · margins</text>
+  <text x="531" y="226" font-size="9.5" text-anchor="middle" fill="#4A5A68">n exposures · one net amount per member per security</text>
+  <text x="360" y="270" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">Novation turns a web of promises into a star — and a star can be netted.</text>
+</svg>
+<figcaption>fig 2.1.6 — novation: without a CCP each pair of firms carries its own exposure; with one, each firm faces only the clearing house, which nets everything a member did into one obligation per security</figcaption>
+</figure>
+
+<h3>Netting: why the plumbing batches</h3>
+<p>The lab simulates <span data-lab="net_days" data-fmt="d">200</span> days of one stock traded among <span data-lab="net_members" data-fmt="d">20</span> clearing members: <span data-lab="net_trades" data-fmt=",d">50,000</span> trades a day between random buyers and sellers, <span data-lab="net_mean_size" data-fmt=",.0f">500</span> shares on average. Netting pair by pair (bilateral) leaves <span data-lab="net_bi_ratio" data-fmt=".1%">6.6%</span> of gross volume to settle; netting each member against the CCP (multilateral) leaves <span data-lab="net_multi_ratio" data-fmt=".2%">1.51%</span>.</p>
+
+<p>The theory is the <a class="term" href="../unit03-math-toolkit/session01-probability-expected-value.html#g-central-limit-theorem" data-term="central limit theorem">central limit theorem</a>: a member's net position is a sum of many signed trades, so it grows like the square root of the number of trades while gross volume grows linearly. For <math><semantics><mi>N</mi><annotation encoding="application/x-tex">N</annotation></semantics></math> clearing members (here <math><semantics><mi>N</mi><annotation encoding="application/x-tex">N</annotation></semantics></math> counts firms), <math><semantics><mi>M</mi><annotation encoding="application/x-tex">M</annotation></semantics></math> trades a day and trade size <math><semantics><mi>s</mi><annotation encoding="application/x-tex">s</annotation></semantics></math>:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><mfrac><mtext>multilateral net</mtext><mtext>gross</mtext></mfrac><mspace width="0.2778em"></mspace><mo>≈</mo><mspace width="0.2778em"></mspace><mfrac><mn>1</mn><mrow><mi>𝔼</mi><mrow><mo fence="true" form="prefix" stretchy="false">[</mo><mi>s</mi><mo fence="true" form="postfix" stretchy="false">]</mo></mrow></mrow></mfrac><msqrt><mfrac><mrow><mi>N</mi><mspace width="0.1667em"></mspace><mi>𝔼</mi><mrow><mo fence="true" form="prefix" stretchy="false">[</mo><msup><mi>s</mi><mn class="tml-sml-pad">2</mn></msup><mo fence="true" form="postfix" stretchy="false">]</mo></mrow></mrow><mrow><mi>π</mi><mi>M</mi></mrow></mfrac></msqrt><mo separator="true">,</mo><mspace width="2em"></mspace><mfrac><mtext>bilateral net</mtext><mtext>gross</mtext></mfrac><mspace width="0.2778em"></mspace><mo>≈</mo><mspace width="0.2778em"></mspace><mfrac><mn>1</mn><mrow><mi>𝔼</mi><mrow><mo fence="true" form="prefix" stretchy="false">[</mo><mi>s</mi><mo fence="true" form="postfix" stretchy="false">]</mo></mrow></mrow></mfrac><msqrt><mfrac><mrow><mi>N</mi><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>N</mi><mo>−</mo><mn>1</mn><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mspace width="0.1667em"></mspace><mi>𝔼</mi><mrow><mo fence="true" form="prefix" stretchy="false">[</mo><msup><mi>s</mi><mn class="tml-sml-pad">2</mn></msup><mo fence="true" form="postfix" stretchy="false">]</mo></mrow></mrow><mrow><mi>π</mi><mi>M</mi></mrow></mfrac></msqrt></mrow><annotation encoding="application/x-tex">\frac{\text{multilateral net}}{\text{gross}} \;\approx\; \frac{1}{\E[s]}\sqrt{\frac{N\,\E[s^2]}{\pi M}}, \qquad \frac{\text{bilateral net}}{\text{gross}} \;\approx\; \frac{1}{\E[s]}\sqrt{\frac{N(N-1)\,\E[s^2]}{\pi M}}</annotation></semantics></math></div>
+<p>which predicts <span data-lab="net_multi_theory" data-fmt=".2%">1.51%</span> and <span data-lab="net_bi_theory" data-fmt=".1%">6.6%</span>: multilateral netting beats bilateral by a factor of <math><semantics><msqrt><mrow><mi>N</mi><mo>−</mo><mn>1</mn></mrow></msqrt><annotation encoding="application/x-tex">\sqrt{N-1}</annotation></semantics></math>, about <span data-lab="net_bi_over_multi" data-fmt=".1f">4.4</span> here. Real markets agree: DTCC's chief executive told Congress that on 3 March 2020 over $3.5 trillion of shares moved through NSCC, but netting cut the money that had to settle by over 98%, to $80.3 billion (Bodson 2021). Netting has limits, though: a CCP that clears only one asset class can net less than bilateral netting across all of a firm's trades (Duffie &amp; Zhu 2011).</p>
+
+<p>Why not settle every trade instantly? Because real-time gross settlement "would eliminate the substantial efficiencies of netting" (same testimony): every trade would need its cash in advance. Batching buys capital efficiency at the price of time — and time is risk, which the CCP covers with margin. DTCC estimated that moving from T+2 to T+1 could cut NSCC's value-at-risk charges by as much as 40%. US equities have settled T+1 since 28 May 2024 (SEC rule adopted 15 February 2023); the EU moves on 11 October 2027 (Regulation (EU) 2025/2075), and HM Treasury published a draft statutory instrument on 20 November 2025 for the UK to move the same day, subject to approval by Parliament (status as of September 2026). Until then both settle T+2.</p>
+
+<h3>When the plumbing bites: January 2021</h3>
+<p>Margin is how the CCP's safety becomes your problem. As "meme stocks" such as GameStop swung wildly, on 27 January 2021 NSCC made intraday margin calls totalling $6.9 billion on 36 clearing members, bringing total required margin to $25.5 billion, and some brokers with mainly retail customers restricted trading in the most volatile stocks (SEC staff report, October 2021; the squeeze itself is in <a class="xref" href="session02-equities-indices-etfs.html#s7" data-xref="2.2#s7" data-style="short" data-auto="">Session 2.2</a>). The CCP protected the system by demanding cash; its members passed the squeeze on to customers. <a class="xref" href="session04-futures.html#s6" data-xref="2.4#s6" data-style="short" data-auto="">Session 2.4</a> shows the same machine in futures, where it runs every evening as <a class="term" href="session04-futures.html#g-variation-margin" data-term="variation margin">variation margin</a>.</p>
+
+<h3>Settlement and custody</h3>
+<p>At settlement the depository moves shares and cash together — <strong>delivery versus payment</strong> — so neither side can hand over its half and get nothing. Sellers must deliver on time, which is why a short seller borrows shares first (<a class="xref" href="session02-equities-indices-etfs.html" data-xref="2.2" data-style="short" data-auto="">Session 2.2</a>). Then your shares sit at the custodian, usually held in the broker's or custodian's name for you and segregated from the firm's own assets. If a US broker fails, SIPC protects customers up to $500,000, including $250,000 of cash, but "does not protect against the decline in value of your securities"; the UK's FSCS covers investments up to £85,000 per person per firm, and EU law sets a minimum of €20,000. Crypto venues often bundle broker, exchange and custodian into one firm, which is why <a class="term" href="session06-crypto-market-structure.html#g-custody-risk" data-term="custody risk">custody risk</a> gets its own treatment in <a class="xref" href="session06-crypto-market-structure.html" data-xref="2.6" data-style="short" data-auto="">Session 2.6</a>.</p>
+
+<div class="co key"><span class="co-t">📌 Key idea — clearing turns counterparty risk into liquidity risk</span>
+<p>Once a trade is cleared you no longer worry whether the other side can pay; you worry whether <em>your</em> side of the chain can meet tonight's margin call. <mark>Central clearing doesn't make risk disappear; it pools it, prices it as margin and bills it in cash, on the days cash is scarcest.</mark></p>
+</div>
+</section>
+
+<!-- ============ §7 — the bill ============ -->
+<section id="s7">
+<h2><span class="no">2.1.7</span> Where every fee and risk sits</h2>
+<p class="lede">Put the whole path on one bill. The explicit fees are the line items you read; the spread and the book are the ones you actually pay.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 366" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">EVERY HOP ON ONE BILL — what you pay there, and what can go wrong there</text>
+  <text x="36" y="44" font-size="10" font-weight="700" fill="#4A5A68">HOP</text>
+  <text x="166" y="44" font-size="10" font-weight="700" fill="#4A5A68">WHAT YOU PAY</text>
+  <text x="450" y="44" font-size="10" font-weight="700" fill="#D64B2A">WHAT CAN GO WRONG</text>
+  <rect x="26" y="52" width="668" height="34" rx="7" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.2"/>
+  <text x="36" y="73" font-size="10.5" font-weight="700" fill="#3A56C5">BROKER</text>
+  <rect x="156" y="56" width="276" height="26" rx="5" fill="#fff" stroke="#C9D2F1"/>
+  <text x="166" y="73" font-size="9.5" fill="#1F2C38">commission — or zero, paid by order flow instead</text>
+  <rect x="440" y="56" width="246" height="26" rx="5" fill="#fff" stroke="#F2CDBF"/>
+  <text x="450" y="73" font-size="9.5" fill="#D64B2A">outages, rejects, the broker failing</text>
+  <rect x="26" y="92" width="668" height="34" rx="7" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.2"/>
+  <text x="36" y="113" font-size="10.5" font-weight="700" fill="#1F7A55">VENUE</text>
+  <rect x="156" y="96" width="276" height="26" rx="5" fill="#fff" stroke="#BFE0CF"/>
+  <text x="166" y="113" font-size="9.5" fill="#1F2C38">a fee to take liquidity, a rebate to make it</text>
+  <rect x="440" y="96" width="246" height="26" rx="5" fill="#fff" stroke="#F2CDBF"/>
+  <text x="450" y="113" font-size="9.5" fill="#D64B2A">halts, glitches, a worse price elsewhere</text>
+  <rect x="26" y="132" width="668" height="34" rx="7" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="36" y="153" font-size="10.5" font-weight="700" fill="#8A6D00">THE BOOK</text>
+  <rect x="156" y="136" width="276" height="26" rx="5" fill="#fff" stroke="#EAD98A"/>
+  <text x="166" y="153" font-size="9.5" font-weight="600" fill="#1F2C38">half-spread + the depth you eat — never billed</text>
+  <rect x="440" y="136" width="246" height="26" rx="5" fill="#fff" stroke="#F2CDBF"/>
+  <text x="450" y="153" font-size="9.5" fill="#D64B2A">slippage; stops filling past their price</text>
+  <rect x="26" y="172" width="668" height="34" rx="7" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.2"/>
+  <text x="36" y="193" font-size="10.5" font-weight="700" fill="#8A6D00">CLEARING</text>
+  <rect x="156" y="176" width="276" height="26" rx="5" fill="#fff" stroke="#EAD98A"/>
+  <text x="166" y="193" font-size="9.5" fill="#1F2C38">clearing fees; cash locked up as margin</text>
+  <rect x="440" y="176" width="246" height="26" rx="5" fill="#fff" stroke="#F2CDBF"/>
+  <text x="450" y="193" font-size="9.5" fill="#D64B2A">margin calls on the worst days</text>
+  <rect x="26" y="212" width="668" height="34" rx="7" fill="#F5F6F2" stroke="#4A5A68" stroke-width="1.2"/>
+  <text x="36" y="233" font-size="10.5" font-weight="700" fill="#1F2C38">REGULATORS</text>
+  <rect x="156" y="216" width="276" height="26" rx="5" fill="#fff" stroke="#C9CFC6"/>
+  <text x="166" y="233" font-size="9.5" fill="#1F2C38">SEC and FINRA fees on US sales</text>
+  <rect x="440" y="216" width="246" height="26" rx="5" fill="#fff" stroke="#F2CDBF"/>
+  <text x="450" y="233" font-size="9.5" fill="#D64B2A">rules change: date every fact</text>
+  <rect x="26" y="252" width="668" height="34" rx="7" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.2"/>
+  <text x="36" y="273" font-size="10.5" font-weight="700" fill="#8A6D00">SETTLEMENT</text>
+  <rect x="156" y="256" width="276" height="26" rx="5" fill="#fff" stroke="#EAD98A"/>
+  <text x="166" y="273" font-size="9.5" fill="#1F2C38">settlement and depository fees</text>
+  <rect x="440" y="256" width="246" height="26" rx="5" fill="#fff" stroke="#F2CDBF"/>
+  <text x="450" y="273" font-size="9.5" fill="#D64B2A">fails; DvP removes principal risk</text>
+  <rect x="26" y="292" width="668" height="34" rx="7" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.2"/>
+  <text x="36" y="313" font-size="10.5" font-weight="700" fill="#1F7A55">CUSTODY</text>
+  <rect x="156" y="296" width="276" height="26" rx="5" fill="#fff" stroke="#BFE0CF"/>
+  <text x="166" y="313" font-size="9.5" fill="#1F2C38">custody and account fees</text>
+  <rect x="440" y="296" width="246" height="26" rx="5" fill="#fff" stroke="#F2CDBF"/>
+  <text x="450" y="313" font-size="9.5" fill="#D64B2A">broker failure: segregation, SIPC (US)</text>
+  <text x="360" y="352" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">Explicit fees are billed per share; the spread and the depth scale with your size and the day.</text>
+</svg>
+<figcaption>fig 2.1.7 — the fee and risk stack: every hop of fig 2.1.2 charges something and can fail somehow; the row that is never billed, the book, is usually the largest cost</figcaption>
+</figure>
+
+<p>The lab prices one round trip — buy <span data-lab="rt_qty" data-fmt=",d">2,000</span> shares with a market order, later sell them the same way — in two <span data-lab="rt_price" data-fmt="$.0f">$50</span> stocks: the liquid book of §2.1.4 and a thin one with a <span data-lab="rt_thin_spread_bps" data-fmt=".0f">20</span>-basis-point spread and <span data-lab="rt_thin_depth_shares" data-fmt=",d">13,400</span> shares displayed on its ask side against <span data-lab="book_depth_shares" data-fmt=",d">68,600</span>. Billed rates: a commission of <span data-lab="rt_commission_rate" data-fmt="$.4f">$0.0035</span> a share and a clearing fee of <span data-lab="rt_clearing_rate" data-fmt="$.4f">$0.0002</span> a share (both illustrative); an exchange fee of <span data-lab="rt_taker_rate" data-fmt="$.3f">$0.003</span> a share for taking liquidity, the Regulation NMS cap on fees for trading against a protected quote (a 2024 SEC amendment lowering it to $0.001 has been postponed to November 2027, as of June 2026); and, on the sale only, the SEC's Section 31 fee of <span data-lab="rt_sec_rate_per_million" data-fmt="$.2f">$20.60</span> per million dollars (from 4 April 2026) and FINRA's Trading Activity Fee of <span data-lab="rt_taf_rate" data-fmt="$.6f">$0.000195</span> a share, capped at <span data-lab="rt_taf_cap" data-fmt="$.2f">$9.79</span> a trade (2026).</p>
+
+<table>
+<thead><tr><th>Round trip, <span data-lab="rt_qty" data-fmt=",d">2,000</span> shares, <span data-lab="rt_notional" data-fmt="$,.0f">$100,000</span></th><th>Liquid large cap (bp)</th><th>Thin small cap (bp)</th></tr></thead>
+<tbody>
+<tr><td>Commission</td><td><span data-lab="rt_liquid_comm_bps" data-fmt=".1f">1.4</span></td><td><span data-lab="rt_thin_comm_bps" data-fmt=".1f">1.4</span></td></tr>
+<tr><td>Exchange fees</td><td><span data-lab="rt_liquid_exch_bps" data-fmt=".1f">1.2</span></td><td><span data-lab="rt_thin_exch_bps" data-fmt=".1f">1.2</span></td></tr>
+<tr><td>Clearing + regulatory</td><td><span data-lab="rt_liquid_clreg_bps" data-fmt=".2f">0.32</span></td><td><span data-lab="rt_thin_clreg_bps" data-fmt=".2f">0.32</span></td></tr>
+<tr><td>Spread (half on each side)</td><td><span data-lab="rt_liquid_spread_bps" data-fmt=".1f">4.0</span></td><td><span data-lab="rt_thin_spread_bps" data-fmt=".1f">20.0</span></td></tr>
+<tr><td>Walking the book</td><td><span data-lab="rt_liquid_depth_bps" data-fmt=".1f">2.2</span></td><td><span data-lab="rt_thin_depth_bps" data-fmt=".1f">39.9</span></td></tr>
+<tr><td><strong>Total</strong></td><td><strong><span data-lab="rt_liquid_total_bps" data-fmt=".1f">9.1</span></strong> (<span data-lab="rt_liquid_total_usd" data-fmt="$,.0f">$91</span>)</td><td><strong><span data-lab="rt_thin_total_bps" data-fmt=".1f">62.8</span></strong> (<span data-lab="rt_thin_total_usd" data-fmt="$,.0f">$628</span>)</td></tr>
+</tbody>
+</table>
+
+<figure class="diagram chart">
+<!-- chart:round_trip -->
+<svg viewBox="0 0 720 280" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="One round trip of 2,000 shares at $50: cost by component, in basis points">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">ONE ROUND TRIP OF 2,000 SHARES AT $50: COST BY COMPONENT, IN BASIS POINTS</text>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#3A56C5" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">liquid large cap</text>
+  <line x1="172.4" y1="32" x2="188.4" y2="32" stroke="#E8850C" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="194.4" y="36" font-size="11" fill="#4A5A68">thin small cap</text>
+  <line x1="64" y1="236" x2="690" y2="236" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="240" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.0</text>
+  <line x1="64" y1="200" x2="690" y2="200" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="204" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">10.0</text>
+  <line x1="64" y1="164" x2="690" y2="164" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="168" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">20.0</text>
+  <line x1="64" y1="128" x2="690" y2="128" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="132" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">30.0</text>
+  <line x1="64" y1="92" x2="690" y2="92" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="96" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">40.0</text>
+  <line x1="64" y1="56" x2="690" y2="56" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="60" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">50.0</text>
+  <line x1="64" y1="236" x2="690" y2="236" stroke="#C9CFC6" stroke-width="1"/>
+  <path d="M101.6,236 V233.5 Q101.6,231 104.1,231 H123.1 Q125.6,231 125.6,233.5 V236 Z" fill="#3A56C5"><title>commission · liquid large cap: 1.4</title></path>
+  <text x="113.6" y="225" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">1.4</text>
+  <path d="M127.6,236 V233.5 Q127.6,231 130.1,231 H149.1 Q151.6,231 151.6,233.5 V236 Z" fill="#E8850C"><title>commission · thin small cap: 1.4</title></path>
+  <text x="139.6" y="225" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">1.4</text>
+  <text x="126.6" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">commission</text>
+  <path d="M226.8,236 V233.8 Q226.8,231.7 229,231.7 H248.6 Q250.8,231.7 250.8,233.8 V236 Z" fill="#3A56C5"><title>exchange fees · liquid large cap: 1.2</title></path>
+  <text x="238.8" y="225.7" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">1.2</text>
+  <path d="M252.8,236 V233.8 Q252.8,231.7 255,231.7 H274.6 Q276.8,231.7 276.8,233.8 V236 Z" fill="#E8850C"><title>exchange fees · thin small cap: 1.2</title></path>
+  <text x="264.8" y="225.7" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">1.2</text>
+  <text x="251.8" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">exchange fees</text>
+  <path d="M352,236 V235.4 Q352,234.8 352.6,234.8 H375.4 Q376,234.8 376,235.4 V236 Z" fill="#3A56C5"><title>clearing + regulatory · liquid large cap: 0.3</title></path>
+  <text x="364" y="228.8" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.3</text>
+  <path d="M378,236 V235.4 Q378,234.8 378.6,234.8 H401.4 Q402,234.8 402,235.4 V236 Z" fill="#E8850C"><title>clearing + regulatory · thin small cap: 0.3</title></path>
+  <text x="390" y="228.8" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.3</text>
+  <text x="377" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">clearing + regulatory</text>
+  <path d="M477.2,236 V225.6 Q477.2,221.6 481.2,221.6 H497.2 Q501.2,221.6 501.2,225.6 V236 Z" fill="#3A56C5"><title>spread · liquid large cap: 4.0</title></path>
+  <text x="489.2" y="215.6" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">4.0</text>
+  <path d="M503.2,236 V168 Q503.2,164 507.2,164 H523.2 Q527.2,164 527.2,168 V236 Z" fill="#E8850C"><title>spread · thin small cap: 20.0</title></path>
+  <text x="515.2" y="158" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">20.0</text>
+  <text x="502.2" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">spread</text>
+  <path d="M602.4,236 V232 Q602.4,228.1 606.4,228.1 H622.4 Q626.4,228.1 626.4,232 V236 Z" fill="#3A56C5"><title>walking the book · liquid large cap: 2.2</title></path>
+  <text x="614.4" y="222.1" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">2.2</text>
+  <path d="M628.4,236 V96.4 Q628.4,92.4 632.4,92.4 H648.4 Q652.4,92.4 652.4,96.4 V236 Z" fill="#E8850C"><title>walking the book · thin small cap: 39.9</title></path>
+  <text x="640.4" y="86.4" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">39.9</text>
+  <text x="627.4" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">walking the book</text>
+</svg>
+<!-- /chart:round_trip -->
+<figcaption>fig 2.1.8 — one round trip, cost by component: the billed fees are identical for both stocks, while the spread and the book decide the total</figcaption>
+</figure>
+
+<p>The billed fees, mostly per share, come to <span data-lab="rt_liquid_explicit_bps" data-fmt=".1f">2.9</span> basis points in both stocks. The unbilled spread and depth are <span data-lab="rt_liquid_implicit_share" data-fmt=".0%">68%</span> of the liquid stock's cost and <span data-lab="rt_thin_implicit_share" data-fmt=".0%">95%</span> of the thin one's, which costs <span data-lab="rt_thin_over_liquid" data-fmt=".1f">6.9</span> times as much to trade. In <a class="xref" href="session03-returns-pnl-leverage.html" data-xref="2.3" data-style="short" data-auto="">Session 2.3</a>'s terms, a round-trip cost <math><semantics><mi>c</mi><annotation encoding="application/x-tex">c</annotation></semantics></math> is a <a class="term" href="session03-returns-pnl-leverage.html#g-simple-return" data-term="simple return">simple return</a> surrendered on every trip, so a fully invested strategy making <math><semantics><mi>n</mi><annotation encoding="application/x-tex">n</annotation></semantics></math> round trips a year multiplies its wealth by <math><semantics><msup><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mn>1</mn><mo>−</mo><mi>c</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mi>n</mi></msup><annotation encoding="application/x-tex">(1-c)^n</annotation></semantics></math>:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><mtext>yearly cost drag</mtext><mspace width="0.2778em"></mspace><mo>=</mo><mspace width="0.2778em"></mspace><mn>1</mn><mo>−</mo><msup><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mn>1</mn><mo>−</mo><mi>c</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mi>n</mi></msup><mspace width="0.2778em"></mspace><mo>≈</mo><mspace width="0.2778em"></mspace><mi>n</mi><mspace width="0.1667em"></mspace><mi>c</mi><mspace width="1em"></mspace><mtext>when </mtext><mi>n</mi><mspace width="0.1667em"></mspace><mi>c</mi><mtext> is small.</mtext></mrow><annotation encoding="application/x-tex">\text{yearly cost drag} \;=\; 1-(1-c)^n \;\approx\; n\,c \quad \text{when } n\,c \text{ is small.}</annotation></semantics></math></div>
+<p>At <span data-lab="rt_trips_per_year" data-fmt="d">50</span> round trips a year — turning positions over about weekly — that is <span data-lab="rt_liquid_annual_drag_compound" data-fmt=".1%">4.5%</span> a year in the liquid stock and <span data-lab="rt_thin_annual_drag_compound" data-fmt=".1%">27.0%</span> in the thin one (the linear shortcut would say <span data-lab="rt_thin_annual_drag" data-fmt=".1%">31.4%</span>), before the strategy has earned anything. A backtest without costs is fiction; <span class="xref soon" data-xref="6.5" data-style="short" data-auto="" title="Coming soon">Session 6.5</span> gives <span class="term soon" data-term="transaction cost" title="Defined in Session 6.5 (coming soon)">transaction costs</span> and capacity a session of their own, and slicing a large order to pay less of them is <span class="xref soon" data-xref="14.4" data-style="short" data-auto="" title="Coming soon">Session 14.4</span>'s subject.</p>
+
+<div class="co warn"><span class="co-t">⚠️ Pitfall — "zero commission means free trading"</span>
+<p>The <span class="term soon" data-term="commission" title="Defined in Session 6.5 (coming soon)">commission</span> is a small line on the lab's bill: <span data-lab="rt_liquid_comm_bps" data-fmt=".1f">1.4</span> of <span data-lab="rt_liquid_total_bps" data-fmt=".1f">9.1</span> basis points even in the liquid stock. A zero-commission broker is paid another way, often by the wholesaler that fills you, and fill quality varies a lot: Schwarz and co-authors measured mean round-trip costs from 0.07% to 0.46% across six accounts, excluding commissions — the same wholesalers gave different prices to different brokers, and the size of the PFOF did not explain the gap. So measure your own fills against the mid, and never backtest with commission as the only cost.</p>
+</div>
+</section>
+
+<!-- ============ §8 — try it ============ -->
+<section id="s8">
+<h2><span class="no">2.1.8</span> Try it</h2>
+<p class="lede">Open the companion lab, predict before you run, and change one thing at a time.</p>
+<div class="co lab"><span class="co-t">🔧 Try it (15 min, in the lab)</span>
+<p>1. <strong>Fatter gaps.</strong> In section 2, set <code>GAP_MEAN = 0.06</code>. Predict the stop-limit's unfilled share from <math><semantics><msup><mi>e</mi><mrow class="tml-sml-pad"><mo form="prefix" stretchy="false" lspace="0em" rspace="0em">−</mo><mi>d</mi><mi>/</mi><mi>η</mi></mrow></msup><annotation encoding="application/x-tex">e^{-d/\eta}</annotation></semantics></math> with <math><semantics><mrow><mi>d</mi><mo>=</mo><mrow><mi>ln</mi><mo>⁡</mo></mrow><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mn>95</mn><mi>/</mi><mn>93</mn><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">d = \ln(95/93)</annotation></semantics></math> before you run, then compare.<br>
+2. <strong>Run out of book.</strong> In section 1, add <code>100_000</code> to <code>ORDER_SIZES</code>. The displayed book runs out: what happens to the rest in a real market?<br>
+3. <strong>The √n rule.</strong> In section 3, set <code>TRADES_PER_DAY = 200_000</code>: predict the share left to settle, then try <code>N_MEMBERS = 5</code>.<br>
+4. <strong>A bigger ticket.</strong> In section 4, set <code>QTY = 10_000</code>. Which components grow, and which barely move?<br>
+Success: step 1 lands within 2 percentage points of your prediction, step 3 within 10% of it (relative), and you can say in one sentence why the billed fees in step 4 hardly move.</p>
+</div>
+</section>
+
+<hr>
+
+<!-- ============ §9 — close ============ -->
+<section id="s9">
+<h2><span class="no">2.1.9</span> Glossary · Check yourself · Go deeper</h2>
+<div class="gloss" id="glossary">
+<div id="g-exchange"><b>Exchange</b> — a regulated venue that runs a public order book and matches its members' buy and sell orders under published rules.</div>
+<div id="g-broker"><b>Broker</b> — the firm that accepts your orders, checks them, sends them to venues for you, reports fills and holds your account.</div>
+<div id="g-clearing-house"><b>Clearing house</b> — the institution that confirms, nets and guarantees trades between the trade and its settlement.</div>
+<div id="g-central-counterparty"><b>Central counterparty</b> — a clearing house that becomes buyer to every seller and seller to every buyer (novation), backed by its members' margin.</div>
+<div id="g-custodian"><b>Custodian</b> — a firm that holds securities on behalf of their owners, kept separate from its own assets.</div>
+<div id="g-dark-pool"><b>Dark pool</b> — a trading venue that does not display orders before they trade; in the US, a kind of alternative trading system.</div>
+<div id="g-market-order"><b>Market order</b> — an order to trade now at the best prices available: certain to execute in a liquid market, at an uncertain price.</div>
+<div id="g-limit-order"><b>Limit order</b> — an order to trade only at a stated price or better: certain of its price, uncertain to execute.</div>
+<div id="g-stop-order"><b>Stop order</b> — a dormant order that becomes a market order once the market trades at or through its stop price.</div>
+<div id="g-bid"><b>Bid</b> — the highest price at which someone is currently willing to buy, with the size they will buy.</div>
+<div id="g-ask"><b>Ask</b> — the lowest price at which someone is currently willing to sell, with the size; also called the offer.</div>
+<div id="g-bid-ask-spread"><b>Bid-ask spread</b> — ask minus bid: what an immediate round trip costs at the touch, before any fees.</div>
+<div id="g-mid-price"><b>Mid price</b> — halfway between the best bid and the best ask; the fair reference against which fill costs are measured.</div>
+<div id="g-nbbo"><b>NBBO</b> — the national best bid and offer: the highest bid and lowest offer among US trading venues' protected quotes.</div>
+<div id="g-payment-for-order-flow"><b>Payment for order flow</b> — a payment from a market maker to a broker for routing it customer orders; legal with disclosure in the US, effectively banned in the UK and banned in the EU.</div>
+<div id="g-time-in-force"><b>Time in force</b> — the instruction that says how long an order stays live: day, good till cancelled, immediate or cancel, fill or kill, or until the close.</div>
+<div id="g-settlement"><b>Settlement</b> — the final delivery of securities against cash that completes a trade; T+1 for US equities since 28 May 2024.</div>
+</div>
+
+<h3>Check yourself</h3>
+<details class="q"><summary>1. Your strategy sends a market buy for <span data-lab="walk_10000_qty" data-fmt=",d">10,000</span> shares into the book of §2.1.4. What does it cost against the mid, and how much of that appears on your broker's statement?</summary><div><span data-lab="walk_10000_cost_bps" data-fmt=".1f">9.1</span> basis points, or <span data-lab="walk_10000_cost_usd" data-fmt="$,.0f">$457</span>: <span data-lab="half_spread_bps" data-fmt=".1f">2.0</span> for the half-spread and the rest for eating into <span data-lab="walk_10000_levels" data-fmt="d">7</span> levels of the book. None of it is on the statement: it is inside the fill price.</div></details>
+<details class="q"><summary>2. You hold a stock bought at <span data-lab="stop_entry" data-fmt="$.0f">$100</span> with a sell stop at <span data-lab="stop_price" data-fmt="$.0f">$95</span>. Results come out after the close, and the stock opens at $88. Where does the stop fill, and what would a stop-limit at <span data-lab="stop_limit_price" data-fmt="$.0f">$93</span> have done?</summary><div>The stop becomes a market order at the open and sells near $88 — a 12% loss, not <span data-lab="stop_pct" data-fmt=".0%">5%</span>. The stop-limit triggers too, but its limit is above the market, so it cannot fill at the open and you still hold the stock at $88. Only position size controls a gap.</div></details>
+<details class="q"><summary>3. <span data-lab="net_members" data-fmt="d">20</span> clearing members trade <span data-lab="net_trades" data-fmt=",d">50,000</span> times a day in one stock. Why does the clearing house need to move so little, and what would happen to that advantage if every trade had to settle instantly?</summary><div>Each member's net position is a sum of many offsetting trades, so it grows like the square root of the number of trades: only <span data-lab="net_multi_ratio" data-fmt=".2%">1.51%</span> of gross volume is left after multilateral netting. Instant gross settlement removes the batch, so every trade must be funded and delivered on its own.</div></details>
+<details class="q"><summary>4. Your app shows an order as "filled". Name two things that can still go wrong before the shares are yours, and what protects you from each.</summary><div>The other side can fail before settlement — the CCP guarantees the trade to your clearing broker, backed by members' margin and a default fund; and your broker itself can fail — your shares are segregated at the custodian, with SIPC protection (US) behind that. A shorter settlement cycle shrinks the first window: DTCC estimated T+1 could cut its value-at-risk margin by as much as 40%.</div></details>
+<details class="q"><summary>5. A broker advertises zero commissions and "best execution". What would you check before trusting it with an active strategy?</summary><div>Its fills against the mid at the time of each order (its execution-quality and routing reports, or your own measurements), whether it takes payment for order flow and from whom, and its per-share fees. Commission is a small part of the bill; Schwarz et al. found mean round-trip costs from 0.07% to 0.46% across six accounts at five brokers, before commissions, with PFOF not explaining the gap.</div></details>
+
+<div class="co lab"><span class="co-t">🔧 Homework (~1 h before Session 2.2)</span>
+<p>1. <strong>Your broker's bill.</strong> Put a real broker's published fees into the constants of lab section 4, rerun, and date every number. Which component moves most?<br>
+2. <strong>Limit-order fill odds.</strong> In a new lab section, rest a buy limit 1% below the price for one day under section 2's intraday model without news. Compare its simulated fill probability with the reflection principle for driftless Brownian motion, <math><semantics><mrow><mn>2</mn><mrow><mi mathvariant="normal">Φ</mi><mspace></mspace></mrow><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mo form="prefix" stretchy="false">−</mo><mi>d</mi><mi>/</mi><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>σ</mi><msqrt><mrow><mi>τ</mi><mspace width="0pt" height="0.5em"></mspace></mrow></msqrt><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">2\Phi(-d/(\sigma\sqrt{\tau}))</annotation></semantics></math>, with the level moved <math><semantics><mrow><mi>β</mi><mspace width="0.1667em"></mspace><mi>σ</mi><msqrt><mrow><mrow><mi mathvariant="normal">Δ</mi><mspace></mspace></mrow><mi>t</mi></mrow></msqrt></mrow><annotation encoding="application/x-tex">\beta\,\sigma\sqrt{\Delta t}</annotation></semantics></math> further away for five-minute checks; assert agreement within 4 <a class="term" href="../unit03-math-toolkit/session01-probability-expected-value.html#g-standard-error" data-term="standard error">standard errors</a>.<br>
+3. <strong>Read</strong> chapters 4 ("Orders and Order Properties") and 7 ("Brokers") of Harris (2003).<br>
+4. <strong>Map one foreign stock.</strong> Find its exchange, CCP, CSD and settlement cycle — the plumbing behind <a class="xref" href="session02-equities-indices-etfs.html" data-xref="2.2" data-style="short" data-auto="">Session 2.2</a>.</p>
+</div>
+
+<h3>📚 Go deeper</h3>
+<ol class="refs">
+<li>Harris, L. (2003). <em>Trading and Exchanges: Market Microstructure for Practitioners</em>, ch. 4 "Orders and Order Properties", ch. 5 "Market Structures", ch. 7 "Brokers" and ch. 25 "Internalization, Preferencing, and Crossing". Oxford University Press. <span class="rid">ISBN 978-0-19-514470-3</span></li>
+<li>Bouchaud, J.-P., Bonart, J., Donier, J. &amp; Gould, M. (2018). <em>Trades, Quotes and Prices: Financial Markets Under the Microscope</em>. Cambridge University Press. <span class="rid">doi:10.1017/9781316659335</span></li>
+<li>Duffie, D. &amp; Zhu, H. (2011). "Does a Central Clearing Counterparty Reduce Counterparty Risk?" <em>Review of Asset Pricing Studies</em> 1(1), 74–95. <span class="rid">doi:10.1093/rapstu/rar001</span></li>
+<li>Schwarz, C., Barber, B. M., Huang, X., Jorion, P. &amp; Odean, T. (2025). "The 'Actual Retail Price' of Equity Trades." <em>Journal of Finance</em> 80(5), 2507–2541. <span class="rid">doi:10.1111/jofi.13467</span></li>
+<li>Battalio, R., Corwin, S. A. &amp; Jennings, R. (2016). "Can Brokers Have It All? On the Relation between Make-Take Fees and Limit Order Execution Quality." <em>Journal of Finance</em> 71(5), 2193–2238. <span class="rid">doi:10.1111/jofi.12422</span></li>
+</ol>
+
+<h3>Sources for the numbers</h3>
+<ol class="refs">
+<li>US Securities and Exchange Commission (2023, 15 February). "SEC Finalizes Rules to Reduce Risks in Clearance and Settlement" (T+1, compliance date 28 May 2024). Press release 2023-29. <span class="rid">https://www.sec.gov/newsroom/press-releases/2023-29</span></li>
+<li>European Parliament and Council (2025). Regulation (EU) 2025/2075 of 8 October 2025 amending Regulation (EU) No 909/2014 as regards a shorter settlement cycle in the Union (T+1 from 11 October 2027). <span class="rid">https://eur-lex.europa.eu/eli/reg/2025/2075/oj/eng</span></li>
+<li>Financial Conduct Authority (2025, 21 November). "Government publishes draft Statutory Instrument on T+1 settlement" (draft SI of 20 November 2025; UK T+1 from 11 October 2027). <span class="rid">https://www.fca.org.uk/news/statements/government-publishes-draft-statutory-instrument-t-plus-1-settlement</span></li>
+<li>Bodson, M. C. (2021, 6 May). Written testimony of the Chief Executive Officer, The Depository Trust &amp; Clearing Corporation, before the US House Committee on Financial Services (NSCC netting, real-time settlement, T+1 margin estimate). <span class="rid">https://www.congress.gov/117/meeting/house/112590/witnesses/HHRG-117-BA00-Wstate-BodsonM-20210506.pdf</span></li>
+<li>DTCC. "CNS®" (novation and the NSCC trade guarantee). <span class="rid">https://www.dtcc.com/clearing-and-settlement-services/equities-clearing-services/cns</span></li>
+<li>US Securities and Exchange Commission, staff (2021, 14 October). "Staff Report on Equity and Options Market Structure Conditions in Early 2021" (off-exchange share; NSCC margin calls of 27 January 2021). <span class="rid">https://www.sec.gov/files/staff-report-equity-options-market-struction-conditions-early-2021.pdf</span></li>
+<li>US Commodity Futures Trading Commission &amp; US Securities and Exchange Commission (2010, 30 September). "Findings Regarding the Market Events of May 6, 2010." <span class="rid">https://www.sec.gov/news/studies/2010/marketevents-report.pdf</span></li>
+<li>US Securities and Exchange Commission (2018). "Regulation of NMS Stock Alternative Trading Systems" Final rule (Form ATS-N; ATSs "including so called 'dark pools'"). <span class="rid">https://www.sec.gov/rules-regulations/2018/07/regulation-nms-stock-alternative-trading-systems</span></li>
+<li>Directive 2014/65/EU (MiFID II), Article 4(1)(20) (systematic internaliser) and Article 27 (best execution). <span class="rid">https://eur-lex.europa.eu/eli/dir/2014/65/oj</span></li>
+<li>Regulation (EU) 2024/791 (MiFIR review), Article 39a (prohibition of payment for order flow; exemptions until 30 June 2026). <span class="rid">https://eur-lex.europa.eu/eli/reg/2024/791/oj/eng</span></li>
+<li>Financial Services Authority (2012, May). "Guidance on the practice of 'Payment for Order Flow'." Finalised guidance FG12/13. <span class="rid">https://www.fca.org.uk/publication/finalised-guidance/fg12-13.pdf</span></li>
+<li>US Securities and Exchange Commission (2025, 12 June). "Withdrawal of Proposed Regulatory Actions" (including the Order Competition Rule). Release 33-11377. <span class="rid">https://www.sec.gov/files/rules/final/2025/33-11377.pdf</span></li>
+<li>US Securities and Exchange Commission (2005, 9 June). "Regulation NMS." Release 34-51808. <span class="rid">https://www.sec.gov/rules-regulations/2005/06/regulation-nms</span></li>
+<li>US Securities and Exchange Commission (2026, 11 June). "SEC Proposes Rescission of Regulation NMS Rules 611 and 610(e)." Press release 2026-54. <span class="rid">https://www.sec.gov/newsroom/press-releases/2026-54-sec-proposes-rescission-regulation-nms-rules-611-610e</span></li>
+<li>FINRA. Rule 5310, "Best Execution and Interpositioning." <span class="rid">https://www.finra.org/rules-guidance/rulebooks/finra-rules/5310</span></li>
+<li>FINRA. "Order Types" (market, limit, stop and stop-limit orders). <span class="rid">https://www.finra.org/investors/investing/investment-products/stocks/order-types</span></li>
+<li>NYSE (2015, 16 November). "Elimination of Stop and GTC order types." Client notice. <span class="rid">https://www.nyse.com/publicdocs/NYSE_Client_Notice_Removal_of_Stop_and_GTC_orders_112015.pdf</span></li>
+<li>US Securities and Exchange Commission (2026). Fee Rate Advisory 2026-2 (Section 31: $20.60 per million from 4 April 2026). <span class="rid">https://www.sec.gov/rules-regulations/fee-rate-advisories/2026-2</span></li>
+<li>FINRA. Trading Activity Fee adjustment schedule, SR-FINRA-2024-019 (2026: $0.000195 a share, maximum $9.79 a trade). <span class="rid">https://www.finra.org/rules-guidance/rule-filings/sr-finra-2024-019/fee-adjustment-schedule</span></li>
+<li>US Securities and Exchange Commission (2024, 18 September). "SEC Adopts Rules to Amend Minimum Pricing Increments and Access Fee Caps…" Press release 2024-137; and Atkins, P. S. (2026, 11 June). "Statement Regarding Minimum Pricing Increments and Access Fee Caps" (compliance postponed to November 2027). <span class="rid">https://www.sec.gov/newsroom/press-releases/2024-137</span> · <span class="rid">https://www.sec.gov/newsroom/speeches-statements/atkins-statement-minimum-pricing-increments-access-fee-caps-061126</span></li>
+<li>SIPC. "What SIPC Protects." <span class="rid">https://www.sipc.org/for-investors/what-sipc-protects</span>; FSCS. "What we cover." <span class="rid">https://www.fscs.org.uk/what-we-cover/</span>; Directive 97/9/EC on investor-compensation schemes. <span class="rid">https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A31997L0009</span></li>
+<li>Siegmund, D. (1985). <em>Sequential Analysis: Tests and Confidence Intervals</em>. Springer. <span class="rid">doi:10.1007/978-1-4757-1862-1</span></li>
+</ol>
+</section>
+
+<!-- nav:foot -->
+<div class="foot">
+<a href="../unit01-quant-landscape/session05-quant-lab-setup.html">← Prev: 1.5 · Lab Setup</a>
+<a href="session02-equities-indices-etfs.html">Next: 2.2 · Equities &amp; ETFs →</a>
+</div>
+<p class="legal">Educational material only — not investment, legal or tax advice. Backtests and simulations are hypothetical. <a href="../start-here.html#disclaimer">Disclaimer</a> · Text CC BY 4.0 · Code MIT.</p>
+<!-- /nav:foot -->
+</main>
+</div></body></html>

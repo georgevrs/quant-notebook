@@ -1,0 +1,45 @@
+<svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Storage model: futures premium over spot by months to expiry, three inventory states">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">STORAGE MODEL: FUTURES PREMIUM OVER SPOT BY MONTHS TO EXPIRY, THREE INVENTORY STATES</text>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#4A5A68" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">full-carry ceiling</text>
+  <line x1="185.2" y1="32" x2="201.2" y2="32" stroke="#3F8E5A" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="207.2" y="36" font-size="11" fill="#4A5A68">glut</text>
+  <line x1="254.79999999999998" y1="32" x2="270.79999999999995" y2="32" stroke="#3A56C5" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="276.79999999999995" y="36" font-size="11" fill="#4A5A68">normal</text>
+  <line x1="337.2" y1="32" x2="353.2" y2="32" stroke="#E8850C" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="359.2" y="36" font-size="11" fill="#4A5A68">scarce</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="268" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">−10%</text>
+  <line x1="64" y1="221.6" x2="602" y2="221.6" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="225.6" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0%</text>
+  <line x1="64" y1="179.2" x2="602" y2="179.2" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="183.2" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">10%</text>
+  <line x1="64" y1="136.8" x2="602" y2="136.8" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="140.8" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">20%</text>
+  <line x1="64" y1="94.4" x2="602" y2="94.4" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="98.4" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">30%</text>
+  <line x1="64" y1="52" x2="602" y2="52" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="56" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">40%</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#C9CFC6" stroke-width="1"/>
+  <line x1="64" y1="264" x2="64" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="64" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">0</text>
+  <line x1="213.4" y1="264" x2="213.4" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="213.4" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">10</text>
+  <line x1="362.9" y1="264" x2="362.9" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="362.9" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">20</text>
+  <line x1="512.3" y1="264" x2="512.3" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="512.3" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">30</text>
+  <line x1="64" y1="221.6" x2="602" y2="221.6" stroke="#4A5A68" stroke-width="1"/>
+  <polyline points="64,221.6 78.9,218.4 93.9,215.2 108.8,212 123.8,208.7 138.7,205.4 153.7,202.1 168.6,198.7 183.6,195.4 198.5,192 213.4,188.6 228.4,185.1 243.3,181.7 258.3,178.2 273.2,174.7 288.2,171.1 303.1,167.5 318.1,163.9 333,160.3 347.9,156.7 362.9,153 377.8,149.3 392.8,145.5 407.7,141.8 422.7,138 437.6,134.2 452.6,130.3 467.5,126.4 482.4,122.5 497.4,118.6 512.3,114.6 527.3,110.6 542.2,106.6 557.2,102.5 572.1,98.4 587.1,94.3 602,90.2" fill="none" stroke="#4A5A68" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><title>full-carry ceiling</title></polyline>
+  <circle cx="602" cy="90.2" r="4" fill="#4A5A68" stroke="#FBFBF8" stroke-width="2"><title>full-carry ceiling: 31%</title></circle>
+  <polyline points="64,221.6 78.9,218.5 93.9,215.5 108.8,212.4 123.8,209.4 138.7,206.4 153.7,203.3 168.6,200.3 183.6,197.3 198.5,194.4 213.4,191.4 228.4,188.5 243.3,185.5 258.3,182.6 273.2,179.7 288.2,176.9 303.1,174 318.1,171.2 333,168.4 347.9,165.6 362.9,162.8 377.8,160 392.8,157.3 407.7,154.5 422.7,151.8 437.6,149.1 452.6,146.4 467.5,143.7 482.4,141.1 497.4,138.4 512.3,135.7 527.3,133.1 542.2,130.4 557.2,127.8 572.1,125.1 587.1,122.5 602,119.9" fill="none" stroke="#3F8E5A" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>glut</title></polyline>
+  <circle cx="602" cy="119.9" r="4" fill="#3F8E5A" stroke="#FBFBF8" stroke-width="2"><title>glut: 24%</title></circle>
+  <polyline points="64,221.6 78.9,219.6 93.9,217.7 108.8,215.7 123.8,213.7 138.7,211.7 153.7,209.7 168.6,207.6 183.6,205.6 198.5,203.6 213.4,201.5 228.4,199.5 243.3,197.4 258.3,195.3 273.2,193.2 288.2,191.1 303.1,189 318.1,186.9 333,184.8 347.9,182.6 362.9,180.5 377.8,178.3 392.8,176.2 407.7,174 422.7,171.8 437.6,169.6 452.6,167.4 467.5,165.2 482.4,162.9 497.4,160.7 512.3,158.4 527.3,156.2 542.2,153.9 557.2,151.6 572.1,149.3 587.1,147 602,144.7" fill="none" stroke="#3A56C5" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>normal</title></polyline>
+  <circle cx="602" cy="144.7" r="4" fill="#3A56C5" stroke="#FBFBF8" stroke-width="2"><title>normal: 18%</title></circle>
+  <polyline points="64,221.6 78.9,226.7 93.9,230.7 108.8,233.8 123.8,236.2 138.7,237.9 153.7,239.2 168.6,240.1 183.6,240.6 198.5,240.9 213.4,240.9 228.4,240.7 243.3,240.3 258.3,239.8 273.2,239.1 288.2,238.3 303.1,237.4 318.1,236.4 333,235.3 347.9,234.1 362.9,232.9 377.8,231.6 392.8,230.2 407.7,228.8 422.7,227.3 437.6,225.8 452.6,224.2 467.5,222.6 482.4,221 497.4,219.3 512.3,217.6 527.3,215.9 542.2,214.2 557.2,212.4 572.1,210.6 587.1,208.8 602,206.9" fill="none" stroke="#E8850C" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>scarce</title></polyline>
+  <circle cx="602" cy="206.9" r="4" fill="#E8850C" stroke="#FBFBF8" stroke-width="2"><title>scarce: 3%</title></circle>
+  <text x="614" y="94.2" font-size="11" fill="#1F2C38">ceiling: 31%</text>
+  <text x="614" y="123.9" font-size="11" fill="#1F2C38">glut: 24%</text>
+  <text x="614" y="148.7" font-size="11" fill="#1F2C38">normal: 18%</text>
+  <text x="614" y="210.9" font-size="11" fill="#1F2C38">scarce: 3%</text>
+</svg>

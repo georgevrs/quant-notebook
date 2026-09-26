@@ -1,0 +1,32 @@
+<svg viewBox="0 0 720 260" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Cost of a market buy against the mid, by order size in shares (synthetic book)">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">COST OF A MARKET BUY AGAINST THE MID, BY ORDER SIZE IN SHARES (SYNTHETIC BOOK)</text>
+  <line x1="64" y1="216" x2="690" y2="216" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="220" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.0 bp</text>
+  <line x1="64" y1="173" x2="690" y2="173" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="177" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">5.0 bp</text>
+  <line x1="64" y1="130" x2="690" y2="130" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="134" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">10.0 bp</text>
+  <line x1="64" y1="87" x2="690" y2="87" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="91" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">15.0 bp</text>
+  <line x1="64" y1="44" x2="690" y2="44" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="48" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">20.0 bp</text>
+  <line x1="64" y1="216" x2="690" y2="216" stroke="#C9CFC6" stroke-width="1"/>
+  <path d="M104.2,216 V202.8 Q104.2,198.8 108.2,198.8 H124.2 Q128.2,198.8 128.2,202.8 V216 Z" fill="#3A56C5"><title>100: 2.0 bp</title></path>
+  <text x="116.2" y="191.8" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">2.0 bp</text>
+  <text x="116.2" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">100</text>
+  <path d="M208.5,216 V202.8 Q208.5,198.8 212.5,198.8 H228.5 Q232.5,198.8 232.5,202.8 V216 Z" fill="#3A56C5"><title>1,000: 2.0 bp</title></path>
+  <text x="220.5" y="191.8" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">2.0 bp</text>
+  <text x="220.5" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">1,000</text>
+  <path d="M312.8,216 V187.7 Q312.8,183.7 316.8,183.7 H332.8 Q336.8,183.7 336.8,187.7 V216 Z" fill="#3A56C5"><title>2,500: 3.8 bp</title></path>
+  <text x="324.8" y="176.7" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">3.8 bp</text>
+  <text x="324.8" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">2,500</text>
+  <path d="M417.2,216 V168.4 Q417.2,164.4 421.2,164.4 H437.2 Q441.2,164.4 441.2,168.4 V216 Z" fill="#3A56C5"><title>5,000: 6.0 bp</title></path>
+  <text x="429.2" y="157.4" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">6.0 bp</text>
+  <text x="429.2" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">5,000</text>
+  <path d="M521.5,216 V141.4 Q521.5,137.4 525.5,137.4 H541.5 Q545.5,137.4 545.5,141.4 V216 Z" fill="#3A56C5"><title>10,000: 9.1 bp</title></path>
+  <text x="533.5" y="130.4" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">9.1 bp</text>
+  <text x="533.5" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">10,000</text>
+  <path d="M625.8,216 V85.8 Q625.8,81.8 629.8,81.8 H645.8 Q649.8,81.8 649.8,85.8 V216 Z" fill="#3A56C5"><title>25,000: 15.6 bp</title></path>
+  <text x="637.8" y="74.8" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">15.6 bp</text>
+  <text x="637.8" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">25,000</text>
+</svg>

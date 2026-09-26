@@ -104,18 +104,18 @@ units:
         short: Market Anatomy
         goal: Follow one order from your code through broker, venue, clearing house and custodian — and see where every fee and risk sits.
         prereqs: ["1.1"]
-        owns: [exchange, broker, clearing house, central counterparty, custodian, dark pool, market order, limit order, stop order, bid, ask, bid-ask spread, settlement]
+        owns: [exchange, broker, clearing house, central counterparty, custodian, dark pool, market order, limit order, stop order, bid, ask, bid-ask spread, settlement, mid price, NBBO, payment for order flow, time in force]
         deps: [core]
-        status: planned
+        status: published
       - id: "2.2"
         slug: equities-indices-etfs
         title: Equities, Indices & ETFs
         short: Equities & ETFs
         goal: Shares, dividends, splits, index construction, ETF creation/redemption, and the mechanics and costs of shorting.
         prereqs: ["2.1"]
-        owns: [common stock, dividend, stock split, corporate action, index, market-cap weighting, ETF, creation and redemption, short selling, borrow fee, total return]
+        owns: [common stock, dividend, stock split, corporate action, index, market-cap weighting, ETF, creation and redemption, short selling, borrow fee, total return, net asset value, authorised participant, free float, ex-dividend date, short squeeze]
         deps: [core]
-        status: planned
+        status: published
       - id: "2.3"
         slug: returns-pnl-leverage
         title: Returns, P&L, Compounding & Leverage
@@ -140,27 +140,27 @@ units:
         short: FX & Commodities
         goal: Currency quoting, forwards and covered interest parity; commodity term structures, storage and convenience yield.
         prereqs: ["2.4"]
-        owns: [currency pair, pip, FX spot, FX forward, covered interest parity, FX carry, convenience yield, commodity term structure, storage cost]
+        owns: [currency pair, pip, FX spot, FX forward, covered interest parity, FX carry, convenience yield, commodity term structure, storage cost, forward points, cross-currency basis]
         deps: [core]
-        status: planned
+        status: published
       - id: "2.6"
         slug: crypto-market-structure
         title: Crypto Market Structure
         short: Crypto
         goal: Centralised vs decentralised venues, AMMs, perpetual futures and funding, basis trades, and the custody and counterparty risks that traditional markets hide from you.
         prereqs: ["2.4"]
-        owns: [centralised exchange, decentralised exchange, automated market maker, perpetual future, funding rate, stablecoin, custody risk, counterparty risk, liquidation]
+        owns: [centralised exchange, decentralised exchange, automated market maker, perpetual future, funding rate, stablecoin, custody risk, counterparty risk, liquidation, impermanent loss, insurance fund, auto-deleveraging, proof of reserves]
         deps: [core]
-        status: planned
+        status: published
       - id: "2.7"
         slug: options-primer
         title: Options Primer
         short: Options Primer
         goal: Calls, puts, payoffs, put-call parity, intrinsic vs time value, and a first look at implied volatility — enough to read any options discussion.
         prereqs: ["2.3"]
-        owns: [call option, put option, strike price, option premium, payoff diagram, moneyness, put-call parity, intrinsic value, time value, implied volatility]
+        owns: [call option, put option, strike price, option premium, payoff diagram, moneyness, put-call parity, intrinsic value, time value, implied volatility, European option, American option, covered call, protective put, vertical spread]
         deps: [core]
-        status: planned
+        status: published
 
   - id: 3
     slug: math-toolkit
@@ -175,9 +175,9 @@ units:
         short: Probability & EV
         goal: Random variables, expectation, variance, conditioning and Bayes — the language of every bet and every interview question.
         prereqs: ["2.3"]
-        owns: [random variable, expected value, variance, conditional probability, Bayes' rule, independence, law of large numbers, central limit theorem]
+        owns: [random variable, expected value, variance, standard deviation, covariance, correlation, standard error, conditional probability, conditional expectation, Bayes' rule, independence, law of large numbers, central limit theorem, linearity of expectation, law of total expectation]
         deps: [core]
-        status: planned
+        status: published
       - id: "3.2"
         slug: distributions-fat-tails
         title: Distributions & Fat Tails
@@ -186,7 +186,7 @@ units:
         prereqs: ["3.1"]
         owns: [normal distribution, lognormal distribution, Student-t distribution, skewness, kurtosis, fat tails, tail index, QQ plot, power law]
         deps: [core]
-        status: planned
+        status: doing
       - id: "3.3"
         slug: linear-algebra-portfolios
         title: Linear Algebra for Portfolios
@@ -195,7 +195,7 @@ units:
         prereqs: ["3.1"]
         owns: [weight vector, covariance matrix, correlation matrix, portfolio variance, eigenvalue, eigenvector, principal component analysis, positive semi-definite, condition number]
         deps: [core]
-        status: planned
+        status: doing
       - id: "3.4"
         slug: convex-optimization
         title: Convex Optimization
@@ -204,7 +204,7 @@ units:
         prereqs: ["3.3"]
         owns: [objective function, constraint, convex set, convex function, quadratic program, Lagrange multiplier, KKT conditions, cvxpy]
         deps: [core, portfolio]
-        status: planned
+        status: doing
       - id: "3.5"
         slug: simulation-monte-carlo
         title: Simulation & Monte Carlo
@@ -213,7 +213,7 @@ units:
         prereqs: ["3.2"]
         owns: [Monte Carlo simulation, random walk, geometric Brownian motion, bootstrap, variance reduction, antithetic variates, Monte Carlo standard error]
         deps: [core]
-        status: planned
+        status: doing
       - id: "3.6"
         slug: kelly-bet-sizing
         title: Bet Sizing, Kelly & Ruin
@@ -222,7 +222,7 @@ units:
         prereqs: ["3.5"]
         owns: [Kelly criterion, fractional Kelly, growth rate, risk of ruin, log utility, bet sizing]
         deps: [core]
-        status: planned
+        status: doing
 
   - id: 4
     slug: data-engineering

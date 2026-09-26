@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- nav:head -->
+<title>2.2 · Equities, Indices &amp; ETFs</title>
+<meta name="description" content="Shares, dividends, splits, index construction, ETF creation/redemption, and the mechanics and costs of shorting.">
+<link rel="canonical" href="https://georgevrs.github.io/quant-notebook/unit02-markets-instruments/session02-equities-indices-etfs.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Quant Notebook">
+<meta property="og:title" content="2.2 · Equities, Indices &amp; ETFs">
+<meta property="og:description" content="Shares, dividends, splits, index construction, ETF creation/redemption, and the mechanics and costs of shorting.">
+<meta property="og:url" content="https://georgevrs.github.io/quant-notebook/unit02-markets-instruments/session02-equities-indices-etfs.html">
+<meta name="twitter:card" content="summary">
+<link rel="stylesheet" href="../assets/brand.css">
+<link rel="stylesheet" href="../assets/temml.css">
+<!-- /nav:head -->
+</head>
+<body><div class="page" id="top">
+<!-- Session 2.2 — equities, indices, ETFs and shorting. Total-return arithmetic and leverage are owned by 2.3; the adjustment pipeline by 4.3. See AUTHORING.md. -->
+<!-- nav:tabs -->
+<nav class="tabs">
+<a href="../index.html">⌂ Course home</a>
+<a href="session01-market-anatomy.html">2.1 · Market Anatomy</a>
+<a class="active" href="session02-equities-indices-etfs.html">2.2 · Equities &amp; ETFs</a>
+<a href="session03-returns-pnl-leverage.html">2.3 · Returns &amp; Leverage</a>
+<a href="session04-futures.html">2.4 · Futures</a>
+<a href="session05-fx-commodities.html">2.5 · FX &amp; Commodities</a>
+<a href="session06-crypto-market-structure.html">2.6 · Crypto</a>
+<a href="session07-options-primer.html">2.7 · Options Primer</a>
+<a href="../roadmap.html">🗺 Roadmap</a>
+</nav>
+<!-- /nav:tabs -->
+
+<header class="cover">
+<!-- nav:heading -->
+<p class="eyebrow">Unit 2 · Markets &amp; Instruments — Session 02 of 07</p>
+<h1>Equities, Indices &amp; ETFs</h1>
+<!-- /nav:heading -->
+<p class="subtitle">A share is a claim on whatever a company has left over; an index is a portfolio with a published rule; an ETF is a basket held in line by an arbitrage trade; a short sale is a loan you repay in shares. Each has plumbing that quietly moves your returns — dividends missing from price charts, splits that fake crashes, discounts that open in a panic, borrow fees that turn a right call into a loss. <mark>The core move: measure what you actually own and what it costs to hold — total returns on adjusted prices, net of every fee — never the quoted price alone.</mark></p>
+<div class="meta">
+<span>DURATION <b>1.5 h + lab</b></span>
+<span>LEVEL <b>Foundations</b></span>
+<span>TRACKS <b>QR · QT · QD · IND</b></span>
+<span>HANDS-ON <b>Build three indices; stress an ETF; short a stock on <span data-lab="short_n" data-fmt=",d">20,000</span> paths</b></span>
+</div>
+<!-- nav:labstrip -->
+<div class="labstrip"><b>📓 Companion lab</b>
+<a href="https://colab.research.google.com/github/georgevrs/quant-notebook/blob/main/labs/u02/s02_equities_indices_etfs.ipynb">Open in Colab</a>
+<a href="https://github.com/georgevrs/quant-notebook/blob/main/labs/u02/s02_equities_indices_etfs.ipynb">Notebook on GitHub</a>
+<a href="https://github.com/georgevrs/quant-notebook/blob/main/labs/u02/s02_equities_indices_etfs.py">Source (.py)</a>
+</div>
+<!-- /nav:labstrip -->
+<div class="toc">
+<b>On this page</b>
+<ol>
+<li><a href="#s1">What a share is: the residual claim</a></li>
+<li><a href="#s2">Dividends, splits &amp; corporate actions</a></li>
+<li><a href="#s3">Price return vs total return</a></li>
+<li><a href="#s4">An index is a weighting rule</a></li>
+<li><a href="#s5">ETFs: a basket with an arbitrage loop</a></li>
+<li><a href="#s6">Short selling: selling what you borrowed</a></li>
+<li><a href="#s7">Short P&amp;L, squeezes &amp; GameStop</a></li>
+<li><a href="#s8">Where people go wrong</a></li>
+<li><a href="#s9">Try it</a></li>
+<li><a href="#s10">Glossary · Check yourself · Go deeper</a></li>
+</ol>
+</div>
+</header>
+
+<main>
+
+<section id="s1">
+<h2><span class="no">2.2.1</span> What a share is: the residual claim</h2>
+<p class="lede">Before prices or indices, ask what a share entitles you to. The answer — whatever is left over — explains why equity is the riskiest claim on a company, and why it should pay the most.</p>
+
+<p>A company funds its assets with debt and equity. Lenders are promised fixed payments and are paid first. A share of <strong>common stock</strong> is a slice of ownership: a vote, dividends when the board pays them, and — the defining feature — a claim on whatever is left once every fixed claim has been paid. Liability is limited: you can lose what you paid, and no more. Picture the cash flowing down a queue of claims in order of seniority (fig 2.2.1): in a good year the fixed claims take their fixed amounts and equity keeps the rest; in a bad year equity is the first to run dry.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">WHO GETS PAID FIRST — a company's value flows down its claims in order of seniority</text>
+  <rect x="26" y="96" width="170" height="104" rx="10" fill="#F5F6F2" stroke="#4A5A68" stroke-width="1.5"/>
+  <text x="111" y="132" font-size="12.5" font-weight="700" text-anchor="middle" fill="#1F2C38">THE FIRM</text>
+  <text x="111" y="152" font-size="9.5" text-anchor="middle" fill="#4A5A68">its assets and all its</text>
+  <text x="111" y="166" font-size="9.5" text-anchor="middle" fill="#4A5A68">future cash flows</text>
+  <path d="M198 148 H234" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s1a)"/>
+  <rect x="240" y="34" width="250" height="44" rx="8" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="365" y="53" font-size="11" font-weight="600" text-anchor="middle" fill="#1F7A55">1 · SECURED DEBT</text>
+  <text x="365" y="69" font-size="9.5" text-anchor="middle" fill="#4A5A68">paid first · backed by specific assets</text>
+  <rect x="240" y="86" width="250" height="44" rx="8" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="365" y="105" font-size="11" font-weight="600" text-anchor="middle" fill="#1F7A55">2 · BONDS &amp; LOANS</text>
+  <text x="365" y="121" font-size="9.5" text-anchor="middle" fill="#4A5A68">fixed interest, then the principal</text>
+  <rect x="240" y="138" width="250" height="44" rx="8" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="365" y="157" font-size="11" font-weight="600" text-anchor="middle" fill="#8A6D00">3 · PREFERRED STOCK</text>
+  <text x="365" y="173" font-size="9.5" text-anchor="middle" fill="#4A5A68">a fixed dividend, ahead of common stock</text>
+  <rect x="240" y="190" width="250" height="58" rx="8" fill="#EDF0FC" stroke="#3A56C5" stroke-width="2"/>
+  <text x="365" y="211" font-size="11.5" font-weight="700" text-anchor="middle" fill="#3A56C5">4 · COMMON STOCK</text>
+  <text x="365" y="227" font-size="9.5" text-anchor="middle" fill="#4A5A68">the residual claim: whatever is left</text>
+  <text x="365" y="241" font-size="9.5" text-anchor="middle" fill="#4A5A68">votes · dividends · limited liability</text>
+  <rect x="516" y="34" width="178" height="100" rx="10" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="605" y="56" font-size="11" font-weight="700" text-anchor="middle" fill="#1F7A55">GOOD YEAR</text>
+  <text x="605" y="78" font-size="9.5" text-anchor="middle" fill="#4A5A68">claims 1–3 get their fixed</text>
+  <text x="605" y="92" font-size="9.5" text-anchor="middle" fill="#4A5A68">amounts; common stock</text>
+  <text x="605" y="106" font-size="9.5" text-anchor="middle" fill="#4A5A68">keeps all of the upside</text>
+  <rect x="516" y="148" width="178" height="100" rx="10" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="605" y="170" font-size="11" font-weight="700" text-anchor="middle" fill="#D64B2A">BAD YEAR</text>
+  <text x="605" y="192" font-size="9.5" text-anchor="middle" fill="#4A5A68">common stock absorbs the</text>
+  <text x="605" y="206" font-size="9.5" text-anchor="middle" fill="#4A5A68">losses first — it can fall</text>
+  <text x="605" y="220" font-size="9.5" text-anchor="middle" fill="#4A5A68">to zero, but never below</text>
+  <text x="360" y="282" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">Equity is the residual claim: all of the upside, and first in line for the losses.</text>
+  <defs><marker id="s1a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F2C38"/></marker></defs>
+</svg>
+<figcaption>fig 2.2.1 — the capital structure as a payment queue: fixed claims are paid first, and common stock owns whatever is left over</figcaption>
+</figure>
+
+<p>That is why stocks should, and on average did, pay more than bonds — the <a class="term" href="../unit01-quant-landscape/session02-where-returns-come-from.html#g-equity-premium" data-term="equity premium">equity premium</a> of <a class="xref" href="../unit01-quant-landscape/session02-where-returns-come-from.html" data-xref="1.2" data-style="short" data-auto="">Session 1.2</a> — and why equity looks like an option on the firm's assets with the debt as the strike, the <span class="term soon" data-term="Merton model" title="Defined in Session 11.4 (coming soon)">Merton model</span> of <span class="xref soon" data-xref="11.4" data-style="short" data-auto="" title="Coming soon">Session 11.4</span>. A company's <em>market capitalisation</em> is its price times its shares outstanding. The count changes as companies issue shares, buy them back and split them, and not every share trades: the <strong>free float</strong> is the fraction that does, excluding blocks held by founders, families or governments — the part an index fund can actually buy (§2.2.4).</p>
+
+<div class="co key"><span class="co-t">📌 Key idea — a price is the equity divided by a share count</span>
+<p><mark>Anything that changes the share count without changing the firm — a split, a stock dividend — changes the price but not your wealth</mark>, and anything that moves cash from the firm to you — a dividend — lowers the price by about the cash you received. Your data has to know the difference.</p>
+</div>
+</section>
+
+<section id="s2">
+<h2><span class="no">2.2.2</span> Dividends, splits &amp; corporate actions</h2>
+<p class="lede">Companies pay cash, split shares, merge and spin off pieces. Each moves the quoted price, few change your wealth, and every one is a data bug waiting for a careless pipeline.</p>
+
+<p>A <strong>dividend</strong> is cash paid per share, set by the board. Four dates matter (fig 2.2.2): the declaration; the <strong>ex-dividend date</strong>, the first day the shares trade without the dividend; the <em>record date</em>, when the company reads its register; and the payment. The ex-date follows the <a class="term" href="session01-market-anatomy.html#g-settlement" data-term="settlement">settlement</a> cycle of <a class="xref" href="session01-market-anatomy.html" data-xref="2.1" data-style="short" data-auto="">Session 2.1</a>: in US markets, since T+1 settlement began on 28 May 2024, it is normally the record date itself (FINRA Regulatory Notice 24-04); under T+2 — still the EU's cycle until its planned move to T+1 on 11 October 2027 (ESMA) — it falls one business day before.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 340" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">THE FOUR DATES OF A DIVIDEND — and what corporate actions do to a price series</text>
+  <rect x="26" y="34" width="150" height="62" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="101" y="56" font-size="10.5" font-weight="600" text-anchor="middle" fill="#3A56C5">1 · DECLARATION</text>
+  <text x="101" y="73" font-size="9.5" text-anchor="middle" fill="#4A5A68">board sets the amount</text>
+  <text x="101" y="86" font-size="9.5" text-anchor="middle" fill="#4A5A68">and the dates</text>
+  <rect x="199" y="34" width="150" height="62" rx="9" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="274" y="56" font-size="10.5" font-weight="600" text-anchor="middle" fill="#8A6D00">2 · EX-DIVIDEND DATE</text>
+  <text x="274" y="73" font-size="9.5" text-anchor="middle" fill="#4A5A68">buyers from today don't</text>
+  <text x="274" y="86" font-size="9.5" text-anchor="middle" fill="#4A5A68">get it: price drops ≈ D</text>
+  <rect x="372" y="34" width="150" height="62" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="447" y="56" font-size="10.5" font-weight="600" text-anchor="middle" fill="#3A56C5">3 · RECORD DATE</text>
+  <text x="447" y="73" font-size="9.5" text-anchor="middle" fill="#4A5A68">company reads its</text>
+  <text x="447" y="86" font-size="9.5" text-anchor="middle" fill="#4A5A68">shareholder register</text>
+  <rect x="545" y="34" width="150" height="62" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="620" y="56" font-size="10.5" font-weight="600" text-anchor="middle" fill="#1F7A55">4 · PAYMENT DATE</text>
+  <text x="620" y="73" font-size="9.5" text-anchor="middle" fill="#4A5A68">cash reaches holders,</text>
+  <text x="620" y="86" font-size="9.5" text-anchor="middle" fill="#4A5A68">often weeks later</text>
+  <path d="M178 65 H195" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M351 65 H368" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M524 65 H541" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <text x="360" y="114" font-size="9.5" text-anchor="middle" fill="#4A5A68" font-style="italic">In the US, since T+1 settlement (28 May 2024), the ex-date is normally the record date itself.</text>
+  <rect x="26" y="128" width="326" height="172" rx="10" fill="#fff" stroke="#C9CFC6" stroke-width="1.5"/>
+  <text x="40" y="148" font-size="10.5" font-weight="700" fill="#D64B2A">WHAT THE EXCHANGE QUOTES</text>
+  <text x="40" y="162" font-size="9" fill="#4A5A68">raw closing prices</text>
+  <line x1="46" y1="172" x2="46" y2="282" stroke="#4A5A68" stroke-width="1.2"/>
+  <line x1="46" y1="282" x2="336" y2="282" stroke="#4A5A68" stroke-width="1.2"/>
+  <text x="191" y="294" font-size="9" text-anchor="middle" fill="#4A5A68">time →</text>
+  <polyline points="46,212 70,206 94,210 118,200 142,204 150,202 150,210 166,208 190,200 214,196 238,190 246,188 246,261 262,259 286,255 310,257 336,251" fill="none" stroke="#4A5A68" stroke-width="2"/>
+  <line x1="150" y1="189" x2="150" y2="199" stroke="#D64B2A" stroke-width="1.2"/>
+  <text x="100" y="185" font-size="9" fill="#D64B2A">ex-date: drop ≈ dividend</text>
+  <text x="254" y="228" font-size="9" fill="#D64B2A">a split:</text>
+  <text x="254" y="240" font-size="9" fill="#D64B2A">a fake crash</text>
+  <rect x="368" y="128" width="326" height="172" rx="10" fill="#fff" stroke="#C9CFC6" stroke-width="1.5"/>
+  <text x="382" y="148" font-size="10.5" font-weight="700" fill="#1F7A55">ADJUSTED FOR BOTH</text>
+  <text x="382" y="162" font-size="9" fill="#4A5A68">past prices rescaled, so every return is true</text>
+  <line x1="388" y1="172" x2="388" y2="282" stroke="#4A5A68" stroke-width="1.2"/>
+  <line x1="388" y1="282" x2="678" y2="282" stroke="#4A5A68" stroke-width="1.2"/>
+  <text x="533" y="294" font-size="9" text-anchor="middle" fill="#4A5A68">time →</text>
+  <polyline points="388,267.9 412,266.7 436,267.5 460,265.5 484,266.3 492,265.9 508,265.5 532,263.7 556,262.8 580,261.4 588,261 604,259 628,255 652,257 678,251" fill="none" stroke="#1F7A55" stroke-width="2"/>
+  <text x="400" y="206" font-size="9" fill="#4A5A68">earlier prices ÷ N (the split)</text>
+  <text x="400" y="219" font-size="9" fill="#4A5A68">and × (1 − D/P) (the dividend);</text>
+  <text x="400" y="232" font-size="9" fill="#4A5A68">the latest prices are unchanged:</text>
+  <text x="400" y="245" font-size="9" fill="#1F7A55" font-weight="600">no cliff, no step</text>
+  <text x="360" y="324" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">The raw series records what traded; only the adjusted series records what an owner earned.</text>
+  <defs><marker id="s2a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F2C38"/></marker></defs>
+</svg>
+<figcaption>fig 2.2.2 — a dividend's four dates (top) and what a dividend and a split do to a raw price series versus an adjusted one (bottom; a conceptual sketch, not data)</figcaption>
+</figure>
+
+<p>On the ex-date the price should open lower by about the dividend: cash has moved from the company to you. In Elton and Gruber's (1970) data the drop was noticeably smaller than the dividend, a gap they tied to taxes; others blame trading frictions. You cannot see it in one stock on one day anyway: in the lab the <a class="term" href="../unit03-math-toolkit/session01-probability-expected-value.html#g-standard-deviation" data-term="standard deviation">standard deviation</a> of a day's move is <span data-lab="ex_noise_to_signal" data-fmt=".1f">2.6</span> times the average dividend, and across <span data-lab="ex_n" data-fmt=",d">2,000</span> ex-dates a regression measures the drop at <span data-lab="ex_theta_hat" data-fmt=".2f">0.99</span> ± <span data-lab="ex_theta_se" data-fmt=".2f">0.06</span> dividends (the truth is 1).</p>
+
+<p>In a <strong>stock split</strong> each share becomes several — 4-for-1 means four shares at a quarter of the price — and nothing economic happens; a <em>reverse split</em> does the opposite. One mechanical consequence (§2.2.4): a split changes a stock's weight in a price-weighted index. When Apple split 4-for-1 at the end of August 2020, S&amp;P Dow Jones Indices replaced three members of the Dow Jones Industrial Average the same day, in part to offset the fall in its technology weight (S&amp;P DJI, 24 August 2020).</p>
+
+<p>A <strong>corporate action</strong> is any company-initiated event that changes its shares or pays its holders. <span class="xref soon" data-xref="4.3" data-style="short" data-auto="" title="Coming soon">Session 4.3</span> builds the pipeline, with an <span class="term soon" data-term="adjustment factor" title="Defined in Session 4.3 (coming soon)">adjustment factor</span> for each event; this is the minimum to recognise:</p>
+
+<table>
+<thead><tr><th>Action</th><th>Quoted price</th><th>What your data must do</th></tr></thead>
+<tbody>
+<tr><td>Cash or special dividend</td><td>drops by about the payout on the ex-date</td><td>add it back: a total return (§2.2.3)</td></tr>
+<tr><td>Split N-for-1 (reverse: 1-for-N)</td><td>divides (multiplies) by N</td><td>rescale earlier prices by the same factor</td></tr>
+<tr><td>Spin-off</td><td>drops by about the value of the new company's shares</td><td>adjust by that value; start a history for the new company</td></tr>
+<tr><td>Merger or acquisition</td><td>moves toward the offer; the ticker may end</td><td>record the payout; map the old identifier to the new one</td></tr>
+<tr><td>Rights issue</td><td>drops on the ex-rights date</td><td>adjust by the value of the right</td></tr>
+<tr><td>Buyback or share issuance</td><td>no mechanical change</td><td>update shares outstanding: index weights move</td></tr>
+<tr><td>Ticker or name change</td><td>none</td><td>key every series on a permanent identifier, never the ticker</td></tr>
+</tbody>
+</table>
+
+<div class="co tip"><span class="co-t">💡 Looking ahead</span>
+<p>A missed split is a fake crash, a missed spin-off a fake loss, and a merger can drop a company from your history altogether. <span class="xref soon" data-xref="4.2" data-style="short" data-auto="" title="Coming soon">Session 4.2</span> handles the companies that vanish (<span class="term soon" data-term="delisting return" title="Defined in Session 4.2 (coming soon)">delisting returns</span>, <span class="term soon" data-term="survivorship bias" title="Defined in Session 4.2 (coming soon)">survivorship bias</span>); <span class="xref soon" data-xref="4.3" data-auto="" title="Coming soon">Session 4.3 — Corporate Actions, Security Master &amp; Continuous Futures</span> builds <span class="term soon" data-term="adjusted price" title="Defined in Session 4.3 (coming soon)">adjusted prices</span> and a <span class="term soon" data-term="security master" title="Defined in Session 4.3 (coming soon)">security master</span>.</p>
+</div>
+</section>
+
+<section id="s3">
+<h2><span class="no">2.2.3</span> Price return vs total return</h2>
+<p class="lede">A price chart leaves out the dividends. Over a year that is a rounding error; over <span data-lab="div_years" data-fmt="d">20</span> years at a <span data-lab="div_yield" data-fmt=".0%">2%</span> yield it is <span data-lab="div_missing_share" data-fmt=".0%">33%</span> of your wealth.</p>
+
+<p>With <math><semantics><msub><mi>D</mi><mi>t</mi></msub><annotation encoding="application/x-tex">D_t</annotation></semantics></math> a dividend that goes ex during period <math><semantics><mi>t</mi><annotation encoding="application/x-tex">t</annotation></semantics></math>, the <em>price return</em> ignores it and the <strong>total return</strong> counts it, as if reinvested on the ex-date:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><msubsup><mi>R</mi><mi>t</mi><mtext class="tml-med-pad">price</mtext></msubsup><mo>=</mo><mfrac><msub><mi>P</mi><mi>t</mi></msub><msub><mi>P</mi><mrow><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub></mfrac><mo>−</mo><mn>1</mn><mo separator="true">,</mo><mspace width="2em"></mspace><msub><mi>R</mi><mi>t</mi></msub><mo>=</mo><mfrac><mrow><msub><mi>P</mi><mi>t</mi></msub><mo>+</mo><msub><mi>D</mi><mi>t</mi></msub></mrow><msub><mi>P</mi><mrow><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub></mfrac><mo>−</mo><mn>1</mn><mo>=</mo><mo fence="true" symmetric="true" minsize="1.2em" maxsize="1.2em">(</mo><mn>1</mn><mo>+</mo><msubsup><mi>R</mi><mi>t</mi><mtext class="tml-med-pad">price</mtext></msubsup><mo fence="true" symmetric="true" minsize="1.2em" maxsize="1.2em">)</mo><mo fence="true" symmetric="true" minsize="1.8em" maxsize="1.8em">(</mo><mn>1</mn><mo>+</mo><mfrac><msub><mi>D</mi><mi>t</mi></msub><msub><mi>P</mi><mi>t</mi></msub></mfrac><mo fence="true" symmetric="true" minsize="1.8em" maxsize="1.8em">)</mo><mo>−</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">R^{\text{price}}_t = \frac{P_t}{P_{t-1}} - 1, \qquad R_t = \frac{P_t + D_t}{P_{t-1}} - 1 = \bigl(1 + R^{\text{price}}_t\bigr)\Bigl(1 + \frac{D_t}{P_t}\Bigr) - 1</annotation></semantics></math></div>
+<p>The total return is the <a class="term" href="session03-returns-pnl-leverage.html#g-simple-return" data-term="simple return">simple return</a> of <a class="xref" href="session03-returns-pnl-leverage.html" data-xref="2.3" data-style="short" data-auto="">Session 2.3</a>, which builds <a class="term" href="session03-returns-pnl-leverage.html#g-compounding" data-term="compounding">compounding</a> and leverage on it. Compounded, the two returns differ by the product of the ex-date yields; when dividends are a fixed fraction of the price, as in the lab, that product is known in advance:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><mfrac><mrow><msub><mo movablelimits="false">∏</mo><mi>t</mi></msub><mo form="prefix" stretchy="false">(</mo><mn>1</mn><mo>+</mo><msub><mi>R</mi><mi>t</mi></msub><mo form="postfix" stretchy="false" lspace="0em" rspace="0em">)</mo></mrow><mrow><msub><mo movablelimits="false">∏</mo><mi>t</mi></msub><mo fence="true" symmetric="true" minsize="1.2em" maxsize="1.2em">(</mo><mn>1</mn><mo>+</mo><msubsup><mi>R</mi><mi>t</mi><mtext class="tml-med-pad">price</mtext></msubsup><mo fence="true" symmetric="true" minsize="1.2em" maxsize="1.2em">)</mo></mrow></mfrac><mo>=</mo><mrow><munder><mo movablelimits="false">∏</mo><mi>t</mi></munder></mrow><mo fence="true" symmetric="true" minsize="1.8em" maxsize="1.8em">(</mo><mn>1</mn><mo>+</mo><mfrac><msub><mi>D</mi><mi>t</mi></msub><msub><mi>P</mi><mi>t</mi></msub></mfrac><mo fence="true" symmetric="true" minsize="1.8em" maxsize="1.8em">)</mo></mrow><annotation encoding="application/x-tex">\frac{\prod_t (1 + R_t)}{\prod_t \bigl(1 + R^{\text{price}}_t\bigr)} = \prod_t \Bigl(1 + \frac{D_t}{P_t}\Bigr)</annotation></semantics></math></div>
+<p>The lab simulates <span data-lab="div_years" data-fmt="d">20</span> years of an index-like asset: expected total return <span data-lab="div_mu" data-fmt=".0%">8%</span>, <a class="term" href="session03-returns-pnl-leverage.html#g-volatility" data-term="volatility">volatility</a> <span data-lab="div_sigma" data-fmt=".0%">18%</span>, dividend yield <math><semantics><mi>q</mi><annotation encoding="application/x-tex">q</annotation></semantics></math> of <span data-lab="div_yield" data-fmt=".0%">2%</span> paid quarterly. On this (below-median) path the price compounded at <span data-lab="div_price_cagr" data-fmt=".2%">2.98%</span> a year and the total return at <span data-lab="div_tr_cagr" data-fmt=".2%">5.07%</span>: <span data-lab="div_cagr_gap_pp" data-fmt=".1f">2.1</span> percentage points a year, or <span data-lab="div_tr_final" data-fmt="$.2f">$2.69</span> against <span data-lab="div_price_final" data-fmt="$.2f">$1.80</span> per dollar. Over <math><semantics><mi>Y</mi><annotation encoding="application/x-tex">Y</annotation></semantics></math> years of quarterly dividends the ratio is <math><semantics><mrow><msup><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mn>1</mn><mo>−</mo><mi>q</mi><mi>/</mi><mn>4</mn><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mrow><mo form="prefix" stretchy="false" lspace="0em" rspace="0em">−</mo><mn>4</mn><mi>Y</mi></mrow></msup><mo>=</mo></mrow><annotation encoding="application/x-tex">(1 - q/4)^{-4Y} =</annotation></semantics></math> <span data-lab="div_gap_ratio" data-fmt=".2f">1.49</span>: a price-only view misses <span data-lab="div_missing_share" data-fmt=".0%">33%</span> of the owner's wealth, whatever the market does (fig 2.2.3).</p>
+
+<figure class="diagram chart">
+<!-- chart:total_vs_price -->
+<svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Growth of $1 over 20 simulated years: total vs price return (log scale)">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">GROWTH OF $1 OVER 20 SIMULATED YEARS: TOTAL VS PRICE RETURN (LOG SCALE)</text>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#3A56C5" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">total return (dividends reinvested)</text>
+  <line x1="294.0" y1="32" x2="310.0" y2="32" stroke="#4A5A68" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="316.0" y="36" font-size="11" fill="#4A5A68">price return</text>
+  <line x1="64" y1="263.8" x2="602" y2="263.8" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="267.8" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$1.00</text>
+  <line x1="64" y1="131.5" x2="602" y2="131.5" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="135.5" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$2.00</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#C9CFC6" stroke-width="1"/>
+  <line x1="64" y1="264" x2="64" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="64" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">0</text>
+  <line x1="198.5" y1="264" x2="198.5" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="198.5" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">5</text>
+  <line x1="333" y1="264" x2="333" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="333" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">10</text>
+  <line x1="467.5" y1="264" x2="467.5" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="467.5" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">15</text>
+  <line x1="602" y1="264" x2="602" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="602" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">20</text>
+  <line x1="64" y1="263.8" x2="602" y2="263.8" stroke="#4A5A68" stroke-width="1"/>
+  <polyline points="64,263.8 65.3,264 66,250.5 67.5,252.4 68.9,234.8 70.2,232.2 71.3,242.9 72.4,235.4 74.5,247.1 75.3,226.5 76.6,237.1 78.3,220.5 79.1,236.9 80.3,242 82.1,229.5 83.1,226.4 84.6,231.8 85.9,225.7 87.2,229.7 89,209 90,219.3 92.3,197.8 92.8,196.7 94.6,219.6 95.8,219.8 96.9,195.9 98.9,187.9 99.5,199.4 100.5,202.1 102.6,190.1 103.3,202.4 104.7,191.3 106.2,194.2 107.8,179.6 109,175.1 110.4,195.6 111.5,187.5 113.6,196.3 114.2,187.6 116.6,175 116.8,179.9 119,170.8 120.6,175.4 122.1,160.9 123.2,173.9 123.8,165.6 125.6,157.2 127,166.8 128.7,151.3 129.8,153.6 130.9,145.2 131.7,149 134.2,148.4 135,140.4 135.9,114.1 137.8,114.8 139.7,98.3 140.3,80.9 141.3,75.4 143.5,79.9 144.2,79.6 145.2,64.7 147.6,76.3 148.1,64.1 149.8,59.7 151.7,79.7 152.7,74.1 154.1,86.3 155.8,93.6 156.8,86.9 158.5,91.2 159.2,106.3 160.3,117.8 161.4,107.8 163.6,124.1 164.3,127.2 166.4,105.6 167.2,106 169.4,130.2 170.7,132.8 171.3,119 172.1,131.4 174.1,138.7 175,121.1 177.2,112.1 178.3,125.4 179.6,112.5 181.2,105.6 182.5,114.2 183.1,102.8 185.1,105.4 186.3,97.5 187.2,103.1 188.8,86.9 190.7,88.2 191.7,110.4 192.9,101.5 193.9,107.4 196.3,86.9 197.6,88.7 198.8,98.9 199.6,92.1 201.1,90 202,103.4 204.1,86.2 204.7,91.9 206,84.6 208,103 208.9,87 210.3,93.4 212.6,74.7 213.8,81 214.7,70.4 216,84.5 216.8,88.6 218.9,64.4 220.2,69.8 220.8,62 223.2,54 224.4,65.3 224.9,59.6 226.9,52 228.7,66.9 229.3,81.6 231.4,97 232.8,82.7 233.8,95.5 235,83.8 236.9,97.3 238,113.4 238.5,104.2 240.8,103.2 242.1,123.5 243.3,101.9 244.7,108.9 246.4,103 247.2,116.8 248.1,104.1 250,115.8 251.7,114.9 252.2,102.5 253.4,91.1 255.7,76.2 256.2,82.4 257.5,68.8 259.3,81.1 260.4,73.7 261.7,86 263.7,63.1 265,71.6 265.4,64.3 267.6,62.4 269.3,78.5 269.8,72.8 271.2,79.6 272.6,66.2 274,64.8 275.8,73.8 276.7,93.7 278,86 279.1,80.9 280.8,101.2 282.3,93 283.6,103.6 284.5,95.1 286.6,97.7 287.7,120.5 288.9,126.5 290.5,115.5 291.6,126.9 292.4,120.7 294.6,127.2 295.4,143.1 297.1,128 298,133.6 299.6,120.2 301.3,128.1 301.9,133.6 303.5,125.3 305.1,125.4 306.6,141.1 307.4,129.5 309.6,146.9 310.7,142.2 312.6,176 313.6,176.8 314.6,195 316.1,186.1 317.2,193.6 318.4,183.6 319.9,189.3 321.5,184 323,162.6 323.7,168.3 325.1,160.7 326.6,158.9 327.9,170.3 329.3,153.1 330.5,158.7 332.3,160.3 333.4,145.3 335.2,154.9 336.3,144.3 337.7,157.6 339.1,141.8 340.8,131.1 341.6,129.9 342.8,137.5 344.3,163 345.2,159 346.7,161.8 348.7,187.1 349.3,185.4 351.8,206 353,198.2 354,206.1 355.3,190.1 356.4,183.5 357.8,194.1 359.9,183 361,195.8 362,191 363.3,213.6 364.1,207.4 365.8,206.8 367.2,196 369.3,209.6 370,198.8 371.4,190.2 372.2,202 373.9,190.6 375.7,199.2 377.3,177.3 378.5,183.8 379.6,184.1 380.6,167.5 382.2,184.6 383.4,165.5 385.4,184.7 386.8,185.5 387.5,178.2 388.5,186.6 390.1,190.4 391.7,171.9 392.9,175.7 394.2,194.2 396.1,185.2 397,199.1 398.2,195.2 399.3,202.4 401,199.1 402.9,175.5 403.8,169.4 405.1,164.5 406.4,178.8 407.4,170.7 409.8,179.6 410.7,192.6 412.2,180.6 413.4,176.6 415.2,184 415.6,174.6 417.3,179.3 418.4,165.9 420.3,187.1 422,179.2 422.5,187.5 423.7,183.7 426,200.8 427,199.3 427.6,185.3 429.5,172.7 431.5,197.8 432.8,178.7 434,174.1 434.8,186.5 435.9,172.5 437.6,181.9 439.4,160.2 440.7,162.3 441.9,144.8 442.8,152.6 443.9,143.1 446.4,135.7 447.6,146.8 449.1,134.8 450.2,140.4 451.4,135.7 452.2,143 453.8,145.6 454.7,133.2 456,124.7 457.6,141.4 458.6,122.9 460.3,116.4 461.5,130.1 464,128.8 464.3,121.9 466.1,118.1 467.1,115.7 469.3,85.9 469.8,82.3 471.1,77.6 472.3,94.4 474.8,103.4 475.6,90.2 476.7,99.4 478,99.2 479.2,113.3 481.1,88.8 482.1,83.8 483.6,102.5 485,114.1 485.9,110.7 487.1,133.5 489.6,127.4 490.8,117.7 491.4,131 492.5,126.9 494.2,132.5 496,113.9 496.6,118.5 498.7,108.8 499.2,119.2 501.6,120.6 502.1,130.9 504.2,138.3 505.2,154 506.4,145.2 508.3,154.2 508.7,145.1 510.7,150.4 512.7,131.1 513.9,157.1 515.3,139.9 516.1,143.7 517.5,147.4 519.2,121.7 520,135.5 521,128.5 522.5,123.8 524.4,140.1 525.8,147.4 526.9,134.1 528,135.9 529.1,118.7 530.9,133.6 532.2,130.2 533.8,145.4 535.3,139.1 536,121.4 538,125.5 539.6,111.1 540.6,118.9 541.2,110.3 543.6,121.4 544.4,111.9 545.4,101.1 547.7,108.3 548.1,100 549.3,104.2 551.1,102.4 552.9,86.7 553.8,91.5 554.6,83.2 556,94.4 557.5,80 559.9,85.5 560.4,95.1 562,99.5 563.1,89.4 565.2,113.2 565.9,102.7 567.5,102.9 568.7,87.2 570.1,81.2 572.1,100.4 573.4,80.7 574.2,98 575.3,81.8 577.2,88 578.1,78.1 579.8,70.3 580.4,78.2 581.9,71 583.6,64.8 585.1,93.8 586.8,80.5 587.3,85.6 589,80.7 590.4,99.4 591.4,93.7 592.5,104 594.2,105.5 595.2,93.8 597.4,81.5 598.4,90.5 599.7,80.7 600.6,86 602,75.1" fill="none" stroke="#3A56C5" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>total return (dividends reinvested)</title></polyline>
+  <circle cx="602" cy="75.1" r="4" fill="#3A56C5" stroke="#FBFBF8" stroke-width="2"><title>total return (dividends reinvested): $2.69</title></circle>
+  <polyline points="64,263.8 65.3,264 66,250.5 67.5,252.4 68.9,234.8 70.2,232.2 71.3,243.8 72.4,236.3 74.5,248 75.3,227.5 76.6,238.1 78.3,222.4 79.1,238.9 80.3,243.9 82.1,231.4 83.1,228.3 84.6,234.7 85.9,228.6 87.2,232.6 89,211.9 90,222.2 92.3,201.6 92.8,200.5 94.6,223.5 95.8,223.6 96.9,199.7 98.9,192.7 99.5,204.1 100.5,206.9 102.6,194.9 103.3,207.2 104.7,197 106.2,200 107.8,185.3 109,180.9 110.4,201.3 111.5,194.2 113.6,203 114.2,194.3 116.6,181.7 117.9,187.1 119,178.4 120.6,183.1 122.1,168.5 123.2,181.5 123.8,173.3 125.6,165.8 127,175.4 128.7,159.9 129.8,162.2 130.9,153.8 131.7,158.6 134.2,158 135,150 135.9,123.6 137.8,124.4 139.7,108.8 140.3,91.4 141.3,86 143.5,90.4 144.6,81.3 145.8,75.7 147.6,87.8 148.1,75.6 149.8,71.1 151.7,92.1 152.7,86.5 154.1,98.8 155.8,106 156.8,99.3 158.5,104.6 159.2,119.7 160.3,131.2 161.4,121.2 163.6,137.5 164.3,140.6 166.4,120 167.2,120.4 169.4,144.5 170.7,147.1 171.3,133.4 172.1,146.7 174.1,154 175,136.4 177.2,127.4 178.3,141.7 179.6,128.8 181.2,121.8 182.5,130.5 184.1,115.3 184.3,121.9 185.9,121.6 187.2,120.3 188.8,104.1 190.7,105.4 191.7,127.7 192.9,119.7 193.9,125.6 196.3,105.1 197.6,106.9 198.8,118.1 199.6,111.2 201.1,109.1 202,122.6 204.1,105.3 204.7,111 206,104.7 208,123.1 208.9,107.1 210.3,113.5 212.6,95.7 213.8,102 214.7,91.5 216,105.5 216.8,109.7 218.9,86.4 220.2,91.8 220.8,84 223.2,76 224.4,87.3 226.1,84 226.9,75 228.7,89.8 229.3,104.5 231.4,120 232.8,106.7 233.8,119.4 235,107.8 236.9,121.3 238,137.3 238.5,128.1 240.8,128.1 242.1,148.3 243.3,126.8 244.7,133.8 246.4,128.8 247.2,142.7 248.1,130 250,141.7 251.7,140.7 252.2,128.3 254.4,110.4 255.7,102.9 256.2,109.2 257.5,95.6 259.3,108.8 260.4,101.5 261.7,113.8 263.7,90.8 265,99.3 265.4,92 267.6,91.1 269.3,107.2 269.8,101.5 271.2,108.3 272.4,96 274,94.4 275.8,103.4 276.7,123.3 278.7,114.3 279.1,110.5 280.8,131.8 282.3,123.6 283.6,134.3 284.5,125.8 286.6,129.2 287.7,152.1 288.9,158 290.5,147.1 291.6,158.4 292.4,152.2 293.8,164.5 295.4,175.6 297.1,160.5 298,166.1 299.6,153.7 301.3,161.6 301.9,167.1 303.5,158.7 305.1,158.9 306.6,175.5 307.4,164 309.6,181.3 310.7,176.7 312.6,210.5 313.6,212.2 314.6,230.4 316.1,221.5 317.2,228.9 318.4,219 319.9,225.6 321.5,220.4 323,198.9 323.7,204.7 325.1,197.1 326.3,204.6 328.4,205.7 329.3,190.4 330.5,196 332.3,197.6 333.4,183.6 335.2,193.2 336.3,182.6 337.7,195.9 339.1,180 340.8,170.4 341.6,169.1 342.8,176.7 344.3,202.2 345.2,198.2 346.7,201.9 348.7,227.2 349.3,225.6 351.8,246.2 353,238.4 354,247.2 355.3,231.2 356.4,224.6 357.8,235.2 359.9,225 361,237.9 362,233.1 363.3,255.7 364.1,249.4 366.5,242.2 367.2,239 369.3,252.7 370,241.9 371.4,233.3 373.5,247.8 373.9,234.6 375.7,243.2 377.3,221.3 378.5,227.8 379.6,228.1 380.6,212.5 382.2,229.5 383.4,210.4 385.4,229.6 386.8,231.4 387.5,224.1 388.5,232.5 390.1,236.4 391.7,217.8 392.9,221.6 394.2,241 396.1,232.1 397,246 398.2,242.1 399.3,249.2 401,246.9 402.9,223.3 403.8,217.2 405.1,212.4 406.4,226.6 408.1,219.9 409.8,228.4 410.7,241.4 412.2,229.4 413.4,225.3 415.2,233.8 415.6,224.3 417.3,229 418.4,215.6 420.3,236.8 422,229.9 422.5,238.2 423.7,234.4 426,251.5 427,250 427.6,237 429.5,224.4 431.5,249.5 432.8,230.3 434,226.7 434.8,239.1 435.9,225.1 437.6,234.5 439.4,212.8 440.7,215.9 441.9,198.3 442.8,206.2 443.9,196.6 446.4,189.3 447.6,201.4 449.1,189.3 450.2,194.9 451.4,190.2 452.2,197.5 453.8,200.1 454.7,188.7 456,180.1 457.6,196.9 458.6,178.3 460.3,171.9 461.5,186.5 464,185.3 464.3,178.3 466.1,174.6 467.1,172.1 469.3,143.3 469.8,139.7 471.1,135 472.3,151.8 474.8,161.8 475.6,148.5 476.7,157.8 478,157.5 479.2,171.6 480.4,152.6 482.1,143.1 483.6,161.8 485,173.4 485.9,170.1 487.1,192.8 489.6,187.7 490.8,178 491.4,191.3 492.5,187.2 494.2,192.8 496,175.1 496.6,179.8 498.7,170 499.2,180.4 501.6,182.8 502.1,193 504.2,200.5 505.2,216.2 506.4,207.3 508.3,217.3 508.7,208.3 510.7,213.6 512.7,194.3 513.9,220.3 515.3,204 516.1,207.8 517.5,211.5 519.2,185.8 520,199.6 521,192.6 522.5,188.9 524.4,205.1 525.8,212.5 526.9,199.1 528,201.9 529.1,184.7 530.9,199.6 532.2,196.2 533.8,211.4 535.3,206 536,188.4 538,192.5 539.6,178 540.6,185.8 541.2,177.2 543.6,189.3 544.4,179.8 545.4,169 547.7,176.2 548.1,167.9 549.3,173.1 551.1,171.3 552.9,155.6 554.1,153.4 555.5,162.1 557.2,147.3 557.8,157.6 559.9,155.4 560.4,164.9 562,170.3 563.1,160.2 565.2,184 565.9,173.5 567.5,173.7 568.7,159 570.1,153 572.1,172.2 573.4,152.5 574.2,169.8 575.3,154.5 577.2,160.7 578.1,150.8 579.8,143 580.4,150.9 581.9,144.7 583.6,138.5 585.1,167.5 586.8,154.1 587.3,159.2 589,155.3 590.4,174 591.4,168.3 592.5,178.6 594.2,180.1 595.2,168.5 597.4,157.1 598.4,166 599.7,156.3 600.6,161.5 602,151.6" fill="none" stroke="#4A5A68" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><title>price return</title></polyline>
+  <circle cx="602" cy="151.6" r="4" fill="#4A5A68" stroke="#FBFBF8" stroke-width="2"><title>price return: $1.80</title></circle>
+  <text x="614" y="79.1" font-size="11" fill="#1F2C38">total: $2.69</text>
+  <text x="614" y="155.6" font-size="11" fill="#1F2C38">price: $1.80</text>
+</svg>
+<!-- /chart:total_vs_price -->
+<figcaption>fig 2.2.3 — <span data-lab="div_years" data-fmt="d">20</span> simulated years with a <span data-lab="div_yield" data-fmt=".0%">2%</span> dividend yield: the two lines share every wiggle, but the gap between them compounds steadily — the level is luck, the gap is not</figcaption>
+</figure>
+
+<h3>The split, mishandled and handled</h3>
+<p>Now the classic bug. In the lab's four-stock market (§2.2.4) the stock <em>Pricey</em> splits <span data-lab="split_ratio" data-fmt="d">4</span>-for-1 after <span data-lab="split_year" data-fmt=".0f">5</span> years. Returns computed from quoted prices show a <span data-lab="split_naive_day" data-fmt=".1%">−75.0%</span> day (the true return was <span data-lab="split_true_day" data-fmt=".1%">−0.2%</span>), and every statistic downstream inherits it:</p>
+
+<pre>raw_r = raw[1:, i_pricey] / raw[:-1, i_pricey] - 1         <span class="c"># the bug: returns from quoted prices</span>
+adj_r = R[:, i_pricey]                                     <span class="c"># handled: split-adjusted returns</span>
+naive_split_day = raw_r[SPLIT_DAY - 1]
+true_split_day = adj_r[SPLIT_DAY - 1]
+<span class="k">assert</span> np.isclose(1 + naive_split_day, (1 + true_split_day) / SPLIT_RATIO)</pre>
+
+<table>
+<thead><tr><th><em>Pricey</em>, <span data-lab="path_years" data-fmt="d">10</span> simulated years</th><th>From quoted prices (the bug)</th><th>Split-adjusted (correct)</th></tr></thead>
+<tbody>
+<tr><td>Compound annual growth (CAGR)</td><td><span data-lab="split_naive_cagr" data-fmt=".2%">−4.74%</span></td><td><span data-lab="split_true_cagr" data-fmt=".2%">9.42%</span></td></tr>
+<tr><td>Maximum <a class="term" href="session03-returns-pnl-leverage.html#g-drawdown" data-term="drawdown">drawdown</a></td><td><span data-lab="split_naive_maxdd" data-fmt=".1%">−88.3%</span></td><td><span data-lab="split_true_maxdd" data-fmt=".1%">−53.1%</span></td></tr>
+<tr><td>Annualised volatility</td><td><span data-lab="split_naive_vol" data-fmt=".1%">36.5%</span></td><td><span data-lab="split_true_vol" data-fmt=".1%">27.8%</span></td></tr>
+</tbody>
+</table>
+
+<div class="co key"><span class="co-t">📌 Key idea — returns are total returns on adjusted prices</span>
+<p>Every return in this course is a total return on prices adjusted for corporate actions, unless it says otherwise. <mark>A price series records what traded; only an adjusted, dividend-inclusive series records what an owner earned.</mark> Headline index levels are usually price indices; providers commonly publish a total-return version alongside, and that is the one to compare a strategy with — it is also what a collateralised index future earns (<a class="xref" href="session04-futures.html#s4" data-xref="2.4#s4" data-style="short" data-auto="">Session 2.4</a>).</p>
+</div>
+</section>
+
+<section id="s4">
+<h2><span class="no">2.2.4</span> An index is a weighting rule</h2>
+<p class="lede">"The market rose 1% today" means some index rose 1% — and an index is a portfolio with a published rule. Change the rule and you change the portfolio, its risk and its return.</p>
+
+<p>An <strong>index</strong> tracks a basket chosen and weighted by a published rule. Every common rule fits one formula: quantities <math><semantics><msub><mi>s</mi><mi>i</mi></msub><annotation encoding="application/x-tex">s_i</annotation></semantics></math> times prices, over a <em>divisor</em> <math><semantics><msub><mi>δ</mi><mi>t</mi></msub><annotation encoding="application/x-tex">\delta_t</annotation></semantics></math> that the provider adjusts so that non-economic events leave the level unchanged:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><msub><mi>I</mi><mi>t</mi></msub><mo>=</mo><mfrac><mn>1</mn><msub><mi>δ</mi><mi>t</mi></msub></mfrac><mrow><munder><mo movablelimits="false">∑</mo><mi>i</mi></munder></mrow><msub><mi>s</mi><mi>i</mi></msub><msub><mi>P</mi><mrow><mi>i</mi><mo separator="true">,</mo><mi>t</mi></mrow></msub><mo separator="true">,</mo><mspace width="2em"></mspace><msub><mi>w</mi><mrow><mi>i</mi><mo separator="true">,</mo><mi>t</mi></mrow></msub><mo>=</mo><mfrac><mrow><msub><mi>s</mi><mi>i</mi></msub><msub><mi>P</mi><mrow><mi>i</mi><mo separator="true">,</mo><mi>t</mi></mrow></msub></mrow><mrow><msub><mo movablelimits="false">∑</mo><mi>j</mi></msub><msub><mi>s</mi><mi>j</mi></msub><msub><mi>P</mi><mrow><mi>j</mi><mo separator="true">,</mo><mi>t</mi></mrow></msub></mrow></mfrac><mo separator="true">,</mo><mspace width="2em"></mspace><msubsup><mi>R</mi><mi>t</mi><mi class="tml-med-pad">I</mi></msubsup><mo>=</mo><mrow><munder><mo movablelimits="false">∑</mo><mi>i</mi></munder></mrow><msub><mi>w</mi><mrow><mi>i</mi><mo separator="true">,</mo><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub><msub><mi>R</mi><mrow><mi>i</mi><mo separator="true">,</mo><mi>t</mi></mrow></msub></mrow><annotation encoding="application/x-tex">I_t = \frac{1}{\delta_t} \sum_i s_i P_{i,t}, \qquad w_{i,t} = \frac{s_i P_{i,t}}{\sum_j s_j P_{j,t}}, \qquad R^{I}_t = \sum_i w_{i,t-1} R_{i,t}</annotation></semantics></math></div>
+<p>The index return is the start-of-period-weighted average of its members' returns (<a class="xref" href="session03-returns-pnl-leverage.html" data-xref="2.3" data-style="short" data-auto="">Session 2.3</a>). Only <math><semantics><msub><mi>s</mi><mi>i</mi></msub><annotation encoding="application/x-tex">s_i</annotation></semantics></math> differs:</p>
+<ul>
+<li><strong>Market-cap weighting</strong>: <math><semantics><msub><mi>s</mi><mi>i</mi></msub><annotation encoding="application/x-tex">s_i</annotation></semantics></math> is the share count, so each weight is the company's share of market value. The S&amp;P 500 counts only the free float.</li>
+<li><strong>Equal weighting</strong>: the same value in every stock, reset at each rebalance — the S&amp;P 500 Equal Weight Index gives each company 0.2% at every quarterly rebalance (S&amp;P DJI).</li>
+<li><strong>Price weighting</strong>: <math><semantics><mrow><msub><mi>s</mi><mi>i</mi></msub><mo>=</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">s_i = 1</annotation></semantics></math>, so the weight is the share price. In the Dow Jones Industrial Average (30 stocks) a $1 move in any member moves the index the same number of points, whatever the company's size. Fig 2.2.4 puts the rules side by side.</li>
+</ul>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 298" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">SAME FOUR STOCKS, FOUR RULES — who gets the money (illustrative proportions)</text>
+  <text x="26" y="50" font-size="10.5" font-weight="700" fill="#1F2C38">MARKET-CAP</text>
+  <text x="26" y="64" font-size="9" fill="#4A5A68">∝ price × shares</text>
+  <rect x="200" y="34" width="271.7" height="38" fill="#DCE4FA" stroke="#3A56C5" stroke-width="1.2"/>
+  <rect x="471.7" y="34" width="123.5" height="38" fill="#FBE3C7" stroke="#E8850C" stroke-width="1.2"/>
+  <rect x="595.2" y="34" width="74.1" height="38" fill="#DDEFE2" stroke="#3F8E5A" stroke-width="1.2"/>
+  <rect x="669.3" y="34" width="24.7" height="38" fill="#E6E9EC" stroke="#4A5A68" stroke-width="1.2"/>
+  <text x="335.9" y="57" font-size="11" font-weight="700" text-anchor="middle" fill="#1F2C38">A</text>
+  <text x="533.5" y="57" font-size="11" font-weight="700" text-anchor="middle" fill="#1F2C38">B</text>
+  <text x="632.3" y="57" font-size="11" font-weight="700" text-anchor="middle" fill="#1F2C38">C</text>
+  <text x="681.7" y="57" font-size="11" font-weight="700" text-anchor="middle" fill="#1F2C38">D</text>
+  <text x="26" y="98" font-size="10.5" font-weight="700" fill="#1F2C38">FLOAT-ADJUSTED CAP</text>
+  <text x="26" y="112" font-size="9" fill="#4A5A68">∝ price × tradable shares</text>
+  <rect x="200" y="82" width="298.6" height="38" fill="#DCE4FA" stroke="#3A56C5" stroke-width="1.2"/>
+  <rect x="498.6" y="82" width="135.7" height="38" fill="#FBE3C7" stroke="#E8850C" stroke-width="1.2"/>
+  <rect x="634.3" y="82" width="32.6" height="38" fill="#DDEFE2" stroke="#3F8E5A" stroke-width="1.2"/>
+  <rect x="666.9" y="82" width="27.1" height="38" fill="#E6E9EC" stroke="#4A5A68" stroke-width="1.2"/>
+  <text x="349.3" y="105" font-size="11" font-weight="700" text-anchor="middle" fill="#1F2C38">A</text>
+  <text x="566.5" y="105" font-size="11" font-weight="700" text-anchor="middle" fill="#1F2C38">B</text>
+  <text x="650.6" y="105" font-size="11" font-weight="700" text-anchor="middle" fill="#1F2C38">C</text>
+  <text x="680.5" y="105" font-size="11" font-weight="700" text-anchor="middle" fill="#1F2C38">D</text>
+  <text x="26" y="146" font-size="10.5" font-weight="700" fill="#1F2C38">EQUAL</text>
+  <text x="26" y="160" font-size="9" fill="#4A5A68">the same share each, reset</text>
+  <rect x="200" y="130" width="123.5" height="38" fill="#DCE4FA" stroke="#3A56C5" stroke-width="1.2"/>
+  <rect x="323.5" y="130" width="123.5" height="38" fill="#FBE3C7" stroke="#E8850C" stroke-width="1.2"/>
+  <rect x="447" y="130" width="123.5" height="38" fill="#DDEFE2" stroke="#3F8E5A" stroke-width="1.2"/>
+  <rect x="570.5" y="130" width="123.5" height="38" fill="#E6E9EC" stroke="#4A5A68" stroke-width="1.2"/>
+  <text x="261.8" y="153" font-size="11" font-weight="700" text-anchor="middle" fill="#1F2C38">A</text>
+  <text x="385.3" y="153" font-size="11" font-weight="700" text-anchor="middle" fill="#1F2C38">B</text>
+  <text x="508.8" y="153" font-size="11" font-weight="700" text-anchor="middle" fill="#1F2C38">C</text>
+  <text x="632.3" y="153" font-size="11" font-weight="700" text-anchor="middle" fill="#1F2C38">D</text>
+  <text x="26" y="194" font-size="10.5" font-weight="700" fill="#1F2C38">PRICE</text>
+  <text x="26" y="208" font-size="9" fill="#4A5A68">∝ share price (the Dow)</text>
+  <rect x="200" y="178" width="49.4" height="38" fill="#DCE4FA" stroke="#3A56C5" stroke-width="1.2"/>
+  <rect x="249.4" y="178" width="271.7" height="38" fill="#FBE3C7" stroke="#E8850C" stroke-width="1.2"/>
+  <rect x="521.1" y="178" width="49.4" height="38" fill="#DDEFE2" stroke="#3F8E5A" stroke-width="1.2"/>
+  <rect x="570.5" y="178" width="123.5" height="38" fill="#E6E9EC" stroke="#4A5A68" stroke-width="1.2"/>
+  <text x="224.7" y="201" font-size="11" font-weight="700" text-anchor="middle" fill="#1F2C38">A</text>
+  <text x="385.3" y="201" font-size="11" font-weight="700" text-anchor="middle" fill="#1F2C38">B</text>
+  <text x="545.8" y="201" font-size="11" font-weight="700" text-anchor="middle" fill="#1F2C38">C</text>
+  <text x="632.3" y="201" font-size="11" font-weight="700" text-anchor="middle" fill="#1F2C38">D</text>
+  <rect x="26" y="231" width="11" height="11" fill="#DCE4FA" stroke="#3A56C5"/>
+  <text x="43" y="240" font-size="9.5" fill="#1F2C38">A · a huge company with a low share price</text>
+  <rect x="370" y="231" width="11" height="11" fill="#FBE3C7" stroke="#E8850C"/>
+  <text x="387" y="240" font-size="9.5" fill="#1F2C38">B · a large company with a high share price</text>
+  <rect x="26" y="248" width="11" height="11" fill="#DDEFE2" stroke="#3F8E5A"/>
+  <text x="43" y="257" font-size="9.5" fill="#1F2C38">C · mid-sized, mostly family-owned (low float)</text>
+  <rect x="370" y="248" width="11" height="11" fill="#E6E9EC" stroke="#4A5A68"/>
+  <text x="387" y="257" font-size="9.5" fill="#1F2C38">D · a small company with a high share price</text>
+  <text x="360" y="284" font-size="11" text-anchor="middle" fill="#4A5A68" font-style="italic">Same companies, four different portfolios: the weighting rule is itself an investment decision.</text>
+</svg>
+<figcaption>fig 2.2.4 — one universe, four weighting rules (bar widths are illustrative, not the lab's): float adjustment shrinks the family-owned stock, and price weighting hands the most money to whichever share happens to be dearest</figcaption>
+</figure>
+
+<p>The lab's toy market has four companies with the same expected return, <span data-lab="u_mu" data-fmt=".0%">8%</span> a year, so any difference between the indices is either the rule or luck:</p>
+
+<table>
+<thead><tr><th>Stock</th><th>Price</th><th>Shares (m)</th><th>Free float</th><th>Market cap ($bn)</th><th>Float-cap weight</th><th>Equal weight</th><th>Price weight</th></tr></thead>
+<tbody>
+<tr><td>Mega</td><td><span data-lab="u_mega_price" data-fmt="$.0f">$50</span></td><td><span data-lab="u_mega_shares_m" data-fmt=",.0f">2,000</span></td><td><span data-lab="u_mega_float" data-fmt=".0%">95%</span></td><td><span data-lab="u_mega_cap_bn" data-fmt=".0f">100</span></td><td><span data-lab="u_mega_w_float" data-fmt=".1%">66.2%</span></td><td><span data-lab="u_mega_w_equal" data-fmt=".0%">25%</span></td><td><span data-lab="u_mega_w_price" data-fmt=".1%">8.3%</span></td></tr>
+<tr><td>Pricey</td><td><span data-lab="u_pricey_price" data-fmt="$.0f">$400</span></td><td><span data-lab="u_pricey_shares_m" data-fmt=",.0f">100</span></td><td><span data-lab="u_pricey_float" data-fmt=".0%">90%</span></td><td><span data-lab="u_pricey_cap_bn" data-fmt=".0f">40</span></td><td><span data-lab="u_pricey_w_float" data-fmt=".1%">25.1%</span></td><td><span data-lab="u_pricey_w_equal" data-fmt=".0%">25%</span></td><td><span data-lab="u_pricey_w_price" data-fmt=".1%">66.7%</span></td></tr>
+<tr><td>Family</td><td><span data-lab="u_family_price" data-fmt="$.0f">$30</span></td><td><span data-lab="u_family_shares_m" data-fmt=",.0f">800</span></td><td><span data-lab="u_family_float" data-fmt=".0%">40%</span></td><td><span data-lab="u_family_cap_bn" data-fmt=".0f">24</span></td><td><span data-lab="u_family_w_float" data-fmt=".1%">6.7%</span></td><td><span data-lab="u_family_w_equal" data-fmt=".0%">25%</span></td><td><span data-lab="u_family_w_price" data-fmt=".1%">5.0%</span></td></tr>
+<tr><td>Small</td><td><span data-lab="u_small_price" data-fmt="$.0f">$120</span></td><td><span data-lab="u_small_shares_m" data-fmt=",.0f">25</span></td><td><span data-lab="u_small_float" data-fmt=".0%">100%</span></td><td><span data-lab="u_small_cap_bn" data-fmt=".0f">3</span></td><td><span data-lab="u_small_w_float" data-fmt=".1%">2.1%</span></td><td><span data-lab="u_small_w_equal" data-fmt=".0%">25%</span></td><td><span data-lab="u_small_w_price" data-fmt=".1%">20.0%</span></td></tr>
+</tbody>
+</table>
+
+<p>Price weighting hands <span data-lab="u_pricey_w_price" data-fmt=".1%">66.7%</span> of the index to <em>Pricey</em>, which is <span data-lab="u_pricey_w_cap" data-fmt=".1%">24.0%</span> of the market's value, and <span data-lab="u_small_w_price" data-fmt=".1%">20.0%</span> to <em>Small</em>, worth <span data-lab="u_small_w_cap" data-fmt=".1%">1.8%</span>. Size is not in a share price, so a pure relabelling moves the index: at <em>Pricey</em>'s split its price weight falls from <span data-lab="pw_pricey_w_before" data-fmt=".1%">73.1%</span> to <span data-lab="pw_pricey_w_after" data-fmt=".1%">40.4%</span> overnight, while its cap weight barely moves (<span data-lab="cw_pricey_w_before" data-fmt=".1%">24.2%</span> to <span data-lab="cw_pricey_w_after" data-fmt=".1%">24.3%</span>). Forget to reset the divisor and the index "falls" <span data-lab="pw_naive_split_day" data-fmt=".1%">−55.0%</span> that day, turning a gain over the period into a CAGR of <span data-lab="path_pw_naive_cagr" data-fmt=".1%">−3.5%</span>.</p>
+
+<figure class="diagram chart">
+<!-- chart:index_growth -->
+<svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Same four stocks, three index rules: growth of $1 over 10 simulated years">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">SAME FOUR STOCKS, THREE INDEX RULES: GROWTH OF $1 OVER 10 SIMULATED YEARS</text>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#3A56C5" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">cap-weighted (float)</text>
+  <line x1="198.0" y1="32" x2="214.0" y2="32" stroke="#E8850C" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="220.0" y="36" font-size="11" fill="#4A5A68">equal-weighted</text>
+  <line x1="331.6" y1="32" x2="347.6" y2="32" stroke="#3F8E5A" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="353.6" y="36" font-size="11" fill="#4A5A68">price-weighted</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="268" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$0.50</text>
+  <line x1="64" y1="228.7" x2="602" y2="228.7" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="232.7" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$0.75</text>
+  <line x1="64" y1="193.3" x2="602" y2="193.3" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="197.3" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$1.00</text>
+  <line x1="64" y1="158" x2="602" y2="158" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="162" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$1.25</text>
+  <line x1="64" y1="122.7" x2="602" y2="122.7" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="126.7" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$1.50</text>
+  <line x1="64" y1="87.3" x2="602" y2="87.3" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="91.3" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$1.75</text>
+  <line x1="64" y1="52" x2="602" y2="52" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="56" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$2.00</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#C9CFC6" stroke-width="1"/>
+  <line x1="64" y1="264" x2="64" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="64" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">0</text>
+  <line x1="171.6" y1="264" x2="171.6" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="171.6" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">2</text>
+  <line x1="279.2" y1="264" x2="279.2" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="279.2" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">4</text>
+  <line x1="386.8" y1="264" x2="386.8" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="386.8" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">6</text>
+  <line x1="494.4" y1="264" x2="494.4" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="494.4" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">8</text>
+  <line x1="602" y1="264" x2="602" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="602" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">10</text>
+  <line x1="64" y1="193.3" x2="602" y2="193.3" stroke="#4A5A68" stroke-width="1"/>
+  <polyline points="64,193.3 64.4,194.4 66.3,185.4 66.8,190.5 68.3,185.6 69.6,187.4 71.9,193.5 72.8,201.1 74.7,205.9 75.7,201.6 76.4,203.6 78.3,194.5 79.2,202.2 81.5,190.9 82.4,200.9 83.2,206.2 84.7,202.4 85.8,207 87.7,202.8 89.6,190.7 90.3,190.1 92,202.1 93.7,196.7 94.1,199.6 96.2,202.5 97.1,196.8 98.6,208 100.3,199 100.9,199 102.4,210.6 103.7,200.4 104.8,204.2 106.5,202.2 108,193.2 109.5,192.2 110.1,197.3 111.4,200.1 112.9,192.6 115.2,196.4 116.5,188.7 117.4,192.4 119.1,184.5 120.4,182.8 121,190.1 123.1,197.1 124,191.4 125.9,188.5 127.2,195.7 127.8,188.2 128.9,187.3 131,199 132.7,192.2 134,193.3 134.5,198.6 135.9,199.7 137.4,193.5 139.1,204.6 140.6,205.9 142.1,201.2 142.8,200.6 144.5,204.2 145.1,198.6 146.6,201 148.8,214.1 149.4,210.8 151.5,213.5 152,215.2 153.2,210 155.2,213.9 156.7,203.8 158.1,201.9 159.6,214.2 160.3,208.3 162.4,208.8 163.7,218.1 165.2,218.4 166.7,211.9 167.5,214.4 168.8,213.1 169.9,222.8 172,230 172.2,228.2 174.6,230.5 175.4,222.3 176.3,229.5 178.6,234.9 179.3,232.1 180.6,235.4 182.7,237.6 183.1,233.3 184.8,233.5 186.5,229.5 187.8,231 188.5,228.3 190.4,225.7 192.3,220.3 192.9,225.4 194,225 195.9,233.8 197.2,225.5 198.7,230.1 200,226.3 201.3,224.1 202.3,226.6 203.8,226.2 204.9,232 206.6,228.5 207.9,230.9 209,225 210.7,224.2 211.7,222.3 213.9,210.4 214.1,212.1 215.8,209.3 217.1,219 218.1,215.4 219.4,217.6 221.8,215.6 222.6,207.4 224.3,210 226,196.9 227.3,201.4 227.5,203.4 229,193.7 230.5,193.7 231.8,184.4 234.2,189.7 234.8,188.1 235.9,188 237.4,198.2 239.1,199.2 239.7,193.8 242.1,183.4 243.1,181.6 244,192 246.1,203.9 247.2,204.2 248.7,214 250,214.9 251.4,208 252.3,210.1 253.8,201.8 254.9,205.8 256.8,198.6 258.1,204.5 258.9,195.4 260.2,199.3 262.3,193.4 263.8,198.3 264.7,185.8 266.2,197.1 267,197.8 268.5,190.3 270.2,188.1 271.9,178.9 273.4,186.2 274.7,185.7 275.8,175.8 276.2,178.7 277.9,173.7 279,176.4 280.9,173.2 282.4,167.7 283.9,156 285,159.2 285.6,160 287.7,158.1 288.8,148.8 290.1,159 291.4,153 292.4,160.1 293.9,152.7 295.6,163.4 297.6,163.5 298.8,155.2 299.5,159.2 301,158.7 303.1,148.9 303.3,142.1 304.6,121.6 307,113.3 308,122 308.9,108.1 310.2,101.9 311.4,111.5 313.8,93.5 314.9,97.3 315.7,89.6 317.2,91.9 318.3,76.3 320.6,86.7 321.9,72.1 323.4,72.4 323.6,81.4 325.1,97.2 326.4,87.6 327.7,98.2 330,94.6 331.1,110.1 332.4,111 333.9,100.3 335.1,107.4 336.8,105.4 337.9,116 338.8,106.4 340.9,105.7 341.3,114.3 343.2,107.5 344.7,103.1 345.8,113.5 347.7,108.3 348.8,117.4 350.3,105.5 351.1,90.4 352.6,89.4 353.5,99.9 354.8,99.3 356.3,114.9 357.8,106.8 358.8,101.7 360.5,117.3 361.8,118.1 363.7,131.1 364.8,121.9 366.5,109.1 368,110.2 369.3,128.3 370.1,122.1 372.1,138.9 372.7,134.4 374.6,134.5 375.7,149.1 377,162.6 378,162.7 380.2,178.2 381,170.3 382.3,174 383.2,169.2 384.7,166.8 386.8,165.6 387.2,170.7 389.6,169.7 390.4,176.6 391.9,180.7 393,172.8 394.7,179.4 396.2,171.9 396.6,169.4 397.9,175.9 399.4,176.7 400.7,186.1 402.6,178.2 403.5,186.4 405.6,190.3 406.2,184.3 407.7,189.9 409.2,191.2 411.1,182.9 412.2,191.4 413.5,196 415.2,186.5 416,191.8 416.9,185 418.8,185.2 419.9,195 421.4,191.2 422.5,180.6 424.2,181.1 425.9,168.5 427.2,164.7 428.4,176.3 429.9,175.7 431.4,164.7 431.8,167.4 432.9,171.6 435.5,169.9 436.1,164.6 438.3,172.9 438.7,163 440.2,162.7 441.2,167.7 443.4,161.1 444.2,166.5 445.7,162.1 447,157.3 448.1,165.8 449.8,170.2 450.6,173.8 452.8,159.1 453.4,154.5 455.3,160.4 457,145.6 458.5,147 459.6,136.7 460.7,141.8 461.7,140.8 463.7,119.1 464.3,126.6 466.4,119.2 467.5,125 469,122.2 470.1,111.1 472,102.8 473.1,109.3 473.9,97.8 475.4,110.7 476.7,107.7 478.2,88.4 479.7,94.8 480.3,109.8 481.6,122.6 483.5,116.3 484.4,124.5 486.3,119.8 487.8,127.5 489.1,124.6 490.6,120.1 491.8,131.9 493.1,123.9 494.6,123.4 495.9,105.2 497.4,127.4 498.5,131.6 499.7,127.5 500.6,134.4 502.9,139.8 504.2,126.6 505.7,129.3 506.6,123.3 507.4,128.7 509.1,123.1 511.1,125.2 512.1,117.2 513.2,122.1 515.1,110.7 516.6,122.3 517.9,113.9 519.2,129.7 519.8,124.4 521.3,124.9 522.2,121.1 524.1,115.8 524.9,123.2 526.9,121 527.9,108.1 530.1,111.5 530.9,110.9 531.8,95.4 533.5,106.8 535.2,101.8 535.6,112.4 537.1,128 539,123.8 539.7,125.1 541.8,146.3 542.6,145.7 544.1,135.8 545.9,131 546.5,135.5 548.6,130.1 550.3,146.1 550.5,142.1 552.7,133.5 553.8,148.7 554.8,157.5 556.1,151.2 558,158.2 559.7,158.7 559.9,154.6 562.1,145.4 562.7,151 564.4,143.9 566.3,152 567.8,142 568.9,154.2 570.4,140.7 571.5,151.9 572.5,152.3 574.2,142.7 574.9,148.1 576.6,146.4 578.1,157.8 579.2,145.1 580.4,160.4 581.9,147.4 583,153 584.7,127.5 586.4,116.8 587.1,123.9 588.8,136.4 590,132.5 591.5,138.2 592.8,122.6 594.1,136.8 595.6,137.2 597.3,127.1 598.6,134.4 599.7,133.3 600.9,116.2 602,117.8" fill="none" stroke="#3A56C5" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>cap-weighted (float)</title></polyline>
+  <circle cx="602" cy="117.8" r="4" fill="#3A56C5" stroke="#FBFBF8" stroke-width="2"><title>cap-weighted (float): $1.53</title></circle>
+  <polyline points="64,193.3 64.6,193.3 66.3,182.5 66.8,188.9 68.3,186.4 70.4,196.2 71.5,195.8 72.5,204.3 74.5,206.4 75.7,200.9 77.5,205.8 78.3,200.6 79.2,209.6 81.5,200.9 82.4,209.5 83.2,214.5 85.6,215.8 86.6,209.7 87.7,215.5 89.6,205 90.3,205.8 92,214.6 92.8,210.3 93.9,206.7 95.4,205.8 97.1,199 98.4,211.1 99.4,206.4 101.6,210.6 102,217.7 104.3,204.3 105.4,208.3 106.1,203.8 108,196 109,200.9 111,203.1 111.8,195.9 112.9,193.4 115.2,202 116.5,192.3 118,197 118.9,192.1 120.4,188.9 121,196.5 122.7,201.1 124,194.5 125.9,190.8 127.2,201.6 128,190.9 130.2,195.7 131,204.2 132.7,199.5 134,201.2 134.9,205.9 136.8,198.8 137.4,200.1 139.1,213.1 140.6,211.6 142.1,201.6 143,203.1 143.8,206.1 145.1,196.7 147.3,202.2 148.8,219.1 150.5,215 151.5,218.6 152.2,220.7 154.3,215.2 155.2,218.2 156.7,209.2 158.1,209.9 159.6,218.2 160.9,209.8 161.4,214.1 163.1,211.4 164.1,221.2 166,221.6 167.1,213.9 169,212.2 170.3,224.9 172,228.5 172.2,225.8 173.7,221.8 176.1,229.4 176.9,223.4 177.8,230.4 179.3,227.3 180.6,231.1 182.7,232.7 183.1,228.6 184.8,229.2 186.5,226.3 187,228.7 188.5,225.6 190,230.3 191.2,219.7 193.6,220.8 194.9,229.7 196.2,230.6 196.8,223.4 198.7,226 200,221.4 201.5,220.2 201.9,222.2 203.8,223.4 204.9,230.8 207,231.3 207.3,227.9 209.2,228 210,221.4 211.7,220.3 213,217.8 214.5,207.2 215.8,210.1 217.1,221.3 219,220.4 220.5,213.6 221.8,217.4 222.6,211.8 224.3,215.6 226,199.9 227.3,206.5 227.5,210 229,203.3 230.5,206.2 231.8,195.6 234.2,202.6 234.8,200.3 235.9,200.1 237.4,211.6 239.1,212.8 240.3,208.8 242.1,197.6 243.1,194.7 244,206.3 246.3,220.5 247.6,219.8 248,217 249.5,227.2 251.7,218.2 252.3,221.3 253.6,213.4 255.5,208.1 256.6,209.1 258.1,217.2 258.9,207.3 260,213.9 261.9,206.7 263.8,211.8 264.7,198.2 266.2,205.7 266.8,207.4 269.2,204.9 270,200.9 271.9,194.5 272.4,192.4 274.3,202 275.8,195 276.2,198.7 278.1,197.4 279.8,188.4 280.9,192.1 282.8,187.9 283.5,174.3 285.2,174.6 285.6,181.6 288,185.6 289,177.4 290.1,183.5 291.4,179.4 292.4,186.2 293.9,181 295.6,194.7 297.3,191.3 298.6,195.1 300.1,188.6 301,192.4 302.9,184.3 304.2,166.4 304.8,158.2 306.3,163.4 308.2,153.7 309.7,137.7 311.2,137.2 311.7,130.6 313.8,112.6 314.9,115.5 316.1,114.2 317.4,103.5 318.3,96.8 320.4,117.8 321.9,97.2 323.4,101.7 324.7,118.7 325.1,122.1 326.4,110.9 328.7,124.4 330,114.1 331.3,124.1 332.8,113.4 333.2,117.2 334.7,112.3 336.8,116.1 337.3,124.6 339.2,111.7 340.9,107 341.5,116.6 342.8,119.6 344.7,107.3 345.8,125 347.7,116.3 348.4,126.6 349.2,125.1 351.1,100.1 352.9,101.5 354.1,115.8 354.8,113 356.1,130.5 357.8,122.9 359.5,125.7 360.8,145.1 362,151.7 364,157.2 364.8,143.7 366.5,132.7 368,134.8 368.2,142.7 370.1,146.5 372.1,163.1 372.7,159.8 374.6,156.4 374.8,161.8 376.6,184 378,185.1 379.3,197.1 381.2,190 382.3,194.8 384.2,188.4 384.9,182.1 386.2,189.4 387,181.3 389.6,179.4 390.4,187.1 391.9,191.6 393,186.8 394.1,190.7 395.1,189.9 396.6,176.4 397.9,182.9 399.4,179.5 400.7,188.2 402.6,178 403.5,184.3 405.2,179.2 406.4,182.7 407.9,181 409.2,187.3 411.1,182.7 412.4,196.9 413.1,201.3 415.2,191.1 416,197.2 416.9,187.9 418.8,190.7 419.9,198.4 421.4,197.3 422.9,181.7 424.6,182.3 425.9,171.2 427.2,171.8 428.4,185.1 429.3,180.9 430.8,183.7 432.1,175.3 432.9,183 434.4,178.5 436.1,175.4 438.3,184.5 438.7,175.7 440,172.2 441.2,176.8 443.4,168.8 444.2,176.4 445.7,174.5 447,173.2 448.5,181.8 449.1,179 450.6,186.8 453,175.1 453.4,171.8 455.3,179.2 457,163.5 458.5,171.6 459.6,163.1 460.7,166.5 461.7,165.1 463.7,148.4 464.3,156.1 466.2,146.8 467.5,149.5 468.4,140.8 469.4,139.8 471.3,122.8 472.2,116.9 474.1,114.7 475.8,134 477.1,129.7 478.2,108.9 479.7,109.8 480.3,126.8 481.6,138.2 483.5,125.6 484.4,132.7 486.1,127.7 487.8,140.7 489.5,144.3 490.6,133.4 491.4,143.9 493.3,146.5 494.6,142.9 495.7,125 496.5,124.6 498.5,145.4 500.2,132.6 500.6,138.4 502.9,135.6 504.4,121.1 505.7,128.7 506.4,121.1 507.4,127.2 509.1,113.5 511.1,117.6 512.1,107.4 513,112.3 514.7,98.2 516.6,118.8 517.2,110.1 518.3,108.8 520,124.7 521.7,113.8 523.2,107.1 524.1,103.3 524.9,115.3 526.9,110.8 527.9,94.9 529.8,93.8 530.9,101 531.8,85.8 533.5,96 535.2,90.1 536.9,119.9 537.7,117.3 539,114.7 540.9,138.5 541.8,147.9 543.5,146.9 544.8,139.4 545.6,135.4 546.5,140.3 548.6,124.3 550.3,141.1 550.5,137.5 552.7,134 554.4,153.8 554.8,156.3 556.1,146 558,151.9 559.1,152.9 559.9,145 562.1,140.1 562.7,149.3 564.4,138.8 566.3,153.6 567.8,148.3 568.9,160.7 570.4,150.4 571.5,159.9 573.2,151.3 573.8,149 575.1,158.7 576.4,153.8 578.1,165.3 579.2,151.1 580.4,164 582.4,156.3 584.1,135.7 585.1,137.4 586.2,122.2 587.1,134 588.8,147.9 590.9,139.4 591.5,145.6 592.8,127.5 594.1,142.5 595.2,133 596.7,137.4 598.6,140.3 599.7,141.7 601.8,112.3 602,114.4" fill="none" stroke="#E8850C" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>equal-weighted</title></polyline>
+  <circle cx="602" cy="114.4" r="4" fill="#E8850C" stroke="#FBFBF8" stroke-width="2"><title>equal-weighted: $1.56</title></circle>
+  <polyline points="64,193.3 64.6,194.4 66.3,184.5 66.8,191 68.3,186.7 70.2,194.7 71.3,192.1 72.5,200.5 74.5,204.1 75.7,197.9 77.2,200.9 78.3,194.1 79.2,200.2 81.5,181.9 82.8,195.2 83.2,200.5 85.6,201.7 86.6,192.8 87.7,199.7 89,187.3 90.3,182.1 92,195.3 93.2,186.9 94.5,191.8 95.2,191.7 96.9,185.4 98.4,199.3 100.3,192.2 101.6,192.6 102.4,206.2 103.9,194.5 104.8,197.9 106.3,194.8 108,185.9 109.5,183.3 111,192.7 111.8,186.2 113.7,193.3 114.4,185.9 115.5,193.7 116.7,178.6 118.2,185.9 120.4,180.6 121,190.9 122.7,200.6 124.2,198.6 125.9,187.3 127.2,197.1 127.8,186.3 129.8,191.5 131.2,202.2 132.7,196.5 134,195.8 134.7,201.6 136.6,193.4 137.7,195.3 139.4,213.3 140.2,208.9 141.5,212.2 142.6,207.6 143.8,211.1 145.1,204.5 147.3,212.2 148.8,228.3 149.8,230.7 151.7,226.3 152,229 154.1,228.4 155.8,220 156.7,220.2 157.5,224.5 159.6,228.5 160.9,219.7 161.4,224.7 163.1,224 164.1,233 166,232.2 167.1,226 169.3,228.4 170.1,236.6 172,242.8 172.5,240.2 174.6,241.1 175.4,234.4 176.9,234.3 178.6,244.1 179.3,237.9 180.6,242.2 182.7,245.5 183.1,241 184.6,242.4 186.5,238.1 187,240.2 188.5,238.7 190,241.8 191.2,233.9 193.6,234.7 194,234.4 195.1,243.4 196.6,243.7 198.3,235.2 199.6,239.9 200.8,236.4 202.3,240.1 203.8,238.8 204.9,243.9 207,248.2 207.3,245.9 209.2,243.8 210,238.5 211.7,236.5 213.9,227.4 214.7,227.7 215.8,229 217.1,237.4 218.1,232.7 220.1,227.1 221.8,230.2 222.6,223.3 224.3,227.9 226,212.8 226.9,214 227.5,216.5 229,206.7 230.7,204.8 231.8,192.8 233.9,198.6 234.6,195.5 236.7,202.9 237.4,205.7 239.1,205.9 239.7,201.1 242.3,189.8 242.9,188.8 244.2,200.3 246.3,214.6 247.6,217.7 248,215.4 249.3,227.1 251.4,218.7 252.3,220.9 253.6,211.8 254.9,215.8 256.4,210 258.1,213.9 258.9,205.6 260,211.4 261.9,204.4 263.4,212.7 264.7,200 266.2,212.9 266.8,213.8 268.3,209.7 270,198.7 271.9,194.3 273.4,204.8 274.7,204.7 275.8,196.2 277.1,190.3 278.1,195.4 279.8,187.8 280.9,192.4 282.6,186.3 283.5,173.4 284.5,172.5 285.6,179.7 288,177.2 288.8,168 290.1,181.5 291.4,174.8 292.4,178.1 293.9,170.3 295.4,180.5 297.6,184.8 298.8,169.5 299.5,175.1 300.5,177.6 302.9,164.7 303.3,155 305.7,122.8 306.1,133 308.2,130.3 308.9,115.7 311.2,118.8 311.7,111.2 313.6,99.4 314.2,98.5 316.1,106.3 317.2,107.8 318.3,89.3 320.4,103.2 321.9,84.9 323.4,84.3 324.7,109.5 325.5,104.6 327.4,119 328.5,115.6 330,116.3 331.1,133.3 332.4,134.5 333.9,129.3 334.7,128.4 336.8,133.2 337.9,143.2 338.3,136.1 340.9,127.8 341.3,134.7 342.8,136.7 344.7,127.4 345.8,140.7 347.7,135.1 348.4,144.3 349.2,143.1 351.1,119.2 352.9,119.7 354.1,134.2 354.8,131.5 356.1,146.3 357.8,142 359.5,143.4 360.8,156.3 362,161.5 364,166.5 364.8,155.2 366.5,143.9 368,145.4 368.2,152.1 370.1,156.4 372.1,172.5 372.7,169.6 374.6,168.4 375.7,182.2 377,194.5 378,193.1 380.2,204.5 381,197.8 382.3,199.6 383.6,193.1 384.7,189.3 386.2,196.1 387,189.2 389.6,188.1 390.4,194.3 391.9,198.7 393,194 394.7,199 396.2,191.4 396.6,188.4 397.9,194.6 399.4,194.1 400.7,203.5 402.6,194.5 403.5,200.1 405.2,194.1 406.9,194.5 407.7,198.6 409.2,199.9 411.1,193.4 412.2,204.4 413.1,209.6 415.2,200.5 416,205.6 416.9,198.3 418.8,198.6 419.9,208.4 421.4,205.5 422.5,194.7 424.2,195.7 425.9,184.4 427.2,183.4 428.4,193.9 429.3,190.8 430.8,194.6 432.1,186.6 432.9,193.9 435.5,192 436.1,187.2 437.4,194.3 438.9,185.5 440,183.4 441.2,188.1 443.4,181.9 444.2,188.1 445.5,188.6 447,184.4 447.9,192.7 449.1,192.4 450.6,199.8 453,187.7 454.3,194 455.8,191.1 457,176.7 458.5,181.8 459.6,171.6 460.7,174 461.7,172.3 463.7,155.1 464.3,163.1 466.2,155.6 467.5,156.8 468.4,149 469.4,150.1 472,126.8 473.1,134 474.1,125.6 475.8,138.1 477.1,134.7 478.2,115.7 479.7,118.3 480.9,140.7 481.6,146.1 483.5,137.3 484.4,144.6 486.1,138.4 487.4,138 488.4,145.4 490.6,137.1 492.3,150.4 493.1,142.8 494.6,142.9 495.7,124.6 497.2,143.3 498.5,149.6 499.7,144.2 500.6,151.5 502.9,153.7 504.4,137.8 505.7,137.6 507,130.4 507.4,136.5 509.1,127 511.1,131 512.1,123.2 513,127.3 515.1,116.1 515.5,123.9 517.2,119.3 519.2,132.5 520,133.5 521.7,124.2 522.8,126.3 524.1,113.5 524.9,123.2 526.9,121 527.9,107.8 530.1,110.3 530.9,110.4 531.8,94.4 533.5,104.5 535.2,95.9 536.9,124.2 538.2,128.1 539,122.5 540.9,142 542.2,150.1 543.3,142.3 543.7,144.2 545.9,127.7 546.5,133.7 548.6,125.6 550.3,145.9 551.6,143.6 552.7,131.1 553.8,148.2 554.8,158.4 556.1,150.8 558,156.7 558.7,151.5 560.4,151.2 562.1,136.8 562.9,143 564.4,133.3 566.3,148.2 567.8,139.3 568.9,151.4 570.4,139.6 571.5,152 572.5,152.8 573.8,140.5 574.9,146 576.6,143.4 578.3,157.9 579.2,142 580.4,161.3 582.8,155.1 584.1,132.7 584.5,134.2 586.2,113.2 587.7,120.1 588.5,135.5 590,128.6 591.5,136.5 592.8,119.7 594.1,133 595.6,133.8 597.7,120 598.6,128.9 599.2,119 600.9,111.8 602,114.7" fill="none" stroke="#3F8E5A" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>price-weighted</title></polyline>
+  <circle cx="602" cy="114.7" r="4" fill="#3F8E5A" stroke="#FBFBF8" stroke-width="2"><title>price-weighted: $1.56</title></circle>
+  <text x="614" y="118.4" font-size="11" fill="#1F2C38">equal: $1.56</text>
+  <line x1="607" y1="114.7" x2="614" y2="124.4" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="614" y="132.4" font-size="11" fill="#1F2C38">price: $1.56</text>
+  <line x1="607" y1="117.8" x2="614" y2="138.4" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="614" y="146.4" font-size="11" fill="#1F2C38">cap: $1.53</text>
+</svg>
+<!-- /chart:index_growth -->
+<figcaption>fig 2.2.5 — one simulated decade of the same four stocks under three rules: here they finish close together, and which one wins is mostly luck</figcaption>
+</figure>
+
+<p>On this path (fig 2.2.5) the float-cap index compounded at <span data-lab="path_cw_cagr" data-fmt=".2%">4.38%</span> a year, equal weighting at <span data-lab="path_ew_cagr" data-fmt=".2%">4.53%</span> and price weighting at <span data-lab="path_pw_cagr" data-fmt=".2%">4.53%</span>. Across <span data-lab="mc_n" data-fmt=",d">2,000</span> simulated decades the float-cap and equal-weight indices have the same expected wealth, <math><semantics><mrow><msup><mi>e</mi><mrow class="tml-sml-pad"><mi>μ</mi><mi>Y</mi></mrow></msup><mo>=</mo></mrow><annotation encoding="application/x-tex">e^{\mu Y} =</annotation></semantics></math> <span data-lab="mc_theory_wealth" data-fmt=".2f">2.23</span> per dollar for <math><semantics><mrow><mi>Y</mi><mo>=</mo></mrow><annotation encoding="application/x-tex">Y =</annotation></semantics></math> <span data-lab="path_years" data-fmt="d">10</span> years (simulated: <span data-lab="mc_cw_mean_wealth" data-fmt=".2f">2.25</span> ± <span data-lab="mc_cw_mean_wealth_se" data-fmt=".2f">0.04</span> and <span data-lab="mc_ew_mean_wealth" data-fmt=".2f">2.22</span> ± <span data-lab="mc_ew_mean_wealth_se" data-fmt=".2f">0.04</span>, ± one <a class="term" href="../unit03-math-toolkit/session01-probability-expected-value.html#g-standard-error" data-term="standard error">standard error</a>), but not the same growth. The <a class="term" href="session03-returns-pnl-leverage.html#g-volatility-drag" data-term="volatility drag">volatility drag</a> of <a class="xref" href="session03-returns-pnl-leverage.html#s4" data-xref="2.3#s4" data-style="short" data-auto="">Session 2.3</a> applies to portfolios, which compound at about <math><semantics><mrow><mi>μ</mi><mo>−</mo><mstyle displaystyle="false" scriptlevel="0"><mfrac><mn>1</mn><mn>2</mn></mfrac></mstyle><msup><mi>w</mi><mi class="tml-med-pad">⊤</mi></msup><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><mi>w</mi></mrow><annotation encoding="application/x-tex">\mu - \tfrac12 w^\top \Sigma w</annotation></semantics></math>, with <math><semantics><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><annotation encoding="application/x-tex">\Sigma</annotation></semantics></math> the <span class="term soon" data-term="covariance matrix" title="Defined in Session 3.3 (coming soon)">covariance matrix</span>. Equal weighting puts a quarter of the money in the wildest stock (portfolio volatility <span data-lab="vol_ew" data-fmt=".1%">23.2%</span> against <span data-lab="vol_cw0" data-fmt=".1%">20.9%</span>), so its typical decade compounds at <span data-lab="mc_ew_growth" data-fmt=".2%">5.40%</span> (theory <span data-lab="mc_ew_growth_theory" data-fmt=".2%">5.46%</span>) against <span data-lab="mc_cw_growth" data-fmt=".2%">6.00%</span> — yet it still wins <span data-lab="mc_p_ew_beats_cw" data-fmt=".0%">46%</span> of decades. Both beat their average stock's <span data-lab="avg_stock_growth" data-fmt=".1%">2.6%</span>: diversification cuts the drag.</p>
+
+<h3>Rebalancing and reconstitution</h3>
+<p>A cap-weighted index never needs to trade: yesterday's weights drift into today's exactly as a buy-and-hold portfolio's do, and the lab asserts it:</p>
+
+<pre>drifted = w_prev * (1 + R)
+drifted /= drifted.sum(axis=1, keepdims=True)
+<span class="k">assert</span> np.allclose(drifted, float_mv[1:] / float_mv[1:].sum(axis=1, keepdims=True), atol=<span class="p">1e-12</span>)</pre>
+
+<p>So an <a class="term" href="../unit01-quant-landscape/session02-where-returns-come-from.html#g-index-fund" data-term="index fund">index fund</a> trades only when the index changes. Equal weighting sells winners and buys losers every quarter — <span data-lab="ew_turnover_year" data-fmt=".0%">17%</span> one-way <span class="term soon" data-term="turnover" title="Defined in Session 6.2 (coming soon)">turnover</span> a year here — which costs money (<span class="xref soon" data-xref="6.5" data-style="short" data-auto="" title="Coming soon">Session 6.5</span>) and tilts toward small companies (<span class="xref soon" data-xref="7.3" data-style="short" data-auto="" title="Coming soon">Session 7.3</span>). Providers also add and delete members (<em>reconstitution</em>) and update share counts (<em>rebalancing</em>); tracking funds then trade, typically at the close of the effective day, and the price pressure is the <span class="term soon" data-term="index rebalance" title="Defined in Session 8.6 (coming soon)">index-rebalance</span> trade of <span class="xref soon" data-xref="8.6" data-style="short" data-auto="" title="Coming soon">Session 8.6</span>. And today's members are survivors: backtest them over the past and you inherit <span class="term soon" data-term="survivorship bias" title="Defined in Session 4.2 (coming soon)">survivorship bias</span> (<span class="xref soon" data-xref="4.2" data-style="short" data-auto="" title="Coming soon">Session 4.2</span>).</p>
+
+<div class="co key"><span class="co-t">📌 Key idea — an index is a portfolio with a rule</span>
+<p><mark>Cap weighting is the one rule that holds itself — no trading, no opinion, the average investor's portfolio</mark> — which is why it is the natural benchmark and why index funds can run it so cheaply (<a class="xref" href="../unit01-quant-landscape/session02-where-returns-come-from.html" data-xref="1.2" data-style="short" data-auto="">Session 1.2</a>). Every other rule is an investment decision with turnover and tilts attached.</p>
+</div>
+</section>
+
+<section id="s5">
+<h2><span class="no">2.2.5</span> ETFs: a basket with an arbitrage loop</h2>
+<p class="lede">An ETF is a fund that trades like a share. A trade, not a rule, keeps its price near the value of its holdings — and trades stop when they get too expensive.</p>
+
+<p>An <strong>ETF</strong> (exchange-traded fund) holds a basket, usually tracking an index, and its shares trade on an <a class="term" href="session01-market-anatomy.html#g-exchange" data-term="exchange">exchange</a> all day. A mutual fund deals with investors once a day at its <strong>net asset value</strong> (NAV), the value of its holdings per share; an ETF publishes a NAV too, but you pay the market price. <strong>Creation and redemption</strong> ties the two together. <strong>Authorised participants</strong> (APs), large dealers under contract with the fund, can deliver the basket for new ETF shares in big blocks called <em>creation units</em>, or hand shares back for the basket — usually in kind (fig 2.2.6). Everyone else simply trades existing shares (Lettau &amp; Madhavan 2018).</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">CREATION AND REDEMPTION — the two trades that pull an ETF's price back to its NAV</text>
+  <rect x="26" y="34" width="132" height="62" rx="9" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="92" y="56" font-size="10.5" font-weight="700" text-anchor="middle" fill="#8A6D00">PREMIUM</text>
+  <text x="92" y="72" font-size="9" text-anchor="middle" fill="#4A5A68">ETF price above</text>
+  <text x="92" y="84" font-size="9" text-anchor="middle" fill="#4A5A68">NAV + AP cost</text>
+  <rect x="176" y="34" width="116" height="62" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="234" y="56" font-size="10.5" font-weight="600" text-anchor="middle" fill="#3A56C5">1 · BUY BASKET</text>
+  <text x="234" y="72" font-size="9" text-anchor="middle" fill="#4A5A68">the index's stocks,</text>
+  <text x="234" y="84" font-size="9" text-anchor="middle" fill="#4A5A68">in the market</text>
+  <rect x="310" y="34" width="116" height="62" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="368" y="56" font-size="10.5" font-weight="600" text-anchor="middle" fill="#3A56C5">2 · DELIVER</text>
+  <text x="368" y="72" font-size="9" text-anchor="middle" fill="#4A5A68">the basket to the</text>
+  <text x="368" y="84" font-size="9" text-anchor="middle" fill="#4A5A68">issuer, in kind</text>
+  <rect x="444" y="34" width="116" height="62" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="502" y="56" font-size="10.5" font-weight="600" text-anchor="middle" fill="#3A56C5">3 · CREATE</text>
+  <text x="502" y="72" font-size="9" text-anchor="middle" fill="#4A5A68">receive a creation</text>
+  <text x="502" y="84" font-size="9" text-anchor="middle" fill="#4A5A68">unit of new shares</text>
+  <rect x="578" y="34" width="116" height="62" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="636" y="56" font-size="10.5" font-weight="600" text-anchor="middle" fill="#3A56C5">4 · SELL</text>
+  <text x="636" y="72" font-size="9" text-anchor="middle" fill="#4A5A68">the new ETF shares</text>
+  <text x="636" y="84" font-size="9" text-anchor="middle" fill="#4A5A68">on the exchange</text>
+  <path d="M160 65 H172" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s5a)"/>
+  <path d="M294 65 H306" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s5a)"/>
+  <path d="M428 65 H440" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s5a)"/>
+  <path d="M562 65 H574" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s5a)"/>
+  <text x="435" y="114" font-size="9.5" text-anchor="middle" fill="#1F7A55" font-style="italic">more ETF shares for sale → the price falls back toward NAV</text>
+  <path d="M290 110 H104 V100" fill="none" stroke="#1F7A55" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#s5b)"/>
+  <rect x="26" y="126" width="668" height="36" rx="8" fill="#F5F6F2" stroke="#C9CFC6" stroke-width="1.2"/>
+  <text x="360" y="148" font-size="10" text-anchor="middle" fill="#1F2C38">INSIDE THE BAND (|premium| ≤ AP cost): no trade — investors simply swap existing shares on the exchange</text>
+  <rect x="26" y="176" width="132" height="62" rx="9" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="92" y="198" font-size="10.5" font-weight="700" text-anchor="middle" fill="#8A6D00">DISCOUNT</text>
+  <text x="92" y="214" font-size="9" text-anchor="middle" fill="#4A5A68">ETF price below</text>
+  <text x="92" y="226" font-size="9" text-anchor="middle" fill="#4A5A68">NAV − AP cost</text>
+  <rect x="176" y="176" width="116" height="62" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="234" y="198" font-size="10.5" font-weight="600" text-anchor="middle" fill="#3A56C5">1 · BUY ETF</text>
+  <text x="234" y="214" font-size="9" text-anchor="middle" fill="#4A5A68">shares cheaply</text>
+  <text x="234" y="226" font-size="9" text-anchor="middle" fill="#4A5A68">on the exchange</text>
+  <rect x="310" y="176" width="116" height="62" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="368" y="198" font-size="10.5" font-weight="600" text-anchor="middle" fill="#3A56C5">2 · REDEEM</text>
+  <text x="368" y="214" font-size="9" text-anchor="middle" fill="#4A5A68">hand a creation unit</text>
+  <text x="368" y="226" font-size="9" text-anchor="middle" fill="#4A5A68">back to the issuer</text>
+  <rect x="444" y="176" width="116" height="62" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="502" y="198" font-size="10.5" font-weight="600" text-anchor="middle" fill="#3A56C5">3 · RECEIVE</text>
+  <text x="502" y="214" font-size="9" text-anchor="middle" fill="#4A5A68">the basket,</text>
+  <text x="502" y="226" font-size="9" text-anchor="middle" fill="#4A5A68">in kind</text>
+  <rect x="578" y="176" width="116" height="62" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="636" y="198" font-size="10.5" font-weight="600" text-anchor="middle" fill="#3A56C5">4 · SELL BASKET</text>
+  <text x="636" y="214" font-size="9" text-anchor="middle" fill="#4A5A68">the stocks, in</text>
+  <text x="636" y="226" font-size="9" text-anchor="middle" fill="#4A5A68">the market</text>
+  <path d="M160 207 H172" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s5a)"/>
+  <path d="M294 207 H306" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s5a)"/>
+  <path d="M428 207 H440" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s5a)"/>
+  <path d="M562 207 H574" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s5a)"/>
+  <text x="435" y="256" font-size="9.5" text-anchor="middle" fill="#1F7A55" font-style="italic">fewer ETF shares for sale → the price rises back toward NAV</text>
+  <path d="M290 252 H104 V242" fill="none" stroke="#1F7A55" stroke-width="1.3" stroke-dasharray="4 3" marker-end="url(#s5b)"/>
+  <text x="360" y="286" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">Each trade closes the gap that pays for it — as long as the APs can afford to trade.</text>
+  <defs>
+    <marker id="s5a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F2C38"/></marker>
+    <marker id="s5b" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F7A55"/></marker>
+  </defs>
+</svg>
+<figcaption>fig 2.2.6 — the creation/redemption loop: a premium beyond the AP's cost triggers a creation, a discount a redemption, and each trade pushes the ETF's price back toward its NAV until the gap no longer pays</figcaption>
+</figure>
+
+<p>Write the premium as <math><semantics><mrow><msub><mi>π</mi><mi>t</mi></msub><mo>=</mo><msubsup><mi>P</mi><mi>t</mi><mtext class="tml-med-pad">ETF</mtext></msubsup><mi>/</mi><msub><mtext>NAV</mtext><mi>t</mi></msub><mo>−</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">\pi_t = P^{\text{ETF}}_t / \text{NAV}_t - 1</annotation></semantics></math> (negative: a discount) and an AP's all-in round-trip cost as <math><semantics><msub><mi>c</mi><mtext>AP</mtext></msub><annotation encoding="application/x-tex">c_{\text{AP}}</annotation></semantics></math>. Any <math><semantics><mrow><mi>|</mi><msub><mi>π</mi><mi>t</mi></msub><mi>|</mi><mo>&gt;</mo><msub><mi>c</mi><mtext>AP</mtext></msub></mrow><annotation encoding="application/x-tex">|\pi_t| \gt c_{\text{AP}}</annotation></semantics></math> pays an AP to create or redeem, and the trade shrinks the gap, so in normal markets <math><semantics><mrow><mi>|</mi><msub><mi>π</mi><mi>t</mi></msub><mi>|</mi><mo>≤</mo><msub><mi>c</mi><mtext>AP</mtext></msub></mrow><annotation encoding="application/x-tex">|\pi_t| \le c_{\text{AP}}</annotation></semantics></math>. Because</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><mn>1</mn><mo>+</mo><msubsup><mi>R</mi><mrow><mn>0</mn><mo>→</mo><mi>T</mi></mrow><mtext class="tml-med-pad">ETF</mtext></msubsup><mo>=</mo><mo fence="true" symmetric="true" minsize="1.2em" maxsize="1.2em">(</mo><mn>1</mn><mo>+</mo><msubsup><mi>R</mi><mrow><mn>0</mn><mo>→</mo><mi>T</mi></mrow><mtext class="tml-med-pad">NAV</mtext></msubsup><mo fence="true" symmetric="true" minsize="1.2em" maxsize="1.2em">)</mo><mspace width="0.1667em"></mspace><mfrac><mrow><mn>1</mn><mo>+</mo><msub><mi>π</mi><mi>T</mi></msub></mrow><mrow><mn>1</mn><mo>+</mo><msub><mi>π</mi><mn>0</mn></msub></mrow></mfrac><mo separator="true">,</mo></mrow><annotation encoding="application/x-tex">1 + R^{\text{ETF}}_{0 \to T} = \bigl(1 + R^{\text{NAV}}_{0 \to T}\bigr)\,\frac{1 + \pi_T}{1 + \pi_0},</annotation></semantics></math></div>
+<p>an ETF earns its NAV's return to within about <math><semantics><mrow><mn>2</mn><msub><mi>c</mi><mtext>AP</mtext></msub></mrow><annotation encoding="application/x-tex">2c_{\text{AP}}</annotation></semantics></math> over any holding period. In the lab's toy (illustrative parameters) order flow moves the premium by <span data-lab="etf_s_bp" data-fmt=".0f">10</span> bp shocks that fade slowly: each day's premium is <span data-lab="etf_phi" data-fmt=".2f">0.98</span> times yesterday's plus a fresh shock. With no APs its standard deviation is <span data-lab="etf_sd_theory_bp" data-fmt=".1f">50.3</span> bp in theory and <span data-lab="etf_sd_hat_bp" data-fmt=".1f">50.5</span> bp over <span data-lab="etf_n" data-fmt=",d">2,000</span> simulated years, and it sits more than <span data-lab="etf_wide_bp" data-fmt=".0f">50</span> bp from NAV, in either direction, on <span data-lab="etf_p_wide_hat" data-fmt=".1%">31.9%</span> of days (theory <span data-lab="etf_p_wide_theory" data-fmt=".1%">32.0%</span>) — roughly a closed-end fund, whose share count is fixed. APs with a <span data-lab="etf_c_bp" data-fmt=".0f">15</span> bp cost cut the average absolute premium from <span data-lab="etf_mean_abs_free_bp" data-fmt=".0f">40</span> to <span data-lab="etf_mean_abs_ap_bp" data-fmt=".0f">10</span> bp and keep every simulated year's ETF return within <span data-lab="etf_track_max_bp" data-fmt=".0f">30</span> bp of its NAV's.</p>
+
+<h3>When the loop breaks: March 2020</h3>
+<p>The band holds only while <math><semantics><msub><mi>c</mi><mtext>AP</mtext></msub><annotation encoding="application/x-tex">c_{\text{AP}}</annotation></semantics></math> is small. In the lab's <span data-lab="stress_len" data-fmt="d">20</span>-day stress episode sellers hit the ETF every day while the cost of arbitrage jumps to <span data-lab="stress_c_bp" data-fmt=",.0f">400</span> bp — a redeeming AP must sell the basket into a market with no buyers. The cost of arbitrage now caps the discount only at that level; inside the cap, the selling sets it, and it reaches <span data-lab="stress_max_discount_pct" data-fmt=".1f">3.4</span>% without the band ever binding (fig 2.2.7).</p>
+
+<figure class="diagram chart">
+<!-- chart:etf_premium -->
+<svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="ETF price vs NAV over one simulated year, with a 20-day stress episode">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">ETF PRICE VS NAV OVER ONE SIMULATED YEAR, WITH A 20-DAY STRESS EPISODE</text>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#3A56C5" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">premium (+) / discount (−)</text>
+  <line x1="236.4" y1="32" x2="252.4" y2="32" stroke="#4A5A68" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="258.4" y="36" font-size="11" fill="#4A5A68">AP band, lower edge</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="268" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">−4.0%</text>
+  <line x1="64" y1="221.6" x2="602" y2="221.6" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="225.6" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">−3.0%</text>
+  <line x1="64" y1="179.2" x2="602" y2="179.2" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="183.2" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">−2.0%</text>
+  <line x1="64" y1="136.8" x2="602" y2="136.8" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="140.8" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">−1.0%</text>
+  <line x1="64" y1="94.4" x2="602" y2="94.4" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="98.4" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.0%</text>
+  <line x1="64" y1="52" x2="602" y2="52" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="56" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">1.0%</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#C9CFC6" stroke-width="1"/>
+  <line x1="64" y1="264" x2="64" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="64" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">0</text>
+  <line x1="171.6" y1="264" x2="171.6" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="171.6" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">0.2</text>
+  <line x1="279.2" y1="264" x2="279.2" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="279.2" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">0.4</text>
+  <line x1="386.8" y1="264" x2="386.8" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="386.8" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">0.6</text>
+  <line x1="494.4" y1="264" x2="494.4" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="494.4" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">0.8</text>
+  <line x1="602" y1="264" x2="602" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="602" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">1</text>
+  <line x1="64" y1="94.4" x2="602" y2="94.4" stroke="#4A5A68" stroke-width="1"/>
+  <polyline points="64,94.4 66.1,88.9 68.3,90.6 70.4,92.6 72.5,88.4 74.7,92.7 76.8,93.7 78.9,88.9 81.1,88 83.2,89.9 85.3,88 87.5,88 89.6,90.6 91.8,96.6 93.9,88.8 96,92.1 98.2,88 100.3,92.1 102.4,91.8 104.6,92.9 106.7,94.5 108.8,100.8 111,100.8 113.1,100.8 115.2,93.2 117.4,93.2 119.5,88 121.6,88.4 123.8,91.1 125.9,92.3 128,89.9 130.2,96.3 132.3,94.8 134.5,100.6 136.6,100.8 138.7,100.8 140.9,90.8 143,88 145.1,90.2 147.3,95.5 149.4,93.9 151.5,99.6 153.7,99.9 155.8,99.3 157.9,100.3 160.1,100.8 162.2,100.8 164.3,96.4 166.5,100.8 168.6,98.7 170.7,99.7 172.9,94.5 175,100.8 177.2,100.8 179.3,100.8 181.4,100.8 183.6,96 185.7,93.5 187.8,99.4 190,92.8 192.1,93.7 194.2,97.5 196.4,100.8 198.5,100.8 200.6,99.6 202.8,92.1 204.9,96.1 207,94.2 209.2,93.2 211.3,95 213.4,91.3 215.6,88 217.7,88 219.8,88 222,97.7 224.1,97.9 226.3,94.6 228.4,96 230.5,99.8 232.7,94.5 234.8,89.8 236.9,89.6 239.1,93.9 241.2,94.6 243.3,88 245.5,90.9 247.6,92.2 249.7,88 251.9,88 254,89.3 256.1,88 258.3,88 260.4,88 262.5,97 264.7,100.1 266.8,98.7 269,99.2 271.1,98.8 273.2,96 275.4,98.5 277.5,98 279.6,96.1 281.8,97.9 283.9,100.8 286,100.8 288.2,100.8 290.3,97.1 292.4,93 294.6,96.9 296.7,95.3 298.8,98.8 301,98.5 303.1,100.5 305.2,94.3 307.4,92.2 309.5,88 311.7,91.1 313.8,93.6 315.9,88.6 318.1,88 320.2,88 322.3,103.1 324.5,116.5 326.6,110.7 328.7,117.2 330.9,101.1 333,107.4 335.1,123.5 337.3,139.5 339.4,144.1 341.5,153.2 343.7,157.5 345.8,173.1 347.9,185.9 350.1,211.3 352.2,204 354.3,216.4 356.5,224.4 358.6,222.4 360.8,238.6 362.9,204.1 365,100.8 367.2,98.1 369.3,94.8 371.4,90.1 373.6,88 375.7,88 377.8,88 380,88 382.1,90.6 384.2,88.6 386.4,94.7 388.5,100.1 390.6,100 392.8,95.4 394.9,91.5 397,93.7 399.2,94.5 401.3,97.1 403.5,97.9 405.6,93.6 407.7,94.9 409.9,92.7 412,95.3 414.1,90.2 416.3,89.7 418.4,91.7 420.5,88 422.7,88 424.8,91.3 426.9,91.5 429.1,97.6 431.2,99.4 433.3,93.8 435.5,89.9 437.6,93.3 439.7,92.3 441.9,93.7 444,97.4 446.2,94.8 448.3,97.5 450.4,97.8 452.6,100.8 454.7,100.8 456.8,100.8 459,100.8 461.1,98.6 463.2,100.2 465.4,94.1 467.5,94.3 469.6,93.2 471.8,91.7 473.9,100.8 476,93.7 478.2,96.8 480.3,97.1 482.4,100.8 484.6,100.8 486.7,98 488.8,93.1 491,93.9 493.1,96.1 495.3,89.4 497.4,88 499.5,88 501.7,88 503.8,88 505.9,90.7 508.1,94.2 510.2,88 512.3,90.1 514.5,91.1 516.6,88 518.7,88 520.9,88.7 523,90.5 525.1,88 527.3,92.2 529.4,88.2 531.5,95.2 533.7,91 535.8,88 538,93.4 540.1,88 542.2,91.4 544.4,91.4 546.5,95.7 548.6,91.4 550.8,90 552.9,100.8 555,94.7 557.2,90.5 559.3,92.1 561.4,90.2 563.6,88 565.7,93.9 567.8,90.3 570,89.7 572.1,89.9 574.2,92 576.4,93.2 578.5,94.1 580.7,90.4 582.8,88 584.9,88 587.1,88 589.2,88 591.3,92.2 593.5,89.6 595.6,89.6 597.7,91 599.9,99.1 602,94.8" fill="none" stroke="#3A56C5" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>premium (+) / discount (−)</title></polyline>
+  <polyline points="64,100.8 66.1,100.8 68.3,100.8 70.4,100.8 72.5,100.8 74.7,100.8 76.8,100.8 78.9,100.8 81.1,100.8 83.2,100.8 85.3,100.8 87.5,100.8 89.6,100.8 91.8,100.8 93.9,100.8 96,100.8 98.2,100.8 100.3,100.8 102.4,100.8 104.6,100.8 106.7,100.8 108.8,100.8 111,100.8 113.1,100.8 115.2,100.8 117.4,100.8 119.5,100.8 121.6,100.8 123.8,100.8 125.9,100.8 128,100.8 130.2,100.8 132.3,100.8 134.5,100.8 136.6,100.8 138.7,100.8 140.9,100.8 143,100.8 145.1,100.8 147.3,100.8 149.4,100.8 151.5,100.8 153.7,100.8 155.8,100.8 157.9,100.8 160.1,100.8 162.2,100.8 164.3,100.8 166.5,100.8 168.6,100.8 170.7,100.8 172.9,100.8 175,100.8 177.2,100.8 179.3,100.8 181.4,100.8 183.6,100.8 185.7,100.8 187.8,100.8 190,100.8 192.1,100.8 194.2,100.8 196.4,100.8 198.5,100.8 200.6,100.8 202.8,100.8 204.9,100.8 207,100.8 209.2,100.8 211.3,100.8 213.4,100.8 215.6,100.8 217.7,100.8 219.8,100.8 222,100.8 224.1,100.8 226.3,100.8 228.4,100.8 230.5,100.8 232.7,100.8 234.8,100.8 236.9,100.8 239.1,100.8 241.2,100.8 243.3,100.8 245.5,100.8 247.6,100.8 249.7,100.8 251.9,100.8 254,100.8 256.1,100.8 258.3,100.8 260.4,100.8 262.5,100.8 264.7,100.8 266.8,100.8 269,100.8 271.1,100.8 273.2,100.8 275.4,100.8 277.5,100.8 279.6,100.8 281.8,100.8 283.9,100.8 286,100.8 288.2,100.8 290.3,100.8 292.4,100.8 294.6,100.8 296.7,100.8 298.8,100.8 301,100.8 303.1,100.8 305.2,100.8 307.4,100.8 309.5,100.8 311.7,100.8 313.8,100.8 315.9,100.8 318.1,100.8 320.2,100.8 322.3,264 324.5,264 326.6,264 328.7,264 330.9,264 333,264 335.1,264 337.3,264 339.4,264 341.5,264 343.7,264 345.8,264 347.9,264 350.1,264 352.2,264 354.3,264 356.5,264 358.6,264 360.8,264 362.9,264 365,100.8 367.2,100.8 369.3,100.8 371.4,100.8 373.6,100.8 375.7,100.8 377.8,100.8 380,100.8 382.1,100.8 384.2,100.8 386.4,100.8 388.5,100.8 390.6,100.8 392.8,100.8 394.9,100.8 397,100.8 399.2,100.8 401.3,100.8 403.5,100.8 405.6,100.8 407.7,100.8 409.9,100.8 412,100.8 414.1,100.8 416.3,100.8 418.4,100.8 420.5,100.8 422.7,100.8 424.8,100.8 426.9,100.8 429.1,100.8 431.2,100.8 433.3,100.8 435.5,100.8 437.6,100.8 439.7,100.8 441.9,100.8 444,100.8 446.2,100.8 448.3,100.8 450.4,100.8 452.6,100.8 454.7,100.8 456.8,100.8 459,100.8 461.1,100.8 463.2,100.8 465.4,100.8 467.5,100.8 469.6,100.8 471.8,100.8 473.9,100.8 476,100.8 478.2,100.8 480.3,100.8 482.4,100.8 484.6,100.8 486.7,100.8 488.8,100.8 491,100.8 493.1,100.8 495.3,100.8 497.4,100.8 499.5,100.8 501.7,100.8 503.8,100.8 505.9,100.8 508.1,100.8 510.2,100.8 512.3,100.8 514.5,100.8 516.6,100.8 518.7,100.8 520.9,100.8 523,100.8 525.1,100.8 527.3,100.8 529.4,100.8 531.5,100.8 533.7,100.8 535.8,100.8 538,100.8 540.1,100.8 542.2,100.8 544.4,100.8 546.5,100.8 548.6,100.8 550.8,100.8 552.9,100.8 555,100.8 557.2,100.8 559.3,100.8 561.4,100.8 563.6,100.8 565.7,100.8 567.8,100.8 570,100.8 572.1,100.8 574.2,100.8 576.4,100.8 578.5,100.8 580.7,100.8 582.8,100.8 584.9,100.8 587.1,100.8 589.2,100.8 591.3,100.8 593.5,100.8 595.6,100.8 597.7,100.8 599.9,100.8 602,100.8" fill="none" stroke="#4A5A68" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><title>AP band, lower edge</title></polyline>
+</svg>
+<!-- /chart:etf_premium -->
+<figcaption>fig 2.2.7 — one simulated year of an ETF's premium: APs pin it inside a narrow band until the band itself blows out in a <span data-lab="stress_len" data-fmt="d">20</span>-day stress episode (grey: the lower edge of the band), then snap it back</figcaption>
+</figure>
+
+<p>That is a cartoon of March 2020. Comparing Vanguard bond ETFs with mutual-fund shares of the same portfolios, Haddad, Moreira and Muir found discounts of up to 10%, with an average peak near 5%, in mid-March — in investment-grade corporate, municipal and Treasury funds, while high-yield funds showed little and an S&amp;P 500 ETF no substantial gap (their Figure 7; NBER w27168, version of May 2020). APs redeemed about $30 billion, yet the gaps faded only after the Federal Reserve announced on 23 March 2020 that it would buy investment-grade corporate bonds and the ETFs that hold them. What the discounts meant is contested: stale NAVs built on bonds that were barely trading, with the ETF price the more honest number (ETFs as a venue for price discovery, Lettau &amp; Madhavan 2018) — or real forced selling, since the least liquid bonds, high yield, showed no such gap (Haddad, Moreira &amp; Muir).</p>
+
+<p>Beyond the expense ratio you met in <a class="xref" href="../unit01-quant-landscape/session01-what-quants-do.html" data-xref="1.1" data-style="short" data-auto="">Session 1.1</a>, judge an ETF by its <em>tracking difference</em> — the fund's total return, measured on NAV, minus its index's — which collects the fee, cash drag, sampling (bond ETFs hold part of their index) and trading costs, partly offset by income from lending its securities to short sellers. The premium or discount you trade at comes on top. In the US, in-kind redemptions also keep an ETF's taxable distributions low (Lettau &amp; Madhavan) — a feature of US tax law, not of ETFs everywhere. Leveraged ETFs add the daily-rebalancing drag of <a class="xref" href="session03-returns-pnl-leverage.html#s7" data-xref="2.3#s7" data-style="short" data-auto="">Session 2.3</a>.</p>
+
+<div class="co warn"><span class="co-t">⚠️ Pitfall — "a 3% discount is a free 3%"</span>
+<p>Only for someone who can redeem, and you cannot: redemption is for APs, in creation units, and in a crisis their cost of selling the basket can exceed the discount — which can widen before it closes, and may partly be a stale NAV. Treat premiums and discounts as a liquidity signal, not an <span class="term soon" data-term="arbitrage" title="Defined in Session 7.1 (coming soon)">arbitrage</span>: the <span class="term soon" data-term="limits to arbitrage" title="Defined in Session 7.1 (coming soon)">limits to arbitrage</span> of <span class="xref soon" data-xref="7.1" data-style="short" data-auto="" title="Coming soon">Session 7.1</span>.</p>
+</div>
+</section>
+
+<section id="s6">
+<h2><span class="no">2.2.6</span> Short selling: selling what you borrowed</h2>
+<p class="lede">To profit from a fall you sell shares you do not own — which means borrowing them, with a fee, obligations, and a lender who can want them back at the worst moment.</p>
+
+<p><strong>Short selling</strong> is selling borrowed shares, then buying them back (<em>covering</em>) and returning them; the profit is the fall in price minus the costs of the loan. People short to bet on a fall, to hedge (the short side of a <span class="term soon" data-term="long-short portfolio" title="Defined in Session 7.3 (coming soon)">long-short portfolio</span>) and, as <a class="term" href="../unit01-quant-landscape/session01-what-quants-do.html#g-market-maker" data-term="market maker">market makers</a>, to sell to a buyer before they own the stock (SEC staff 2021). Fig 2.2.8 is the lifecycle.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 282" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">THE LIFE OF A SHORT SALE — and the two ways it can be ended for you</text>
+  <rect x="26" y="34" width="118" height="66" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="85" y="55" font-size="10.5" font-weight="600" text-anchor="middle" fill="#3A56C5">1 · LOCATE</text>
+  <text x="85" y="72" font-size="9" text-anchor="middle" fill="#4A5A68">broker confirms the</text>
+  <text x="85" y="84" font-size="9" text-anchor="middle" fill="#4A5A68">shares can be borrowed</text>
+  <rect x="163" y="34" width="118" height="66" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="222" y="55" font-size="10.5" font-weight="600" text-anchor="middle" fill="#3A56C5">2 · BORROW</text>
+  <text x="222" y="72" font-size="9" text-anchor="middle" fill="#4A5A68">lender delivers them;</text>
+  <text x="222" y="84" font-size="9" text-anchor="middle" fill="#4A5A68">you leave collateral</text>
+  <rect x="300" y="34" width="118" height="66" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="359" y="55" font-size="10.5" font-weight="600" text-anchor="middle" fill="#3A56C5">3 · SELL</text>
+  <text x="359" y="72" font-size="9" text-anchor="middle" fill="#4A5A68">at today's price; the</text>
+  <text x="359" y="84" font-size="9" text-anchor="middle" fill="#4A5A68">cash stays as collateral</text>
+  <rect x="437" y="34" width="118" height="66" rx="9" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="496" y="55" font-size="10.5" font-weight="600" text-anchor="middle" fill="#8A6D00">4 · CARRY</text>
+  <text x="496" y="72" font-size="9" text-anchor="middle" fill="#4A5A68">daily: borrow fee,</text>
+  <text x="496" y="84" font-size="9" text-anchor="middle" fill="#4A5A68">dividends, margin</text>
+  <rect x="574" y="34" width="120" height="66" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="634" y="55" font-size="10.5" font-weight="600" text-anchor="middle" fill="#1F7A55">5 · COVER</text>
+  <text x="634" y="72" font-size="9" text-anchor="middle" fill="#4A5A68">buy the shares back</text>
+  <text x="634" y="84" font-size="9" text-anchor="middle" fill="#4A5A68">and return them</text>
+  <path d="M146 67 H159" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s6a)"/>
+  <path d="M283 67 H296" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s6a)"/>
+  <path d="M420 67 H433" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s6a)"/>
+  <path d="M557 67 H570" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s6a)"/>
+  <rect x="26" y="150" width="254" height="64" rx="9" fill="#F5F6F2" stroke="#4A5A68" stroke-width="1.2"/>
+  <text x="40" y="170" font-size="10.5" font-weight="700" fill="#1F2C38">WHAT IT COSTS TO STAY SHORT</text>
+  <text x="40" y="187" font-size="9" fill="#4A5A68">fee and dividends, every day it is open</text>
+  <text x="40" y="200" font-size="9" fill="#4A5A68">gain capped at 100% · loss has no ceiling</text>
+  <rect x="300" y="150" width="180" height="64" rx="9" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="390" y="170" font-size="10.5" font-weight="700" text-anchor="middle" fill="#D64B2A">LENDER RECALLS</text>
+  <text x="390" y="187" font-size="9" text-anchor="middle" fill="#4A5A68">return the shares within</text>
+  <text x="390" y="200" font-size="9" text-anchor="middle" fill="#4A5A68">days, or re-borrow elsewhere</text>
+  <rect x="500" y="150" width="194" height="64" rx="9" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="597" y="170" font-size="10.5" font-weight="700" text-anchor="middle" fill="#D64B2A">MARGIN CALL</text>
+  <text x="597" y="187" font-size="9" text-anchor="middle" fill="#4A5A68">the price rises: add cash</text>
+  <text x="597" y="200" font-size="9" text-anchor="middle" fill="#4A5A68">or be bought in by the broker</text>
+  <path d="M478 102 L424 146" stroke="#D64B2A" stroke-width="1.6" marker-end="url(#s6b)"/>
+  <path d="M514 102 L566 146" stroke="#D64B2A" stroke-width="1.6" marker-end="url(#s6b)"/>
+  <path d="M662 148 L650 106" stroke="#D64B2A" stroke-width="1.6" stroke-dasharray="4 3" marker-end="url(#s6b)"/>
+  <text x="497" y="234" font-size="9.5" text-anchor="middle" fill="#D64B2A" font-style="italic">either one can force you to cover at the worst possible price</text>
+  <text x="360" y="266" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">A short pays rent every day it is open — and the lender or the broker can end it for you.</text>
+  <defs>
+    <marker id="s6a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F2C38"/></marker>
+    <marker id="s6b" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#D64B2A"/></marker>
+  </defs>
+</svg>
+<figcaption>fig 2.2.8 — the short-sale lifecycle: locate, borrow, sell, carry, cover — with the two exits someone else can force on you, a recall and a margin call</figcaption>
+</figure>
+
+<p>In the US a <a class="term" href="session01-market-anatomy.html#g-broker" data-term="broker">broker</a> may not accept a short sale until it has borrowed the shares, arranged to, or has reasonable grounds to believe they can be borrowed in time for delivery — the <em>locate</em> of Regulation SHO Rule 203(b)(1). The lender, often an index fund or another long-term holder, takes cash collateral of about 102% of the shares' value, marked daily (D'Avolio 2002); you pay it every dividend as a "manufactured" dividend; and it can <em>recall</em> the shares at any time, leaving you only days to return them or borrow elsewhere — three in D'Avolio's T+3-era data, and less under today's US T+1 settlement cycle (as of 2026).</p>
+
+<p>The <strong>borrow fee</strong> is the annual rate, charged daily on the loan's value, that the lender earns. With cash collateral it is netted from the <em>rebate</em> the lender pays on your cash: a 5% cash rate and a 1.5% fee give a 3.5% rebate (D'Avolio's example). In D'Avolio's data (April 2000 to September 2001), 91% of the stocks on loan cost under 1% a year — <em>general collateral</em>, with a value-weighted mean fee of 17 basis points — while the 9% of <em>specials</em> averaged 4.3%, a few reaching 50%. Recalls hit 2% of loaned stocks in an average month, but fees and recalls both rise with disagreement about a stock, exactly where shorts cluster. Engelberg, Reed and Ringgenberg (2018) show that this short-selling risk is priced: stocks with more of it have lower returns and less short selling.</p>
+
+<p>Margin works as in <a class="xref" href="session04-futures.html#s6" data-xref="2.4#s6" data-style="short" data-auto="">Session 2.4</a>, with one difference: securities margin is a percentage of the position's value, not 2.4's dollars per contract.</p>
+
+<table>
+<thead><tr><th>Cost or rule</th><th>Size or requirement (source; rules as of 2026)</th></tr></thead>
+<tbody>
+<tr><td>Borrow fee</td><td>under 1% a year for 91% of stocks; specials 4.3% on average; extremes near 50% (D'Avolio 2002); GameStop about 25% in January 2021 (SEC staff 2021)</td></tr>
+<tr><td><a class="term" href="session04-futures.html#g-initial-margin" data-term="initial margin">Initial margin</a> (US)</td><td>the sale proceeds plus 50% of the position — 150% in all (Regulation T)</td></tr>
+<tr><td><a class="term" href="session04-futures.html#g-maintenance-margin" data-term="maintenance margin">Maintenance margin</a> (US)</td><td>equity of at least 30% of the shares' current value or $5 a share, whichever is greater, for stocks at $5 or more; brokers may ask for more (FINRA Rule 4210)</td></tr>
+<tr><td>Circuit breaker (US)</td><td>after a 10% fall from the prior close, short sales only above the best bid, that day and the next (Regulation SHO Rule 201)</td></tr>
+<tr><td>EU</td><td>no uncovered short sales of shares (Art. 12); net short positions reported to the regulator from 0.1% of share capital (Art. 5, as amended by Delegated Regulation 2022/27, from 31 January 2022) and published from 0.5% (Art. 6) — Regulation (EU) No 236/2012</td></tr>
+</tbody>
+</table>
+
+<div class="co note"><span class="co-t">🧭 Margin note — short-selling bans, and what they did</span>
+<p>Regulators reach for bans in crises. Studying the bans of 2008–09 across 30 countries, Beber and Pagano (2013) found they hurt liquidity (most for small, volatile stocks without listed options), slowed price discovery, and failed to support prices except possibly for US financial stocks. <span class="xref soon" data-xref="6.5" data-style="short" data-auto="" title="Coming soon">Session 6.5</span> turns fees and constraints into the <span class="term soon" data-term="borrow cost" title="Defined in Session 6.5 (coming soon)">borrow cost</span> line of a strategy's <a class="term" href="session03-returns-pnl-leverage.html#g-p-l" data-term="P&amp;L">P&amp;L</a>.</p>
+</div>
+</section>
+
+<section id="s7">
+<h2><span class="no">2.2.7</span> Short P&amp;L, squeezes &amp; GameStop</h2>
+<p class="lede">A short's payoff is a long's turned upside down, and the flip is not symmetric: at most you make 100%, and the loss has no ceiling.</p>
+
+<p>Short one share at <math><semantics><msub><mi>P</mi><mn>0</mn></msub><annotation encoding="application/x-tex">P_0</annotation></semantics></math> for <math><semantics><mi>n</mi><annotation encoding="application/x-tex">n</annotation></semantics></math> trading days, paying a borrow fee <math><semantics><mi>κ</mi><annotation encoding="application/x-tex">\kappa</annotation></semantics></math> and dividends at a yield <math><semantics><mi>q</mi><annotation encoding="application/x-tex">q</annotation></semantics></math>, both accruing daily on the current price:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><mtext>P&amp;L</mtext><mo>=</mo><msub><mi>P</mi><mn>0</mn></msub><mo>−</mo><msub><mi>P</mi><mi>n</mi></msub><mo>−</mo><mfrac><mrow><mi>q</mi><mo>+</mo><mi>κ</mi></mrow><mn>252</mn></mfrac><mrow><munderover><mo movablelimits="false">∑</mo><mrow><mi>t</mi><mo>=</mo><mn>0</mn></mrow><mrow><mi>n</mi><mo>−</mo><mn>1</mn></mrow></munderover></mrow><msub><mi>P</mi><mi>t</mi></msub></mrow><annotation encoding="application/x-tex">\text{P\&amp;L} = P_0 - P_n - \frac{q + \kappa}{252} \sum_{t=0}^{n-1} P_t</annotation></semantics></math></div>
+<p>The profit is capped at <math><semantics><msub><mi>P</mi><mn>0</mn></msub><annotation encoding="application/x-tex">P_0</annotation></semantics></math>; <math><semantics><msub><mi>P</mi><mi>n</mi></msub><annotation encoding="application/x-tex">P_n</annotation></semantics></math> is not. If the stock's expected total return is <math><semantics><mi>μ</mi><annotation encoding="application/x-tex">\mu</annotation></semantics></math>, its price is expected to grow at <math><semantics><mrow><mi>μ</mi><mo>−</mo><mi>q</mi></mrow><annotation encoding="application/x-tex">\mu - q</annotation></semantics></math>, and with <math><semantics><mrow><mi>a</mi><mo>=</mo><msup><mi>e</mi><mrow class="tml-sml-pad"><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>μ</mi><mo>−</mo><mi>q</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mi>/</mi><mn>252</mn></mrow></msup></mrow><annotation encoding="application/x-tex">a = e^{(\mu - q)/252}</annotation></semantics></math>:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><mi>𝔼</mi><mo form="prefix" stretchy="false">[</mo><mtext>P&amp;L</mtext><mo form="postfix" stretchy="false">]</mo><mo>=</mo><msub><mi>P</mi><mn>0</mn></msub><mo fence="true" symmetric="true" minsize="1.2em" maxsize="1.2em">(</mo><mn>1</mn><mo>−</mo><msup><mi>a</mi><mi>n</mi></msup><mo fence="true" symmetric="true" minsize="1.2em" maxsize="1.2em">)</mo><mo>−</mo><mfrac><mrow><mi>q</mi><mo>+</mo><mi>κ</mi></mrow><mn>252</mn></mfrac><mspace width="0.1667em"></mspace><msub><mi>P</mi><mn>0</mn></msub><mrow><munderover><mo movablelimits="false">∑</mo><mrow><mi>t</mi><mo>=</mo><mn>0</mn></mrow><mrow><mi>n</mi><mo>−</mo><mn>1</mn></mrow></munderover></mrow><msup><mi>a</mi><mi>t</mi></msup></mrow><annotation encoding="application/x-tex">\E[\text{P\&amp;L}] = P_0\bigl(1 - a^{n}\bigr) - \frac{q + \kappa}{252}\, P_0 \sum_{t=0}^{n-1} a^{t}</annotation></semantics></math></div>
+<p>A short pays the stock's expected total return plus the fee, in excess of any rebate your collateral earns (zero here): it needs a genuine negative forecast to pay its way. The lab's crowded short: price <span data-lab="short_p0" data-fmt="$.0f">$50</span>, expected total return <span data-lab="short_mu" data-fmt=".0%">8%</span>, dividend yield <span data-lab="short_q" data-fmt=".0%">2%</span>, volatility <span data-lab="short_sigma" data-fmt=".0%">50%</span>, fee <span data-lab="short_fee" data-fmt=".0%">5%</span>, <span data-lab="short_n" data-fmt=",d">20,000</span> one-year paths, with a risk-free rate of zero so the collateral earns nothing. World A is a <span class="term soon" data-term="geometric Brownian motion" title="Defined in Session 3.5 (coming soon)">geometric Brownian motion</span>. World B adds <strong>short squeezes</strong> — sudden rallies that force shorts to buy back, which pushes the price higher still: <span data-lab="short_lambda" data-fmt=".1f">0.3</span> a year on average, each lifting the price <span data-lab="short_jump" data-fmt=".0%">80%</span> in a day, with the drift lowered so the expected price path is identical.</p>
+
+<table>
+<thead><tr><th>Short, one year (return on the initial short value)</th><th>World A: no squeezes</th><th>World B: squeezes</th></tr></thead>
+<tbody>
+<tr><td>Average return (theory <span data-lab="short_theory_ret" data-fmt=".1%">−13.4%</span> in both)</td><td><span data-lab="short_a_mean_ret" data-fmt=".1%">−13.8%</span></td><td><span data-lab="short_b_mean_ret" data-fmt=".1%">−13.0%</span></td></tr>
+<tr><td>P(any profit)</td><td><span data-lab="short_a_p_profit" data-fmt=".1%">49.3%</span></td><td><span data-lab="short_b_p_profit" data-fmt=".1%">55.2%</span></td></tr>
+<tr><td>P(lose more than the whole initial value)</td><td><span data-lab="short_a_p_loss100" data-fmt=".1%">8.0%</span></td><td><span data-lab="short_b_p_loss100" data-fmt=".1%">9.9%</span></td></tr>
+<tr><td>P(the price doubles by year-end) — theory</td><td><span data-lab="short_a_p_double" data-fmt=".1%">6.7%</span> — <span data-lab="short_a_p_double_theory" data-fmt=".1%">6.5%</span></td><td><span data-lab="short_b_p_double" data-fmt=".1%">8.6%</span> — <span data-lab="short_b_p_double_theory" data-fmt=".1%">8.7%</span></td></tr>
+<tr><td>P(<a class="term" href="session04-futures.html#g-margin-call" data-term="margin call">margin call</a> within the year), price test only</td><td><span data-lab="short_a_p_call" data-fmt=".1%">71.8%</span> (theory <span data-lab="short_a_p_call_theory" data-fmt=".1%">71.5%</span>)</td><td><span data-lab="short_b_p_call" data-fmt=".1%">67.6%</span></td></tr>
+<tr><td>P(margin call), counting accrued fees and dividends</td><td><span data-lab="short_a_p_call_net" data-fmt=".1%">73.8%</span></td><td><span data-lab="short_b_p_call_net" data-fmt=".1%">69.6%</span></td></tr>
+<tr><td>P(called, yet the price ended below entry)</td><td><span data-lab="short_a_p_right_but_called" data-fmt=".1%">29.4%</span></td><td><span data-lab="short_b_p_right_but_called" data-fmt=".1%">30.2%</span></td></tr>
+<tr><td>1st percentile of returns</td><td><span data-lab="short_a_q01" data-fmt=".0%">−213%</span></td><td><span data-lab="short_b_q01" data-fmt=".0%">−304%</span></td></tr>
+</tbody>
+</table>
+
+<p>The averages match the formula in both worlds, and world A's price-test call rate matches the barrier formula of <a class="xref" href="session04-futures.html#s7" data-xref="2.4#s7" data-style="short" data-auto="">Session 2.4</a> (the lab asserts both at four standard errors). Squeezes change the shape, not the mean. World B wins <em>more often</em> and loses <em>bigger</em> (fig 2.2.9) — the negative <span class="term soon" data-term="skewness" title="Defined in Session 3.2 (coming soon)">skewness</span> that makes shorting feel easy until it isn't. Then margin: equity is the cash (150% of the entry value) minus the shares owed, and a call comes when it falls below 30% of their value, <math><semantics><mrow><mn>1.5</mn><msub><mi>P</mi><mn>0</mn></msub><mo>−</mo><mi>P</mi><mo>=</mo><mn>0.3</mn><mi>P</mi></mrow><annotation encoding="application/x-tex">1.5P_0 - P = 0.3P</annotation></semantics></math>, so <math><semantics><mrow><msup><mi>P</mi><mo form="prefix" stretchy="false" class="tml-med-pad">⋆</mo></msup><mo>=</mo><mstyle displaystyle="false" scriptlevel="0"><mfrac><mn>1.5</mn><mn>1.3</mn></mfrac></mstyle><msub><mi>P</mi><mn>0</mn></msub></mrow><annotation encoding="application/x-tex">P^\star = \tfrac{1.5}{1.3}P_0</annotation></semantics></math> — a rise of only <span data-lab="short_call_rise" data-fmt=".1%">15.4%</span>, to <span data-lab="short_barrier" data-fmt="$.2f">$57.69</span>, a move this volatile stock makes routinely. That ignores the accrued fees and dividends, which lower the call price as the year goes on: counting them, <span data-lab="short_a_p_call_net" data-fmt=".1%">73.8%</span> of world-A paths get a call.</p>
+
+<figure class="diagram chart">
+<!-- chart:short_hist -->
+<svg viewBox="0 0 720 280" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="One−year return of a short, world B (20,000 paths; losses below −300% shown at −300%)">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">ONE−YEAR RETURN OF A SHORT, WORLD B (20,000 PATHS; LOSSES BELOW −300% SHOWN AT −300%)</text>
+  <line x1="64" y1="197.7" x2="680" y2="197.7" stroke="#E4E8EC" stroke-width="1"/>
+  <line x1="64" y1="151.4" x2="680" y2="151.4" stroke="#E4E8EC" stroke-width="1"/>
+  <line x1="64" y1="105.1" x2="680" y2="105.1" stroke="#E4E8EC" stroke-width="1"/>
+  <line x1="64" y1="58.8" x2="680" y2="58.8" stroke="#E4E8EC" stroke-width="1"/>
+  <line x1="64" y1="244" x2="680" y2="244" stroke="#C9CFC6" stroke-width="1"/>
+  <line x1="64" y1="244" x2="64" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="64" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">−300%</text>
+  <line x1="221.9" y1="244" x2="221.9" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="221.9" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">−200%</text>
+  <line x1="379.8" y1="244" x2="379.8" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="379.8" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">−100%</text>
+  <line x1="537.7" y1="244" x2="537.7" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="537.7" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">0%</text>
+  <rect x="64.5" y="206.7" width="8.6" height="37.3" fill="#D64B2A" fill-opacity="0.55"><title>−300% to −294%</title></rect>
+  <rect x="74.1" y="241.6" width="8.6" height="2.4" fill="#D64B2A" fill-opacity="0.55"><title>−294% to −288%</title></rect>
+  <rect x="83.8" y="241.6" width="8.6" height="2.4" fill="#D64B2A" fill-opacity="0.55"><title>−288% to −282%</title></rect>
+  <rect x="93.4" y="240.8" width="8.6" height="3.2" fill="#D64B2A" fill-opacity="0.55"><title>−282% to −276%</title></rect>
+  <rect x="103" y="240.3" width="8.6" height="3.7" fill="#D64B2A" fill-opacity="0.55"><title>−276% to −270%</title></rect>
+  <rect x="112.6" y="239.9" width="8.6" height="4.1" fill="#D64B2A" fill-opacity="0.55"><title>−270% to −263%</title></rect>
+  <rect x="122.2" y="241" width="8.6" height="3" fill="#D64B2A" fill-opacity="0.55"><title>−263% to −257%</title></rect>
+  <rect x="131.9" y="241.9" width="8.6" height="2.1" fill="#D64B2A" fill-opacity="0.55"><title>−257% to −251%</title></rect>
+  <rect x="141.5" y="241" width="8.6" height="3" fill="#D64B2A" fill-opacity="0.55"><title>−251% to −245%</title></rect>
+  <rect x="151.1" y="240.7" width="8.6" height="3.3" fill="#D64B2A" fill-opacity="0.55"><title>−245% to −239%</title></rect>
+  <rect x="160.8" y="240" width="8.6" height="4" fill="#D64B2A" fill-opacity="0.55"><title>−239% to −233%</title></rect>
+  <rect x="170.4" y="240.8" width="8.6" height="3.2" fill="#D64B2A" fill-opacity="0.55"><title>−233% to −227%</title></rect>
+  <rect x="180" y="239.9" width="8.6" height="4.1" fill="#D64B2A" fill-opacity="0.55"><title>−227% to −221%</title></rect>
+  <rect x="189.6" y="240" width="8.6" height="4" fill="#D64B2A" fill-opacity="0.55"><title>−221% to −215%</title></rect>
+  <rect x="199.3" y="237.9" width="8.6" height="6.1" fill="#D64B2A" fill-opacity="0.55"><title>−215% to −209%</title></rect>
+  <rect x="208.9" y="240" width="8.6" height="4" fill="#D64B2A" fill-opacity="0.55"><title>−209% to −202%</title></rect>
+  <rect x="218.5" y="238.3" width="8.6" height="5.7" fill="#D64B2A" fill-opacity="0.55"><title>−202% to −196%</title></rect>
+  <rect x="228.1" y="237.1" width="8.6" height="6.9" fill="#D64B2A" fill-opacity="0.55"><title>−196% to −190%</title></rect>
+  <rect x="237.8" y="237.3" width="8.6" height="6.7" fill="#D64B2A" fill-opacity="0.55"><title>−190% to −184%</title></rect>
+  <rect x="247.4" y="236.2" width="8.6" height="7.8" fill="#D64B2A" fill-opacity="0.55"><title>−184% to −178%</title></rect>
+  <rect x="257" y="234.9" width="8.6" height="9.1" fill="#D64B2A" fill-opacity="0.55"><title>−178% to −172%</title></rect>
+  <rect x="266.6" y="235.9" width="8.6" height="8.1" fill="#D64B2A" fill-opacity="0.55"><title>−172% to −166%</title></rect>
+  <rect x="276.2" y="233.8" width="8.6" height="10.2" fill="#D64B2A" fill-opacity="0.55"><title>−166% to −160%</title></rect>
+  <rect x="285.9" y="231.7" width="8.6" height="12.3" fill="#D64B2A" fill-opacity="0.55"><title>−160% to −154%</title></rect>
+  <rect x="295.5" y="232.2" width="8.6" height="11.8" fill="#D64B2A" fill-opacity="0.55"><title>−154% to −148%</title></rect>
+  <rect x="305.1" y="229.3" width="8.6" height="14.7" fill="#D64B2A" fill-opacity="0.55"><title>−148% to −142%</title></rect>
+  <rect x="314.8" y="229" width="8.6" height="15" fill="#D64B2A" fill-opacity="0.55"><title>−142% to −135%</title></rect>
+  <rect x="324.4" y="227.7" width="8.6" height="16.3" fill="#D64B2A" fill-opacity="0.55"><title>−135% to −129%</title></rect>
+  <rect x="334" y="225.7" width="8.6" height="18.3" fill="#D64B2A" fill-opacity="0.55"><title>−129% to −123%</title></rect>
+  <rect x="343.6" y="223.1" width="8.6" height="20.9" fill="#D64B2A" fill-opacity="0.55"><title>−123% to −117%</title></rect>
+  <rect x="353.2" y="224.6" width="8.6" height="19.4" fill="#D64B2A" fill-opacity="0.55"><title>−117% to −111%</title></rect>
+  <rect x="362.9" y="222.2" width="8.6" height="21.8" fill="#D64B2A" fill-opacity="0.55"><title>−111% to −105%</title></rect>
+  <rect x="372.5" y="216.6" width="8.6" height="27.4" fill="#3A56C5" fill-opacity="0.55"><title>−105% to −99%</title></rect>
+  <rect x="382.1" y="214.4" width="8.6" height="29.6" fill="#3A56C5" fill-opacity="0.55"><title>−99% to −93%</title></rect>
+  <rect x="391.8" y="213.4" width="8.6" height="30.6" fill="#3A56C5" fill-opacity="0.55"><title>−93% to −87%</title></rect>
+  <rect x="401.4" y="213.2" width="8.6" height="30.8" fill="#3A56C5" fill-opacity="0.55"><title>−87% to −81%</title></rect>
+  <rect x="411" y="206.9" width="8.6" height="37.1" fill="#3A56C5" fill-opacity="0.55"><title>−81% to −74%</title></rect>
+  <rect x="420.6" y="202.2" width="8.6" height="41.8" fill="#3A56C5" fill-opacity="0.55"><title>−74% to −68%</title></rect>
+  <rect x="430.2" y="197.9" width="8.6" height="46.1" fill="#3A56C5" fill-opacity="0.55"><title>−68% to −62%</title></rect>
+  <rect x="439.9" y="195.2" width="8.6" height="48.8" fill="#3A56C5" fill-opacity="0.55"><title>−62% to −56%</title></rect>
+  <rect x="449.5" y="188.5" width="8.6" height="55.5" fill="#3A56C5" fill-opacity="0.55"><title>−56% to −50%</title></rect>
+  <rect x="459.1" y="184.2" width="8.6" height="59.8" fill="#3A56C5" fill-opacity="0.55"><title>−50% to −44%</title></rect>
+  <rect x="468.8" y="167.3" width="8.6" height="76.7" fill="#3A56C5" fill-opacity="0.55"><title>−44% to −38%</title></rect>
+  <rect x="478.4" y="163.7" width="8.6" height="80.3" fill="#3A56C5" fill-opacity="0.55"><title>−38% to −32%</title></rect>
+  <rect x="488" y="161.9" width="8.6" height="82.1" fill="#3A56C5" fill-opacity="0.55"><title>−32% to −26%</title></rect>
+  <rect x="497.6" y="149.2" width="8.6" height="94.8" fill="#3A56C5" fill-opacity="0.55"><title>−26% to −20%</title></rect>
+  <rect x="507.2" y="136.1" width="8.6" height="107.9" fill="#3A56C5" fill-opacity="0.55"><title>−20% to −14%</title></rect>
+  <rect x="516.9" y="120.2" width="8.6" height="123.8" fill="#3A56C5" fill-opacity="0.55"><title>−14% to −7%</title></rect>
+  <rect x="526.5" y="111.7" width="8.6" height="132.3" fill="#3A56C5" fill-opacity="0.55"><title>−7% to −1%</title></rect>
+  <rect x="536.1" y="107.7" width="8.6" height="136.3" fill="#3A56C5" fill-opacity="0.55"><title>−1% to 5%</title></rect>
+  <rect x="545.8" y="98.3" width="8.6" height="145.7" fill="#3A56C5" fill-opacity="0.55"><title>5% to 11%</title></rect>
+  <rect x="555.4" y="89.7" width="8.6" height="154.3" fill="#3A56C5" fill-opacity="0.55"><title>11% to 17%</title></rect>
+  <rect x="565" y="68.2" width="8.6" height="175.8" fill="#3A56C5" fill-opacity="0.55"><title>17% to 23%</title></rect>
+  <rect x="574.6" y="58.8" width="8.6" height="185.2" fill="#3A56C5" fill-opacity="0.55"><title>23% to 29%</title></rect>
+  <rect x="584.2" y="59.5" width="8.6" height="184.5" fill="#3A56C5" fill-opacity="0.55"><title>29% to 35%</title></rect>
+  <rect x="593.9" y="68.5" width="8.6" height="175.5" fill="#3A56C5" fill-opacity="0.55"><title>35% to 41%</title></rect>
+  <rect x="603.5" y="70.8" width="8.6" height="173.2" fill="#3A56C5" fill-opacity="0.55"><title>41% to 47%</title></rect>
+  <rect x="613.1" y="86.9" width="8.6" height="157.1" fill="#3A56C5" fill-opacity="0.55"><title>47% to 54%</title></rect>
+  <rect x="622.8" y="119.2" width="8.6" height="124.8" fill="#3A56C5" fill-opacity="0.55"><title>54% to 60%</title></rect>
+  <rect x="632.4" y="158.9" width="8.6" height="85.1" fill="#3A56C5" fill-opacity="0.55"><title>60% to 66%</title></rect>
+  <rect x="642" y="187.9" width="8.6" height="56.1" fill="#3A56C5" fill-opacity="0.55"><title>66% to 72%</title></rect>
+  <rect x="651.6" y="218.3" width="8.6" height="25.7" fill="#3A56C5" fill-opacity="0.55"><title>72% to 78%</title></rect>
+  <rect x="661.2" y="237.3" width="8.6" height="6.7" fill="#3A56C5" fill-opacity="0.55"><title>78% to 84%</title></rect>
+  <rect x="670.9" y="242.6" width="8.6" height="1.4" fill="#3A56C5" fill-opacity="0.55"><title>84% to 90%</title></rect>
+  <line x1="379.8" y1="42" x2="379.8" y2="244" stroke="#4A5A68" stroke-width="1"/>
+  <text x="374.8" y="38" font-size="10.5" text-anchor="end" fill="#1F2C38">lost more than the initial value ←</text>
+</svg>
+<!-- /chart:short_hist -->
+<figcaption>fig 2.2.9 — a crowded short's one-year return in world B: gains stop short of +100%, losses do not; coral bars lost more than the entire initial short value (the <span data-lab="short_b_share_below_floor" data-fmt=".1%">1.1%</span> of paths below −300% are stacked at −300%)</figcaption>
+</figure>
+
+<p>One path, chosen to illustrate rather than because it is typical: the short was winning, the price down <span data-lab="sq_path_pre_drop" data-fmt=".1%">28.0%</span>, when on trading day <span data-lab="sq_path_day" data-fmt="d">77</span> a squeeze lifted it <span data-lab="sq_path_jump_day_ret" data-fmt=".1%">73.0%</span> in one session and breached maintenance. Bought in at the close, the trade returned <span data-lab="sq_path_bought_in_ret" data-fmt=".1%">−26.4%</span>; held, it would have returned <span data-lab="sq_path_held_ret" data-fmt="+.1%">+37.8%</span>, as the price ended the year <span data-lab="sq_path_end_drop" data-fmt=".1%">44.1%</span> below entry (fig 2.2.10). The broker does not care that you would have been right.</p>
+
+<figure class="diagram chart">
+<!-- chart:squeeze_path -->
+<svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Short 100 shares at $50 with 150% collateral: one squeeze path (x = trading days)">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">SHORT 100 SHARES AT $50 WITH 150% COLLATERAL: ONE SQUEEZE PATH (X = TRADING DAYS)</text>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#3A56C5" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">equity, if you could hold on</text>
+  <line x1="249.20000000000002" y1="32" x2="265.20000000000005" y2="32" stroke="#D64B2A" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="271.20000000000005" y="36" font-size="11" fill="#4A5A68">maintenance requirement</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="268" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$0</text>
+  <line x1="64" y1="221.6" x2="602" y2="221.6" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="225.6" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$1.0k</text>
+  <line x1="64" y1="179.2" x2="602" y2="179.2" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="183.2" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$2.0k</text>
+  <line x1="64" y1="136.8" x2="602" y2="136.8" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="140.8" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$3.0k</text>
+  <line x1="64" y1="94.4" x2="602" y2="94.4" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="98.4" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$4.0k</text>
+  <line x1="64" y1="52" x2="602" y2="52" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="56" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$5.0k</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#C9CFC6" stroke-width="1"/>
+  <line x1="64" y1="264" x2="64" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="64" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">0</text>
+  <line x1="170.7" y1="264" x2="170.7" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="170.7" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">50</text>
+  <line x1="277.5" y1="264" x2="277.5" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="277.5" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">100</text>
+  <line x1="384.2" y1="264" x2="384.2" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="384.2" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">150</text>
+  <line x1="491" y1="264" x2="491" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="491" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">200</text>
+  <line x1="597.7" y1="264" x2="597.7" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="597.7" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">250</text>
+  <polyline points="64,158 66.1,150.8 68.3,156 70.4,160.8 72.5,160.1 74.7,151 76.8,147.9 78.9,143.2 81.1,146.9 83.2,140.9 85.3,143.7 87.5,152.7 89.6,163.7 91.8,159.3 93.9,153.3 96,149.4 98.2,141.7 100.3,144.6 102.4,156 104.6,159.6 106.7,152 108.8,147.3 111,143.8 113.1,136.4 115.2,133.6 117.4,134.8 119.5,138.8 121.6,131.8 123.8,132.2 125.9,129.1 128,131.1 130.2,128.4 132.3,123.6 134.5,114.2 136.6,118.4 138.7,103.3 140.9,111.9 143,116.9 145.1,117.2 147.3,121.8 149.4,123.6 151.5,127.1 153.7,126.1 155.8,122.7 157.9,118.1 160.1,119.5 162.2,118.4 164.3,112.9 166.5,113.7 168.6,117.8 170.7,118.9 172.9,112.7 175,120.3 177.2,118.9 179.3,110.2 181.4,116.3 183.6,114.4 185.7,115.8 187.8,118.6 190,124.5 192.1,125.3 194.2,115.8 196.4,118.5 198.5,122.2 200.6,120.7 202.8,110.8 204.9,110.2 207,110.9 209.2,117 211.3,112.6 213.4,112.9 215.6,113.1 217.7,99.9 219.8,103.2 222,100.7 224.1,101.6 226.3,102.5 228.4,214.1 230.5,199.1 232.7,211.6 234.8,225.1 236.9,213.4 239.1,201.2 241.2,198.3 243.3,176.8 245.5,176 247.6,171.7 249.7,171.1 251.9,165.1 254,168.9 256.1,176.7 258.3,174 260.4,170.5 262.5,159.6 264.7,157.5 266.8,167.9 269,171.3 271.1,173.3 273.2,168.5 275.4,172.4 277.5,182.9 279.6,189.9 281.8,185.5 283.9,201 286,216.7 288.2,228.9 290.3,241.4 292.4,233.4 294.6,241.6 296.7,231.2 298.8,221.3 301,220.2 303.1,227.5 305.2,222.8 307.4,217.9 309.5,218.7 311.7,221.7 313.8,210.3 315.9,208.7 318.1,212.6 320.2,204.9 322.3,200.3 324.5,199.7 326.6,186.4 328.7,184.5 330.9,185 333,181.9 335.1,189 337.3,178.3 339.4,171.5 341.5,166.1 343.7,162.1 345.8,170.2 347.9,165.6 350.1,165.4 352.2,173.6 354.3,178 356.5,171 358.6,172.1 360.8,160.4 362.9,169.7 365,163.3 367.2,168.1 369.3,152.8 371.4,157.6 373.6,146.3 375.7,151.6 377.8,149.1 380,148.8 382.1,148.4 384.2,151.7 386.4,158.6 388.5,151.4 390.6,151.2 392.8,146 394.9,150.9 397,153.2 399.2,148.3 401.3,149.6 403.5,145.2 405.6,140.6 407.7,139.1 409.9,141.3 412,137.5 414.1,129.5 416.3,124.4 418.4,128.7 420.5,136 422.7,125.8 424.8,129.2 426.9,124.6 429.1,121.5 431.2,121.6 433.3,123.9 435.5,122.4 437.6,125.7 439.7,134.7 441.9,133.8 444,134.5 446.2,121 448.3,121.8 450.4,126.2 452.6,133.3 454.7,144.8 456.8,147.5 459,150.3 461.1,154.3 463.2,151.7 465.4,146.5 467.5,140.7 469.6,136.3 471.8,141.1 473.9,144.1 476,143.9 478.2,143.5 480.3,149.5 482.4,143.4 484.6,138.9 486.7,130.1 488.8,129.2 491,131.6 493.1,124.6 495.3,124.9 497.4,122.7 499.5,115.5 501.7,117.8 503.8,124.5 505.9,127.5 508.1,115.1 510.2,126.8 512.3,117.8 514.5,113.5 516.6,110.5 518.7,111.9 520.9,110.7 523,107.9 525.1,104.5 527.3,99 529.4,91.7 531.5,99.3 533.7,97.7 535.8,105.8 538,105.2 540.1,99.7 542.2,103.7 544.4,98 546.5,92.5 548.6,90.5 550.8,92.5 552.9,96.1 555,91.9 557.2,98.8 559.3,100 561.4,99.9 563.6,93.3 565.7,101.7 567.8,93.2 570,103.9 572.1,97.6 574.2,91.6 576.4,93.2 578.5,93.9 580.7,90.6 582.8,88.4 584.9,84.9 587.1,82.2 589.2,82.5 591.3,82.8 593.5,84.6 595.6,78.4 597.7,79.1 599.9,79.6 602,77.8" fill="none" stroke="#3A56C5" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>equity, if you could hold on</title></polyline>
+  <circle cx="602" cy="77.8" r="4" fill="#3A56C5" stroke="#FBFBF8" stroke-width="2"><title>equity, if you could hold on: $4.4k</title></circle>
+  <polyline points="64,200.4 66.1,202.6 68.3,201 70.4,199.6 72.5,199.8 74.7,202.6 76.8,203.5 78.9,205 81.1,203.9 83.2,205.7 85.3,204.9 87.5,202.2 89.6,198.9 91.8,200.2 93.9,202 96,203.2 98.2,205.6 100.3,204.7 102.4,201.3 104.6,200.3 106.7,202.5 108.8,204 111,205 113.1,207.3 115.2,208.1 117.4,207.8 119.5,206.6 121.6,208.7 123.8,208.6 125.9,209.5 128,209 130.2,209.8 132.3,211.2 134.5,214.1 136.6,212.8 138.7,217.4 140.9,214.8 143,213.3 145.1,213.3 147.3,211.9 149.4,211.4 151.5,210.3 153.7,210.6 155.8,211.7 157.9,213.1 160.1,212.7 162.2,213 164.3,214.7 166.5,214.5 168.6,213.2 170.7,212.9 172.9,214.8 175,212.5 177.2,213 179.3,215.6 181.4,213.8 183.6,214.4 185.7,213.9 187.8,213.1 190,211.4 192.1,211.1 194.2,214 196.4,213.2 198.5,212.1 200.6,212.6 202.8,215.6 204.9,215.8 207,215.6 209.2,213.7 211.3,215.1 213.4,215 215.6,214.9 217.7,218.9 219.8,217.9 222,218.7 224.1,218.5 226.3,218.2 228.4,184.7 230.5,189.3 232.7,185.5 234.8,181.5 236.9,185 239.1,188.7 241.2,189.6 243.3,196.1 245.5,196.3 247.6,197.6 249.7,197.8 251.9,199.7 254,198.5 256.1,196.2 258.3,197 260.4,198.1 262.5,201.4 264.7,202 266.8,198.9 269,197.9 271.1,197.4 273.2,198.8 275.4,197.7 277.5,194.5 279.6,192.4 281.8,193.8 283.9,189.2 286,184.5 288.2,180.8 290.3,177.1 292.4,179.5 294.6,177.1 296.7,180.2 298.8,183.2 301,183.6 303.1,181.4 305.2,182.9 307.4,184.3 309.5,184.1 311.7,183.2 313.8,186.7 315.9,187.2 318.1,186 320.2,188.4 322.3,189.8 324.5,190 326.6,194 328.7,194.6 330.9,194.4 333,195.4 335.1,193.3 337.3,196.5 339.4,198.6 341.5,200.2 343.7,201.4 345.8,199 347.9,200.4 350.1,200.5 352.2,198 354.3,196.7 356.5,198.9 358.6,198.5 360.8,202.1 362.9,199.3 365,201.2 367.2,199.8 369.3,204.4 371.4,203 373.6,206.4 375.7,204.8 377.8,205.6 380,205.7 382.1,205.8 384.2,204.9 386.4,202.8 388.5,205 390.6,205.1 392.8,206.7 394.9,205.2 397,204.5 399.2,206 401.3,205.6 403.5,207 405.6,208.4 407.7,208.8 409.9,208.2 412,209.3 414.1,211.8 416.3,213.3 418.4,212 420.5,209.9 422.7,212.9 424.8,211.9 426.9,213.3 429.1,214.3 431.2,214.2 433.3,213.6 435.5,214 437.6,213 439.7,210.4 441.9,210.6 444,210.5 446.2,214.5 448.3,214.3 450.4,213 452.6,210.9 454.7,207.5 456.8,206.6 459,205.8 461.1,204.6 463.2,205.4 465.4,207 467.5,208.8 469.6,210.1 471.8,208.7 473.9,207.8 476,207.9 478.2,208 480.3,206.2 482.4,208.1 484.6,209.4 486.7,212.1 488.8,212.4 491,211.7 493.1,213.8 495.3,213.7 497.4,214.4 499.5,216.6 501.7,215.9 503.8,213.9 505.9,213 508.1,216.7 510.2,213.2 512.3,215.9 514.5,217.2 516.6,218.2 518.7,217.8 520.9,218.1 523,219 525.1,220 527.3,221.7 529.4,223.9 531.5,221.6 533.7,222.1 535.8,219.7 538,219.9 540.1,221.5 542.2,220.3 544.4,222.1 546.5,223.7 548.6,224.3 550.8,223.7 552.9,222.7 555,223.9 557.2,221.9 559.3,221.6 561.4,221.6 563.6,223.6 565.7,221.1 567.8,223.6 570,220.4 572.1,222.3 574.2,224.1 576.4,223.7 578.5,223.5 580.7,224.5 582.8,225.2 584.9,226.2 587.1,227 589.2,226.9 591.3,226.9 593.5,226.3 595.6,228.2 597.7,228 599.9,227.9 602,228.4" fill="none" stroke="#D64B2A" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>maintenance requirement</title></polyline>
+  <circle cx="602" cy="228.4" r="4" fill="#D64B2A" stroke="#FBFBF8" stroke-width="2"><title>maintenance requirement: $839</title></circle>
+  <text x="614" y="81.8" font-size="11" fill="#1F2C38">equity: $4.4k</text>
+  <text x="614" y="232.4" font-size="11" fill="#1F2C38">maintenance: $839</text>
+</svg>
+<!-- /chart:squeeze_path -->
+<figcaption>fig 2.2.10 — <span data-lab="sq_shares" data-fmt="d">100</span> shares shorted at <span data-lab="short_p0" data-fmt="$.0f">$50</span> with <span data-lab="short_regt" data-fmt=".0%">150%</span> collateral: one squeeze day drives the account's equity below the maintenance requirement, months before the price collapses</figcaption>
+</figure>
+
+<h3>GameStop, January 2021</h3>
+<p>The textbook squeeze is GameStop (GME), documented in the SEC staff report of 14 October 2021. Short interest — shares sold short as a share of the float — reached 122.97% in January 2021, possible because a borrowed share, once sold, can be lent and shorted again, and borrowing cost about 25% a year. The price surged from 13 January, closed at a high of $347.51 on 27 January — more than 1,600% above its 11 January close — and touched $483.00 intraday on the 28th, when several retail brokers restricted trading after the <a class="term" href="session01-market-anatomy.html#g-clearing-house" data-term="clearing house">clearing house</a>'s margin calls (<a class="xref" href="session01-market-anatomy.html#s6" data-xref="2.1#s6" data-auto="">Session 2.1 — Market Anatomy &amp; the Life of an Order</a>). Some funds closed their shorts at large losses; by 19 February the price had fallen as low as $40.59. The staff found that short covering added to the rise at times, but concluded that "it was the positive sentiment, not the buying-to-cover, that sustained the weeks-long price appreciation."</p>
+
+<div class="co key"><span class="co-t">📌 Key idea — a short is a callable loan with unlimited liability</span>
+<p>You pay a variable fee and every dividend, the lender can end the loan at will, and your broker will end it after a modest rise. <mark>Size a short by the squeeze you can fund, not by how sure you are.</mark> The same frictions explain why overpriced stocks can stay overpriced — the <span class="term soon" data-term="limits to arbitrage" title="Defined in Session 7.1 (coming soon)">limits to arbitrage</span> of <span class="xref soon" data-xref="7.1" data-style="short" data-auto="" title="Coming soon">Session 7.1</span>.</p>
+</div>
+</section>
+
+<section id="s8">
+<h2><span class="no">2.2.8</span> Where people go wrong</h2>
+<p class="lede">None of these mistakes raises an exception. Each one changes a backtest's verdict.</p>
+
+<table>
+<thead><tr><th>Mistake</th><th>Symptom (in the lab)</th><th>Fix</th></tr></thead>
+<tbody>
+<tr><td>Returns from quoted prices across a split</td><td>a <span data-lab="split_naive_day" data-fmt=".1%">−75.0%</span> day; CAGR <span data-lab="split_naive_cagr" data-fmt=".2%">−4.74%</span>, not <span data-lab="split_true_cagr" data-fmt=".2%">9.42%</span></td><td>adjust for every corporate action (<span class="xref soon" data-xref="4.3" data-style="short" data-auto="" title="Coming soon">Session 4.3</span>)</td></tr>
+<tr><td>A price index used as a total return</td><td><span data-lab="div_cagr_gap_pp" data-fmt=".1f">2.1</span> percentage points a year missing at a <span data-lab="div_yield" data-fmt=".0%">2%</span> yield</td><td>use total-return series</td></tr>
+<tr><td>A price-weighted index without a divisor reset</td><td>a <span data-lab="pw_naive_split_day" data-fmt=".1%">−55.0%</span> "crash" on the split day</td><td>reset the divisor at every corporate action</td></tr>
+<tr><td>Backtesting today's index members</td><td>only survivors; past losers silently dropped</td><td>point-in-time membership (<span class="xref soon" data-xref="4.2" data-style="short" data-auto="" title="Coming soon">Session 4.2</span>)</td></tr>
+<tr><td>Treating ETF price and NAV as one number</td><td>phantom arbitrage; in stress you trade at the price</td><td>know who can arbitrage, at what cost</td></tr>
+<tr><td>Short P&amp;L = −(long P&amp;L)</td><td>fees, dividends, recalls and margin calls ignored</td><td>model the borrow cost and the margin path</td></tr>
+</tbody>
+</table>
+
+<div class="co warn"><span class="co-t">⚠️ Pitfall — "a short is a long with a minus sign"</span>
+<p>Short <span data-lab="ex_shares" data-fmt=",d">1,000</span> shares at <span data-lab="ex_p_in" data-fmt="$.0f">$50</span>; a year later they are at <span data-lab="ex_p_out" data-fmt="$.0f">$45</span>. You were right: <span data-lab="ex_price_pnl" data-fmt="$,.0f">$5,000</span> on the price. But you owe <span data-lab="ex_div_owed" data-fmt="$,.0f">$1,000</span> of dividends plus a fee on the <span data-lab="ex_notional" data-fmt="$,.0f">$50,000</span> borrowed (on the starting value, for simplicity). As general collateral at <span data-lab="ex_fee_gc_rate" data-fmt=".2%">0.25%</span> the fee is <span data-lab="ex_fee_gc" data-fmt="$,.0f">$125</span> and you keep <span data-lab="ex_net_gc" data-fmt="$,.0f">$3,875</span>; as a special at <span data-lab="ex_fee_special_rate" data-fmt=".0%">5%</span>, <span data-lab="ex_fee_special" data-fmt="$,.0f">$2,500</span>, leaving <span data-lab="ex_net_special" data-fmt="$,.0f">$1,500</span>; hard to borrow at <span data-lab="ex_fee_htb_rate" data-fmt=".0%">15%</span>, <span data-lab="ex_fee_htb" data-fmt="$,.0f">$7,500</span> — and you lose <span data-lab="ex_loss_htb" data-fmt="$,.0f">$3,500</span> on a correct call.</p>
+</div>
+</section>
+
+<section id="s9">
+<h2><span class="no">2.2.9</span> Try it</h2>
+<p class="lede">Open the companion lab, predict before you run, and break things on purpose.</p>
+
+<div class="co lab"><span class="co-t">🔧 Try it (15 min, in the lab)</span>
+<p>1. In section 2, set <code>SPLIT_RATIO = 10</code>. First predict the naive split-day "return" and <em>Pricey</em>'s new price weight: at price <math><semantics><mi>x</mi><annotation encoding="application/x-tex">x</annotation></semantics></math>, with the other three summing to <math><semantics><mi>y</mi><annotation encoding="application/x-tex">y</annotation></semantics></math>, its weight goes from <math><semantics><mrow><mi>x</mi><mi>/</mi><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>x</mi><mo>+</mo><mi>y</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">x/(x+y)</annotation></semantics></math> to <math><semantics><mstyle displaystyle="false" scriptlevel="0"><mfrac><mrow><mi>x</mi><mi>/</mi><mn>10</mn></mrow><mrow><mi>y</mi><mo>+</mo><mi>x</mi><mi>/</mi><mn>10</mn></mrow></mfrac></mstyle><annotation encoding="application/x-tex">\tfrac{x/10}{y + x/10}</annotation></semantics></math>.<br>
+2. In section 7, raise <code>FEE_S</code> from 0.05 to 0.25, GameStop's January 2021 borrow cost. Predict the new average return with the <math><semantics><mrow><mi>𝔼</mi><mrow><mo fence="true" form="prefix" stretchy="false">[</mo><mtext>P&amp;L</mtext><mo fence="true" form="postfix" stretchy="false">]</mo></mrow></mrow><annotation encoding="application/x-tex">\E[\text{P\&amp;L}]</annotation></semantics></math> formula, then compare with <code>short_theory_ret</code> and the simulation.<br>
+3. In section 5, set <code>STRESS_C_BP = 15.0</code> so the APs keep working through the stress. What happens to the maximum discount?<br>
+Success: step 1 lands near −90%; step 2's simulation lands within four standard errors of your prediction; and step 3 shows that the cost of arbitrage caps the discount, while inside the cap the selling sets it.</p>
+</div>
+</section>
+
+<hr>
+
+<section id="s10">
+<h2><span class="no">2.2.10</span> Glossary · Check yourself · Go deeper</h2>
+<div class="gloss" id="glossary">
+<div id="g-common-stock"><b>Common stock</b> — a share of ownership: a vote, dividends when paid, and the residual claim on whatever is left after all fixed claims, with limited liability.</div>
+<div id="g-free-float"><b>Free float</b> — the fraction of a company's shares that can actually trade, excluding blocks held by founders, families, governments or other companies.</div>
+<div id="g-dividend"><b>Dividend</b> — cash paid per share to holders; the price drops by about the dividend on the ex-dividend date.</div>
+<div id="g-ex-dividend-date"><b>Ex-dividend date</b> — the first trading day on which a share trades without the right to its next dividend; under US T+1 settlement, normally the record date itself.</div>
+<div id="g-stock-split"><b>Stock split</b> — each share becomes N (or N become one, a reverse split); the price divides (multiplies) by N and the value is unchanged.</div>
+<div id="g-corporate-action"><b>Corporate action</b> — any company-initiated event that changes its shares or pays its holders: dividends, splits, spin-offs, mergers, rights issues, buybacks.</div>
+<div id="g-total-return"><b>Total return</b> — price change plus dividends reinvested, <math><semantics><mrow><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><msub><mi>P</mi><mi>t</mi></msub><mo>+</mo><msub><mi>D</mi><mi>t</mi></msub><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mi>/</mi><msub><mi>P</mi><mrow><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub><mo>−</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">(P_t + D_t)/P_{t-1} - 1</annotation></semantics></math>; the return this course always means.</div>
+<div id="g-index"><b>Index</b> — a number tracking a rule-defined basket: quantity × price summed, over a divisor adjusted so corporate actions leave the level unchanged.</div>
+<div id="g-market-cap-weighting"><b>Market-cap weighting</b> — weighting each stock by its market value (usually float-adjusted); the one rule that needs no trading between index changes.</div>
+<div id="g-etf"><b>ETF</b> — an exchange-traded fund: a basket whose shares trade all day, held near its NAV by creation and redemption.</div>
+<div id="g-net-asset-value"><b>Net asset value</b> — a fund's holdings minus its liabilities, per share (NAV); what a mutual fund deals at and what an ETF's price is compared with.</div>
+<div id="g-authorised-participant"><b>Authorised participant</b> — a large dealer under contract with an ETF, allowed to create and redeem its shares in creation units.</div>
+<div id="g-creation-and-redemption"><b>Creation and redemption</b> — authorised participants swapping the basket for new ETF shares, or ETF shares for the basket, usually in kind; the arbitrage that bounds the premium.</div>
+<div id="g-short-selling"><b>Short selling</b> — borrowing shares, selling them, and later buying them back to return; the gain is capped at 100%, the loss is not.</div>
+<div id="g-borrow-fee"><b>Borrow fee</b> — the annual rate, charged daily on the loan's value, that a short seller pays the lender; under 1% for most stocks, far more for hard-to-borrow ones.</div>
+<div id="g-short-squeeze"><b>Short squeeze</b> — a rally that forces short sellers to buy back, whose buying pushes the price higher and forces yet more buying.</div>
+</div>
+
+<h3>Check yourself</h3>
+<details class="q"><summary>1. A company has $10bn of assets, $6bn of debt and 400 million shares. What is a share worth, and what happens to it if the assets lose 20%?</summary><div>Equity is the residual, $4bn: $10 a share. Assets of $8bn leave $2bn of equity — $5 a share, a 50% fall on a 20% fall in the firm. The residual claim magnifies the firm's moves: the <a class="term" href="session03-returns-pnl-leverage.html#g-leverage" data-term="leverage">leverage</a> of <a class="xref" href="session03-returns-pnl-leverage.html#s6" data-xref="2.3#s6" data-style="short" data-auto="">Session 2.3</a>, inside every stock.</div></details>
+<details class="q"><summary>2. A friend plans to buy the day before the ex-date, collect a $1 dividend and sell next morning. Why is that not free money?</summary><div>The price opens lower by about the dividend, since the share no longer carries it, so the cash is roughly offset by a capital loss (often taxed differently). And one day's random move is several times a quarterly dividend — its standard deviation is <span data-lab="ex_noise_to_signal" data-fmt=".1f">2.6</span> times in the lab — so a single trade is a coin flip plus costs.</div></details>
+<details class="q"><summary>3. In a price-weighted index, one member's weight halves overnight while prices are flat. What happened, and what should your code do?</summary><div>A split: in the lab <em>Pricey</em>'s weight fell from <span data-lab="pw_pricey_w_before" data-fmt=".1%">73.1%</span> to <span data-lab="pw_pricey_w_after" data-fmt=".1%">40.4%</span> at a <span data-lab="split_ratio" data-fmt="d">4</span>-for-1 split, because the index weights by quoted price. Reset the divisor so the level does not jump, and accept the new weight — that is the rule, not a bug.</div></details>
+<details class="q"><summary>4. A bond ETF trades at a 3% discount to NAV in a panic. Can you buy it, redeem it and pocket 3%?</summary><div>No: only APs redeem, in creation units, and they will not if selling the basket costs more than 3% — as in March 2020, when discounts persisted until the Fed's 23 March announcement. Part of the gap may also be a stale NAV. Buying is a bet on the gap closing, not an arbitrage.</div></details>
+<details class="q"><summary>5. You short a <span data-lab="short_p0" data-fmt="$.0f">$50</span> stock with <span data-lab="short_regt" data-fmt=".0%">150%</span> collateral and <span data-lab="short_maint" data-fmt=".0%">30%</span> maintenance. When does the first margin call come, and why does it matter for a volatile stock?</summary><div>On price alone, at <math><semantics><mrow><msup><mi>P</mi><mo form="prefix" stretchy="false" class="tml-med-pad">⋆</mo></msup><mo>=</mo><mn>1.5</mn><msub><mi>P</mi><mn>0</mn></msub><mi>/</mi><mn>1.3</mn><mo>=</mo></mrow><annotation encoding="application/x-tex">P^\star = 1.5P_0/1.3 =</annotation></semantics></math> <span data-lab="short_barrier" data-fmt="$.2f">$57.69</span>, a <span data-lab="short_call_rise" data-fmt=".1%">15.4%</span> rise; accrued fees and dividends bring it a little lower over time. At <span data-lab="short_sigma" data-fmt=".0%">50%</span> volatility the lab's short is called within a year on <span data-lab="short_a_p_call_net" data-fmt=".0%">74%</span> of paths, often while it would have ended the year right. Keep spare cash, or size smaller.</div></details>
+
+<div class="co lab"><span class="co-t">🔧 Homework (~1 h before Session 2.3)</span>
+<p>1. <strong>A total-return function.</strong> Write <code>total_return(prices, dividends)</code> from raw closes and ex-date dividends; compounded over section 4's series it must reproduce <code>tr[-1] / tr[0]</code> to ten decimal places.<br>
+2. <strong>A fifth stock.</strong> Add "Giant" to <code>UNIVERSE</code> (price $2,000, 50 million shares, float 1.0, beta 1.0, volatility 0.25). Predict its price and float-cap weights, then check how <code>vol_ew</code>, <code>vol_cw0</code> and the growth gap change.<br>
+3. <strong>A break-even short.</strong> With <code>MU_S = -0.10</code>, use the <math><semantics><mrow><mi>𝔼</mi><mrow><mo fence="true" form="prefix" stretchy="false">[</mo><mtext>P&amp;L</mtext><mo fence="true" form="postfix" stretchy="false">]</mo></mrow></mrow><annotation encoding="application/x-tex">\E[\text{P\&amp;L}]</annotation></semantics></math> formula to find the borrow fee at which the short only breaks even; confirm it in the lab.<br>
+4. <strong>Read</strong> the creation/redemption section of Lettau &amp; Madhavan (2018) and section 3 of the SEC staff report on GameStop.</p>
+</div>
+
+<h3>📚 Go deeper</h3>
+<ol class="refs">
+<li>Bodie, Z., Kane, A. &amp; Marcus, A. J. (2024). <em>Investments</em>, 13th ed., §2.3 "Equity Securities", §2.4 "Stock and Bond Market Indexes", §3.9 "Short Sales", §4.6 "Exchange-Traded Funds". McGraw Hill. <span class="rid">ISBN 978-1-264-41266-2</span></li>
+<li>Lettau, M. &amp; Madhavan, A. (2018). "Exchange-Traded Funds 101 for Economists." <em>Journal of Economic Perspectives</em> 32(1), 135–154. Points here are drawn from the working-paper version, NBER w24250. <span class="rid">doi:10.1257/jep.32.1.135</span></li>
+<li>D'Avolio, G. (2002). "The Market for Borrowing Stock." <em>Journal of Financial Economics</em> 66(2–3), 271–306. <span class="rid">doi:10.1016/S0304-405X(02)00206-4</span></li>
+<li>Engelberg, J. E., Reed, A. V. &amp; Ringgenberg, M. C. (2018). "Short-Selling Risk." <em>Journal of Finance</em> 73(2), 755–786. <span class="rid">doi:10.1111/jofi.12601</span></li>
+<li>Duffie, D., Gârleanu, N. &amp; Pedersen, L. H. (2002). "Securities Lending, Shorting, and Pricing." <em>Journal of Financial Economics</em> 66(2–3), 307–339. <span class="rid">doi:10.1016/S0304-405X(02)00226-X</span></li>
+</ol>
+
+<h3>Sources for the numbers</h3>
+<ol class="refs">
+<li>SEC staff (2021). "Staff Report on Equity and Options Market Structure Conditions in Early 2021." U.S. Securities and Exchange Commission, 14 October 2021. <span class="rid">https://www.sec.gov/files/staff-report-equity-options-market-struction-conditions-early-2021.pdf</span></li>
+<li>Haddad, V., Moreira, A. &amp; Muir, T. (2021). "When Selling Becomes Viral: Disruptions in Debt Markets in the COVID-19 Crisis and the Fed's Response." <em>Review of Financial Studies</em> 34(11), 5309–5351 <span class="rid">doi:10.1093/rfs/hhaa145</span>. Figures and Figure 7 quoted from NBER Working Paper 27168, version of May 2020 <span class="rid">doi:10.3386/w27168</span></li>
+<li>Board of Governors of the Federal Reserve System (2020). "Federal Reserve announces extensive new measures to support the economy." Press release, 23 March 2020. <span class="rid">https://www.federalreserve.gov/newsevents/pressreleases/monetary20200323b.htm</span></li>
+<li>Elton, E. J. &amp; Gruber, M. J. (1970). "Marginal Stockholder Tax Rates and the Clientele Effect." <em>Review of Economics and Statistics</em> 52(1), 68–74. <span class="rid">doi:10.2307/1927599</span></li>
+<li>FINRA (2024). Regulatory Notice 24-04, "FINRA Adopts Amendments to Conform its Rules to the T+1 Settlement Cycle," 26 February 2024. <span class="rid">https://www.finra.org/rules-guidance/notices/24-04</span></li>
+<li>ESMA (2024). "ESMA proposes to move to T+1 by October 2027," 18 November 2024. <span class="rid">https://www.esma.europa.eu/node/214007</span></li>
+<li>S&amp;P Dow Jones Indices (2020). "Salesforce.com, Amgen and Honeywell International Set to Join Dow Jones Industrial Average." Press release, 24 August 2020. <span class="rid">https://press.spglobal.com/2020-08-24-Salesforce-com-Amgen-and-Honeywell-International-Set-to-Join-Dow-Jones-Industrial-Average</span></li>
+<li>S&amp;P Dow Jones Indices. "S&amp;P U.S. Indices Methodology" (the S&amp;P 500's float-adjusted market-cap weighting). <span class="rid">https://www.spglobal.com/spdji/en/methodology/article/sp-us-indices-methodology/</span></li>
+<li>S&amp;P Dow Jones Indices. "FAQ: S&amp;P 500 Equal Weight Index" (0.2% per company at each quarterly rebalance). <span class="rid">https://www.spglobal.com/spdji/en/education/article/sp-500-equal-weight-index-faq/</span></li>
+<li>US rules (as of 2026): Regulation SHO, 17 CFR 242.203 (locate) and 242.201 (circuit breaker); FINRA Rule 4210 (margin requirements). <span class="rid">https://www.law.cornell.edu/cfr/text/17/242.203</span> · <span class="rid">https://www.law.cornell.edu/cfr/text/17/242.201</span> · <span class="rid">https://www.finra.org/rules-guidance/rulebooks/finra-rules/4210</span></li>
+<li>EU rules (as of 2026): Regulation (EU) No 236/2012 on short selling, Arts. 5, 6 and 12; Commission Delegated Regulation (EU) 2022/27 (the 0.1% notification threshold). <span class="rid">https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=celex%3A32012R0236</span> · <span class="rid">https://eur-lex.europa.eu/legal-content/EN/TXT/PDF/?uri=CELEX:32022R0027</span></li>
+<li>Beber, A. &amp; Pagano, M. (2013). "Short-Selling Bans Around the World: Evidence from the 2007–09 Crisis." <em>Journal of Finance</em> 68(1), 343–381. <span class="rid">doi:10.1111/j.1540-6261.2012.01802.x</span></li>
+</ol>
+</section>
+
+<!-- nav:foot -->
+<div class="foot">
+<a href="session01-market-anatomy.html">← Prev: 2.1 · Market Anatomy</a>
+<a href="session03-returns-pnl-leverage.html">Next: 2.3 · Returns &amp; Leverage →</a>
+</div>
+<p class="legal">Educational material only — not investment, legal or tax advice. Backtests and simulations are hypothetical. <a href="../start-here.html#disclaimer">Disclaimer</a> · Text CC BY 4.0 · Code MIT.</p>
+<!-- /nav:foot -->
+</main>
+</div></body></html>

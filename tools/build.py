@@ -132,7 +132,8 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--check", action="store_true", help="verify only: fail if anything would change")
     ap.add_argument("--run-labs", action="store_true", help="re-run lab scripts before injecting")
-    ap.add_argument("--only", nargs="*", help="session ids to limit labs/inject/checks to (e.g. 2.3)")
+    ap.add_argument("--only", nargs="*", help="session ids to limit labs/inject/checks to (e.g. 2.3); "
+                                              "add 'hubs' to also refresh the hub pages")
     ap.add_argument("--skip-checks", action="store_true")
     args = ap.parse_args()
 

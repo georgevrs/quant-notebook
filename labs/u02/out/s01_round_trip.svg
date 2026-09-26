@@ -1,0 +1,45 @@
+<svg viewBox="0 0 720 280" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="One round trip of 2,000 shares at $50: cost by component, in basis points">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">ONE ROUND TRIP OF 2,000 SHARES AT $50: COST BY COMPONENT, IN BASIS POINTS</text>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#3A56C5" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">liquid large cap</text>
+  <line x1="172.4" y1="32" x2="188.4" y2="32" stroke="#E8850C" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="194.4" y="36" font-size="11" fill="#4A5A68">thin small cap</text>
+  <line x1="64" y1="236" x2="690" y2="236" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="240" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.0</text>
+  <line x1="64" y1="200" x2="690" y2="200" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="204" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">10.0</text>
+  <line x1="64" y1="164" x2="690" y2="164" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="168" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">20.0</text>
+  <line x1="64" y1="128" x2="690" y2="128" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="132" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">30.0</text>
+  <line x1="64" y1="92" x2="690" y2="92" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="96" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">40.0</text>
+  <line x1="64" y1="56" x2="690" y2="56" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="60" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">50.0</text>
+  <line x1="64" y1="236" x2="690" y2="236" stroke="#C9CFC6" stroke-width="1"/>
+  <path d="M101.6,236 V233.5 Q101.6,231 104.1,231 H123.1 Q125.6,231 125.6,233.5 V236 Z" fill="#3A56C5"><title>commission · liquid large cap: 1.4</title></path>
+  <text x="113.6" y="225" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">1.4</text>
+  <path d="M127.6,236 V233.5 Q127.6,231 130.1,231 H149.1 Q151.6,231 151.6,233.5 V236 Z" fill="#E8850C"><title>commission · thin small cap: 1.4</title></path>
+  <text x="139.6" y="225" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">1.4</text>
+  <text x="126.6" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">commission</text>
+  <path d="M226.8,236 V233.8 Q226.8,231.7 229,231.7 H248.6 Q250.8,231.7 250.8,233.8 V236 Z" fill="#3A56C5"><title>exchange fees · liquid large cap: 1.2</title></path>
+  <text x="238.8" y="225.7" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">1.2</text>
+  <path d="M252.8,236 V233.8 Q252.8,231.7 255,231.7 H274.6 Q276.8,231.7 276.8,233.8 V236 Z" fill="#E8850C"><title>exchange fees · thin small cap: 1.2</title></path>
+  <text x="264.8" y="225.7" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">1.2</text>
+  <text x="251.8" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">exchange fees</text>
+  <path d="M352,236 V235.4 Q352,234.8 352.6,234.8 H375.4 Q376,234.8 376,235.4 V236 Z" fill="#3A56C5"><title>clearing + regulatory · liquid large cap: 0.3</title></path>
+  <text x="364" y="228.8" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.3</text>
+  <path d="M378,236 V235.4 Q378,234.8 378.6,234.8 H401.4 Q402,234.8 402,235.4 V236 Z" fill="#E8850C"><title>clearing + regulatory · thin small cap: 0.3</title></path>
+  <text x="390" y="228.8" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.3</text>
+  <text x="377" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">clearing + regulatory</text>
+  <path d="M477.2,236 V225.6 Q477.2,221.6 481.2,221.6 H497.2 Q501.2,221.6 501.2,225.6 V236 Z" fill="#3A56C5"><title>spread · liquid large cap: 4.0</title></path>
+  <text x="489.2" y="215.6" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">4.0</text>
+  <path d="M503.2,236 V168 Q503.2,164 507.2,164 H523.2 Q527.2,164 527.2,168 V236 Z" fill="#E8850C"><title>spread · thin small cap: 20.0</title></path>
+  <text x="515.2" y="158" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">20.0</text>
+  <text x="502.2" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">spread</text>
+  <path d="M602.4,236 V232 Q602.4,228.1 606.4,228.1 H622.4 Q626.4,228.1 626.4,232 V236 Z" fill="#3A56C5"><title>walking the book · liquid large cap: 2.2</title></path>
+  <text x="614.4" y="222.1" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">2.2</text>
+  <path d="M628.4,236 V96.4 Q628.4,92.4 632.4,92.4 H648.4 Q652.4,92.4 652.4,96.4 V236 Z" fill="#E8850C"><title>walking the book · thin small cap: 39.9</title></path>
+  <text x="640.4" y="86.4" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">39.9</text>
+  <text x="627.4" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">walking the book</text>
+</svg>

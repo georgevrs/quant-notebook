@@ -1,0 +1,39 @@
+<svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Cost of a sale (fee + impact) by pool depth (x = trade size, $ thousands)">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">COST OF A SALE (FEE + IMPACT) BY POOL DEPTH (X = TRADE SIZE, $ THOUSANDS)</text>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#3A56C5" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">lab pool</text>
+  <line x1="121.2" y1="32" x2="137.2" y2="32" stroke="#E8850C" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="143.2" y="36" font-size="11" fill="#4A5A68">10× deeper</text>
+  <line x1="229.2" y1="32" x2="245.2" y2="32" stroke="#3F8E5A" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="251.2" y="36" font-size="11" fill="#4A5A68">100× deeper</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="268" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.0%</text>
+  <line x1="64" y1="211" x2="602" y2="211" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="215" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">5.0%</text>
+  <line x1="64" y1="158" x2="602" y2="158" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="162" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">10.0%</text>
+  <line x1="64" y1="105" x2="602" y2="105" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="109" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">15.0%</text>
+  <line x1="64" y1="52" x2="602" y2="52" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="56" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">20.0%</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#C9CFC6" stroke-width="1"/>
+  <line x1="64" y1="264" x2="64" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="64" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">0</text>
+  <line x1="198.5" y1="264" x2="198.5" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="198.5" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">100</text>
+  <line x1="333" y1="264" x2="333" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="333" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">200</text>
+  <line x1="467.5" y1="264" x2="467.5" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="467.5" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">300</text>
+  <line x1="602" y1="264" x2="602" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="602" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">400</text>
+  <polyline points="64,260.8 70.7,258.2 77.5,255.6 84.2,253 90.9,250.4 97.6,247.8 104.3,245.2 111.1,242.7 117.8,240.2 124.5,237.6 131.2,235.1 138,232.6 144.7,230.1 151.4,227.7 158.1,225.2 164.9,222.7 171.6,220.3 178.3,217.9 185.1,215.4 191.8,213 198.5,210.6 205.2,208.3 212,205.9 218.7,203.5 225.4,201.2 232.1,198.8 238.8,196.5 245.6,194.2 252.3,191.9 259,189.6 265.8,187.3 272.5,185 279.2,182.8 285.9,180.5 292.6,178.3 299.4,176 306.1,173.8 312.8,171.6 319.5,169.4 326.3,167.2 333,165 339.7,162.8 346.4,160.7 353.2,158.5 359.9,156.4 366.6,154.2 373.3,152.1 380.1,150 386.8,147.9 393.5,145.8 400.2,143.7 407,141.6 413.7,139.6 420.4,137.5 427.2,135.5 433.9,133.4 440.6,131.4 447.3,129.4 454.1,127.3 460.8,125.3 467.5,123.3 474.2,121.3 480.9,119.4 487.7,117.4 494.4,115.4 501.1,113.5 507.8,111.5 514.6,109.6 521.3,107.7 528,105.7 534.8,103.8 541.5,101.9 548.2,100 554.9,98.1 561.7,96.2 568.4,94.4 575.1,92.5 581.8,90.7 588.5,88.8 595.3,87 602,85.1" fill="none" stroke="#3A56C5" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>lab pool</title></polyline>
+  <circle cx="602" cy="85.1" r="4" fill="#3A56C5" stroke="#FBFBF8" stroke-width="2"><title>lab pool: 16.9%</title></circle>
+  <polyline points="64,260.8 70.7,260.6 77.5,260.3 84.2,260 90.9,259.8 97.6,259.5 104.3,259.2 111.1,259 117.8,258.7 124.5,258.5 131.2,258.2 138,257.9 144.7,257.7 151.4,257.4 158.1,257.1 164.9,256.9 171.6,256.6 178.3,256.4 185.1,256.1 191.8,255.8 198.5,255.6 205.2,255.3 212,255.1 218.7,254.8 225.4,254.5 232.1,254.3 238.8,254 245.6,253.8 252.3,253.5 259,253.2 265.8,253 272.5,252.7 279.2,252.5 285.9,252.2 292.6,251.9 299.4,251.7 306.1,251.4 312.8,251.2 319.5,250.9 326.3,250.6 333,250.4 339.7,250.1 346.4,249.9 353.2,249.6 359.9,249.4 366.6,249.1 373.3,248.8 380.1,248.6 386.8,248.3 393.5,248.1 400.2,247.8 407,247.6 413.7,247.3 420.4,247 427.2,246.8 433.9,246.5 440.6,246.3 447.3,246 454.1,245.8 460.8,245.5 467.5,245.2 474.2,245 480.9,244.7 487.7,244.5 494.4,244.2 501.1,244 507.8,243.7 514.6,243.5 521.3,243.2 528,243 534.8,242.7 541.5,242.4 548.2,242.2 554.9,241.9 561.7,241.7 568.4,241.4 575.1,241.2 581.8,240.9 588.5,240.7 595.3,240.4 602,240.2" fill="none" stroke="#E8850C" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>10× deeper</title></polyline>
+  <circle cx="602" cy="240.2" r="4" fill="#E8850C" stroke="#FBFBF8" stroke-width="2"><title>10× deeper: 2.2%</title></circle>
+  <polyline points="64,260.8 70.7,260.8 77.5,260.8 84.2,260.7 90.9,260.7 97.6,260.7 104.3,260.7 111.1,260.6 117.8,260.6 124.5,260.6 131.2,260.6 138,260.5 144.7,260.5 151.4,260.5 158.1,260.5 164.9,260.4 171.6,260.4 178.3,260.4 185.1,260.3 191.8,260.3 198.5,260.3 205.2,260.3 212,260.2 218.7,260.2 225.4,260.2 232.1,260.2 238.8,260.1 245.6,260.1 252.3,260.1 259,260.1 265.8,260 272.5,260 279.2,260 285.9,260 292.6,259.9 299.4,259.9 306.1,259.9 312.8,259.8 319.5,259.8 326.3,259.8 333,259.8 339.7,259.7 346.4,259.7 353.2,259.7 359.9,259.7 366.6,259.6 373.3,259.6 380.1,259.6 386.8,259.6 393.5,259.5 400.2,259.5 407,259.5 413.7,259.5 420.4,259.4 427.2,259.4 433.9,259.4 440.6,259.3 447.3,259.3 454.1,259.3 460.8,259.3 467.5,259.2 474.2,259.2 480.9,259.2 487.7,259.2 494.4,259.1 501.1,259.1 507.8,259.1 514.6,259.1 521.3,259 528,259 534.8,259 541.5,259 548.2,258.9 554.9,258.9 561.7,258.9 568.4,258.8 575.1,258.8 581.8,258.8 588.5,258.8 595.3,258.7 602,258.7" fill="none" stroke="#3F8E5A" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>100× deeper</title></polyline>
+  <circle cx="602" cy="258.7" r="4" fill="#3F8E5A" stroke="#FBFBF8" stroke-width="2"><title>100× deeper: 0.5%</title></circle>
+  <text x="614" y="89.1" font-size="11" fill="#1F2C38">lab pool: 16.9%</text>
+  <text x="614" y="244.2" font-size="11" fill="#1F2C38">10× deeper: 2.2%</text>
+  <text x="614" y="262.7" font-size="11" fill="#1F2C38">100× deeper: 0.5%</text>
+</svg>
