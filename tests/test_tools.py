@@ -122,12 +122,15 @@ def test_fmt_value_no_negative_zero():
     assert build.fmt_value(-0.001, "$.2f") == "$0.00"
 
 
-def test_verify_labs_loose_tol_for_scs():
-    # SCS's own near-zero residual is platform-sensitive; it gets a wider absolute tolerance than
-    # a normal reproducibility check, but one still far tighter than the owning lab's own assert.
+def test_verify_labs_skips_nondeterministic_scs_keys():
+    # SCS's own near-zero residual varies run to run even on identical CI hardware (observed
+    # swinging from -6e-5 to +1e-3 across two back-to-back runs), so its value is never compared —
+    # only that the key is present on both sides.
     assert verify_labs.compare(
         {"tol_daily_scs_dvol_bp": -9.79e-08, "tol_daily_scs_dw": 9.51e-09, "other": 1.0},
-        {"tol_daily_scs_dvol_bp": -6.04e-05, "tol_daily_scs_dw": 2.32e-05, "other": 1.0},
+        {"tol_daily_scs_dvol_bp": 1.07e-03, "tol_daily_scs_dw": 2.32e-05, "other": 1.0},
     ) == []
-    # an ordinary key doesn't get the loose tolerance — the same-sized drift is still a real diff
+    # an ordinary key with the same-sized drift is still a real, reported difference
     assert verify_labs.compare({"other": -9.79e-08}, {"other": -6.04e-05}) != []
+    # the key must still be present on both sides
+    assert verify_labs.compare({"tol_daily_scs_dw": 1.0}, {}) == ["tol_daily_scs_dw: missing after re-run"]
