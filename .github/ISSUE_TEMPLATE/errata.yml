@@ -1,0 +1,45 @@
+name: Erratum
+description: Something in a session is wrong, out of date or unclear.
+title: "[erratum] Session X.Y — "
+labels: ["erratum"]
+body:
+  - type: input
+    id: session
+    attributes:
+      label: Session
+      description: The session number and title, e.g. "2.3 · Returns, P&L, Compounding & Leverage"
+    validations:
+      required: true
+  - type: input
+    id: section
+    attributes:
+      label: Section, figure or question
+      description: e.g. "§2.3.4", "fig 2.3.6", "Check yourself question 3"
+    validations:
+      required: true
+  - type: textarea
+    id: wrong
+    attributes:
+      label: What is wrong
+      description: Quote the text or describe the figure.
+    validations:
+      required: true
+  - type: textarea
+    id: fix
+    attributes:
+      label: What it should say
+      description: Your suggested correction, with a source if it is a factual matter.
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind of problem
+      options:
+        - Factual or mathematical error
+        - Out of date (tools, data, regulation)
+        - Unclear or confusing
+        - Broken link, figure or lab
+        - Typo
+    validations:
+      required: true

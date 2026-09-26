@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Read the course
+    url: https://georgevrs.github.io/quant-notebook/
+    about: Start at the course home; the roadmap lists every session and its status.

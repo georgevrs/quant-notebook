@@ -1,0 +1,322 @@
+/* ============================================================
+   NOTEBOOK COURSE DESIGN SYSTEM — SHARED BRAND STYLESHEET
+   ------------------------------------------------------------
+   The single source of truth for the "notebook" look: a paper
+   page on a sage desk, tabbed like a binder, with a dashed
+   margin rule, numbered section chips, a yellow marker, sticky-
+   note labs and graph-paper diagram figures.
+
+   Font pairing: Space Grotesk (headings) · IBM Plex Sans (body)
+                 · IBM Plex Mono (code / labels / captions)
+
+   HOW TO USE IN A PAGE
+   --------------------
+   Quant Notebook self-hosts its fonts (see the extensions block
+   at the end), so pages need no Google Fonts <link>. In <head>,
+   link this file and temml.css with the right relative path:
+
+       <link rel="stylesheet" href="assets/brand.css">       (course root)
+       <link rel="stylesheet" href="../assets/brand.css">    (a unit folder)
+
+   To re-theme a course, change ONLY the tokens in :root.
+   Content lives in the page; style lives here.
+   ============================================================ */
+
+:root{
+  --paper:#FBFBF8;          /* the page */
+  --desk:#EEEFE9;           /* the table the page sits on */
+  --ink:#1F2C38;            /* body text, arrows */
+  --ink-soft:#4A5A68;       /* secondary text, captions */
+  --rule:#E4E8EC;           /* hairlines */
+  --ultramarine:#3A56C5;    /* primary accent: concepts, links, chips */
+  --ultra-soft:#EDF0FC;
+  --marker-yellow:#FFE86B;  /* the <mark> highlighter */
+  --sticky:#FFF6C9;         /* hands-on labs, in-progress */
+  --sticky-edge:#EAD98A;
+  --sticky-ink:#8A6D00;
+  --pine:#1F7A55;           /* success, done, tips */
+  --pine-soft:#E9F5EF;
+  --coral:#D64B2A;          /* danger, pitfalls */
+  --coral-soft:#FCEEE9;
+  --graph:#F4F6F3;          /* diagram graph paper */
+  --graph-line:#DDE5DC;
+  --accent-a:#0A66C2;       /* three neutral comparison accents   */
+  --accent-b:#E8850C;       /* (e.g. vendor A / B / C, option     */
+  --accent-c:#3F8E5A;       /*  1 / 2 / 3) — used by .dot         */
+  --code-bg:#20303C;
+  --code-ink:#E7EEF3;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0;background:var(--desk);color:var(--ink);
+  font-family:"IBM Plex Sans",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  font-size:16.5px;line-height:1.62;
+}
+.page{
+  max-width:1000px;margin:28px auto 80px;background:var(--paper);
+  border:1px solid #DDDFD6;border-radius:10px;
+  box-shadow:0 18px 45px rgba(31,44,56,.10);
+  overflow:hidden;
+}
+/* ---------- notebook tab strip ---------- */
+.tabs{display:flex;flex-wrap:wrap;gap:6px;padding:14px 18px 0;background:#F1F2EB;border-bottom:1px solid #DDDFD6}
+.tabs a{
+  font-family:"Space Grotesk",sans-serif;font-size:.82rem;font-weight:600;letter-spacing:.02em;
+  text-decoration:none;color:var(--ink-soft);
+  padding:8px 14px;border:1px solid #D8DAD0;border-bottom:none;
+  border-radius:8px 8px 0 0;background:#E9EAE2;
+  transition:background .15s;
+}
+.tabs a:hover{background:#fff}
+.tabs a.active{background:var(--paper);color:var(--ultramarine);border-color:#CFD3E8;position:relative;top:1px}
+/* ---------- header ---------- */
+header.cover{padding:44px 56px 34px;border-bottom:3px double var(--rule);position:relative}
+.eyebrow{font-family:"IBM Plex Mono",monospace;font-size:.78rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ultramarine);margin:0 0 10px}
+h1{font-family:"Space Grotesk",sans-serif;font-weight:700;font-size:2.35rem;line-height:1.14;margin:0 0 12px;letter-spacing:-.01em}
+.subtitle{color:var(--ink-soft);max-width:46em;margin:0}
+.meta{display:flex;gap:22px;flex-wrap:wrap;margin-top:18px;font-family:"IBM Plex Mono",monospace;font-size:.78rem;color:var(--ink-soft)}
+.meta span b{color:var(--ink)}
+/* ---------- body ---------- */
+main{padding:10px 56px 56px;position:relative}
+main::before{ /* the notebook margin rule */
+  content:"";position:absolute;top:0;bottom:0;left:34px;width:2px;
+  background:linear-gradient(var(--ultramarine) 60%, transparent 0);
+  background-size:2px 9px;opacity:.28;
+}
+section{margin-top:52px}
+h2{
+  font-family:"Space Grotesk",sans-serif;font-size:1.5rem;font-weight:700;letter-spacing:-.005em;
+  margin:0 0 4px;display:flex;align-items:baseline;gap:14px;
+}
+h2 .no{
+  font-family:"IBM Plex Mono",monospace;font-size:.85rem;color:#fff;background:var(--ultramarine);
+  padding:3px 9px;border-radius:6px;flex:none;transform:translateY(-3px);
+}
+h3{font-family:"Space Grotesk",sans-serif;font-size:1.08rem;font-weight:600;margin:30px 0 6px}
+p{margin:.55em 0 .9em}
+.lede{color:var(--ink-soft);font-size:1.02rem;margin-top:2px}
+mark{background:linear-gradient(transparent 42%, var(--marker-yellow) 0);padding:0 2px;border-radius:2px}
+strong{font-weight:600}
+a{color:var(--ultramarine)}
+hr{border:none;border-top:1px dashed var(--rule);margin:40px 0}
+ul,ol{padding-left:1.35em;margin:.4em 0 1em}
+li{margin:.32em 0}
+li::marker{color:var(--ultramarine)}
+/* ---------- callouts ---------- */
+.co{border-radius:9px;padding:15px 18px 13px;margin:20px 0;border:1px solid;position:relative}
+.co .co-t{font-family:"Space Grotesk",sans-serif;font-weight:600;font-size:.82rem;letter-spacing:.06em;text-transform:uppercase;display:block;margin-bottom:5px}
+.co p{margin:.35em 0}
+.co.key{background:var(--ultra-soft);border-color:#C9D2F1}
+.co.key .co-t{color:var(--ultramarine)}
+.co.tip{background:var(--pine-soft);border-color:#BFE0CF}
+.co.tip .co-t{color:var(--pine)}
+.co.warn{background:var(--coral-soft);border-color:#F2CDBF}
+.co.warn .co-t{color:var(--coral)}
+.co.lab{
+  background:var(--sticky);border-color:var(--sticky-edge);
+  transform:rotate(-.35deg);box-shadow:2px 3px 0 rgba(60,50,0,.06);
+}
+.co.lab .co-t{color:var(--sticky-ink)}
+.co.note{background:#F5F6F2;border-color:var(--rule)}
+.co.note .co-t{color:var(--ink-soft)}
+/* ---------- diagrams ---------- */
+figure.diagram{
+  margin:26px 0;padding:22px 20px 14px;border:1px solid var(--graph-line);border-radius:10px;
+  background:
+    linear-gradient(var(--graph-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--graph-line) 1px, transparent 1px),
+    var(--graph);
+  background-size:22px 22px;
+}
+figure.diagram svg{display:block;max-width:100%;height:auto;margin:0 auto}
+figcaption{
+  font-family:"IBM Plex Mono",monospace;font-size:.76rem;color:var(--ink-soft);
+  margin-top:12px;text-align:center;letter-spacing:.03em;
+}
+/* ---------- tables ---------- */
+table{width:100%;border-collapse:collapse;margin:18px 0;font-size:.92rem}
+th,td{border:1px solid var(--rule);padding:9px 12px;text-align:left;vertical-align:top}
+th{font-family:"Space Grotesk",sans-serif;font-size:.82rem;letter-spacing:.04em;text-transform:uppercase;background:#F3F4EE;color:var(--ink-soft)}
+tbody tr:nth-child(even){background:#FAFAF5}
+td code, li code, p code{
+  font-family:"IBM Plex Mono",monospace;font-size:.86em;background:#EDEFEA;
+  padding:1px 5px;border-radius:4px;color:#203040;
+}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:7px;transform:translateY(-1px)}
+.dot.a,.dot.az{background:var(--accent-a)}
+.dot.b,.dot.aw{background:var(--accent-b)}
+.dot.c,.dot.gc{background:var(--accent-c)}
+/* ---------- code blocks ---------- */
+pre{
+  background:var(--code-bg);color:var(--code-ink);border-radius:9px;
+  padding:16px 18px;overflow-x:auto;font-size:.85rem;line-height:1.55;
+  font-family:"IBM Plex Mono",monospace;margin:16px 0;
+}
+pre .c{color:#8FA8B8}  /* comment */
+pre .k{color:#8BD0FF}  /* keyword-ish */
+pre .s{color:#C9E8A9}  /* string */
+pre .p{color:#FFD479}  /* prompt/path */
+/* ---------- toc ---------- */
+.toc{background:#F5F6F2;border:1px solid var(--rule);border-radius:9px;padding:16px 22px;margin-top:26px}
+.toc b{font-family:"Space Grotesk",sans-serif;font-size:.82rem;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft)}
+.toc ol{margin:8px 0 2px;columns:2;column-gap:36px}
+.toc a{text-decoration:none}
+.toc a:hover{text-decoration:underline}
+/* ---------- glossary ---------- */
+.gloss{display:grid;grid-template-columns:1fr 1fr;gap:10px 26px;margin-top:14px}
+.gloss div{border-left:3px solid var(--ultramarine);padding:2px 0 2px 12px;font-size:.92rem}
+.gloss b{font-family:"IBM Plex Mono",monospace;font-size:.85rem}
+/* ---------- quiz ---------- */
+details.q{border:1px solid var(--rule);border-radius:8px;margin:10px 0;background:#fff}
+details.q summary{cursor:pointer;padding:11px 15px;font-weight:500;list-style-position:inside}
+details.q div{padding:2px 15px 12px;color:var(--ink-soft);border-top:1px dashed var(--rule)}
+details.q summary::marker{color:var(--ultramarine)}
+/* ---------- pills ---------- */
+.pills{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+.pills span{font-family:"IBM Plex Mono",monospace;font-size:.78rem;border:1px solid #CFD3E8;background:var(--ultra-soft);color:var(--ultramarine);border-radius:99px;padding:3px 11px}
+/* ---------- footer nav ---------- */
+.foot{display:flex;justify-content:space-between;gap:14px;margin-top:60px;padding-top:22px;border-top:3px double var(--rule)}
+.foot a{
+  font-family:"Space Grotesk",sans-serif;font-weight:600;text-decoration:none;font-size:.92rem;
+  border:1px solid #CFD3E8;border-radius:8px;padding:10px 16px;background:var(--ultra-soft);
+}
+.foot a:hover{background:#fff}
+
+/* ============================================================
+   HUB & GUIDE COMPONENTS (course home, roadmap, how-to pages)
+   ============================================================ */
+/* card grid — the session launcher on the course home */
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px;margin:22px 0}
+.card{
+  display:block;text-decoration:none;color:var(--ink);
+  border:1px solid #D8DAD0;border-radius:10px;background:#fff;
+  padding:18px 18px 16px;transition:box-shadow .15s,transform .15s,border-color .15s;
+}
+.card:hover{box-shadow:0 10px 24px rgba(31,44,56,.10);transform:translateY(-2px);border-color:#CFD3E8}
+.card .k{font-family:"IBM Plex Mono",monospace;font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ultramarine)}
+.card h3{margin:6px 0 4px;font-size:1.02rem}
+.card p{margin:0;font-size:.88rem;color:var(--ink-soft)}
+.card .tag{display:inline-block;margin-top:10px;font-family:"IBM Plex Mono",monospace;font-size:.72rem;color:var(--ink-soft)}
+/* step list — numbered, connected workflow steps in prose */
+ol.steps{counter-reset:step;list-style:none;padding-left:0;margin:18px 0}
+ol.steps>li{
+  position:relative;padding:2px 0 16px 46px;margin:0;border-left:2px solid var(--rule);margin-left:15px;
+}
+ol.steps>li:last-child{border-left-color:transparent}
+ol.steps>li::before{
+  counter-increment:step;content:counter(step);
+  position:absolute;left:-15px;top:0;width:30px;height:30px;border-radius:50%;
+  background:var(--ultramarine);color:#fff;font-family:"Space Grotesk",sans-serif;font-weight:600;font-size:.9rem;
+  display:flex;align-items:center;justify-content:center;
+}
+ol.steps>li h3{margin:2px 0 4px}
+/* status pills for trackers */
+.badge{font-family:"IBM Plex Mono",monospace;font-size:.72rem;padding:2px 8px;border-radius:99px;border:1px solid}
+.badge.done{background:var(--pine-soft);border-color:#BFE0CF;color:var(--pine)}
+.badge.doing{background:var(--sticky);border-color:var(--sticky-edge);color:var(--sticky-ink)}
+.badge.todo{background:#F1F2EB;border-color:#D8DAD0;color:var(--ink-soft)}
+/* keyboard / command chip inline */
+kbd{font-family:"IBM Plex Mono",monospace;font-size:.82em;background:#EDEFEA;border:1px solid #D8DAD0;border-bottom-width:2px;border-radius:5px;padding:1px 6px}
+/* checklist */
+ul.check{list-style:none;padding-left:0}
+ul.check li{position:relative;padding-left:30px;margin:.4em 0}
+ul.check li::before{content:"☐";position:absolute;left:0;top:-1px;font-size:1.1rem;color:var(--ultramarine)}
+/* two-column layout (e.g. good vs avoid tables side by side) */
+.two{display:grid;grid-template-columns:1fr 1fr;gap:0 26px}
+.good{color:var(--pine);font-weight:600}
+.bad{color:var(--coral);font-weight:600}
+
+@media (max-width:760px){
+  header.cover{padding:30px 22px 26px}
+  main{padding:6px 22px 40px}
+  main::before{left:10px}
+  h1{font-size:1.7rem}
+  .toc ol{columns:1}
+  .gloss,.two{grid-template-columns:1fr}
+}
+@media print{
+  body{background:#fff}
+  .page{box-shadow:none;border:none;margin:0}
+  .tabs,.foot{display:none}
+  .co.lab{transform:none}
+}
+
+/* ============================================================
+   QUANT NOTEBOOK EXTENSIONS
+   ------------------------------------------------------------
+   Additions for this course only. Everything above is the
+   notebook design system, unchanged. Pages link this file and
+   assets/temml.css (MathML support); nothing else.
+   ============================================================ */
+
+/* ---------- self-hosted fonts (OFL / GUST) — zero external requests ---------- */
+@font-face{font-family:"Space Grotesk";font-style:normal;font-weight:500;font-display:swap;src:url(fonts/space-grotesk-latin-500-normal.woff2) format("woff2")}
+@font-face{font-family:"Space Grotesk";font-style:normal;font-weight:600;font-display:swap;src:url(fonts/space-grotesk-latin-600-normal.woff2) format("woff2")}
+@font-face{font-family:"Space Grotesk";font-style:normal;font-weight:700;font-display:swap;src:url(fonts/space-grotesk-latin-700-normal.woff2) format("woff2")}
+@font-face{font-family:"IBM Plex Sans";font-style:normal;font-weight:400;font-display:swap;src:url(fonts/ibm-plex-sans-latin-400-normal.woff2) format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:"IBM Plex Sans";font-style:normal;font-weight:400;font-display:swap;src:url(fonts/ibm-plex-sans-latin-ext-400-normal.woff2) format("woff2");unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+@font-face{font-family:"IBM Plex Sans";font-style:normal;font-weight:400;font-display:swap;src:url(fonts/ibm-plex-sans-greek-400-normal.woff2) format("woff2");unicode-range:U+0370-0377,U+037A-037F,U+0384-038A,U+038C,U+038E-03A1,U+03A3-03FF}
+@font-face{font-family:"IBM Plex Sans";font-style:italic;font-weight:400;font-display:swap;src:url(fonts/ibm-plex-sans-latin-400-italic.woff2) format("woff2")}
+@font-face{font-family:"IBM Plex Sans";font-style:normal;font-weight:500;font-display:swap;src:url(fonts/ibm-plex-sans-latin-500-normal.woff2) format("woff2")}
+@font-face{font-family:"IBM Plex Sans";font-style:normal;font-weight:600;font-display:swap;src:url(fonts/ibm-plex-sans-latin-600-normal.woff2) format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:"IBM Plex Sans";font-style:normal;font-weight:600;font-display:swap;src:url(fonts/ibm-plex-sans-greek-600-normal.woff2) format("woff2");unicode-range:U+0370-0377,U+037A-037F,U+0384-038A,U+038C,U+038E-03A1,U+03A3-03FF}
+@font-face{font-family:"IBM Plex Mono";font-style:normal;font-weight:400;font-display:swap;src:url(fonts/ibm-plex-mono-latin-400-normal.woff2) format("woff2")}
+@font-face{font-family:"IBM Plex Mono";font-style:normal;font-weight:500;font-display:swap;src:url(fonts/ibm-plex-mono-latin-500-normal.woff2) format("woff2")}
+
+:root{
+  /* one sequential ramp (ultramarine family) for heatmaps and ordered categories — light → dark */
+  --seq-1:#EDF0FC; --seq-2:#C9D2F1; --seq-3:#93A6E3; --seq-4:#5C78D2; --seq-5:#3A56C5; --seq-6:#26398A;
+}
+
+/* ---------- math (MathML rendered at build time by Temml; see tools/render_math.mjs) ---------- */
+math{font-size:1.06em}
+.eq{overflow-x:auto;overflow-y:hidden;margin:16px 0 18px;padding:6px 2px}
+.eq math{font-size:1.12em}
+.co .eq{margin:10px 0}
+
+/* ---------- companion-lab strip (in the cover, under .meta) ---------- */
+.labstrip{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin-top:16px;font-family:"IBM Plex Mono",monospace;font-size:.76rem}
+.labstrip b{color:var(--sticky-ink);letter-spacing:.08em;text-transform:uppercase;font-weight:500}
+.labstrip a{border:1px solid var(--sticky-edge);background:var(--sticky);color:var(--sticky-ink);border-radius:99px;padding:3px 12px;text-decoration:none}
+.labstrip a:hover{background:#fff}
+
+/* ---------- references ("📚 Go deeper") ---------- */
+ol.refs{font-size:.92rem;padding-left:1.5em}
+ol.refs li{margin:.55em 0}
+ol.refs .rid{font-family:"IBM Plex Mono",monospace;font-size:.76rem;color:var(--ink-soft);white-space:nowrap}
+
+/* ---------- disclaimer line under the footer nav ---------- */
+p.legal{font-size:.76rem;color:var(--ink-soft);text-align:center;margin:22px auto 0;max-width:46em}
+
+/* ---------- not-yet-published targets (rendered by tools/sync_nav.py) ---------- */
+.tabs span.soon{
+  font-family:"Space Grotesk",sans-serif;font-size:.82rem;font-weight:600;letter-spacing:.02em;color:#9AA6AF;
+  padding:8px 14px;border:1px dashed #D8DAD0;border-bottom:none;border-radius:8px 8px 0 0;background:#F1F2EB;cursor:default;
+}
+.foot span.soon{
+  font-family:"Space Grotesk",sans-serif;font-weight:600;font-size:.92rem;color:#9AA6AF;
+  border:1px dashed #D8DAD0;border-radius:8px;padding:10px 16px;cursor:default;
+}
+.card.soon{background:#F7F7F3;border-style:dashed;cursor:default}
+.card.soon:hover{box-shadow:none;transform:none;border-color:#D8DAD0}
+.card.soon h3{color:var(--ink-soft)}
+span.xref.soon{color:var(--ink-soft);border-bottom:1px dashed #C9CFC6}
+
+/* ---------- data charts (generated from lab output by tools/svgchart.py) ---------- */
+/* plain paper, not graph paper: charts carry their own axes and gridlines */
+figure.diagram.chart{background:var(--paper);border-color:var(--rule)}
+
+/* ---------- phones: wide things scroll inside their own frame, never the page ---------- */
+/* Diagrams are drawn on a 720–760 wide viewBox; scaled to a 390px phone their labels would
+   shrink to ~5px. Below 760px they keep a 560px minimum and scroll inside the figure instead. */
+@media (max-width:760px){
+  table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  figure.diagram{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  figure.diagram svg{min-width:560px}
+  .labstrip{font-size:.72rem}
+}
+@media print{
+  .labstrip{display:none}
+  p.legal{display:block}
+}

@@ -1,0 +1,25 @@
+cff-version: 1.2.0
+message: "If you use or adapt Quant Notebook, please cite it as below."
+title: "Quant Notebook: From Engineer to Quant"
+abstract: >-
+  A free, open, in-depth course that takes software, data and AI engineers to professional quant
+  level: markets, mathematics, financial data engineering, research discipline, factor investing,
+  strategy families, portfolio construction and risk, derivatives, rates, machine learning,
+  alternative data, market microstructure and production trading systems — 100 illustrated
+  sessions with companion Python labs.
+type: software
+authors:
+  - family-names: Verouchis
+    given-names: Georges
+repository-code: "https://github.com/georgevrs/quant-notebook"
+url: "https://georgevrs.github.io/quant-notebook/"
+license: MIT
+keywords:
+  - quantitative finance
+  - algorithmic trading
+  - backtesting
+  - portfolio construction
+  - machine learning
+  - course
+version: "0.1.0"
+date-released: "2026-09-26"

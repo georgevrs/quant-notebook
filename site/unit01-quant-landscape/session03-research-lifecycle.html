@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- nav:head -->
+<title>1.3 · The Quant Research Lifecycle</title>
+<meta name="description" content="The master workflow of the whole course — hypothesis to data to signal to validation to sizing to paper to live to decay — and the gates between the stages.">
+<link rel="canonical" href="https://georgevrs.github.io/quant-notebook/unit01-quant-landscape/session03-research-lifecycle.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Quant Notebook">
+<meta property="og:title" content="1.3 · The Quant Research Lifecycle">
+<meta property="og:description" content="The master workflow of the whole course — hypothesis to data to signal to validation to sizing to paper to live to decay — and the gates between the stages.">
+<meta property="og:url" content="https://georgevrs.github.io/quant-notebook/unit01-quant-landscape/session03-research-lifecycle.html">
+<meta name="twitter:card" content="summary">
+<link rel="stylesheet" href="../assets/brand.css">
+<link rel="stylesheet" href="../assets/temml.css">
+<!-- /nav:head -->
+</head>
+<body><div class="page" id="top">
+<!-- Golden session 1.3 — the master workflow of the course. See AUTHORING.md. -->
+<!-- nav:tabs -->
+<nav class="tabs">
+<a href="../index.html">⌂ Course home</a>
+<span class="soon" title="Coming soon">1.1 · What Quants Do</span>
+<span class="soon" title="Coming soon">1.2 · Sources of Return</span>
+<a class="active" href="session03-research-lifecycle.html">1.3 · Research Lifecycle</a>
+<span class="soon" title="Coming soon">1.4 · Edge &amp; Odds</span>
+<span class="soon" title="Coming soon">1.5 · Lab Setup</span>
+<a href="../roadmap.html">🗺 Roadmap</a>
+</nav>
+<!-- /nav:tabs -->
+
+<header class="cover">
+<!-- nav:heading -->
+<p class="eyebrow">Unit 1 · The Quant Landscape — Session 03 of 05</p>
+<h1>The Quant Research Lifecycle</h1>
+<!-- /nav:heading -->
+<p class="subtitle">Every professional quant shop, from a two-person prop desk to a thousand-person fund, runs ideas through the same pipeline: question, data, signal, backtest, validation, sizing, paper, live, monitoring — and, eventually, retirement. The stages are easy to list. What separates professionals from everyone else is the <em>gates</em> between them, and the discipline to let ideas die at the gates. <mark>The core move: decide how an idea will be judged before you look at the result.</mark></p>
+<div class="meta">
+<span>DURATION <b>1.5 h + lab</b></span>
+<span>LEVEL <b>Foundations</b></span>
+<span>TRACKS <b>QR · QT · QD · IND</b></span>
+<span>HANDS-ON <b>Find "alpha" in pure noise</b></span>
+</div>
+<!-- nav:labstrip -->
+<div class="labstrip"><b>📓 Companion lab</b>
+<a href="https://colab.research.google.com/github/georgevrs/quant-notebook/blob/main/labs/u01/s03_research_lifecycle.ipynb">Open in Colab</a>
+<a href="https://github.com/georgevrs/quant-notebook/blob/main/labs/u01/s03_research_lifecycle.ipynb">Notebook on GitHub</a>
+<a href="https://github.com/georgevrs/quant-notebook/blob/main/labs/u01/s03_research_lifecycle.py">Source (.py)</a>
+</div>
+<!-- /nav:labstrip -->
+<div class="toc">
+<b>On this page</b>
+<ol>
+<li><a href="#s1">The lifecycle at a glance</a></li>
+<li><a href="#s2">Start with a question, not a backtest</a></li>
+<li><a href="#s3">Gates, not vibes</a></li>
+<li><a href="#s4">The garden of forking paths</a></li>
+<li><a href="#s5">The research log &amp; pre-registration</a></li>
+<li><a href="#s6">Paper, live &amp; decay</a></li>
+<li><a href="#s7">Try it</a></li>
+<li><a href="#s8">Glossary · Check yourself · Go deeper</a></li>
+</ol>
+</div>
+</header>
+
+<main>
+
+<section id="s1">
+<h2><span class="no">1.3.1</span> The lifecycle at a glance</h2>
+<p class="lede">This diagram is the map of the whole course. Almost every later session zooms into one of its boxes.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">THE QUANT RESEARCH LIFECYCLE — research on top, deployment below</text>
+  <rect x="22" y="40" width="120" height="66" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="82" y="65" font-size="11" text-anchor="middle" fill="#3A56C5" font-weight="600">1 · QUESTION</text>
+  <text x="82" y="82" font-size="9.5" text-anchor="middle" fill="#4A5A68">a hypothesis and</text>
+  <text x="82" y="95" font-size="9.5" text-anchor="middle" fill="#4A5A68">who pays you</text>
+  <rect x="164" y="40" width="120" height="66" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="224" y="65" font-size="11" text-anchor="middle" fill="#3A56C5" font-weight="600">2 · DATA</text>
+  <text x="224" y="82" font-size="9.5" text-anchor="middle" fill="#4A5A68">point-in-time,</text>
+  <text x="224" y="95" font-size="9.5" text-anchor="middle" fill="#4A5A68">survivorship-free</text>
+  <rect x="306" y="40" width="120" height="66" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="366" y="65" font-size="11" text-anchor="middle" fill="#3A56C5" font-weight="600">3 · SIGNAL</text>
+  <text x="366" y="82" font-size="9.5" text-anchor="middle" fill="#4A5A68">a forecast you</text>
+  <text x="366" y="95" font-size="9.5" text-anchor="middle" fill="#4A5A68">could compute live</text>
+  <rect x="448" y="40" width="120" height="66" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="508" y="65" font-size="11" text-anchor="middle" fill="#3A56C5" font-weight="600">4 · BACKTEST</text>
+  <text x="508" y="82" font-size="9.5" text-anchor="middle" fill="#4A5A68">with costs, every</text>
+  <text x="508" y="95" font-size="9.5" text-anchor="middle" fill="#4A5A68">trial logged</text>
+  <rect x="590" y="40" width="108" height="66" rx="9" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="644" y="65" font-size="11" text-anchor="middle" fill="#8A6D00" font-weight="600">5 · VALIDATE</text>
+  <text x="644" y="82" font-size="9.5" text-anchor="middle" fill="#4A5A68">holdout, deflated</text>
+  <text x="644" y="95" font-size="9.5" text-anchor="middle" fill="#4A5A68">Sharpe · GATE</text>
+  <rect x="590" y="178" width="108" height="66" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="644" y="203" font-size="11" text-anchor="middle" fill="#3A56C5" font-weight="600">6 · SIZE</text>
+  <text x="644" y="220" font-size="9.5" text-anchor="middle" fill="#4A5A68">risk budget,</text>
+  <text x="644" y="233" font-size="9.5" text-anchor="middle" fill="#4A5A68">portfolio fit</text>
+  <rect x="448" y="178" width="120" height="66" rx="9" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="508" y="203" font-size="11" text-anchor="middle" fill="#8A6D00" font-weight="600">7 · PAPER</text>
+  <text x="508" y="220" font-size="9.5" text-anchor="middle" fill="#4A5A68">live data, fake money</text>
+  <text x="508" y="233" font-size="9.5" text-anchor="middle" fill="#4A5A68">· GATE</text>
+  <rect x="306" y="178" width="120" height="66" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="366" y="203" font-size="11" text-anchor="middle" fill="#1F7A55" font-weight="600">8 · LIVE</text>
+  <text x="366" y="220" font-size="9.5" text-anchor="middle" fill="#4A5A68">small first,</text>
+  <text x="366" y="233" font-size="9.5" text-anchor="middle" fill="#4A5A68">then scale</text>
+  <rect x="164" y="178" width="120" height="66" rx="9" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="224" y="203" font-size="11" text-anchor="middle" fill="#8A6D00" font-weight="600">9 · MONITOR</text>
+  <text x="224" y="220" font-size="9.5" text-anchor="middle" fill="#4A5A68">live vs expected,</text>
+  <text x="224" y="233" font-size="9.5" text-anchor="middle" fill="#4A5A68">decay alarms</text>
+  <rect x="22" y="178" width="120" height="66" rx="9" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="82" y="203" font-size="11" text-anchor="middle" fill="#D64B2A" font-weight="600">RETIRE</text>
+  <text x="82" y="220" font-size="9.5" text-anchor="middle" fill="#4A5A68">pre-agreed kill rule</text>
+  <text x="82" y="233" font-size="9.5" text-anchor="middle" fill="#4A5A68">fires</text>
+  <path d="M145 73 H161" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s1a)"/>
+  <path d="M287 73 H303" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s1a)"/>
+  <path d="M429 73 H445" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s1a)"/>
+  <path d="M571 73 H587" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s1a)"/>
+  <path d="M644 109 V175" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s1a)"/>
+  <path d="M587 211 H571" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s1a)"/>
+  <path d="M445 211 H429" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s1a)"/>
+  <path d="M303 211 H287" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s1a)"/>
+  <path d="M161 211 H145" stroke="#D64B2A" stroke-width="1.7" marker-end="url(#s1b)"/>
+  <path d="M82 175 V109" stroke="#3A56C5" stroke-width="1.7" stroke-dasharray="5 4" marker-end="url(#s1c)"/>
+  <text x="92" y="146" font-size="9.5" fill="#3A56C5" font-style="italic">lessons → new questions</text>
+  <text x="656" y="146" font-size="9.5" fill="#8A6D00" font-style="italic">passes</text>
+  <text x="360" y="148" font-size="9.5" text-anchor="middle" fill="#D64B2A">any failed gate → kill the idea, keep the lesson</text>
+  <text x="360" y="280" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">Ideas are cheap and most of them should die — the earlier in this loop, the cheaper.</text>
+  <defs>
+    <marker id="s1a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F2C38"/></marker>
+    <marker id="s1b" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#D64B2A"/></marker>
+    <marker id="s1c" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#3A56C5"/></marker>
+  </defs>
+</svg>
+<figcaption>fig 1.3.1 — the research lifecycle: nine stages, two hard gates, and a loop that turns retired strategies into new questions</figcaption>
+</figure>
+
+<p>Read it as a production pipeline, because that is what it is. The top row is <strong>research</strong>: you turn a question into a <strong>signal</strong> — a number, computable from data available at the time, that forecasts something — and simulate trading it in a <strong>backtest</strong>. The bottom row is <strong>deployment</strong>: you size it, trade it with fake money on live data (<strong>paper trading</strong>), then with real money, and watch it until it stops working. Two stages are sticky yellow because they are <em>gates</em>: validation, where an idea must beat a statistical bar it did not choose, and paper trading, where it must survive contact with real market data and real execution.</p>
+
+<div class="co key"><span class="co-t">📌 Key idea — the backtest is not the finish line</span>
+<p>Beginners treat stage 4 as the goal: once the backtest looks good, they are done. Professionals treat it as the <em>middle</em>. A backtest is one noisy measurement of a hypothesis, taken on data you have probably already looked at. Everything after it exists to answer one question: <mark>is this real, or is it the best of many accidents?</mark></p>
+</div>
+
+<div class="co note"><span class="co-t">🧭 Margin note — the engineering analogy</span>
+<p>You already know this pipeline. Question = design doc; signal = the code; backtest = unit tests; validation = a test suite you did not write; paper trading = staging; live = production with a small canary; monitoring = observability; retirement = decommissioning. The difference is that in markets <em>your tests can pass by luck</em> — which is why this course spends a whole unit (<span class="xref soon" data-xref="6.1" data-style="short" data-auto="" title="Coming soon">Session 6.1</span> onward) on making them fail honestly.</p>
+</div>
+</section>
+
+<section id="s2">
+<h2><span class="no">1.3.2</span> Start with a question, not a backtest</h2>
+<p class="lede">A strategy without an economic story is a pattern in noise waiting to be discovered. Every durable edge answers three questions before any code is written.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 236" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <rect x="20" y="14" width="680" height="206" rx="12" fill="#fff" stroke="#1F2C38" stroke-width="1.5"/>
+  <text x="40" y="40" font-size="12" fill="#4A5A68" font-family="IBM Plex Mono,monospace">EVERY EDGE NEEDS A STORY — three questions, one example</text>
+  <rect x="42" y="56" width="202" height="118" rx="8" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="143" y="82" font-size="13" font-weight="600" text-anchor="middle" fill="#3A56C5">WHO PAYS YOU?</text>
+  <text x="143" y="104" font-size="10.5" text-anchor="middle" fill="#4A5A68">every profit is someone</text>
+  <text x="143" y="119" font-size="10.5" text-anchor="middle" fill="#4A5A68">else's cost or premium</text>
+  <text x="143" y="150" font-size="10.5" text-anchor="middle" fill="#1F2C38" font-style="italic">impatient sellers</text>
+  <text x="143" y="164" font-size="10.5" text-anchor="middle" fill="#1F2C38" font-style="italic">who need to trade now</text>
+  <rect x="259" y="56" width="202" height="118" rx="8" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="360" y="82" font-size="13" font-weight="600" text-anchor="middle" fill="#1F7A55">WHY DO THEY PAY?</text>
+  <text x="360" y="104" font-size="10.5" text-anchor="middle" fill="#4A5A68">risk they shed, a constraint,</text>
+  <text x="360" y="119" font-size="10.5" text-anchor="middle" fill="#4A5A68">a bias, or a need for speed</text>
+  <text x="360" y="150" font-size="10.5" text-anchor="middle" fill="#1F2C38" font-style="italic">immediacy is worth more to</text>
+  <text x="360" y="164" font-size="10.5" text-anchor="middle" fill="#1F2C38" font-style="italic">them than a few basis points</text>
+  <rect x="476" y="56" width="202" height="118" rx="8" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="577" y="82" font-size="13" font-weight="600" text-anchor="middle" fill="#8A6D00">WHY DOES IT PERSIST?</text>
+  <text x="577" y="104" font-size="10.5" text-anchor="middle" fill="#4A5A68">what stops everyone else</text>
+  <text x="577" y="119" font-size="10.5" text-anchor="middle" fill="#4A5A68">from taking it all?</text>
+  <text x="577" y="150" font-size="10.5" text-anchor="middle" fill="#1F2C38" font-style="italic">inventory risk, capital limits,</text>
+  <text x="577" y="164" font-size="10.5" text-anchor="middle" fill="#1F2C38" font-style="italic">and capacity caps the take</text>
+  <text x="360" y="203" font-size="12" text-anchor="middle" fill="#4A5A68" font-style="italic">Example: short-term reversal — being paid for providing liquidity to people in a hurry.</text>
+</svg>
+<figcaption>fig 1.3.2 — the three questions every hypothesis must answer, illustrated with short-term reversal</figcaption>
+</figure>
+
+<p>A <strong>hypothesis</strong> is a falsifiable claim about why prices behave a certain way <em>and</em> who is on the other side. "Stocks that fell a lot this week tend to bounce next week" is an observation. "Stocks that fell a lot this week bounce because the sellers were in a hurry and liquidity providers charge for absorbing them" is a hypothesis — it predicts where the effect should be stronger (illiquid names, stressed markets) and weaker (after costs, at scale). Those predictions are what let you test it without data-mining. <span class="xref soon" data-xref="1.2" data-auto="" title="Coming soon">Session 1.2 — Where Returns Come From</span> catalogues the honest sources of <span class="term soon" data-term="edge" title="Defined in Session 1.2 (coming soon)">edge</span> you can build a story on.</p>
+
+<table>
+<thead><tr><th>Weak starting point</th><th>Why it fails</th><th>Strong starting point</th></tr></thead>
+<tbody>
+<tr><td>"Let's see which indicators predict returns"</td><td>You will find some — by chance (§1.3.4)</td><td>"Forced sellers overshoot; who is forced, and when?"</td></tr>
+<tr><td>"This pattern made money in the backtest"</td><td>No reason for it to continue</td><td>"This is a risk premium: who bears the risk, and why do they accept the price?"</td></tr>
+<tr><td>"An ML model on 500 features"</td><td>Thousands of hidden trials</td><td>"Three features, each with a story, combined simply"</td></tr>
+<tr><td>"It works on Bitcoin since 2023"</td><td>One asset, one regime</td><td>"It should work across assets where the same mechanism applies"</td></tr>
+</tbody>
+</table>
+
+<div class="co tip"><span class="co-t">💡 Looking ahead</span>
+<p>Unit 7 turns this into a method: <span class="xref soon" data-xref="7.5" data-auto="" title="Coming soon">Session 7.5 — Causal Factor Investing</span> uses causal graphs to check that a factor's story is not just a correlation with a hidden cause. Unit 8 walks through the strategy families whose stories have survived decades of scrutiny.</p>
+</div>
+</section>
+
+<section id="s3">
+<h2><span class="no">1.3.3</span> Gates, not vibes</h2>
+<p class="lede">A gate is a go/no-go decision with a criterion written down in advance. Without gates, every idea drifts forward on enthusiasm.</p>
+
+<table>
+<thead><tr><th>Stage</th><th>Gate question</th><th>Typical kill criterion</th><th>Taught in</th></tr></thead>
+<tbody>
+<tr><td>1 · Question</td><td>Is there a plausible counterparty and mechanism?</td><td>No answer to "who pays me?"</td><td><span class="xref soon" data-xref="1.2" data-style="short" data-auto="" title="Coming soon">Session 1.2</span>, Unit 7</td></tr>
+<tr><td>2 · Data</td><td>Could I have known this at the time?</td><td>Any look-ahead or survivorship you cannot remove</td><td>Unit 4</td></tr>
+<tr><td>3–4 · Signal &amp; backtest</td><td>Does it survive realistic costs?</td><td>Net Sharpe below a floor you set in advance</td><td><span class="xref soon" data-xref="6.2" data-style="short" data-auto="" title="Coming soon">Session 6.2</span>–<span class="xref soon" data-xref="6.5" data-style="short" data-auto="" title="Coming soon">Session 6.5</span></td></tr>
+<tr><td>5 · Validate</td><td>Is it better than the best of my failed tries?</td><td>Deflated Sharpe below threshold; holdout negative</td><td><span class="xref soon" data-xref="6.6" data-style="short" data-auto="" title="Coming soon">Session 6.6</span>–<span class="xref soon" data-xref="6.8" data-style="short" data-auto="" title="Coming soon">Session 6.8</span></td></tr>
+<tr><td>6 · Size</td><td>Does it add to the existing portfolio?</td><td>Correlated with what you already run; no diversification</td><td>Unit 9</td></tr>
+<tr><td>7 · Paper</td><td>Do live signals and fills match the simulation?</td><td>Implementation gap larger than the edge</td><td>Unit 15</td></tr>
+<tr><td>8–9 · Live</td><td>Is live performance inside the expected range?</td><td>Drawdown or decay beyond the pre-agreed limit</td><td><span class="xref soon" data-xref="9.9" data-style="short" data-auto="" title="Coming soon">Session 9.9</span></td></tr>
+</tbody>
+</table>
+
+<p>The cheapest place to kill an idea is the first gate that can kill it. Killing it at the question stage costs an afternoon. Killing it after paper trading costs months. Killing it live costs money — and, worse, the temptation not to.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 190" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">A HEALTHY FUNNEL — illustrative survival of 100 ideas (widths to scale)</text>
+  <rect x="26" y="36" width="668" height="26" rx="5" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="40" y="54" font-size="11" fill="#1F2C38">100 questions written down</text>
+  <rect x="26" y="68" width="167" height="26" rx="5" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="203" y="86" font-size="11" fill="#1F2C38">25 survive the data gate and a first backtest with costs</text>
+  <rect x="26" y="100" width="40" height="26" rx="5" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="76" y="118" font-size="11" fill="#1F2C38">6 pass validation (deflated, holdout)</text>
+  <rect x="26" y="132" width="20" height="26" rx="5" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="56" y="150" font-size="11" fill="#1F2C38">3 pass paper trading</text>
+  <rect x="26" y="164" width="7" height="16" rx="3" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="43" y="177" font-size="11" fill="#1F2C38">1 is still earning after two years live</text>
+</svg>
+<figcaption>fig 1.3.3 — an illustrative idea funnel: a researcher who kills most ideas early is working, not failing</figcaption>
+</figure>
+
+<div class="co warn"><span class="co-t">⚠️ Pitfall — "I'll decide what counts as good once I see it"</span>
+<p>Choosing the bar after seeing the result is the single most common way smart people fool themselves. The mind is superb at explaining why <em>this</em> result is good enough. Write the kill criterion first; if you later want to change it, write down why and treat it as a new, separately counted trial.</p>
+</div>
+</section>
+
+<section id="s4">
+<h2><span class="no">1.3.4</span> The garden of forking paths</h2>
+<p class="lede">Why do gates matter so much? Because if you try enough strategies, one of them will look excellent even when none of them has any skill. The lab proves it.</p>
+
+<p>The lab builds strategies with <em>zero</em> true edge — returns that are pure noise — and gives each <span data-lab="years_is" data-fmt="d">5</span> years of history. It then plays researcher: try N strategies, keep the one with the best <span class="term soon" data-term="Sharpe ratio" title="Defined in Session 2.3 (coming soon)">Sharpe ratio</span> (return per unit of risk), and repeat the whole project <span data-lab="repeats" data-fmt="d">200</span> times to see what typically happens.</p>
+
+<figure class="diagram chart">
+<!-- chart:best_of_n -->
+<svg viewBox="0 0 720 260" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Best in-sample Sharpe among N skill-less strategies (5 years, 200 repeats)">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">BEST IN-SAMPLE SHARPE AMONG N SKILL-LESS STRATEGIES (5 YEARS, 200 REPEATS)</text>
+  <line x1="64" y1="216" x2="690" y2="216" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="220" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.00</text>
+  <line x1="64" y1="173" x2="690" y2="173" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="177" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.50</text>
+  <line x1="64" y1="130" x2="690" y2="130" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="134" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">1.00</text>
+  <line x1="64" y1="87" x2="690" y2="87" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="91" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">1.50</text>
+  <line x1="64" y1="44" x2="690" y2="44" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="48" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">2.00</text>
+  <line x1="64" y1="216" x2="690" y2="216" stroke="#C9CFC6" stroke-width="1"/>
+  <path d="M130.2,216 V214.1 Q130.2,212.2 132.1,212.2 H152.4 Q154.2,212.2 154.2,214.1 V216 Z" fill="#3A56C5"><title>N = 1: 0.04</title></path>
+  <text x="142.2" y="205.2" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.04</text>
+  <text x="142.2" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">N = 1</text>
+  <path d="M286.8,216 V158.1 Q286.8,154.1 290.8,154.1 H306.8 Q310.8,154.1 310.8,158.1 V216 Z" fill="#3A56C5"><title>N = 10: 0.72</title></path>
+  <text x="298.8" y="147.1" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.72</text>
+  <text x="298.8" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">N = 10</text>
+  <path d="M443.2,216 V123.7 Q443.2,119.7 447.2,119.7 H463.2 Q467.2,119.7 467.2,123.7 V216 Z" fill="#3A56C5"><title>N = 100: 1.12</title></path>
+  <text x="455.2" y="112.7" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">1.12</text>
+  <text x="455.2" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">N = 100</text>
+  <path d="M599.8,216 V94 Q599.8,90 603.8,90 H619.8 Q623.8,90 623.8,94 V216 Z" fill="#3A56C5"><title>N = 1,000: 1.47</title></path>
+  <text x="611.8" y="83" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">1.47</text>
+  <text x="611.8" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">N = 1,000</text>
+</svg>
+<!-- /chart:best_of_n -->
+<figcaption>fig 1.3.4 — the best of N skill-less strategies: the more you try, the better the winner looks</figcaption>
+</figure>
+
+<figure class="diagram chart">
+<!-- chart:winner_oos -->
+<svg viewBox="0 0 720 260" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="…and the same winner&#x27;s Sharpe on 5 unseen years">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">…AND THE SAME WINNER&#x27;S SHARPE ON 5 UNSEEN YEARS</text>
+  <line x1="64" y1="216" x2="690" y2="216" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="220" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">-0.04</text>
+  <line x1="64" y1="181.6" x2="690" y2="181.6" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="185.6" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">-0.02</text>
+  <line x1="64" y1="147.2" x2="690" y2="147.2" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="151.2" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.00</text>
+  <line x1="64" y1="112.8" x2="690" y2="112.8" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="116.8" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.02</text>
+  <line x1="64" y1="78.4" x2="690" y2="78.4" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="82.4" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.04</text>
+  <line x1="64" y1="44" x2="690" y2="44" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="48" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.06</text>
+  <line x1="64" y1="147.2" x2="690" y2="147.2" stroke="#C9CFC6" stroke-width="1"/>
+  <path d="M130.2,147.2 V170.1 Q130.2,174.1 134.2,174.1 H150.2 Q154.2,174.1 154.2,170.1 V147.2 Z" fill="#4A5A68"><title>N = 1: -0.02</title></path>
+  <text x="142.2" y="189.1" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">-0.02</text>
+  <text x="142.2" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">N = 1</text>
+  <path d="M286.8,147.2 V103.4 Q286.8,99.4 290.8,99.4 H306.8 Q310.8,99.4 310.8,103.4 V147.2 Z" fill="#4A5A68"><title>N = 10: 0.03</title></path>
+  <text x="298.8" y="92.4" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.03</text>
+  <text x="298.8" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">N = 10</text>
+  <path d="M443.2,147.2 V159.3 Q443.2,163.3 447.2,163.3 H463.2 Q467.2,163.3 467.2,159.3 V147.2 Z" fill="#4A5A68"><title>N = 100: -0.01</title></path>
+  <text x="455.2" y="178.3" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">-0.01</text>
+  <text x="455.2" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">N = 100</text>
+  <path d="M599.8,147.2 V93.9 Q599.8,89.9 603.8,89.9 H619.8 Q623.8,89.9 623.8,93.9 V147.2 Z" fill="#4A5A68"><title>N = 1,000: 0.03</title></path>
+  <text x="611.8" y="82.9" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.03</text>
+  <text x="611.8" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">N = 1,000</text>
+</svg>
+<!-- /chart:winner_oos -->
+<figcaption>fig 1.3.5 — the same winners on five unseen years: indistinguishable from zero, however impressive they looked</figcaption>
+</figure>
+
+<p>Try one strategy and its in-sample Sharpe averages <span data-lab="best_is_1" data-fmt=".2f">0.04</span> — noise around zero, as it should. Try 100 and the winner averages <span data-lab="best_is_100" data-fmt=".2f">1.12</span>; try 1,000 and it averages <span data-lab="best_is_1000" data-fmt=".2f">1.47</span>, a number many funds would advertise. With 1,000 tries, the chance that the winner's Sharpe exceeds 1.0 is <span data-lab="p_above1_1000" data-fmt=".0%">100%</span>. Out of sample, the winner earns <span data-lab="winner_oos_1000" data-fmt=".2f">0.03</span>. There was never anything there.</p>
+
+<p>This is not a simulation quirk; it is a theorem. An estimated annual Sharpe ratio has a standard error of about <math><semantics><mrow><mn>1</mn><mi>/</mi><msqrt><mi>Y</mi></msqrt></mrow><annotation encoding="application/x-tex">1/\sqrt{Y}</annotation></semantics></math> after <math><semantics><mi>Y</mi><annotation encoding="application/x-tex">Y</annotation></semantics></math> years when the truth is zero, and the expected maximum of <math><semantics><mi>N</mi><annotation encoding="application/x-tex">N</annotation></semantics></math> such noisy estimates is, approximately:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><mi>𝔼</mi><mo fence="false" symmetric="true" minsize="1.8em" maxsize="1.8em">[</mo><munder><mi>max</mi><mrow><mi>n</mi><mo>≤</mo><mi>N</mi></mrow></munder><mo>⁡</mo><mspace width="0.1667em"></mspace><msub><mover><mpadded lspace="0"><mi>SR</mi></mpadded><mo stretchy="true" class="tml-hat-3" style="math-depth:0;">ˆ</mo></mover><mi>n</mi></msub><mo fence="false" symmetric="true" minsize="1.8em" maxsize="1.8em">]</mo><mspace width="0.2778em"></mspace><mo>≈</mo><mspace width="0.2778em"></mspace><mfrac><mn>1</mn><msqrt><mi>Y</mi></msqrt></mfrac><mo fence="false" symmetric="true" minsize="1.8em" maxsize="1.8em">[</mo><mo form="prefix" stretchy="false">(</mo><mn>1</mn><mo>−</mo><mi>γ</mi><mo form="postfix" stretchy="false">)</mo><mspace width="0.1667em"></mspace><msup><mrow><mi mathvariant="normal">Φ</mi><mspace></mspace></mrow><mrow><mo form="prefix" stretchy="false" lspace="0em" rspace="0em">−</mo><mn>1</mn></mrow></msup><mo fence="false" symmetric="true" minsize="1.2em" maxsize="1.2em">(</mo><mn>1</mn><mo>−</mo><mstyle displaystyle="false" scriptlevel="0"><mfrac><mn>1</mn><mi>N</mi></mfrac></mstyle><mo fence="false" symmetric="true" minsize="1.2em" maxsize="1.2em">)</mo><mo>+</mo><mi>γ</mi><mspace width="0.1667em"></mspace><msup><mrow><mi mathvariant="normal">Φ</mi><mspace></mspace></mrow><mrow><mo form="prefix" stretchy="false" lspace="0em" rspace="0em">−</mo><mn>1</mn></mrow></msup><mo fence="false" symmetric="true" minsize="1.2em" maxsize="1.2em">(</mo><mn>1</mn><mo>−</mo><mstyle displaystyle="false" scriptlevel="0"><mfrac><mn>1</mn><mrow><mi>N</mi><mi>e</mi></mrow></mfrac></mstyle><mo fence="false" symmetric="true" minsize="1.2em" maxsize="1.2em">)</mo><mo fence="false" symmetric="true" minsize="1.8em" maxsize="1.8em">]</mo></mrow><annotation encoding="application/x-tex">\E\Big[\max_{n \le N} \widehat{\SR}_n\Big] \;\approx\; \frac{1}{\sqrt{Y}}\Big[(1-\gamma)\,\Phi^{-1}\big(1 - \tfrac{1}{N}\big) + \gamma\,\Phi^{-1}\big(1 - \tfrac{1}{N e}\big)\Big]</annotation></semantics></math></div>
+<p>where <math><semantics><msup><mrow><mi mathvariant="normal">Φ</mi><mspace></mspace></mrow><mrow><mo form="prefix" stretchy="false" lspace="0em" rspace="0em">−</mo><mn>1</mn></mrow></msup><annotation encoding="application/x-tex">\Phi^{-1}</annotation></semantics></math> is the inverse normal CDF and <math><semantics><mrow><mi>γ</mi><mo>≈</mo><mn>0.577</mn></mrow><annotation encoding="application/x-tex">\gamma \approx 0.577</annotation></semantics></math> is the Euler–Mascheroni constant. For <math><semantics><mrow><mi>N</mi><mo>=</mo><mn>1,000</mn></mrow><annotation encoding="application/x-tex">N = 1{,}000</annotation></semantics></math> and <math><semantics><mrow><mi>Y</mi><mo>=</mo><mn>5</mn></mrow><annotation encoding="application/x-tex">Y = 5</annotation></semantics></math> it predicts <span data-lab="theory_1000" data-fmt=".2f">1.46</span>; the lab measured <span data-lab="best_is_1000" data-fmt=".2f">1.47</span>. This is the <strong>False Strategy Theorem</strong>, and <span class="xref soon" data-xref="6.7" data-auto="" title="Coming soon">Session 6.7 — Overfitting Statistics: PSR, DSR, MinTRL &amp; PBO</span> turns it into a correction you apply to every backtest: the <span class="term soon" data-term="deflated Sharpe ratio" title="Defined in Session 6.7 (coming soon)">deflated Sharpe ratio</span>.</p>
+
+<table>
+<thead><tr><th>Strategies tried (N)</th><th>Best in-sample Sharpe</th><th>Theory</th><th>P(best &gt; 1.0)</th><th>Winner out of sample</th></tr></thead>
+<tbody>
+<tr><td>1</td><td><span data-lab="best_is_1" data-fmt=".2f">0.04</span></td><td><span data-lab="theory_1" data-fmt=".2f">0.00</span></td><td><span data-lab="p_above1_1" data-fmt=".0%">2%</span></td><td><span data-lab="winner_oos_1" data-fmt=".2f">-0.02</span></td></tr>
+<tr><td>10</td><td><span data-lab="best_is_10" data-fmt=".2f">0.72</span></td><td><span data-lab="theory_10" data-fmt=".2f">0.70</span></td><td><span data-lab="p_above1_10" data-fmt=".0%">12%</span></td><td><span data-lab="winner_oos_10" data-fmt=".2f">0.03</span></td></tr>
+<tr><td>100</td><td><span data-lab="best_is_100" data-fmt=".2f">1.12</span></td><td><span data-lab="theory_100" data-fmt=".2f">1.13</span></td><td><span data-lab="p_above1_100" data-fmt=".0%">74%</span></td><td><span data-lab="winner_oos_100" data-fmt=".2f">-0.01</span></td></tr>
+<tr><td>1,000</td><td><span data-lab="best_is_1000" data-fmt=".2f">1.47</span></td><td><span data-lab="theory_1000" data-fmt=".2f">1.46</span></td><td><span data-lab="p_above1_1000" data-fmt=".0%">100%</span></td><td><span data-lab="winner_oos_1000" data-fmt=".2f">0.03</span></td></tr>
+</tbody>
+</table>
+
+<div class="co warn"><span class="co-t">⚠️ Pitfall — "but I didn't try 1,000 strategies"</span>
+<p>You almost certainly did. Every parameter you tuned, every lookback you tweaked, every universe you narrowed, every "let me just try it without 2008" is a trial. So is every idea a colleague tried before you and told you about, and every strategy in a paper that was published because it worked. Counting them honestly — a <span class="term soon" data-term="trial log" title="Defined in Session 6.8 (coming soon)">trial log</span> — is the only defence. Even one honest test is noisy: with five years of data, a skill-less strategy shows a Sharpe above 0.5 by luck <span data-lab="single_p_above_05" data-fmt=".0%">14%</span> of the time.</p>
+</div>
+</section>
+
+<section id="s5">
+<h2><span class="no">1.3.5</span> The research log &amp; pre-registration</h2>
+<p class="lede">Two documents make the lifecycle honest: a pre-registration written before you look, and a research log that records everything you did after.</p>
+
+<p><strong>Pre-registration</strong> means writing down, before touching the test data, exactly what you will test and what result would kill the idea. Scientists adopted it after their own replication crisis; it is the quant equivalent of writing the test before the code. The lab writes one for a short-term reversal idea:</p>
+
+<pre><span class="c"># preregistration R-001 — committed to git BEFORE looking at the data</span>
+hypothesis:       <span class="s">"Stocks with the worst 5-day return outperform over the next 5 days,</span>
+<span class="s">                   because liquidity providers are paid to absorb selling pressure."</span>
+who_pays_us:      <span class="s">"impatient sellers demanding immediacy"</span>
+universe:         <span class="s">"US large caps, point-in-time index membership"</span>
+data:             <span class="s">"2005–2019 in-sample; 2020–2024 held out, untouched"</span>
+signal:           <span class="s">"rank of 5-day return, rebalanced weekly, dollar-neutral"</span>
+primary_metric:   <span class="s">"annualised Sharpe after 10 bp one-way costs"</span>
+variants_allowed: <span class="p">12</span>
+kill_criterion:   <span class="s">"deflated Sharpe below 0.95 in-sample, OR holdout Sharpe below 0"</span>
+holdout_rule:     <span class="s">"evaluated exactly once, after the in-sample decision is frozen"</span></pre>
+
+<p>The <strong>research log</strong> is the commit history of your thinking: every variant run, every result, every decision and its reason, with a date. It sounds like bureaucracy; it is actually leverage. It gives you the true trial count for deflating results (<span class="xref soon" data-xref="6.7" data-style="short" data-auto="" title="Coming soon">Session 6.7</span>), it stops you re-running dead ideas, and when a strategy fails live it tells you exactly what you assumed.</p>
+
+<div class="co key"><span class="co-t">📌 Key idea — the holdout is a single-use resource</span>
+<p>Data you have looked at is in-sample, whatever you call it. The moment you check a holdout, adjust, and check again, it has joined your training set. <mark>Treat out-of-sample data like a one-time password: once used, it is spent.</mark> The only unlimited source of fresh out-of-sample data is time — which is what paper trading buys.</p>
+</div>
+
+<table>
+<thead><tr><th>Record</th><th>When</th><th>What it protects against</th></tr></thead>
+<tbody>
+<tr><td>Pre-registration</td><td>before any test</td><td>moving the goalposts; hindsight stories</td></tr>
+<tr><td>Trial log</td><td>every run</td><td>undercounting trials; re-testing dead ideas</td></tr>
+<tr><td>Decision memo</td><td>at each gate</td><td>enthusiasm carrying an idea past a failed gate</td></tr>
+<tr><td>Live monitoring report</td><td>weekly / monthly</td><td>slow decay nobody notices until the drawdown</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="s6">
+<h2><span class="no">1.3.6</span> Paper, live &amp; decay</h2>
+<p class="lede">The bottom row of the lifecycle is where most of the money is lost — not because the research was wrong, but because reality differs from simulation, and edges erode.</p>
+
+<p>Paper trading runs the strategy on live data with simulated fills. It catches problems a backtest cannot: data that arrives late or gets revised, signals that depend on prices you could not actually trade at, costs larger than assumed. Then comes live trading, <em>small</em> — sized so that being wrong is survivable — and scaled up only as live results land inside the range the backtest predicted.</p>
+
+<p>And every edge decays. Once an anomaly is published, others trade it: McLean and Pontiff found that published return predictors earn about 26% less out-of-sample and 58% less after publication. Crowding, changing market structure and regulation all erode edges over time. <strong>Alpha decay</strong> is not a failure of the strategy; it is the normal lifecycle of an edge, which is why the loop in fig 1.3.1 ends at retirement and feeds back into new questions.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 230" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">SAME IDEA, TWO RESEARCHERS</text>
+  <rect x="26" y="32" width="326" height="186" rx="9" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="189" y="54" font-size="11" font-weight="700" text-anchor="middle" fill="#D64B2A">THE NAIVE WAY</text>
+  <rect x="46" y="66" width="286" height="24" rx="5" fill="#fff" stroke="#F2CDBF"/>
+  <text x="58" y="82" font-size="9.5" fill="#1F2C38">tweak the backtest until the curve looks good</text>
+  <rect x="46" y="96" width="286" height="24" rx="5" fill="#fff" stroke="#F2CDBF"/>
+  <text x="58" y="112" font-size="9.5" fill="#1F2C38">"validate" on data already peeked at</text>
+  <rect x="46" y="126" width="286" height="24" rx="5" fill="#fff" stroke="#F2CDBF"/>
+  <text x="58" y="142" font-size="9.5" fill="#1F2C38">go live at full size; explain away the drawdown</text>
+  <text x="189" y="178" font-size="9.5" text-anchor="middle" fill="#D64B2A" font-weight="600">Deploys the best accident of many trials.</text>
+  <text x="189" y="196" font-size="9" text-anchor="middle" fill="#4A5A68">Learns nothing when it fails — nothing was written down.</text>
+  <rect x="368" y="32" width="326" height="186" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="531" y="54" font-size="11" font-weight="700" text-anchor="middle" fill="#1F7A55">THE DISCIPLINED WAY</text>
+  <rect x="388" y="66" width="286" height="24" rx="5" fill="#fff" stroke="#BFE0CF"/>
+  <text x="400" y="82" font-size="9.5" fill="#1F2C38">1 · story and kill criteria written first</text>
+  <rect x="388" y="96" width="286" height="24" rx="5" fill="#fff" stroke="#BFE0CF"/>
+  <text x="400" y="112" font-size="9.5" fill="#1F2C38">2 · every trial logged; results deflated; holdout used once</text>
+  <rect x="388" y="126" width="286" height="24" rx="5" fill="#fff" stroke="#BFE0CF"/>
+  <text x="400" y="142" font-size="9.5" fill="#1F2C38">3 · paper, then small live, then scale on evidence</text>
+  <text x="531" y="178" font-size="9.5" text-anchor="middle" fill="#1F7A55" font-weight="600">Deploys less, keeps more.</text>
+  <text x="531" y="196" font-size="9" text-anchor="middle" fill="#4A5A68">Every failure sharpens the next question.</text>
+</svg>
+<figcaption>fig 1.3.6 — two researchers, one idea: the difference is the process, not the intelligence</figcaption>
+</figure>
+
+<div class="co tip"><span class="co-t">💡 Looking ahead</span>
+<p>The evidence on how far backtests overstate live results — and on who actually makes money trading — is the subject of <span class="xref soon" data-xref="1.4" data-auto="" title="Coming soon">Session 1.4 — The Engineer&#x27;s Edge, Blind Spots &amp; Honest Odds</span>. The mechanics of paper and live trading are Unit 15; deciding when to switch a strategy off is <span class="xref soon" data-xref="9.9" data-auto="" title="Coming soon">Session 9.9 — Performance, Attribution &amp; When to Switch Off</span>.</p>
+</div>
+</section>
+
+<section id="s7">
+<h2><span class="no">1.3.7</span> Try it</h2>
+<p class="lede">Open the companion lab and become the researcher who finds alpha in noise — on purpose, so you recognise it later.</p>
+<div class="co lab"><span class="co-t">🔧 Try it (15 min, in the lab)</span>
+<p>1. Before running anything, use the formula in §1.3.4 to predict the best in-sample Sharpe for <math><semantics><mrow><mi>N</mi><mo>=</mo><mn>100</mn></mrow><annotation encoding="application/x-tex">N = 100</annotation></semantics></math> strategies with <math><semantics><mrow><mi>Y</mi><mo>=</mo><mn>10</mn></mrow><annotation encoding="application/x-tex">Y = 10</annotation></semantics></math> years. Write your prediction down.<br>
+2. Change <code>YEARS_IS</code> to 10 and rerun. Did more data shrink the best fake Sharpe the way the formula says (by <math><semantics><mrow><mn>1</mn><mi>/</mi><msqrt><mn>2</mn></msqrt></mrow><annotation encoding="application/x-tex">1/\sqrt{2}</annotation></semantics></math>)?<br>
+3. Success looks like this: your prediction is within 0.1 of the lab's number, and you can explain in one sentence why longer histories protect you — and why they never make <math><semantics><mi>N</mi><annotation encoding="application/x-tex">N</annotation></semantics></math> irrelevant.</p>
+</div>
+</section>
+
+<hr>
+
+<section id="s8">
+<h2><span class="no">1.3.8</span> Glossary · Check yourself · Go deeper</h2>
+<div class="gloss" id="glossary">
+<div id="g-hypothesis"><b>Hypothesis</b> — a falsifiable claim about why prices behave a certain way and who is on the other side.</div>
+<div id="g-signal"><b>Signal</b> — a number computable from data available at the time that forecasts a future return.</div>
+<div id="g-backtest"><b>Backtest</b> — a simulation of how a trading rule would have performed on historical data.</div>
+<div id="g-out-of-sample"><b>Out-of-sample</b> — data not used in any way to build or choose a strategy; spent once looked at.</div>
+<div id="g-paper-trading"><b>Paper trading</b> — running a strategy on live data with simulated money and fills.</div>
+<div id="g-alpha-decay"><b>Alpha decay</b> — the erosion of an edge over time as others trade it or markets change.</div>
+<div id="g-research-log"><b>Research log</b> — a dated record of every trial, result and decision in a research project.</div>
+<div id="g-pre-registration"><b>Pre-registration</b> — writing down the test, metrics and kill criteria before seeing results.</div>
+<div id="g-kill-criterion"><b>Kill criterion</b> — a pre-agreed result that ends an idea at a gate, no arguments.</div>
+</div>
+
+<h3>Check yourself</h3>
+<details class="q"><summary>1. A colleague shows a strategy with a 5-year backtest Sharpe of 1.4, found after "a few hundred" variations. How impressed should you be?</summary><div>Not very. With no skill at all, the best of 100 five-year backtests averages a Sharpe of about 1.1, and the best of 1,000 about 1.5. Ask for the trial count, deflate the Sharpe for it (Session 6.7), and ask whether an untouched holdout was used exactly once.</div></details>
+<details class="q"><summary>2. At which stage should an idea ideally die — and why?</summary><div>At the earliest gate that can kill it, usually the question or data stage. The cost of killing an idea rises by orders of magnitude at each stage — an afternoon, then weeks, then months, then real money — and so does the emotional investment that makes killing it harder.</div></details>
+<details class="q"><summary>3. You test on your holdout once, it fails, you tweak the rule and test on the holdout again. What is the holdout now?</summary><div>In-sample. The tweak was chosen using the holdout's result, so it no longer measures out-of-sample performance. Fresh out-of-sample data now has to come from time: paper trading or a later data period.</div></details>
+<details class="q"><summary>4. After three months of paper trading, a strategy's Sharpe is 0.3 against a backtest of 1.1. Kill it?</summary><div>Not on performance alone: three months of returns can barely distinguish a Sharpe of 1.1 from 0 — the standard error is around 2. Check the implementation instead: are signals and fills matching the simulation? The pre-registered paper-trading gate should specify a minimum duration and what "matching" means.</div></details>
+<details class="q"><summary>5. Why must the kill criterion be written before the result is known?</summary><div>Because after seeing the result you will, sincerely, find reasons why it is good enough. It is the research version of writing the test before the code: the criterion constrains you only if it exists before the temptation does.</div></details>
+
+<div class="co lab"><span class="co-t">🔧 Homework (~1 h before Session 1.4)</span>
+<p>1. Write a pre-registration for a trading idea you have had, using the template in the lab (section 4). Commit it to a git repository so it has a timestamp.<br>
+2. In the lab, set <code>TRIALS = [1, 10, 100, 1000, 5000]</code>. Predict the N = 5,000 result with the formula first, then run it.<br>
+3. Read Bailey, Borwein, López de Prado &amp; Zhu (2014), below — fourteen pages, and the best argument you will read for why this session exists.</p>
+</div>
+
+<h3>📚 Go deeper</h3>
+<ol class="refs">
+<li>Bailey, D. H., Borwein, J. M., López de Prado, M. &amp; Zhu, Q. J. (2014). "Pseudo-Mathematics and Financial Charlatanism: The Effects of Backtest Overfitting on Out-of-Sample Performance." <em>Notices of the AMS</em> 61(5), 458–471. <span class="rid">doi:10.1090/noti1105</span></li>
+<li>López de Prado, M. (2018). <em>Advances in Financial Machine Learning</em>, ch. 11–14 (backtesting). Wiley. <span class="rid">ISBN 978-1-119-48208-6</span></li>
+<li>Harvey, C. R., Liu, Y. &amp; Zhu, H. (2016). "…and the Cross-Section of Expected Returns." <em>Review of Financial Studies</em> 29(1), 5–68. <span class="rid">doi:10.1093/rfs/hhv059</span></li>
+<li>McLean, R. D. &amp; Pontiff, J. (2016). "Does Academic Research Destroy Stock Return Predictability?" <em>Journal of Finance</em> 71(1), 5–32. <span class="rid">doi:10.1111/jofi.12365</span></li>
+<li>Wiecki, T., Campbell, A., Lent, J. &amp; Stauth, J. (2016). "All That Glitters Is Not Gold: Comparing Backtest and Out-of-Sample Performance on a Large Cohort of Trading Algorithms." <span class="rid">SSRN 2745220</span></li>
+</ol>
+</section>
+
+<!-- nav:foot -->
+<div class="foot">
+<span class="soon" title="Coming soon">← Prev: 1.2 · Sources of Return</span>
+<span class="soon" title="Coming soon">Next: 1.4 · Edge &amp; Odds →</span>
+</div>
+<p class="legal">Educational material only — not investment, legal or tax advice. Backtests and simulations are hypothetical. <a href="../start-here.html#disclaimer">Disclaimer</a> · Text CC BY 4.0 · Code MIT.</p>
+<!-- /nav:foot -->
+</main>
+</div></body></html>

@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- nav:head -->
+<title>2.3 · Returns, P&amp;L, Compounding &amp; Leverage</title>
+<meta name="description" content="The arithmetic every later session relies on — simple vs log returns, compounding, annualisation, volatility drag, Sharpe, drawdown and leverage.">
+<link rel="canonical" href="https://georgevrs.github.io/quant-notebook/unit02-markets-instruments/session03-returns-pnl-leverage.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Quant Notebook">
+<meta property="og:title" content="2.3 · Returns, P&amp;L, Compounding &amp; Leverage">
+<meta property="og:description" content="The arithmetic every later session relies on — simple vs log returns, compounding, annualisation, volatility drag, Sharpe, drawdown and leverage.">
+<meta property="og:url" content="https://georgevrs.github.io/quant-notebook/unit02-markets-instruments/session03-returns-pnl-leverage.html">
+<meta name="twitter:card" content="summary">
+<link rel="stylesheet" href="../assets/brand.css">
+<link rel="stylesheet" href="../assets/temml.css">
+<!-- /nav:head -->
+</head>
+<body><div class="page" id="top">
+<!-- Golden session 2.3 — sets the return conventions every later session reuses. See AUTHORING.md. -->
+<!-- nav:tabs -->
+<nav class="tabs">
+<a href="../index.html">⌂ Course home</a>
+<span class="soon" title="Coming soon">2.1 · Market Anatomy</span>
+<span class="soon" title="Coming soon">2.2 · Equities &amp; ETFs</span>
+<a class="active" href="session03-returns-pnl-leverage.html">2.3 · Returns &amp; Leverage</a>
+<span class="soon" title="Coming soon">2.4 · Futures</span>
+<span class="soon" title="Coming soon">2.5 · FX &amp; Commodities</span>
+<span class="soon" title="Coming soon">2.6 · Crypto</span>
+<span class="soon" title="Coming soon">2.7 · Options Primer</span>
+<a href="../roadmap.html">🗺 Roadmap</a>
+</nav>
+<!-- /nav:tabs -->
+
+<header class="cover">
+<!-- nav:heading -->
+<p class="eyebrow">Unit 2 · Markets &amp; Instruments — Session 03 of 07</p>
+<h1>Returns, P&amp;L, Compounding &amp; Leverage</h1>
+<!-- /nav:heading -->
+<p class="subtitle">Every number a quant ever reports — a backtest's growth, a fund's Sharpe ratio, a strategy's worst loss — is built from the same handful of return calculations. Get them slightly wrong and you will manufacture performance that doesn't exist, or miss risk that does. This session nails down the arithmetic once, with code and simulations that check every formula against a known truth. <mark>The core move: add log returns across time, add simple returns across assets, and never confuse the two.</mark></p>
+<div class="meta">
+<span>DURATION <b>1.5 h + lab</b></span>
+<span>LEVEL <b>Foundations</b></span>
+<span>TRACKS <b>QR · QT · QD · IND</b></span>
+<span>HANDS-ON <b>Leverage on 2,000 simulated paths</b></span>
+</div>
+<!-- nav:labstrip -->
+<div class="labstrip"><b>📓 Companion lab</b>
+<a href="https://colab.research.google.com/github/georgevrs/quant-notebook/blob/main/labs/u02/s03_returns_pnl_leverage.ipynb">Open in Colab</a>
+<a href="https://github.com/georgevrs/quant-notebook/blob/main/labs/u02/s03_returns_pnl_leverage.ipynb">Notebook on GitHub</a>
+<a href="https://github.com/georgevrs/quant-notebook/blob/main/labs/u02/s03_returns_pnl_leverage.py">Source (.py)</a>
+</div>
+<!-- /nav:labstrip -->
+<div class="toc">
+<b>On this page</b>
+<ol>
+<li><a href="#s1">One trade, four numbers</a></li>
+<li><a href="#s2">From prices to a track record</a></li>
+<li><a href="#s3">The math of returns</a></li>
+<li><a href="#s4">Compounding, drag &amp; the asymmetry of losses</a></li>
+<li><a href="#s5">Sharpe &amp; drawdown, in code</a></li>
+<li><a href="#s6">Leverage: when more becomes less</a></li>
+<li><a href="#s7">Return bugs that fake alpha</a></li>
+<li><a href="#s8">Try it</a></li>
+<li><a href="#s9">Glossary · Check yourself · Go deeper</a></li>
+</ol>
+</div>
+</header>
+
+<main>
+
+<section id="s1">
+<h2><span class="no">2.3.1</span> One trade, four numbers</h2>
+<p class="lede">The same trade can be described four ways, and each description answers a different question. Mixing them up is the most common arithmetic error in finance.</p>
+
+<p>You buy 200 shares at $100 and sell them at $110. Your broker statement shows a <strong>P&amp;L</strong> — profit and loss in currency — of $<span data-lab="trade_pnl" data-fmt=",.0f">2,000</span>. That number is what pays the rent, but it is useless for comparison: the same trade on 2,000 shares would show ten times as much. So quants almost always work with <strong>returns</strong>, which divide out the size of the position.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 236" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <rect x="20" y="14" width="680" height="206" rx="12" fill="#fff" stroke="#1F2C38" stroke-width="1.5"/>
+  <text x="40" y="40" font-size="12" fill="#4A5A68" font-family="IBM Plex Mono,monospace">ONE TRADE — BUY 200 @ $100, SELL @ $110</text>
+  <rect x="40" y="56" width="148" height="116" rx="8" fill="#F5F6F2" stroke="#4A5A68" stroke-width="1.5"/>
+  <text x="114" y="84" font-size="13" font-weight="600" text-anchor="middle" fill="#1F2C38">PRICE MOVE</text>
+  <text x="114" y="110" font-size="15" text-anchor="middle" fill="#1F2C38" font-family="IBM Plex Mono,monospace">$100 → $110</text>
+  <text x="114" y="136" font-size="10.5" text-anchor="middle" fill="#4A5A68">what the market did</text>
+  <text x="114" y="152" font-size="10.5" text-anchor="middle" fill="#4A5A68">(size-free, not a return)</text>
+  <rect x="202" y="56" width="148" height="116" rx="8" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="276" y="84" font-size="13" font-weight="600" text-anchor="middle" fill="#8A6D00">P&amp;L</text>
+  <text x="276" y="110" font-size="15" text-anchor="middle" fill="#1F2C38" font-family="IBM Plex Mono,monospace">+$2,000</text>
+  <text x="276" y="136" font-size="10.5" text-anchor="middle" fill="#4A5A68">what you earned —</text>
+  <text x="276" y="152" font-size="10.5" text-anchor="middle" fill="#4A5A68">scales with position size</text>
+  <rect x="364" y="56" width="148" height="116" rx="8" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="438" y="84" font-size="13" font-weight="600" text-anchor="middle" fill="#3A56C5">SIMPLE RETURN</text>
+  <text x="438" y="110" font-size="15" text-anchor="middle" fill="#1F2C38" font-family="IBM Plex Mono,monospace">+10.00%</text>
+  <text x="438" y="136" font-size="10.5" text-anchor="middle" fill="#4A5A68">adds across ASSETS —</text>
+  <text x="438" y="152" font-size="10.5" text-anchor="middle" fill="#4A5A68">use it for portfolios</text>
+  <rect x="526" y="56" width="154" height="116" rx="8" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="603" y="84" font-size="13" font-weight="600" text-anchor="middle" fill="#1F7A55">LOG RETURN</text>
+  <text x="603" y="110" font-size="15" text-anchor="middle" fill="#1F2C38" font-family="IBM Plex Mono,monospace">0.0953</text>
+  <text x="603" y="136" font-size="10.5" text-anchor="middle" fill="#4A5A68">adds across TIME —</text>
+  <text x="603" y="152" font-size="10.5" text-anchor="middle" fill="#4A5A68">use it for compounding</text>
+  <text x="360" y="200" font-size="12" text-anchor="middle" fill="#4A5A68" font-style="italic">Same trade. The question you are answering decides which number you use.</text>
+</svg>
+<figcaption>fig 2.3.1 — one trade described four ways: price move, P&amp;L, simple return and log return</figcaption>
+</figure>
+
+<p>The <strong>simple return</strong> is the percentage change you learned at school: <span data-lab="trade_simple" data-fmt=".2%">10.00%</span>. The <strong>log return</strong> is the natural logarithm of the price ratio: <span data-lab="trade_log" data-fmt=".4f">0.0953</span>. For small moves they are almost identical; for big moves, or over long periods, they diverge — and each has exactly one job it does perfectly.</p>
+
+<div class="co key"><span class="co-t">📌 Key idea — two returns, two jobs</span>
+<p>Simple returns <em>add across assets</em>: a portfolio's simple return is exactly the weighted sum of its holdings' simple returns. Log returns <em>add across time</em>: a year's log return is exactly the sum of its daily log returns. <mark>Use simple returns to combine positions and log returns to combine periods</mark>, and convert between them with <math><semantics><mrow><mi>r</mi><mo>=</mo><mrow><mi>ln</mi><mo>⁡</mo></mrow><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mn>1</mn><mo>+</mo><mi>R</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">r = \ln(1 + R)</annotation></semantics></math>.</p>
+</div>
+
+<div class="co note"><span class="co-t">🧭 Margin note — an engineer's analogy</span>
+<p>Log returns are the <em>decibels</em> of finance. Gains multiply, just as amplifier stages multiply a signal; taking logs turns multiplication into addition, which is why a log-scale chart of wealth shows steady compounding as a straight line (fig 2.3.5).</p>
+</div>
+</section>
+
+<section id="s2">
+<h2><span class="no">2.3.2</span> From prices to a track record</h2>
+<p class="lede">Every performance number — in a backtest, a fund factsheet or your own trading journal — comes out of the same five-step pipeline. Each step has one classic bug.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 176" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">THE RETURN PIPELINE — every performance number is built this way</text>
+  <rect x="22" y="38" width="120" height="66" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="82" y="64" font-size="11" text-anchor="middle" fill="#3A56C5" font-weight="600">1 · PRICES</text>
+  <text x="82" y="81" font-size="9.5" text-anchor="middle" fill="#4A5A68">adjusted for splits</text>
+  <text x="82" y="94" font-size="9.5" text-anchor="middle" fill="#4A5A68">and dividends</text>
+  <rect x="164" y="38" width="120" height="66" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="224" y="64" font-size="11" text-anchor="middle" fill="#3A56C5" font-weight="600">2 · RETURNS</text>
+  <text x="224" y="81" font-size="9.5" text-anchor="middle" fill="#4A5A68">simple per asset,</text>
+  <text x="224" y="94" font-size="9.5" text-anchor="middle" fill="#4A5A68">per period</text>
+  <rect x="306" y="38" width="120" height="66" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="366" y="64" font-size="11" text-anchor="middle" fill="#3A56C5" font-weight="600">3 · AGGREGATE</text>
+  <text x="366" y="81" font-size="9.5" text-anchor="middle" fill="#4A5A68">assets: weight simple</text>
+  <text x="366" y="94" font-size="9.5" text-anchor="middle" fill="#4A5A68">time: sum log</text>
+  <rect x="448" y="38" width="120" height="66" rx="9" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="508" y="64" font-size="11" text-anchor="middle" fill="#8A6D00" font-weight="600">4 · ANNUALISE</text>
+  <text x="508" y="81" font-size="9.5" text-anchor="middle" fill="#4A5A68">mean × 252,</text>
+  <text x="508" y="94" font-size="9.5" text-anchor="middle" fill="#4A5A68">volatility × √252</text>
+  <rect x="590" y="38" width="108" height="66" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="644" y="64" font-size="11" text-anchor="middle" fill="#1F7A55" font-weight="600">5 · RISK-ADJUST</text>
+  <text x="644" y="81" font-size="9.5" text-anchor="middle" fill="#4A5A68">Sharpe ratio,</text>
+  <text x="644" y="94" font-size="9.5" text-anchor="middle" fill="#4A5A68">drawdown</text>
+  <path d="M145 71 H161" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M287 71 H303" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M429 71 H445" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M571 71 H587" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <text x="82" y="126" font-size="9" text-anchor="middle" fill="#D64B2A">bug: raw prices</text>
+  <text x="224" y="126" font-size="9" text-anchor="middle" fill="#D64B2A">bug: pct_change on</text>
+  <text x="224" y="138" font-size="9" text-anchor="middle" fill="#D64B2A">unsorted dates</text>
+  <text x="366" y="126" font-size="9" text-anchor="middle" fill="#D64B2A">bug: summing simple</text>
+  <text x="366" y="138" font-size="9" text-anchor="middle" fill="#D64B2A">returns over time</text>
+  <text x="508" y="126" font-size="9" text-anchor="middle" fill="#D64B2A">bug: √252 on</text>
+  <text x="508" y="138" font-size="9" text-anchor="middle" fill="#D64B2A">monthly data</text>
+  <text x="644" y="126" font-size="9" text-anchor="middle" fill="#D64B2A">bug: forgetting</text>
+  <text x="644" y="138" font-size="9" text-anchor="middle" fill="#D64B2A">the risk-free rate</text>
+  <text x="360" y="164" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">Each stage is a function you can unit-test — and each has one classic bug, shown in coral.</text>
+  <defs><marker id="s2a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F2C38"/></marker></defs>
+</svg>
+<figcaption>fig 2.3.2 — the return pipeline, and the classic bug that lives at each stage</figcaption>
+</figure>
+
+<p>Step 1 matters more than it looks: returns must be computed on prices adjusted for splits and dividends, or a 2-for-1 split shows up as a −50% crash. Whether dividends are included is the difference between a price return and a <span class="term soon" data-term="total return" title="Defined in Session 2.2 (coming soon)">total return</span> — you met both in <span class="xref soon" data-xref="2.2" data-auto="" title="Coming soon">Session 2.2 — Equities, Indices &amp; ETFs</span>, and <span class="xref soon" data-xref="4.3" data-auto="" title="Coming soon">Session 4.3 — Corporate Actions, Security Master &amp; Continuous Futures</span> builds the adjustment pipeline properly.</p>
+
+<table>
+<thead><tr><th>Job</th><th>Use</th><th>Why</th></tr></thead>
+<tbody>
+<tr><td>Combine positions into a portfolio return</td><td><strong>simple</strong> returns, weighted</td><td>exact: <math><semantics><mrow><msub><mi>R</mi><mi>p</mi></msub><mo>=</mo><msub><mo movablelimits="false">∑</mo><mi>i</mi></msub><msub><mi>w</mi><mi>i</mi></msub><msub><mi>R</mi><mi>i</mi></msub></mrow><annotation encoding="application/x-tex">R_p = \sum_i w_i R_i</annotation></semantics></math></td></tr>
+<tr><td>Combine days into a month or a year</td><td><strong>log</strong> returns, summed</td><td>exact: <math><semantics><mrow><msub><mi>r</mi><mrow><mn>0</mn><mo>→</mo><mi>T</mi></mrow></msub><mo>=</mo><msub><mo movablelimits="false">∑</mo><mi>t</mi></msub><msub><mi>r</mi><mi>t</mi></msub></mrow><annotation encoding="application/x-tex">r_{0\to T} = \sum_t r_t</annotation></semantics></math></td></tr>
+<tr><td>Statistical modelling of one asset</td><td><strong>log</strong> returns (usually)</td><td>additive, more symmetric, unbounded below</td></tr>
+<tr><td>Report performance to a human</td><td><strong>simple</strong> returns, compounded</td><td>"+8% a year" is what people understand</td></tr>
+<tr><td>Compare two strategies</td><td><strong>excess</strong> returns, risk-adjusted</td><td>subtract the risk-free rate first, then divide by risk</td></tr>
+</tbody>
+</table>
+
+<div class="co tip"><span class="co-t">💡 Looking ahead</span>
+<p>The <strong>excess return</strong> — your return minus what cash would have paid — is the only return that measures skill. It powers the Sharpe ratio below, the regressions of <span class="xref soon" data-xref="5.2" data-auto="" title="Coming soon">Session 5.2 — Regression &amp; Inference That Doesn&#x27;t Lie</span> and every factor model in Unit 7.</p>
+</div>
+</section>
+
+<section id="s3">
+<h2><span class="no">2.3.3</span> The math of returns</h2>
+<p class="lede">Six formulas carry the whole course. Read each one in words first.</p>
+
+<h3>Simple and log returns</h3>
+<p>Price <math><semantics><msub><mi>P</mi><mi>t</mi></msub><annotation encoding="application/x-tex">P_t</annotation></semantics></math> at the end of period <math><semantics><mi>t</mi><annotation encoding="application/x-tex">t</annotation></semantics></math>, dividend <math><semantics><msub><mi>D</mi><mi>t</mi></msub><annotation encoding="application/x-tex">D_t</annotation></semantics></math> paid during it. The simple return is the fractional change in your money; the log return is its natural logarithm:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><msub><mi>R</mi><mi>t</mi></msub><mo>=</mo><mfrac><mrow><msub><mi>P</mi><mi>t</mi></msub><mo>+</mo><msub><mi>D</mi><mi>t</mi></msub></mrow><msub><mi>P</mi><mrow><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub></mfrac><mo>−</mo><mn>1</mn><mo separator="true">,</mo><mspace width="2em"></mspace><msub><mi>r</mi><mi>t</mi></msub><mo>=</mo><mrow><mi>ln</mi><mo>⁡</mo></mrow><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mn>1</mn><mo>+</mo><msub><mi>R</mi><mi>t</mi></msub><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">R_t = \frac{P_t + D_t}{P_{t-1}} - 1, \qquad r_t = \ln(1 + R_t)</annotation></semantics></math></div>
+
+<h3>Aggregating across time and across assets</h3>
+<p>Over <math><semantics><mi>T</mi><annotation encoding="application/x-tex">T</annotation></semantics></math> periods, simple returns <em>compound</em> (multiply) while log returns <em>add</em>. Across assets with portfolio weights <math><semantics><msub><mi>w</mi><mi>i</mi></msub><annotation encoding="application/x-tex">w_i</annotation></semantics></math>, it is the other way round:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><mn>1</mn><mo>+</mo><msub><mi>R</mi><mrow><mn>0</mn><mo>→</mo><mi>T</mi></mrow></msub><mo>=</mo><mrow><munderover><mo movablelimits="false">∏</mo><mrow><mi>t</mi><mo>=</mo><mn>1</mn></mrow><mi>T</mi></munderover></mrow><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mn>1</mn><mo>+</mo><msub><mi>R</mi><mi>t</mi></msub><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mo separator="true">,</mo><mspace width="2em"></mspace><msub><mi>r</mi><mrow><mn>0</mn><mo>→</mo><mi>T</mi></mrow></msub><mo>=</mo><mrow><munderover><mo movablelimits="false">∑</mo><mrow><mi>t</mi><mo>=</mo><mn>1</mn></mrow><mi>T</mi></munderover></mrow><msub><mi>r</mi><mi>t</mi></msub><mo separator="true">,</mo><mspace width="2em"></mspace><msub><mi>R</mi><mrow><mi>p</mi><mo separator="true">,</mo><mi>t</mi></mrow></msub><mo>=</mo><mrow><munder><mo movablelimits="false">∑</mo><mi>i</mi></munder></mrow><msub><mi>w</mi><mi>i</mi></msub><msub><mi>R</mi><mrow><mi>i</mi><mo separator="true">,</mo><mi>t</mi></mrow></msub></mrow><annotation encoding="application/x-tex">1 + R_{0\to T} = \prod_{t=1}^{T} (1 + R_t), \qquad r_{0\to T} = \sum_{t=1}^{T} r_t, \qquad R_{p,t} = \sum_{i} w_i R_{i,t}</annotation></semantics></math></div>
+
+<h3>Annualising</h3>
+<p>If daily returns are independent, the mean grows with time and the variance grows with time, so volatility grows with the <em>square root</em> of time. With 252 trading days a year, from a daily mean <math><semantics><mover><mi>R</mi><mo stretchy="false" class="chr-med wbk-med-acc" style="math-depth:0;">‾</mo></mover><annotation encoding="application/x-tex">\bar R</annotation></semantics></math> and daily standard deviation <math><semantics><mi>s</mi><annotation encoding="application/x-tex">s</annotation></semantics></math>:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><msub><mi>μ</mi><mtext>ann</mtext></msub><mo>=</mo><mn>252</mn><mspace width="0.1667em"></mspace><mover><mi>R</mi><mo stretchy="false" class="chr-med wbk-med-acc" style="math-depth:0;">‾</mo></mover><mo separator="true">,</mo><mspace width="2em"></mspace><msub><mi>σ</mi><mtext>ann</mtext></msub><mo>=</mo><msqrt><mn>252</mn></msqrt><mspace width="0.2778em"></mspace><mi>s</mi><mo separator="true">,</mo><mspace width="2em"></mspace><mtext>CAGR</mtext><mo>=</mo><msup><mrow><mo fence="true" form="prefix" stretchy="true">(</mo><mfrac><msub><mi>W</mi><mi>T</mi></msub><msub><mi>W</mi><mn>0</mn></msub></mfrac><mo fence="true" form="postfix" stretchy="true">)</mo></mrow><mrow><mn>1</mn><mi>/</mi><mi>Y</mi></mrow></msup><mo>−</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">\mu_{\text{ann}} = 252\,\bar R, \qquad \sigma_{\text{ann}} = \sqrt{252}\; s, \qquad \text{CAGR} = \left(\frac{W_T}{W_0}\right)^{1/Y} - 1</annotation></semantics></math></div>
+<p>Here <math><semantics><msub><mi>W</mi><mi>t</mi></msub><annotation encoding="application/x-tex">W_t</annotation></semantics></math> is wealth and <math><semantics><mi>Y</mi><annotation encoding="application/x-tex">Y</annotation></semantics></math> the number of years. The compound annual growth rate (CAGR) is what you actually experienced; <math><semantics><msub><mi>μ</mi><mtext>ann</mtext></msub><annotation encoding="application/x-tex">\mu_{\text{ann}}</annotation></semantics></math> is the average of what happened each day — and they are not the same number (§2.3.4).</p>
+
+<h3>Risk-adjusting</h3>
+<p>The <strong>Sharpe ratio</strong> is annualised excess return per unit of annualised volatility. The <strong>drawdown</strong> at time <math><semantics><mi>t</mi><annotation encoding="application/x-tex">t</annotation></semantics></math> is how far wealth sits below its running peak:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><mpadded lspace="0"><mi>SR</mi></mpadded><mo>=</mo><msqrt><mn>252</mn></msqrt><mspace width="0.2778em"></mspace><mfrac><mrow><mi>𝔼</mi><mrow><mo fence="true" form="prefix" stretchy="false">[</mo><msub><mi>R</mi><mi>t</mi></msub><mo>−</mo><msub><mi>r</mi><mi>f</mi></msub><mo fence="true" form="postfix" stretchy="false">]</mo></mrow></mrow><mrow><mi>σ</mi><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><msub><mi>R</mi><mi>t</mi></msub><mo>−</mo><msub><mi>r</mi><mi>f</mi></msub><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow></mfrac><mo separator="true">,</mo><mspace width="2em"></mspace><msub><mpadded lspace="0"><mi>DD</mi></mpadded><mi>t</mi></msub><mo>=</mo><mfrac><msub><mi>W</mi><mi>t</mi></msub><mrow><msub><mi>max</mi><mrow><mi>s</mi><mo>≤</mo><mi>t</mi></mrow></msub><mo>⁡</mo><mspace width="0.1667em"></mspace><msub><mi>W</mi><mi>s</mi></msub></mrow></mfrac><mo>−</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">\SR = \sqrt{252}\;\frac{\E[R_t - r_f]}{\sigma(R_t - r_f)}, \qquad \mathrm{DD}_t = \frac{W_t}{\max_{s \le t} W_s} - 1</annotation></semantics></math></div>
+
+<div class="co note"><span class="co-t">🧭 Margin note — the √252 comes with a condition</span>
+<p>Scaling volatility by <math><semantics><msqrt><mn>252</mn></msqrt><annotation encoding="application/x-tex">\sqrt{252}</annotation></semantics></math> assumes daily returns are independent. Strategies whose returns are autocorrelated — trend followers, illiquid assets, anything marked to model — break this, usually making the annualised Sharpe ratio look better than it is. <span class="xref soon" data-xref="5.2" data-auto="" title="Coming soon">Session 5.2 — Regression &amp; Inference That Doesn&#x27;t Lie</span> shows how to correct for it.</p>
+</div>
+</section>
+
+<section id="s4">
+<h2><span class="no">2.3.4</span> Compounding, drag &amp; the asymmetry of losses</h2>
+<p class="lede">Averages lie about compounding. The arithmetic mean of your returns is always higher than the rate at which your money actually grows — and the gap is set by volatility.</p>
+
+<p>Start with the asymmetry. Lose 50%, then gain 50%, and you are down <span data-lab="down50_up50" data-fmt=".0%">-25%</span>, because the gain applies to a smaller base. The deeper the hole, the steeper the climb out:</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 222" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">LOSS → GAIN NEEDED TO GET BACK TO EVEN (one scale: 1px = 1 percentage point)</text>
+  <line x1="210" y1="34" x2="210" y2="190" stroke="#1F2C38" stroke-width="1.5"/>
+  <text x="200" y="46" font-size="10" text-anchor="end" fill="#D64B2A" font-weight="600">LOSS</text>
+  <text x="220" y="46" font-size="10" fill="#1F7A55" font-weight="600">GAIN NEEDED</text>
+  <rect x="200" y="58" width="10" height="24" rx="4" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="192" y="74" font-size="11" text-anchor="end" fill="#1F2C38" font-family="IBM Plex Mono,monospace">−10%</text>
+  <rect x="210" y="58" width="11.1" height="24" rx="4" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="229.1" y="74" font-size="11" fill="#1F2C38" font-family="IBM Plex Mono,monospace">+11%</text>
+  <rect x="190" y="90" width="20" height="24" rx="4" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="182" y="106" font-size="11" text-anchor="end" fill="#1F2C38" font-family="IBM Plex Mono,monospace">−20%</text>
+  <rect x="210" y="90" width="25" height="24" rx="4" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="243" y="106" font-size="11" fill="#1F2C38" font-family="IBM Plex Mono,monospace">+25%</text>
+  <rect x="160" y="122" width="50" height="24" rx="4" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="152" y="138" font-size="11" text-anchor="end" fill="#1F2C38" font-family="IBM Plex Mono,monospace">−50%</text>
+  <rect x="210" y="122" width="100" height="24" rx="4" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="318" y="138" font-size="11" fill="#1F2C38" font-family="IBM Plex Mono,monospace">+100%</text>
+  <rect x="130" y="154" width="80" height="24" rx="4" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="122" y="170" font-size="11" text-anchor="end" fill="#1F2C38" font-family="IBM Plex Mono,monospace">−80%</text>
+  <rect x="210" y="154" width="400" height="24" rx="4" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="618" y="170" font-size="11" fill="#1F2C38" font-family="IBM Plex Mono,monospace">+400%</text>
+  <text x="360" y="208" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">Drawn to the same scale: the deeper the loss, the faster the climb back runs away from it.</text>
+</svg>
+<figcaption>fig 2.3.3 — the asymmetry of losses, to scale: a 50% loss needs a 100% gain, an 80% loss needs 400%</figcaption>
+</figure>
+
+<p>Averaging hides this. In the lab, twenty years of synthetic prices with a true drift of <span data-lab="gbm_mu" data-fmt=".0%">8%</span> and volatility of <span data-lab="gbm_sigma" data-fmt=".0%">20%</span> produce an arithmetic mean return of <span data-lab="ann_arith" data-fmt=".2%">10.43%</span> a year — but the money compounded at a CAGR of only <span data-lab="cagr" data-fmt=".2%">8.82%</span>. What compounds is the mean <em>log</em> return, <span data-lab="log_growth" data-fmt=".2%">8.45%</span>, and the gap between the two is <strong>volatility drag</strong>:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><mi>g</mi><mspace width="0.2778em"></mspace><mo>≈</mo><mspace width="0.2778em"></mspace><mi>μ</mi><mo>−</mo><mstyle displaystyle="false" scriptlevel="0"><mfrac><mn>1</mn><mn>2</mn></mfrac></mstyle><msup><mi>σ</mi><mn>2</mn></msup></mrow><annotation encoding="application/x-tex">g \;\approx\; \mu - \tfrac{1}{2}\sigma^2</annotation></semantics></math></div>
+<p>The lab measures a drag of <span data-lab="drag_measured" data-fmt=".2%">1.98%</span> against a predicted <math><semantics><mrow><msup><mi>σ</mi><mn>2</mn></msup><mi>/</mi><mn>2</mn></mrow><annotation encoding="application/x-tex">\sigma^2/2</annotation></semantics></math> of <span data-lab="drag_theory" data-fmt=".2%">1.98%</span>. Two percentage points a year, every year, just for being volatile.</p>
+
+<div class="co warn"><span class="co-t">⚠️ Pitfall — "the average return was 10%, so I made 10% a year"</span>
+<p>No — you made the geometric rate. Fund marketing loves the arithmetic mean because it is always the bigger number. When you compare strategies, compare CAGR or mean log returns, and remember that <em>reducing volatility raises growth</em> even when the average return is unchanged.</p>
+<p>Also notice the sampling noise: the true drift was 8% but twenty years of data estimated 10.43%. The standard error of a 20-year mean return is about <math><semantics><mrow><mi>σ</mi><mi>/</mi><msqrt><mn>20</mn></msqrt><mo>≈</mo></mrow><annotation encoding="application/x-tex">\sigma/\sqrt{20} \approx</annotation></semantics></math> <span data-lab="mean_se" data-fmt=".1%">4.5%</span>. Mean returns are the hardest thing in finance to estimate — a theme that returns in every unit.</p>
+</div>
+</section>
+
+<section id="s5">
+<h2><span class="no">2.3.5</span> Sharpe &amp; drawdown, in code</h2>
+<p class="lede">The whole pipeline is a dozen lines of pandas. The companion lab uses the <code>quantnb.returns</code> module, but it is worth writing once by hand.</p>
+
+<pre><span class="k">import</span> numpy <span class="k">as</span> np
+<span class="k">import</span> quantnb <span class="k">as</span> qn
+
+lab = qn.Lab(<span class="s">"2.3"</span>)                                       <span class="c"># seeded: same numbers every run</span>
+px = qn.synth.gbm_prices(<span class="p">252</span> * <span class="p">20</span>, mu=<span class="p">0.08</span>, sigma=<span class="p">0.20</span>, rng=lab.rng)[<span class="s">"price"</span>]
+
+r  = px.pct_change().iloc[<span class="p">1</span>:]                          <span class="c"># simple returns</span>
+lr = np.log(px / px.shift(<span class="p">1</span>)).iloc[<span class="p">1</span>:]                  <span class="c"># log returns</span>
+
+wealth = (<span class="p">1</span> + r).cumprod()                             <span class="c"># compound, never sum</span>
+cagr   = wealth.iloc[-<span class="p">1</span>] ** (<span class="p">1</span> / <span class="p">20</span>) - <span class="p">1</span>
+excess = r - <span class="p">0.03</span> / <span class="p">252</span>                               <span class="c"># 3% risk-free, per day</span>
+sharpe = excess.mean() / excess.std() * np.sqrt(<span class="p">252</span>)
+dd     = wealth / wealth.cummax() - <span class="p">1</span>                   <span class="c"># drawdown path, ≤ 0</span>
+
+<span class="k">assert</span> np.isclose(lr.sum(), np.log(px.iloc[-<span class="p">1</span>] / px.iloc[<span class="p">0</span>]))   <span class="c"># log returns add</span></pre>
+
+<p>On the lab's path the numbers are: CAGR <span data-lab="cagr" data-fmt=".2%">8.82%</span>, volatility <span data-lab="vol" data-fmt=".2%">19.90%</span>, Sharpe ratio <span data-lab="sharpe" data-fmt=".2f">0.37</span> against a <span data-lab="rf" data-fmt=".0%">3%</span> risk-free rate, and a maximum drawdown of <span data-lab="maxdd" data-fmt=".1%">-44.5%</span>. One dollar became $<span data-lab="final_wealth" data-fmt=".2f">5.42</span>.</p>
+
+<table>
+<thead><tr><th>Measure</th><th>What it answers</th><th>Blind spot</th></tr></thead>
+<tbody>
+<tr><td>CAGR</td><td>How fast did the money actually grow?</td><td>Says nothing about the ride</td></tr>
+<tr><td>Volatility</td><td>How big are typical swings?</td><td>Treats upside and downside alike; misses fat tails</td></tr>
+<tr><td>Sharpe ratio</td><td>How much excess return per unit of risk?</td><td>Assumes volatility is the right risk; noisy on short samples</td></tr>
+<tr><td>Max drawdown</td><td>What is the worst peak-to-trough loss?</td><td>A single path's worst case — the next one can be worse</td></tr>
+</tbody>
+</table>
+
+<div class="co tip"><span class="co-t">💡 Tip — a Sharpe ratio is an estimate, not a fact</span>
+<p>A Sharpe ratio of 0.37 over twenty years has a standard error of roughly <math><semantics><mrow><msqrt><mrow><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mn>1</mn><mo>+</mo><msup><mpadded lspace="0"><mi>SR</mi></mpadded><mn>2</mn></msup><mi>/</mi><mn>2</mn><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mi>/</mi><mi>Y</mi></mrow></msqrt><mo>≈</mo><mn>0.23</mn></mrow><annotation encoding="application/x-tex">\sqrt{(1 + \SR^2/2)/Y} \approx 0.23</annotation></semantics></math> — you could not rule out zero skill. <span class="xref soon" data-xref="5.2" data-auto="" title="Coming soon">Session 5.2 — Regression &amp; Inference That Doesn&#x27;t Lie</span> derives this, and <span class="xref soon" data-xref="6.7" data-auto="" title="Coming soon">Session 6.7 — Overfitting Statistics: PSR, DSR, MinTRL &amp; PBO</span> adds what happens when you tried many strategies before picking this one.</p>
+</div>
+</section>
+
+<section id="s6">
+<h2><span class="no">2.3.6</span> Leverage: when more becomes less</h2>
+<p class="lede">Leverage multiplies both the mean and the volatility, so it leaves the Sharpe ratio unchanged. It does not leave growth unchanged — and the difference is where accounts go to die.</p>
+
+<p><strong>Leverage</strong> <math><semantics><mi>L</mi><annotation encoding="application/x-tex">L</annotation></semantics></math> means holding <math><semantics><mi>L</mi><annotation encoding="application/x-tex">L</annotation></semantics></math> dollars of exposure for each dollar of capital, borrowing the rest at the risk-free rate. Rebalanced daily, the levered return is <math><semantics><mrow><msubsup><mi>R</mi><mi>t</mi><mrow class="tml-med-pad"><mo fence="true" form="prefix" stretchy="false">(</mo><mi>L</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></msubsup><mo>=</mo><mi>L</mi><msub><mi>R</mi><mi>t</mi></msub><mo>−</mo><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>L</mi><mo>−</mo><mn>1</mn><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mspace width="0.1667em"></mspace><msub><mi>r</mi><mi>f</mi></msub></mrow><annotation encoding="application/x-tex">R^{(L)}_t = L R_t - (L-1)\, r_f</annotation></semantics></math>. The mean rises linearly in <math><semantics><mi>L</mi><annotation encoding="application/x-tex">L</annotation></semantics></math>, but the drag rises with <math><semantics><msup><mi>L</mi><mn class="tml-sml-pad">2</mn></msup><annotation encoding="application/x-tex">L^2</annotation></semantics></math>:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><mi>g</mi><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>L</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mo>=</mo><msub><mi>r</mi><mi>f</mi></msub><mo>+</mo><mi>L</mi><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>μ</mi><mo>−</mo><msub><mi>r</mi><mi>f</mi></msub><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mo>−</mo><mstyle displaystyle="false" scriptlevel="0"><mfrac><mn>1</mn><mn>2</mn></mfrac></mstyle><msup><mi>L</mi><mn class="tml-sml-pad">2</mn></msup><msup><mi>σ</mi><mn>2</mn></msup><mo separator="true">,</mo><mspace width="2em"></mspace><msup><mi>L</mi><mo class="tml-sml-pad">⋆</mo></msup><mo>=</mo><mfrac><mrow><mi>μ</mi><mo>−</mo><msub><mi>r</mi><mi>f</mi></msub></mrow><msup><mi>σ</mi><mn>2</mn></msup></mfrac></mrow><annotation encoding="application/x-tex">g(L) = r_f + L(\mu - r_f) - \tfrac{1}{2}L^2\sigma^2, \qquad L^\star = \frac{\mu - r_f}{\sigma^2}</annotation></semantics></math></div>
+<p>Growth peaks at <math><semantics><msup><mi>L</mi><mo form="prefix" stretchy="false" class="tml-sml-pad">⋆</mo></msup><annotation encoding="application/x-tex">L^\star</annotation></semantics></math> — here <span data-lab="L_star" data-fmt=".2f">1.25</span> — and then falls. Past <math><semantics><mrow><mn>2</mn><msup><mi>L</mi><mo class="tml-sml-pad">⋆</mo></msup></mrow><annotation encoding="application/x-tex">2L^\star</annotation></semantics></math> you would grow faster holding cash, and a little further on growth turns negative: a levered position in an asset that goes up on average will, typically, lose money.</p>
+
+<figure class="diagram chart">
+<!-- chart:growth -->
+<svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Growth of $1 on one simulated 20-year path (log scale)">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">GROWTH OF $1 ON ONE SIMULATED 20-YEAR PATH (LOG SCALE)</text>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#3A56C5" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">1× unlevered</text>
+  <line x1="146.8" y1="32" x2="162.8" y2="32" stroke="#E8850C" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="168.8" y="36" font-size="11" fill="#4A5A68">2× daily</text>
+  <line x1="242.0" y1="32" x2="258.0" y2="32" stroke="#3F8E5A" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="264.0" y="36" font-size="11" fill="#4A5A68">3× daily</text>
+  <line x1="64" y1="250.1" x2="602" y2="250.1" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="254.1" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$0.50</text>
+  <line x1="64" y1="200.4" x2="602" y2="200.4" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="204.4" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$1.00</text>
+  <line x1="64" y1="150.8" x2="602" y2="150.8" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="154.8" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$2.00</text>
+  <line x1="64" y1="85.1" x2="602" y2="85.1" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="89.1" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$5.00</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#C9CFC6" stroke-width="1"/>
+  <line x1="91.5" y1="264" x2="91.5" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="91.5" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">2011</text>
+  <line x1="230.8" y1="264" x2="230.8" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="230.8" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">2016</text>
+  <line x1="370.1" y1="264" x2="370.1" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="370.1" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">2021</text>
+  <line x1="509.3" y1="264" x2="509.3" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="509.3" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">2026</text>
+  <line x1="64" y1="200.4" x2="602" y2="200.4" stroke="#4A5A68" stroke-width="1"/>
+  <polyline points="64,199.4 65.1,197.6 66.1,200.9 67.8,197.9 68.5,202.1 70.4,199 72,203.4 72.7,200.9 74.6,203.9 75.8,195.4 76.4,200 78.6,206.4 79.6,201.7 80.2,202.6 82.7,195 83.7,196.2 85,189.8 86.9,189.2 87.6,184.1 88.7,182.1 90.8,179.8 91.8,185 92.9,182.3 93.8,186.5 95.6,187.6 97.3,184.9 97.9,190.3 99.7,186.9 101.5,177.9 102.1,181.3 103.4,177 105.2,184.9 106.6,183.2 107.5,189.2 109.6,190.9 110.4,185.9 111.7,182.4 113.3,188.6 114.6,181.7 116.3,178.9 117.8,178.3 119,182.6 120,177 121.3,182.1 122.8,184.5 123.4,179.9 125.9,185.4 126.5,180.7 128.2,185.2 129,181 130.3,184.8 132.5,179.1 133.6,170.6 135.5,167.2 136.2,171.7 137.7,164 138.4,168.4 140.3,164.7 141.6,163 143,166.6 144.3,164.4 145.8,169.7 146.4,166.7 148,169.8 149.6,164.1 151.5,171.6 153.1,170.3 153.8,175.2 154.7,173 156,177 158.4,176 159.6,180.4 160.5,178.1 161.3,184.1 163.2,181.7 164.5,175.3 166.4,185.1 167.6,181.5 169.2,185.5 170.2,179.9 171.8,180.8 172.4,175.5 173.6,171.8 175.6,172.2 176.3,167.8 178.7,176.3 179.2,175.1 180.6,162.6 181.6,168.3 183,170.1 184.6,160.9 186.2,163.1 187.9,162.9 189.4,160 190.2,152.8 191.6,150.1 192.6,152.5 193.9,149 195.9,151.2 197.5,142.1 198.4,145.6 199.6,141.1 200.7,141.6 202.4,148.3 203.3,144.2 205,149.8 207,140.1 207.2,142.3 209.4,148.8 210.2,146.8 212,145.5 213,145.2 214.8,150.7 216.3,148 216.8,152.2 218.3,149.3 219.9,151.9 221.1,149.7 222.7,151.6 223.8,146.3 225.8,158.2 227.4,151.8 227.9,154.3 229,151.9 230.2,156.4 231.8,159.5 233.2,158.9 235,153 236.6,151.9 237.1,156.2 239,151.5 240.1,154.2 242.2,154.5 243.6,152.8 244.4,145 246.3,142.8 246.7,143.3 248.9,154.6 249.8,150.9 250.8,154.8 252.4,157.1 253.6,153.8 255,153.9 256.1,149.4 258.2,147.2 258.5,150.7 260.1,151.9 261.6,155.4 263.3,165.8 264.6,165.7 265.7,161.8 266.8,164.2 268.5,161.3 269.6,166.7 271.1,161.5 272.6,160.6 274,170.7 275.1,171 277.2,178.7 278.3,175.5 279.8,182.3 281,175.2 282.5,179.1 283.5,174.1 284.6,179.8 286.6,175.3 287.1,180.6 288.8,173.7 289.7,176 291.9,167.2 292.6,170.4 294,167 295.3,176.4 297.3,170.9 298.5,176.4 300.4,171 301.2,165.1 302.8,170.1 304.3,167.2 305.7,169.6 306.9,166.6 307.6,170.8 308.7,165.7 310.1,165 311.7,171 313.2,172.2 314.5,167.3 315.6,168.9 316.7,164.4 318.9,165.9 319.8,163.8 321,164.2 322.8,173.6 323.9,167.6 325.6,166.2 326.6,171.7 327.8,173.5 330.1,168.1 330.6,171.3 331.7,167.6 333.6,174 334.3,167.7 335.7,174.7 338.3,173.2 339.1,166.7 340,170.8 341.8,175.2 342.3,171.7 344.2,173.4 346.3,171.7 347.7,175.3 348.7,166.9 350.3,162.4 351.6,166.3 353,158.1 353.6,155.5 354.6,162.3 356.1,164.4 357.6,155.5 359.7,149.7 360.4,154.8 361.9,153.1 363.5,145.1 365,150.2 366.4,145.2 367.3,151 369.3,151.2 369.9,147.5 372,148.4 372.8,153.8 373.8,150.2 374.9,155.1 377,156.1 378.3,151.5 379.7,157.6 380.7,154.4 381.6,159.6 383.9,151.9 384.7,156.5 386.5,147.5 387.7,155.8 389.6,155.5 390.2,150.5 392,155.8 393.6,146.1 394.5,151.1 395.1,149.3 396.6,152.2 398.4,144.7 399.3,147.5 400.8,141.6 402,143.9 404.1,139 405.8,149 406.7,147.2 408,146.1 409.4,155.2 410,151.4 412.6,153 413.6,150.2 414.3,152.3 415.5,152 416.8,154.7 419,151.5 420.5,161.2 421.7,155.7 422.3,158.7 423.8,156.4 426.1,161.9 427.1,157.1 428.3,163.7 428.8,158.9 430.3,160.9 432.9,150.8 434.1,151.2 435.1,156.3 436.7,148.9 437.7,155.9 438.9,150.6 440.5,153.4 441.4,147.8 443.1,143.5 444.8,144.9 446.1,141 447.4,140.9 448.4,135.6 449.4,138.5 451.2,139.7 452.8,131.1 454.1,134.4 455.5,127.7 456.5,127 457.5,131.3 459.8,121.3 460.2,126.1 461.7,125.9 463,135.6 464.8,131.6 465.4,126.7 467.3,124.4 468.7,115.2 470.7,111.2 471.4,114.6 473.4,116.8 474.1,112.8 475,114.8 476.8,117.2 478.2,113 479.5,117.6 481.1,113.5 481.9,116.5 484.1,117.8 485.6,112.5 486.2,115.6 487.4,106.4 488.6,103.9 490.2,105.7 491.7,105.1 492.6,97 494.2,93 495.5,97.7 497.6,92.1 498.7,96.8 500.2,97.7 500.8,101.1 503,94.7 503.9,93.9 505.6,101 506.7,97.2 507.3,103.7 508.7,100.9 510.8,108.5 512.5,104.6 513.2,110.2 514.7,116 516.4,109.2 517.3,112.8 518.4,104 519.9,107.2 521.7,104 523.1,106.1 524.3,113.4 526,110 527,101.7 528,104.4 529.1,100.7 531.1,103.2 532.1,98.6 533.4,103 535.4,100.6 536.6,103.7 538,100.8 539.3,91.4 540.8,88.7 542,93.9 542.9,94.7 544.5,90.1 546.2,93.4 546.8,89.6 548.2,89 549.8,96.1 550.9,92 552.1,97.4 553.2,93.3 555.7,96.6 556.8,96.8 557.8,91.5 559,93.5 560.4,88.9 562.1,89 562.8,94.9 564.4,95.2 565.9,88 567.5,91.8 569.4,89.7 570,95.7 571.1,89.4 572.8,92.3 574.2,90.3 575.5,95.6 576.5,92.6 577.7,97 579.3,88.3 581.5,95.5 581.9,92.3 584.2,93 585.5,87.4 586.8,90.3 588.1,89.2 589.3,81.6 590,84.2 591.5,79.2 592.5,86.9 594.3,88.1 596.4,77.6 597.2,76.8 598.3,84.4 599.6,78.4 601,77.2 602,79.3" fill="none" stroke="#3A56C5" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>1× unlevered</title></polyline>
+  <circle cx="602" cy="79.3" r="4" fill="#3A56C5" stroke="#FBFBF8" stroke-width="2"><title>1× unlevered: $5.42</title></circle>
+  <polyline points="64,198.4 65.1,195 66.1,201.7 67.8,196 68.5,204.5 70.4,198.6 72,207.9 72.7,203.2 74.6,209.5 75.8,192.6 76.4,202.1 78.6,215.1 79.6,205.8 80.2,207.9 82.7,193 83.7,195.6 85,183.1 86.9,182.2 87.6,172.2 88.7,168.3 90.8,164 91.8,174.8 92.9,169.5 93.8,178.1 95.6,180.8 97.3,175.6 97.9,186.5 99.7,180.2 101.5,162.4 102.1,169.3 103.4,160.9 105.2,177.1 106.6,173.9 107.5,186.1 109.6,189.8 110.4,179.9 111.5,173 113.3,186.1 114.6,172.4 116.3,167.2 117.8,166.1 119,175.1 120,164.1 121.3,174.5 122.8,179.5 123.4,170.5 125.9,181.8 126.5,172.7 128.2,182 129,173.5 130.3,181.3 132.5,170.4 133.6,153.7 135.5,147 136.2,156.4 137.7,141.3 138.4,150.4 140.3,143.3 141.6,140 143,147.4 144.3,143.2 145.8,154 146.4,148.3 148,154.8 149.6,143.6 151.5,158.9 153.1,156.6 153.8,166.4 154.7,162.3 156,170.5 158.4,168.9 159.6,177.9 160.5,173.4 161.3,185.6 163.2,181.2 164.5,168.6 166.4,188.7 167.6,181.6 169.2,190 170.2,178.9 171.8,181.2 172.4,170.7 173.6,163.5 175.6,164.7 176.3,156 178.7,173.3 179.2,171.2 180.6,146.4 181.6,158.1 183,161.9 184.6,143.9 186.2,148.7 187.9,148.4 189.4,143 190.2,128.6 191.6,123.4 192.6,128.5 193.9,121.6 195.9,126.5 197.5,108.6 198.4,115.8 199.6,106.9 200.7,108.1 202.4,121.9 203.3,113.8 205,125.3 207,106.3 207.2,110.8 209.4,124.1 210.2,120.3 212,117.8 213,117.4 214.8,128.6 216.3,123.6 216.8,132 218.3,126.4 219.9,131.7 221.1,127.7 222.7,131.7 223.8,121.2 225.8,145.6 227.4,133 227.9,138.2 229,133.6 230.2,142.6 231.8,149.1 233.2,148.1 235,136.6 236.6,134.7 237.1,143.4 239,134.3 240.1,139.9 242.2,140.8 243.6,137.6 244.4,122.5 246.3,118.5 247.1,127.8 248.9,142.6 249.8,135.3 250.8,143.4 252.4,148.3 254.3,144.2 255.6,134.9 257.2,135.8 258.2,129.3 258.5,136.4 260.1,139.2 262.6,161 263.3,167.8 264.6,167.8 265.7,160.1 266.8,164.9 268.5,159.4 269.6,170.6 271.1,160.3 272.6,158.9 274,179.4 275.1,180.2 277.2,196 278.3,189.8 279.8,203.6 281,189.8 282.5,197.7 283.5,187.9 284.6,199.5 286.6,190.9 287.1,201.7 288.8,188.2 289.7,192.9 291.9,175.7 292.6,182.3 294,175.6 295.3,194.7 297.3,184.1 298.5,195.3 300.4,184.9 301.2,173.3 302.8,183.4 304.3,177.9 305.7,183 306.9,177.1 307.6,185.6 308.7,175.7 310.1,174.5 311.7,186.5 313.2,189.1 314.5,179.6 315.6,182.9 316.7,174.1 318.9,177.7 319.8,173.6 321,174.6 322.8,193.7 323.9,182.1 325.6,179.6 326.6,190.8 327.8,194.5 330.1,184.1 330.6,190.6 331.7,183.5 333.6,196.5 334.3,184.1 335.7,198.4 338.3,195.8 339.1,183.2 340,191.6 341.8,200.5 342.3,193.6 344.2,197.6 346.3,194.5 347.7,201.9 348.7,185.5 350.3,176.8 351.6,184.8 353,168.7 353.6,163.6 354.6,177.3 356.1,181.8 357.6,164.3 359.7,153 360.4,163.5 361.9,160.3 363.5,144.5 365,155.3 366.4,145.5 367.3,157.3 369.3,158.1 369.9,150.9 372,153 372.8,163.9 373.8,157.3 374.9,167.2 377,169.6 378.3,160.6 379,169.6 381.3,179.9 382.7,176.2 383.9,162.5 384.7,172 386.5,154.3 387.7,171.1 389.6,170.9 390.2,161 392,171.9 393.6,152.8 394.5,163 395.1,159.4 396.6,165.5 398.4,150.9 399.3,156.6 400.8,145 402,149.9 404.1,140.4 405.8,161 406.7,157.5 408,155.5 409.4,174.1 410,166.6 412.6,170 413.6,164.7 414.3,169.2 415.7,169 416.8,174.2 419,168.2 420.1,185.6 421.7,177.1 422.3,183.4 423.8,179 426.1,190.5 427.1,181.3 428.3,194.5 428.8,185.3 430.3,189.5 432.9,169.8 434.1,170.6 435.1,181.1 436.7,166.6 437.7,180.8 438.9,170.6 440.5,176.4 441.4,165.3 443.1,157 444.8,160.1 446.1,152.5 447.4,152.6 448.4,142.1 449.4,148.1 451.2,150.9 452.8,134 454.1,140.7 455.5,127.6 456.5,126.3 457.5,135.2 459.8,115.7 460.2,125.4 461.7,125.2 463,145 464.8,137.3 465.4,127.5 467.3,123.3 468.7,105.2 470.7,97.5 471.4,104.4 472.6,101.7 473.7,109 475.1,101.6 476.8,110.6 478.2,102.4 479.5,111.7 481.1,103.9 481.9,109.9 484.1,113 485.6,102.6 486.2,108.9 487.4,90.8 488.6,86.1 490.2,89.8 491.7,89 492.6,73.1 494.2,65.2 495.5,75 497.6,64 498.7,73.7 500.2,75.6 500.8,82.7 503,70.2 503.9,68.8 505.6,83.2 506.7,75.9 507.3,89 508.7,83.8 510.8,99.2 512.5,91.9 513.2,103.1 514.7,115.1 516.4,101.9 517.3,109.2 518.4,91.9 519.9,98.5 521.7,92.3 523.1,96.7 524.3,111.7 526,105.1 527,88.9 528,94.3 529.1,87.2 531.1,92.4 532.1,83.4 533.4,92.5 535.4,88.1 536.6,94.6 538,89 539.3,70.5 540.8,65.3 542,76 542.9,77.7 544.5,68.7 546.2,75.8 546.8,68.2 548.2,67.3 549.8,81.9 550.9,74 552.1,85 553.2,77 555.7,83.9 556.8,84.4 557.8,73.9 559,78.1 560.4,69.2 562.1,69.8 562.8,81.8 564.4,82.7 565.9,68.7 567.5,76.6 569.4,72.6 570,84.8 571.1,72.4 572.8,78.4 574.2,74.7 575.5,85.5 576.5,79.6 578.3,87.6 579.3,71.5 581.5,86.3 581.9,80 584.2,82 585.5,70.9 586.2,68.4 587.3,77.7 589.3,60 590,65.3 591.5,55.7 592.5,71.2 594.3,74 596.4,53.3 597.2,52 598.3,67.4 599.6,55.7 601,53.6 602,57.9" fill="none" stroke="#E8850C" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>2× daily</title></polyline>
+  <circle cx="602" cy="57.9" r="4" fill="#E8850C" stroke="#FBFBF8" stroke-width="2"><title>2× daily: $7.31</title></circle>
+  <polyline points="64,197.5 65.1,192.6 66.1,202.7 67.8,194.3 68.5,207.5 70.4,198.9 72,213.4 72.7,206.4 74.6,216.3 75.8,191.2 76.4,205.7 78.6,225.5 79.6,211.7 80.2,215 82.7,193 83.7,197 85,178.7 86.9,177.6 87.6,162.8 88.7,157 90.8,151.1 91.8,167.5 92.9,159.9 93.8,173 95.6,177.3 97.3,169.8 97.9,186.4 99.7,177.3 101.5,150.9 102.1,161.4 103.4,149.2 105.2,173.9 106.6,169.3 107.5,187.8 109.6,193.5 110.4,178.9 111.5,168.8 113.3,188.7 114.6,168.6 116.3,161.2 117.8,159.8 119,173.4 120,157.2 121.3,173.1 122.8,180.9 123.4,167.4 125.9,184.9 126.5,171.4 128.2,185.4 129,172.9 130.3,184.9 132.5,168.9 133.6,144.1 135.5,134.3 136.2,148.8 137.7,126.7 138.4,140.4 140.3,130 141.6,125.1 143,136.6 144.3,130.5 145.8,146.8 146.4,138.6 148,148.6 149.6,131.9 151.5,155.3 153.1,152.1 153.8,167.1 154.7,161 156,173.6 158.4,171.5 159.6,185.4 160.5,178.8 161.3,197.3 163.2,191.1 164.5,172.5 166.4,203.1 167.6,192.6 169.2,205.4 170.2,189 171.8,193 172.4,177.5 173.6,166.8 175.6,169 176.3,156.2 178.7,182.5 179.2,179.3 180.6,142.6 181.6,160.3 183,166.5 185.3,136.1 186.2,147.2 187.9,147.2 189.4,139.3 190.2,118 191.6,110.3 192.6,118 193.9,108.1 195.9,115.7 197.5,89.3 198.4,100.3 199.6,87.1 200.7,89 202.4,110.2 203.3,98.2 205,115.7 207,87.6 207.2,94.3 209.4,114.7 210.2,109.1 212,105.7 213,105.2 214.8,122.2 216.3,114.9 216.8,127.6 218.3,119.4 219.9,127.5 221.1,121.6 222.7,128 223.8,112.5 225.8,149.6 227.4,131.1 227.9,139 229,132.2 230.2,146 231.8,155.8 233.2,154.4 235,137.5 236.6,135 237.1,148.1 239,134.7 240.1,143.5 242.2,145.2 243.6,140.7 244.4,118.3 246.3,112.9 247.1,127.1 248.9,149.7 249.8,138.8 250.8,151.2 252.4,159 254.3,153.1 255.6,139.3 257.2,140.8 258.2,131.2 258.5,142 260.1,146.6 262.6,180.1 263.3,190.4 264.6,190.6 265.7,179.3 266.8,186.6 268.5,178.6 269.6,195.6 271.1,180.3 272.6,178.5 274,209.8 275.1,211.2 276.1,227.8 278.3,226.2 279.8,247.2 281,226.6 282.5,239 283.5,224.3 284.6,242 286.6,229.4 287.1,245.9 288.8,225.9 289.7,233.2 291.9,207.7 292.6,217.9 294,208 295.3,237 297.3,221.5 298.5,238.6 300.4,223.2 301.2,206.1 302.8,221.4 304.3,213.4 305.7,221.2 306.9,212.6 307.6,225.6 308.7,210.8 310.1,209.2 311.7,227.4 313.2,231.4 314.5,217.4 315.6,222.5 316.7,209.6 318.9,215.3 319.8,209.5 321,211.2 322.8,240.2 323.9,223 325.6,219.5 326.6,236.6 327.8,242.5 330.1,227.2 330.6,237.1 331.7,226.7 333.6,246.5 334.3,228.1 335.7,249.9 338.3,246.4 339.1,228 340,240.7 341.8,254.3 342.3,244.1 344.2,250.4 346.3,246.2 347.7,257.6 348.7,233.4 350.3,220.6 351.6,232.9 353,209.1 353.6,201.5 354.6,222.4 356.1,229.3 357.6,203.3 359.7,186.9 360.4,202.9 361.9,198.3 363.5,174.9 365,191.7 366.4,177.2 367.3,195 369.3,196.6 369.9,186.2 372,189.7 372.8,206.2 373.8,196.8 374.9,212 377,215.9 378.3,202.6 379,216.3 381.3,232.3 382.7,227.1 383.9,206.9 384.7,221.2 386.5,195 387.7,220.5 389.6,220.4 390.2,205.8 392,222.5 393.6,194.2 394.5,209.8 395.1,204.4 396.6,213.8 398.4,192.3 399.3,201 400.8,183.9 402,191.5 404.1,177.7 405.8,209.1 406.7,203.9 408,201.2 409.4,229.5 410,218.3 412.6,223.8 413.6,216.1 414.3,223.2 415.7,223 416.8,230.9 419,222.1 420.1,248.7 421.7,236.4 422.3,245.9 423.8,239.6 426.1,257.3 427.1,243.9 428.3,264 428.8,250.3 430.4,256.5 432.9,227.8 434.1,229.2 435.1,245.2 436.7,223.7 437.7,245.4 438.9,230.5 440.5,239.4 441.4,222.9 443.1,210.7 444.8,215.8 446.1,204.6 447.4,205 448.4,189.4 449.4,198.5 451.2,203.1 452.8,177.6 454.1,188.3 455.5,169 456.5,167.1 457.5,180.7 459.8,151.9 460.2,165.9 461.6,166.1 463,196.6 464.8,185.4 465.4,170.8 467.3,165 468.7,138.1 470.7,127 471.4,137.4 472.6,133.5 473.7,144.6 475.1,133.9 476.8,147.7 478.2,135.4 479.5,149.5 481.1,138.1 481.9,147.4 483.1,140.7 484.3,152 486.2,146.7 487.4,120 488.6,113 490.2,118.8 491.7,117.9 492.6,94.3 494.2,82.9 495.5,97.7 497.6,81.5 498.7,96.3 500.2,99.4 500.8,110.3 503,91.8 503.5,87.4 505.6,111.9 506.7,101.1 507.3,121 508.7,113.5 510.8,136.9 512.5,126.4 513.2,143.4 514.7,161.6 516.4,142.2 517.3,153.4 518.4,127.8 519.9,137.7 521.7,128.9 523.1,135.7 524.3,158.5 526,148.9 527,125 528,133.1 529.1,122.8 531.1,131 532.1,117.6 533.4,131.6 535.4,125.4 536.6,135.2 538,127 539.3,99.7 540.8,92.1 542,108.4 542.9,111.2 544.5,98 546.2,109.1 546.8,97.8 548.2,96.7 549.8,119 550.9,107.5 552.1,124.2 553.2,112.3 555.7,123.1 556.8,123.9 557.8,108.4 559,114.8 560.4,101.7 562.1,103 562.8,121.3 564.4,122.9 565.9,102.3 567.5,114.6 569.4,108.9 570,127.4 571.1,108.9 572.8,118.2 574.2,112.7 575.5,129.2 576.5,120.5 578.3,133 579.3,109.1 581.5,131.7 581.9,122.3 584.2,125.8 585.5,109.3 586.2,105.8 587.3,120 589.3,93.8 590,101.8 591.5,87.7 592.5,111.3 594.3,115.8 596.4,85.1 597.2,83.3 598.3,106.9 599.6,89.5 601,86.7 602,93.3" fill="none" stroke="#3F8E5A" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>3× daily</title></polyline>
+  <circle cx="602" cy="93.3" r="4" fill="#3F8E5A" stroke="#FBFBF8" stroke-width="2"><title>3× daily: $4.46</title></circle>
+  <text x="614" y="61.9" font-size="11" fill="#1F2C38">2× daily: $7.31</text>
+  <text x="614" y="83.3" font-size="11" fill="#1F2C38">1× unlevered: $5.42</text>
+  <text x="614" y="97.3" font-size="11" fill="#1F2C38">3× daily: $4.46</text>
+</svg>
+<!-- /chart:growth -->
+<figcaption>fig 2.3.4 — the same 20-year path held at 1×, 2× and 3× daily leverage (log scale)</figcaption>
+</figure>
+
+<p>On this one lucky path, 2× beat 1× (<span data-lab="path_2_0_cagr" data-fmt=".1%">10.5%</span> a year) — at the price of a <span data-lab="path_2_0_maxdd" data-fmt=".0%">-74%</span> drawdown. The 3× version compounded at only <span data-lab="path_3_0_cagr" data-fmt=".1%">7.8%</span> and fell <span data-lab="path_3_0_maxdd" data-fmt=".1%">-91.5%</span> from its peak. Few people hold on through a 91% loss.</p>
+
+<figure class="diagram chart">
+<!-- chart:drawdown3x -->
+<svg viewBox="0 0 720 220" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Drawdown of the 3× version">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">DRAWDOWN OF THE 3× VERSION</text>
+  <line x1="64" y1="184" x2="602" y2="184" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="188" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">-100%</text>
+  <line x1="64" y1="155.2" x2="602" y2="155.2" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="159.2" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">-80%</text>
+  <line x1="64" y1="126.4" x2="602" y2="126.4" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="130.4" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">-60%</text>
+  <line x1="64" y1="97.6" x2="602" y2="97.6" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="101.6" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">-40%</text>
+  <line x1="64" y1="68.8" x2="602" y2="68.8" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="72.8" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">-20%</text>
+  <line x1="64" y1="40" x2="602" y2="40" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="44" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0%</text>
+  <line x1="64" y1="184" x2="602" y2="184" stroke="#C9CFC6" stroke-width="1"/>
+  <line x1="91.5" y1="184" x2="91.5" y2="188" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="91.5" y="202" font-size="11" text-anchor="middle" fill="#4A5A68">2011</text>
+  <line x1="230.8" y1="184" x2="230.8" y2="188" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="230.8" y="202" font-size="11" text-anchor="middle" fill="#4A5A68">2016</text>
+  <line x1="370.1" y1="184" x2="370.1" y2="188" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="370.1" y="202" font-size="11" text-anchor="middle" fill="#4A5A68">2021</text>
+  <line x1="509.3" y1="184" x2="509.3" y2="188" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="509.3" y="202" font-size="11" text-anchor="middle" fill="#4A5A68">2026</text>
+  <polygon points="64,40 64,40 64.2,52.2 65.5,43.2 67.8,43.4 68.5,67 70.4,52.1 72,76.2 72.7,65.2 74.6,80.5 75.8,40 76.4,66.3 78.6,94.8 79.6,75.8 80.2,80.6 82.7,43.5 82.9,56.2 84.4,40 86.9,50.4 87.1,40 89.2,53.3 90.8,40 91.8,69.5 92.9,56.6 93.8,77.9 95.6,84.1 97.3,73.2 97.9,96.1 99.7,84.1 101.5,40 102.1,59.6 103.4,40 105.2,82 106.6,75.2 107.5,100 109.6,106.4 110.4,88.9 111.5,74.5 113.3,101.1 114.6,74.1 116.3,62.3 117.8,59.9 119,81.3 120,55.3 121.3,80.8 122.8,91.5 123.4,72.4 125.9,96.5 126.5,78.3 128.2,97.2 129,80.6 130.3,96.5 132.5,74.7 133.5,40 135.5,40 136.2,74.4 137.7,40 138.4,65.2 140.3,46.5 141.6,40 143,61.3 144.3,50.4 145.8,77.7 146.4,64.6 148,80.2 149.6,53.1 151.5,89.6 153.1,85.1 153.8,103.8 154.7,96.8 156,110.8 158.4,108.6 159.6,121.9 160.5,115.9 161.3,131.4 163.2,126.6 164.5,109.6 166.4,135.5 167.6,127.8 169.2,137 170.2,125 171.8,128.2 172.4,114.7 173.6,103.6 175.6,105.9 176.3,90.6 178.7,119.3 179.2,116.4 180.6,71.2 181.6,95.9 183,103.1 185.3,60.4 186.2,78.3 187.9,78.2 189.4,65.8 190,40 192.3,52.9 193.2,40 194.5,55.1 195.3,42.7 197.5,40 198.1,59.4 199.6,40 200.7,43.7 202.4,79.6 203.3,60.6 205,87.3 207,40.9 207.2,53.8 209.4,86 210.2,78 212,72.8 213,72.1 214.8,95.7 216.3,86.2 216.8,102.2 218.3,92.2 219.9,102.1 221.1,95 222.7,102.5 223.8,82.9 225.8,123.7 227.4,106 227.9,114.1 229,107.3 230.2,120.6 231.8,128.7 233.2,127.7 235,112.6 236.6,110.2 237.1,122.5 239,109.8 240.1,118.4 242.2,119.9 243.6,115.8 244.4,90.7 246.3,83.5 247.1,101.6 248.9,123.8 249.8,113.9 250.8,125.1 252.4,131.2 254.3,126.6 255.6,114.4 257.2,115.9 258.2,106.2 258.5,117 260.1,121.2 262.6,144.6 263.3,149.9 264.6,150 265.7,144.2 266.8,148 268.5,143.8 269.6,152.3 271.1,144.8 272.6,143.7 274,158 275.1,158.5 276.1,163.8 278.3,163.3 279.8,168.6 281,163.4 282.5,166.7 283.5,162.8 284.6,167.4 286.6,164.2 287.1,168.3 288.8,163.2 289.7,165.2 291.9,157.2 292.6,160.8 294,157.3 295.3,166.2 297.3,161.9 298.5,166.6 300.4,162.4 301.2,156.6 302.8,161.9 304.3,159.3 305.7,161.8 306.9,159 307.6,163.1 308.7,158.4 310.1,157.8 311.7,163.7 313.2,164.8 314.5,160.6 315.6,162.2 316.7,157.9 318.9,159.9 319.8,157.9 321,158.5 322.8,167 323.9,162.4 325.6,161.3 326.6,166.1 327.8,167.5 330.1,163.6 330.6,166.2 331.7,163.4 333.6,168.4 334.3,163.8 335.7,169.1 338.3,168.4 339.1,163.8 340,167.1 341.8,170 342.3,167.9 344.2,169.2 346.3,168.3 347.7,170.7 348.7,165.3 350.3,161.6 351.6,165.2 353,157.7 353.6,154.8 354.6,162.2 356.1,164.2 357.6,155.5 359.7,148.2 360.4,155.4 361.9,153.5 363.5,141.7 365,150.5 366.4,143 367.3,152 369.3,152.7 369.9,147.8 372,149.6 372.8,156.7 373.8,152.8 374.9,158.8 377,160.1 378.3,155.2 379,160.3 381.3,165 382.7,163.6 383.9,156.9 384.7,161.8 386.5,152 387.7,161.6 389.6,161.6 390.2,156.5 392,162.2 393.6,151.7 394.5,158 395.1,156 396.6,159.4 398.4,150.8 399.3,154.6 400.8,146.7 402,150.4 404.1,143.3 405.8,157.7 406.7,155.8 408,154.7 409.4,164.3 410,160.9 412.6,162.6 413.6,160.2 414.3,162.4 415.7,162.4 416.8,164.6 419,162.1 420.1,168.9 421.7,166 422.3,168.3 423.8,166.8 426.1,170.6 427.1,167.8 428.3,171.8 428.8,169.2 430.4,170.4 432.9,163.8 434.1,164.2 435.1,168.1 436.7,162.6 437.7,168.2 438.9,164.5 440.5,166.8 441.4,162.3 443.1,158.3 444.8,160.1 446.1,156 447.4,156.2 448.4,149.4 449.4,153.6 451.2,155.4 452.8,143.2 454.1,148.9 455.5,138 456.5,136.8 457.5,145 459.8,125.7 460.2,136 461.6,136.2 463,152.7 464.8,147.4 465.4,139.2 467.3,135.4 468.7,113.3 470.7,101.4 471.4,112.6 472.6,108.6 473.7,119.5 475.1,109 476.8,122.1 478.2,110.6 479.5,123.7 481.1,113.3 481.9,121.9 483.1,115.8 484.3,125.8 486.2,121.3 487.4,92.9 488.6,83.7 490.2,91.4 491.7,90.3 492.6,53.7 494.2,40 495.5,66.8 496.5,42.8 498,41.6 499.2,73 500.8,87.6 503,59.1 503.5,51.3 505.6,89.7 506.7,74.3 507.3,101 508.7,91.8 510.8,117.5 512.5,107 513.2,123.2 514.7,136.9 516.4,122.3 517.3,131.2 518.4,108.5 519.9,118.3 521.7,109.7 523.1,116.4 524.3,134.8 526,127.8 527,105.5 528,113.9 529.1,103 531.1,111.8 532.1,97 533.4,112.3 535.4,105.9 536.6,115.9 538,107.7 539.3,72.3 540.8,59.8 542,85 542.9,88.8 544.5,69.6 546.2,86 546.8,69.2 548.2,67.5 549.8,98.6 550.9,83.7 552.1,104.6 553.2,90.3 555.7,103.4 556.8,104.3 557.8,85 559,93.5 560.4,75.3 562.1,77.2 562.8,101.3 564.4,103.2 565.9,76.2 567.5,93.3 569.4,85.7 570,108.1 571.1,85.7 572.8,97.7 574.2,90.8 575.5,110 576.5,100.4 578.3,113.8 579.3,86 581.5,112.5 581.9,102.5 584.2,106.4 585.5,86.3 586.2,81.4 587.3,99.8 589.3,62.6 590,75.5 591.5,51.9 592.5,88.9 594.3,94.8 596.4,46.9 597.2,43.6 598.3,82.9 599.6,55.2 601,49.9 602,61.7 602,40" fill="#D64B2A" fill-opacity="0.10"/>
+  <polyline points="64,40 64.2,52.2 65.5,43.2 67.8,43.4 68.5,67 70.4,52.1 72,76.2 72.7,65.2 74.6,80.5 75.8,40 76.4,66.3 78.6,94.8 79.6,75.8 80.2,80.6 82.7,43.5 82.9,56.2 84.4,40 86.9,50.4 87.1,40 89.2,53.3 90.8,40 91.8,69.5 92.9,56.6 93.8,77.9 95.6,84.1 97.3,73.2 97.9,96.1 99.7,84.1 101.5,40 102.1,59.6 103.4,40 105.2,82 106.6,75.2 107.5,100 109.6,106.4 110.4,88.9 111.5,74.5 113.3,101.1 114.6,74.1 116.3,62.3 117.8,59.9 119,81.3 120,55.3 121.3,80.8 122.8,91.5 123.4,72.4 125.9,96.5 126.5,78.3 128.2,97.2 129,80.6 130.3,96.5 132.5,74.7 133.5,40 135.5,40 136.2,74.4 137.7,40 138.4,65.2 140.3,46.5 141.6,40 143,61.3 144.3,50.4 145.8,77.7 146.4,64.6 148,80.2 149.6,53.1 151.5,89.6 153.1,85.1 153.8,103.8 154.7,96.8 156,110.8 158.4,108.6 159.6,121.9 160.5,115.9 161.3,131.4 163.2,126.6 164.5,109.6 166.4,135.5 167.6,127.8 169.2,137 170.2,125 171.8,128.2 172.4,114.7 173.6,103.6 175.6,105.9 176.3,90.6 178.7,119.3 179.2,116.4 180.6,71.2 181.6,95.9 183,103.1 185.3,60.4 186.2,78.3 187.9,78.2 189.4,65.8 190,40 192.3,52.9 193.2,40 194.5,55.1 195.3,42.7 197.5,40 198.1,59.4 199.6,40 200.7,43.7 202.4,79.6 203.3,60.6 205,87.3 207,40.9 207.2,53.8 209.4,86 210.2,78 212,72.8 213,72.1 214.8,95.7 216.3,86.2 216.8,102.2 218.3,92.2 219.9,102.1 221.1,95 222.7,102.5 223.8,82.9 225.8,123.7 227.4,106 227.9,114.1 229,107.3 230.2,120.6 231.8,128.7 233.2,127.7 235,112.6 236.6,110.2 237.1,122.5 239,109.8 240.1,118.4 242.2,119.9 243.6,115.8 244.4,90.7 246.3,83.5 247.1,101.6 248.9,123.8 249.8,113.9 250.8,125.1 252.4,131.2 254.3,126.6 255.6,114.4 257.2,115.9 258.2,106.2 258.5,117 260.1,121.2 262.6,144.6 263.3,149.9 264.6,150 265.7,144.2 266.8,148 268.5,143.8 269.6,152.3 271.1,144.8 272.6,143.7 274,158 275.1,158.5 276.1,163.8 278.3,163.3 279.8,168.6 281,163.4 282.5,166.7 283.5,162.8 284.6,167.4 286.6,164.2 287.1,168.3 288.8,163.2 289.7,165.2 291.9,157.2 292.6,160.8 294,157.3 295.3,166.2 297.3,161.9 298.5,166.6 300.4,162.4 301.2,156.6 302.8,161.9 304.3,159.3 305.7,161.8 306.9,159 307.6,163.1 308.7,158.4 310.1,157.8 311.7,163.7 313.2,164.8 314.5,160.6 315.6,162.2 316.7,157.9 318.9,159.9 319.8,157.9 321,158.5 322.8,167 323.9,162.4 325.6,161.3 326.6,166.1 327.8,167.5 330.1,163.6 330.6,166.2 331.7,163.4 333.6,168.4 334.3,163.8 335.7,169.1 338.3,168.4 339.1,163.8 340,167.1 341.8,170 342.3,167.9 344.2,169.2 346.3,168.3 347.7,170.7 348.7,165.3 350.3,161.6 351.6,165.2 353,157.7 353.6,154.8 354.6,162.2 356.1,164.2 357.6,155.5 359.7,148.2 360.4,155.4 361.9,153.5 363.5,141.7 365,150.5 366.4,143 367.3,152 369.3,152.7 369.9,147.8 372,149.6 372.8,156.7 373.8,152.8 374.9,158.8 377,160.1 378.3,155.2 379,160.3 381.3,165 382.7,163.6 383.9,156.9 384.7,161.8 386.5,152 387.7,161.6 389.6,161.6 390.2,156.5 392,162.2 393.6,151.7 394.5,158 395.1,156 396.6,159.4 398.4,150.8 399.3,154.6 400.8,146.7 402,150.4 404.1,143.3 405.8,157.7 406.7,155.8 408,154.7 409.4,164.3 410,160.9 412.6,162.6 413.6,160.2 414.3,162.4 415.7,162.4 416.8,164.6 419,162.1 420.1,168.9 421.7,166 422.3,168.3 423.8,166.8 426.1,170.6 427.1,167.8 428.3,171.8 428.8,169.2 430.4,170.4 432.9,163.8 434.1,164.2 435.1,168.1 436.7,162.6 437.7,168.2 438.9,164.5 440.5,166.8 441.4,162.3 443.1,158.3 444.8,160.1 446.1,156 447.4,156.2 448.4,149.4 449.4,153.6 451.2,155.4 452.8,143.2 454.1,148.9 455.5,138 456.5,136.8 457.5,145 459.8,125.7 460.2,136 461.6,136.2 463,152.7 464.8,147.4 465.4,139.2 467.3,135.4 468.7,113.3 470.7,101.4 471.4,112.6 472.6,108.6 473.7,119.5 475.1,109 476.8,122.1 478.2,110.6 479.5,123.7 481.1,113.3 481.9,121.9 483.1,115.8 484.3,125.8 486.2,121.3 487.4,92.9 488.6,83.7 490.2,91.4 491.7,90.3 492.6,53.7 494.2,40 495.5,66.8 496.5,42.8 498,41.6 499.2,73 500.8,87.6 503,59.1 503.5,51.3 505.6,89.7 506.7,74.3 507.3,101 508.7,91.8 510.8,117.5 512.5,107 513.2,123.2 514.7,136.9 516.4,122.3 517.3,131.2 518.4,108.5 519.9,118.3 521.7,109.7 523.1,116.4 524.3,134.8 526,127.8 527,105.5 528,113.9 529.1,103 531.1,111.8 532.1,97 533.4,112.3 535.4,105.9 536.6,115.9 538,107.7 539.3,72.3 540.8,59.8 542,85 542.9,88.8 544.5,69.6 546.2,86 546.8,69.2 548.2,67.5 549.8,98.6 550.9,83.7 552.1,104.6 553.2,90.3 555.7,103.4 556.8,104.3 557.8,85 559,93.5 560.4,75.3 562.1,77.2 562.8,101.3 564.4,103.2 565.9,76.2 567.5,93.3 569.4,85.7 570,108.1 571.1,85.7 572.8,97.7 574.2,90.8 575.5,110 576.5,100.4 578.3,113.8 579.3,86 581.5,112.5 581.9,102.5 584.2,106.4 585.5,86.3 586.2,81.4 587.3,99.8 589.3,62.6 590,75.5 591.5,51.9 592.5,88.9 594.3,94.8 596.4,46.9 597.2,43.6 598.3,82.9 599.6,55.2 601,49.9 602,61.7" fill="none" stroke="#D64B2A" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>drawdown</title></polyline>
+  <text x="694" y="22" font-size="11" text-anchor="end" fill="#1F2C38">worst -91.5%</text>
+</svg>
+<!-- /chart:drawdown3x -->
+<figcaption>fig 2.3.5 — the 3× version's drawdown: most of the path is spent far below the previous peak</figcaption>
+</figure>
+
+<p>One path proves nothing, so the lab simulates 2,000 ten-year paths, using the same random shocks at every leverage level so the comparison is fair. The median growth rate traces the theory almost exactly:</p>
+
+<figure class="diagram chart">
+<!-- chart:cagr_by_leverage -->
+<svg viewBox="0 0 720 260" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Median compound growth by leverage — 2,000 simulated 10-year paths">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">MEDIAN COMPOUND GROWTH BY LEVERAGE — 2,000 SIMULATED 10-YEAR PATHS</text>
+  <line x1="64" y1="216" x2="690" y2="216" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="220" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">-30.0%</text>
+  <line x1="64" y1="181.6" x2="690" y2="181.6" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="185.6" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">-20.0%</text>
+  <line x1="64" y1="147.2" x2="690" y2="147.2" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="151.2" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">-10.0%</text>
+  <line x1="64" y1="112.8" x2="690" y2="112.8" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="116.8" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.0%</text>
+  <line x1="64" y1="78.4" x2="690" y2="78.4" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="82.4" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">10.0%</text>
+  <line x1="64" y1="44" x2="690" y2="44" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="48" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">20.0%</text>
+  <line x1="64" y1="112.8" x2="690" y2="112.8" stroke="#C9CFC6" stroke-width="1"/>
+  <path d="M96.7,112.8 V99 Q96.7,95 100.7,95 H116.7 Q120.7,95 120.7,99 V112.8 Z" fill="#3A56C5"><title>0.5×: 5.2%</title></path>
+  <text x="108.7" y="88" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">5.2%</text>
+  <text x="108.7" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">0.5×</text>
+  <path d="M186.1,112.8 V95.3 Q186.1,91.3 190.1,91.3 H206.1 Q210.1,91.3 210.1,95.3 V112.8 Z" fill="#3A56C5"><title>1×: 6.2%</title></path>
+  <text x="198.1" y="84.3" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">6.2%</text>
+  <text x="198.1" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">1×</text>
+  <path d="M275.6,112.8 V95.2 Q275.6,91.2 279.6,91.2 H295.6 Q299.6,91.2 299.6,95.2 V112.8 Z" fill="#3A56C5"><title>1.5×: 6.3%</title></path>
+  <text x="287.6" y="84.2" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">6.3%</text>
+  <text x="287.6" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">1.5×</text>
+  <path d="M365,112.8 V98.8 Q365,94.8 369,94.8 H385 Q389,94.8 389,98.8 V112.8 Z" fill="#3A56C5"><title>2×: 5.2%</title></path>
+  <text x="377" y="87.8" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">5.2%</text>
+  <text x="377" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">2×</text>
+  <path d="M454.4,112.8 V112.4 Q454.4,112.1 454.8,112.1 H478.1 Q478.4,112.1 478.4,112.4 V112.8 Z" fill="#3A56C5"><title>3×: 0.2%</title></path>
+  <text x="466.4" y="105.1" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.2%</text>
+  <text x="466.4" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">3×</text>
+  <path d="M543.9,112.8 V137.5 Q543.9,141.5 547.9,141.5 H563.9 Q567.9,141.5 567.9,137.5 V112.8 Z" fill="#D64B2A"><title>4×: -8.4%</title></path>
+  <text x="555.9" y="156.5" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">-8.4%</text>
+  <text x="555.9" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">4×</text>
+  <path d="M633.3,112.8 V176.4 Q633.3,180.4 637.3,180.4 H653.3 Q657.3,180.4 657.3,176.4 V112.8 Z" fill="#D64B2A"><title>5×: -19.6%</title></path>
+  <text x="645.3" y="195.4" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">-19.6%</text>
+  <text x="645.3" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">5×</text>
+</svg>
+<!-- /chart:cagr_by_leverage -->
+<figcaption>fig 2.3.6 — median compound growth by leverage: it peaks near L* and collapses beyond it</figcaption>
+</figure>
+
+<table>
+<thead><tr><th>Leverage</th><th>Median CAGR</th><th>Theory g(L)</th><th>P(losing money over 10 y)</th><th>P(a 90% drawdown)</th></tr></thead>
+<tbody>
+<tr><td>1×</td><td><span data-lab="lev_1_0_median_cagr" data-fmt=".1%">6.2%</span></td><td><span data-lab="lev_1_0_theory_cagr" data-fmt=".1%">6.2%</span></td><td><span data-lab="lev_1_0_p_loss" data-fmt=".0%">16%</span></td><td><span data-lab="lev_1_0_p_wipeout" data-fmt=".0%">0%</span></td></tr>
+<tr><td>2×</td><td><span data-lab="lev_2_0_median_cagr" data-fmt=".1%">5.2%</span></td><td><span data-lab="lev_2_0_theory_cagr" data-fmt=".1%">5.1%</span></td><td><span data-lab="lev_2_0_p_loss" data-fmt=".0%">34%</span></td><td><span data-lab="lev_2_0_p_wipeout" data-fmt=".0%">3%</span></td></tr>
+<tr><td>3×</td><td><span data-lab="lev_3_0_median_cagr" data-fmt=".1%">0.2%</span></td><td><span data-lab="lev_3_0_theory_cagr" data-fmt=".1%">0.0%</span></td><td><span data-lab="lev_3_0_p_loss" data-fmt=".0%">50%</span></td><td><span data-lab="lev_3_0_p_wipeout" data-fmt=".0%">20%</span></td></tr>
+<tr><td>5×</td><td><span data-lab="lev_5_0_median_cagr" data-fmt=".1%">-19.6%</span></td><td><span data-lab="lev_5_0_theory_cagr" data-fmt=".1%">-19.7%</span></td><td><span data-lab="lev_5_0_p_loss" data-fmt=".0%">77%</span></td><td><span data-lab="lev_5_0_p_wipeout" data-fmt=".0%">69%</span></td></tr>
+</tbody>
+</table>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 220" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">SAME EDGE, TWO WAYS TO SIZE IT</text>
+  <rect x="26" y="32" width="326" height="176" rx="9" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="189" y="54" font-size="11" font-weight="700" text-anchor="middle" fill="#D64B2A">THE NAIVE WAY</text>
+  <rect x="46" y="66" width="286" height="24" rx="5" fill="#fff" stroke="#F2CDBF"/>
+  <text x="58" y="82" font-size="9.5" fill="#1F2C38">"Sharpe is the same at 5×, so 5× the return"</text>
+  <rect x="46" y="96" width="286" height="24" rx="5" fill="#fff" stroke="#F2CDBF"/>
+  <text x="58" y="112" font-size="9.5" fill="#1F2C38">size from the backtest's best-case volatility</text>
+  <text x="189" y="148" font-size="9.5" text-anchor="middle" fill="#D64B2A" font-weight="600">Past 2L*, cash beats you; then growth goes negative.</text>
+  <text x="189" y="166" font-size="9" text-anchor="middle" fill="#4A5A68">At 5× here: −19.6% a year, 69% chance of a 90% drawdown.</text>
+  <rect x="368" y="32" width="326" height="176" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="531" y="54" font-size="11" font-weight="700" text-anchor="middle" fill="#1F7A55">THE DISCIPLINED WAY</text>
+  <rect x="388" y="66" width="286" height="24" rx="5" fill="#fff" stroke="#BFE0CF"/>
+  <text x="400" y="82" font-size="9.5" fill="#1F2C38">1 · estimate L* = (μ − r_f)/σ², then assume μ is too high</text>
+  <rect x="388" y="96" width="286" height="24" rx="5" fill="#fff" stroke="#BFE0CF"/>
+  <text x="400" y="112" font-size="9.5" fill="#1F2C38">2 · size well below L*, set by the drawdown you can bear</text>
+  <text x="531" y="148" font-size="9.5" text-anchor="middle" fill="#1F7A55" font-weight="600">Near-peak growth, far smaller tails.</text>
+  <text x="531" y="166" font-size="9" text-anchor="middle" fill="#4A5A68">Half of L* keeps 75% of the excess growth at half the volatility.</text>
+</svg>
+<figcaption>fig 2.3.7 — two ways to size the same edge: lever the Sharpe, or respect the growth curve</figcaption>
+</figure>
+
+<div class="co key"><span class="co-t">📌 Key idea — leverage is a volatility decision</span>
+<p>Because drag grows with <math><semantics><msup><mi>L</mi><mn class="tml-sml-pad">2</mn></msup><annotation encoding="application/x-tex">L^2</annotation></semantics></math>, there is always a leverage beyond which more exposure means less wealth. The optimum depends on <math><semantics><mi>μ</mi><annotation encoding="application/x-tex">\mu</annotation></semantics></math> — the number you know least well — so professionals size <em>below</em> it. <mark>Overestimate your edge and optimal leverage becomes ruinous leverage.</mark> This is the seed of the Kelly criterion (<span class="xref soon" data-xref="3.6" data-auto="" title="Coming soon">Session 3.6 — Bet Sizing, Kelly &amp; Ruin</span>) and of volatility targeting (<span class="xref soon" data-xref="9.5" data-auto="" title="Coming soon">Session 9.5 — Sizing, Vol Targeting &amp; Allocating Across Strategies</span>).</p>
+</div>
+</section>
+
+<section id="s7">
+<h2><span class="no">2.3.7</span> Return bugs that fake alpha</h2>
+<p class="lede">None of these raise an exception. All of them change your conclusions. Every one has shipped in a real backtest.</p>
+
+<table>
+<thead><tr><th>Bug</th><th>Symptom</th><th>Fix</th></tr></thead>
+<tbody>
+<tr><td>Summing simple returns over time</td><td>Lab: sum = <span data-lab="naive_sum_simple" data-fmt=".0%">209%</span>, true total = <span data-lab="total_simple" data-fmt=".0%">442%</span></td><td><code>(1 + r).prod() - 1</code>, or sum <em>log</em> returns</td></tr>
+<tr><td>Weighting log returns across assets</td><td>Lab: +30%/−20% at 50/50 gives <span data-lab="xs_port_log_wrong" data-fmt=".4f">0.0196</span> instead of <span data-lab="xs_port_log_true" data-fmt=".4f">0.0488</span></td><td>Weight simple returns, then take the log</td></tr>
+<tr><td>√252 on weekly or monthly data</td><td>Sharpe inflated by √21 ≈ 4.6× on monthly data</td><td>Annualise with periods per year of <em>that</em> data</td></tr>
+<tr><td>Returns on unadjusted prices</td><td>Fake crashes on splits; dividends missing</td><td>Use adjusted or <span class="term soon" data-term="total return" title="Defined in Session 2.2 (coming soon)">total-return</span> series</td></tr>
+<tr><td>Forgetting the risk-free rate</td><td>Cash-like strategies look skilful when rates are high</td><td>Always compute on excess returns</td></tr>
+<tr><td>Percent vs percentage points</td><td>"Returns fell 2%" when they fell from 10% to 8%</td><td>Say "2 percentage points"</td></tr>
+</tbody>
+</table>
+
+<div class="co warn"><span class="co-t">⚠️ Pitfall — "3× leveraged ETF = 3× the index return"</span>
+<p>Only for one day. A daily-rebalanced 3× fund held for a year earns roughly <math><semantics><mrow><mn>3</mn><mi>μ</mi><mo>−</mo><mn>2</mn><msub><mi>r</mi><mi>f</mi></msub><mo>−</mo><mstyle displaystyle="false" scriptlevel="0"><mfrac><mn>9</mn><mn>2</mn></mfrac></mstyle><msup><mi>σ</mi><mn>2</mn></msup></mrow><annotation encoding="application/x-tex">3\mu - 2r_f - \tfrac{9}{2}\sigma^2</annotation></semantics></math> in log terms (it borrows two dollars for every one it holds), not <math><semantics><mrow><mn>3</mn><mi>μ</mi></mrow><annotation encoding="application/x-tex">3\mu</annotation></semantics></math>. If the index ends a volatile year flat, the 3× fund ends it down. This is the arithmetic of §2.3.6 — and why leveraged ETFs are trading tools, not investments.</p>
+</div>
+</section>
+
+<section id="s8">
+<h2><span class="no">2.3.8</span> Try it</h2>
+<p class="lede">Open the companion lab and break things on purpose.</p>
+<div class="co lab"><span class="co-t">🔧 Try it (15 min, in the lab)</span>
+<p>1. Before running anything, compute <math><semantics><msup><mi>L</mi><mo form="prefix" stretchy="false" class="tml-sml-pad">⋆</mo></msup><annotation encoding="application/x-tex">L^\star</annotation></semantics></math> by hand for <math><semantics><mrow><mi>μ</mi><mo>=</mo><mn>8</mn><mi>%</mi></mrow><annotation encoding="application/x-tex">\mu = 8\%</annotation></semantics></math>, <math><semantics><mrow><msub><mi>r</mi><mi>f</mi></msub><mo>=</mo><mn>3</mn><mi>%</mi></mrow><annotation encoding="application/x-tex">r_f = 3\%</annotation></semantics></math> and <math><semantics><mrow><mi>σ</mi><mo>=</mo><mn>30</mn><mi>%</mi></mrow><annotation encoding="application/x-tex">\sigma = 30\%</annotation></semantics></math>. Then change <code>SIGMA</code> in the lab and check your answer against the leverage table.<br>
+2. Replace <code>lab.rng</code> with <code>np.random.default_rng(1)</code> and rerun section 2. How much do the arithmetic mean and the Sharpe ratio move? That spread is estimation error.<br>
+3. Success looks like this: your hand-computed <math><semantics><msup><mi>L</mi><mo form="prefix" stretchy="false" class="tml-sml-pad">⋆</mo></msup><annotation encoding="application/x-tex">L^\star</annotation></semantics></math> matches the peak of the new column chart to within one step.</p>
+</div>
+</section>
+
+<hr>
+
+<section id="s9">
+<h2><span class="no">2.3.9</span> Glossary · Check yourself · Go deeper</h2>
+<div class="gloss" id="glossary">
+<div id="g-p-amp-l"><b>P&amp;L</b> — profit and loss in currency; what you earned, scaled by position size.</div>
+<div id="g-simple-return"><b>Simple return</b> — <math><semantics><mrow><msub><mi>R</mi><mi>t</mi></msub><mo>=</mo><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><msub><mi>P</mi><mi>t</mi></msub><mo>+</mo><msub><mi>D</mi><mi>t</mi></msub><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mi>/</mi><msub><mi>P</mi><mrow><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub><mo>−</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">R_t = (P_t + D_t)/P_{t-1} - 1</annotation></semantics></math>; adds exactly across assets.</div>
+<div id="g-log-return"><b>Log return</b> — <math><semantics><mrow><msub><mi>r</mi><mi>t</mi></msub><mo>=</mo><mrow><mi>ln</mi><mo>⁡</mo></mrow><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mn>1</mn><mo>+</mo><msub><mi>R</mi><mi>t</mi></msub><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">r_t = \ln(1 + R_t)</annotation></semantics></math>; adds exactly across time.</div>
+<div id="g-excess-return"><b>Excess return</b> — return minus the risk-free rate over the same period; the part that measures skill.</div>
+<div id="g-compounding"><b>Compounding</b> — returns multiplying on a growing (or shrinking) base: <math><semantics><mrow><mo movablelimits="false">∏</mo><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mn>1</mn><mo>+</mo><msub><mi>R</mi><mi>t</mi></msub><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">\prod (1 + R_t)</annotation></semantics></math>.</div>
+<div id="g-annualisation"><b>Annualisation</b> — rescaling to a yearly figure: mean × periods, volatility × √periods.</div>
+<div id="g-volatility"><b>Volatility</b> — the standard deviation of returns, usually annualised.</div>
+<div id="g-volatility-drag"><b>Volatility drag</b> — the gap between arithmetic mean and compound growth, ≈ σ²/2 a year.</div>
+<div id="g-sharpe-ratio"><b>Sharpe ratio</b> — annualised mean excess return divided by its annualised volatility.</div>
+<div id="g-drawdown"><b>Drawdown</b> — the fall of wealth below its running peak; the maximum drawdown is the worst one.</div>
+<div id="g-leverage"><b>Leverage</b> — exposure per unit of capital; multiplies mean and volatility, and drag by its square.</div>
+</div>
+
+<h3>Check yourself</h3>
+<details class="q"><summary>1. A fund reports an average annual return of 12% but a CAGR of 8%. Roughly how volatile is it?</summary><div>Drag ≈ 12% − 8% = 4% ≈ σ²/2, so σ ≈ √0.08 ≈ 28% a year. A large gap between the arithmetic and geometric returns is a volatility tell.</div></details>
+<details class="q"><summary>2. You hold three assets with weights 50/30/20 and have their daily log returns. How do you get the portfolio's daily return?</summary><div>Convert each to simple returns (<math><semantics><mrow><mi>R</mi><mo>=</mo><msup><mi>e</mi><mi class="tml-sml-pad">r</mi></msup><mo>−</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">R = e^r - 1</annotation></semantics></math>), take the weighted sum, and convert back if you need a log return. Weighting log returns directly is only approximately right — and badly wrong on big moves.</div></details>
+<details class="q"><summary>3. A strategy's monthly returns have a Sharpe ratio of 0.30. What is the annualised figure — and what are you assuming?</summary><div>0.30 × √12 ≈ 1.04. Not × √252: annualise with the number of periods per year of the data you have. The √12 assumes monthly returns are independent; positive autocorrelation makes the true figure lower.</div></details>
+<details class="q"><summary>4. The S&amp;P 500 ends a very choppy year exactly flat. What happened to a daily-rebalanced 3× fund on it?</summary><div>It lost money. A flat index means <math><semantics><mrow><mi>μ</mi><mo>≈</mo><msup><mi>σ</mi><mn>2</mn></msup><mi>/</mi><mn>2</mn></mrow><annotation encoding="application/x-tex">\mu \approx \sigma^2/2</annotation></semantics></math>. The 3× fund's log growth is about <math><semantics><mrow><mn>3</mn><mi>μ</mi><mo>−</mo><mn>2</mn><msub><mi>r</mi><mi>f</mi></msub><mo>−</mo><mstyle displaystyle="false" scriptlevel="0"><mfrac><mn>9</mn><mn>2</mn></mfrac></mstyle><msup><mi>σ</mi><mn>2</mn></msup><mo>=</mo><mo form="prefix" stretchy="false">−</mo><mn>3</mn><msup><mi>σ</mi><mn>2</mn></msup><mo>−</mo><mn>2</mn><msub><mi>r</mi><mi>f</mi></msub></mrow><annotation encoding="application/x-tex">3\mu - 2r_f - \tfrac{9}{2}\sigma^2 = -3\sigma^2 - 2r_f</annotation></semantics></math>: its drag grows with the <em>square</em> of the leverage, and it pays to borrow. Leverage turns volatility into a certain cost.</div></details>
+<details class="q"><summary>5. A colleague's backtest reports a total return of 209% by summing daily returns. Is that too high or too low?</summary><div>It could be either — summing simple returns ignores compounding. In the lab's 20-year path the true total was <span data-lab="total_simple" data-fmt=".0%">442%</span> against a naive sum of <span data-lab="naive_sum_simple" data-fmt=".0%">209%</span>. On a path with big drawdowns the sum can overstate instead. Always compound.</div></details>
+
+<div class="co lab"><span class="co-t">🔧 Homework (~1 h before Session 2.4)</span>
+<p>1. Write <code>annualise(returns, periods_per_year)</code> that returns CAGR, volatility and Sharpe ratio, and unit-test it on data where you know the answer (a constant 0.1% daily return; a ±1% alternating series).<br>
+2. In the lab, add a "0.5× + cash" line to the growth chart. How much growth do you give up relative to 1×, and how much drawdown do you avoid?<br>
+3. Read Meucci's two-page note on linear vs compounded returns (below). Then find one chart in the financial press that averages returns it should have compounded.</p>
+</div>
+
+<h3>📚 Go deeper</h3>
+<ol class="refs">
+<li>Campbell, J. Y., Lo, A. W. &amp; MacKinlay, A. C. (1997). <em>The Econometrics of Financial Markets</em>, ch. 1 "Introduction" (returns and their properties). Princeton University Press. <span class="rid">ISBN 978-0-691-04301-2</span></li>
+<li>Meucci, A. (2010). "Quant Nugget 2: Linear vs. Compounded Returns — Common Pitfalls in Portfolio Management." <em>GARP Risk Professional</em>. <span class="rid">SSRN 1586656</span></li>
+<li>Lo, A. W. (2002). "The Statistics of Sharpe Ratios." <em>Financial Analysts Journal</em> 58(4), 36–52. <span class="rid">doi:10.2469/faj.v58.n4.2453</span></li>
+<li>Cheng, M. &amp; Madhavan, A. (2009). "The Dynamics of Leveraged and Inverse Exchange-Traded Funds." <em>Journal of Investment Management</em> 7(4). <span class="rid">SSRN 1393995</span></li>
+</ol>
+</section>
+
+<!-- nav:foot -->
+<div class="foot">
+<span class="soon" title="Coming soon">← Prev: 2.2 · Equities &amp; ETFs</span>
+<span class="soon" title="Coming soon">Next: 2.4 · Futures →</span>
+</div>
+<p class="legal">Educational material only — not investment, legal or tax advice. Backtests and simulations are hypothetical. <a href="../start-here.html#disclaimer">Disclaimer</a> · Text CC BY 4.0 · Code MIT.</p>
+<!-- /nav:foot -->
+</main>
+</div></body></html>

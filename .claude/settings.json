@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "deny": [
+      "mcp__claude_ai_Interactive_Brokers_IBKR",
+      "mcp__claude_ai_Gmail",
+      "mcp__claude_ai_Slack",
+      "mcp__claude_ai_Google_Drive"
+    ]
+  },
+  "env": {
+    "PYTHONUTF8": "1"
+  }
+}

@@ -1,0 +1,1067 @@
+# Quant Notebook — single source of truth for the course structure.
+#
+# Everything navigational (tab strips, eyebrows, prev/next footers, home cards, status table,
+# roadmap, sitemap, head meta, cross-reference text) is generated from this file by
+# tools/sync_nav.py. Slugs are FROZEN: renaming one breaks links, Colab URLs and citations.
+#
+# Session fields
+#   id      "U.S" session number            slug   frozen file slug (lowercase, hyphens)
+#   title   full title (<h1>, <title>)      short  tab-strip title
+#   goal    one line: what the learner walks away with (home cards, meta description)
+#   prereqs session numbers assumed known   owns   glossary terms this session DEFINES
+#   deps    lab dependency extras           status planned | doing | published
+#
+# Glossary rule: a term is defined once, by the session that owns it. Every other session links
+# to the owner (see AUTHORING.md). Terms a session relies on = owned terms of its prereqs.
+
+course:
+  name: Quant Notebook
+  tagline: From engineer to quant — markets, math, models and machines.
+  repo: georgevrs/quant-notebook
+  site_url: https://georgevrs.github.io/quant-notebook/
+  branch: main
+  author: Georges Verouchis
+  duration: ~300 h (100 sessions × 1.5 h + labs)
+  level: Engineer → professional quant
+
+tracks:
+  QR: { name: Quant Researcher, blurb: "Finds and validates signals; owns the research process." }
+  QT: { name: Quant Trader, blurb: "Turns forecasts into positions; lives with execution, risk and P&L." }
+  QD: { name: Quant Developer, blurb: "Builds the data, research and trading infrastructure." }
+  IND: { name: Independent Trader, blurb: "Runs their own systematic book with their own capital." }
+
+phases:
+  - { id: 1, name: Foundations, units: [1, 2, 3, 4], milestone: "Your own research data lake", colour: ultramarine }
+  - { id: 2, name: Research Craft, units: [5, 6, 7, 8], milestone: "A strategy report that survives DSR/PBO", colour: pine }
+  - { id: 3, name: "Portfolio, Risk & Derivatives", units: [9, 10, 11], milestone: "A risk-managed multi-strategy portfolio", colour: sticky }
+  - { id: 4, name: Machines & Markets, units: [12, 13, 14, 15], milestone: "A paper-trading system running", colour: coral }
+  - { id: 5, name: The Professional, units: [16], milestone: "Capstone + interview-ready", colour: neutral }
+
+units:
+  - id: 1
+    slug: quant-landscape
+    name: The Quant Landscape
+    level: Foundations
+    tracks: [QR, QT, QD, IND]
+    thread: "Quant finance is engineering for decisions under uncertainty with money on the line — and the job is mostly not fooling yourself."
+    sessions:
+      - id: "1.1"
+        slug: what-quants-do
+        title: What Quants Actually Do
+        short: What Quants Do
+        goal: Map the roles, the firms and how each one actually makes money — so you know which game you are training for.
+        prereqs: []
+        owns: [quant researcher, quant trader, quant developer, buy side, sell side, proprietary trading firm, market maker, hedge fund, asset manager]
+        deps: [core]
+        status: planned
+      - id: "1.2"
+        slug: where-returns-come-from
+        title: Where Returns Come From
+        short: Sources of Return
+        goal: The five honest sources of edge — risk premia, behavioural anomalies, liquidity provision, information and speed — and why most apparent edges are none of them.
+        prereqs: ["1.1"]
+        owns: [alpha, beta, edge, risk premium, anomaly, liquidity premium, informational edge, latency edge, zero-sum game]
+        deps: [core]
+        status: planned
+      - id: "1.3"
+        slug: research-lifecycle
+        title: The Quant Research Lifecycle
+        short: Research Lifecycle
+        goal: The master workflow of the whole course — hypothesis to data to signal to validation to sizing to paper to live to decay — and the gates between the stages.
+        prereqs: ["1.2"]
+        owns: [hypothesis, signal, backtest, out-of-sample, paper trading, alpha decay, research log, pre-registration, kill criterion]
+        deps: [core]
+        status: doing
+      - id: "1.4"
+        slug: engineers-edge-and-odds
+        title: The Engineer's Edge, Blind Spots & Honest Odds
+        short: Edge & Odds
+        goal: What transfers from software and ML, what breaks in markets, and the evidence on who actually makes money.
+        prereqs: ["1.3"]
+        owns: [signal-to-noise ratio, non-stationarity, overfitting, backtest-to-live decay, base rate]
+        deps: [core]
+        status: planned
+      - id: "1.5"
+        slug: quant-lab-setup
+        title: Set Up Your Quant Lab
+        short: Lab Setup
+        goal: A reproducible workbench — uv, Python 3.12, Jupyter, DuckDB, the quantnb package, a research repo layout and a data cache.
+        prereqs: ["1.3"]
+        owns: [uv, virtual environment, lockfile, jupytext, research repository, data cache, random seed]
+        deps: [core]
+        status: planned
+
+  - id: 2
+    slug: markets-instruments
+    name: Markets & Instruments
+    level: Foundations
+    tracks: [QR, QT, QD, IND]
+    thread: "Every instrument is a contract with a cash-flow profile — learn the plumbing and the P&L arithmetic before you model anything."
+    sessions:
+      - id: "2.1"
+        slug: market-anatomy
+        title: Market Anatomy & the Life of an Order
+        short: Market Anatomy
+        goal: Follow one order from your code through broker, venue, clearing house and custodian — and see where every fee and risk sits.
+        prereqs: ["1.1"]
+        owns: [exchange, broker, clearing house, central counterparty, custodian, dark pool, market order, limit order, stop order, bid, ask, bid-ask spread, settlement]
+        deps: [core]
+        status: planned
+      - id: "2.2"
+        slug: equities-indices-etfs
+        title: Equities, Indices & ETFs
+        short: Equities & ETFs
+        goal: Shares, dividends, splits, index construction, ETF creation/redemption, and the mechanics and costs of shorting.
+        prereqs: ["2.1"]
+        owns: [common stock, dividend, stock split, corporate action, index, market-cap weighting, ETF, creation and redemption, short selling, borrow fee, total return]
+        deps: [core]
+        status: planned
+      - id: "2.3"
+        slug: returns-pnl-leverage
+        title: Returns, P&L, Compounding & Leverage
+        short: Returns & Leverage
+        goal: The arithmetic every later session relies on — simple vs log returns, compounding, annualisation, volatility drag, Sharpe, drawdown and leverage.
+        prereqs: ["2.2"]
+        owns: [simple return, log return, excess return, compounding, annualisation, volatility, volatility drag, Sharpe ratio, drawdown, leverage, P&L]
+        deps: [core]
+        status: doing
+      - id: "2.4"
+        slug: futures
+        title: "Futures: Carry, Basis, Roll & Margin"
+        short: Futures
+        goal: How futures are priced from cost of carry, why curves slope, what roll yield really is, and how margin creates leverage and liquidation risk.
+        prereqs: ["2.3"]
+        owns: [futures contract, forward contract, cost of carry, basis, contango, backwardation, roll yield, initial margin, variation margin, mark-to-market, expiry, contract multiplier, notional value]
+        deps: [core]
+        status: planned
+      - id: "2.5"
+        slug: fx-commodities
+        title: FX & Commodities
+        short: FX & Commodities
+        goal: Currency quoting, forwards and covered interest parity; commodity term structures, storage and convenience yield.
+        prereqs: ["2.4"]
+        owns: [currency pair, pip, FX spot, FX forward, covered interest parity, FX carry, convenience yield, commodity term structure, storage cost]
+        deps: [core]
+        status: planned
+      - id: "2.6"
+        slug: crypto-market-structure
+        title: Crypto Market Structure
+        short: Crypto
+        goal: Centralised vs decentralised venues, AMMs, perpetual futures and funding, basis trades, and the custody and counterparty risks that traditional markets hide from you.
+        prereqs: ["2.4"]
+        owns: [centralised exchange, decentralised exchange, automated market maker, perpetual future, funding rate, stablecoin, custody risk, counterparty risk, liquidation]
+        deps: [core]
+        status: planned
+      - id: "2.7"
+        slug: options-primer
+        title: Options Primer
+        short: Options Primer
+        goal: Calls, puts, payoffs, put-call parity, intrinsic vs time value, and a first look at implied volatility — enough to read any options discussion.
+        prereqs: ["2.3"]
+        owns: [call option, put option, strike price, option premium, payoff diagram, moneyness, put-call parity, intrinsic value, time value, implied volatility]
+        deps: [core]
+        status: planned
+
+  - id: 3
+    slug: math-toolkit
+    name: The Quant Math Toolkit
+    level: Foundations
+    tracks: [QR, QT, QD, IND]
+    thread: "The math is a toolkit, not a hurdle — every tool here earns its place by answering a trading question."
+    sessions:
+      - id: "3.1"
+        slug: probability-expected-value
+        title: Probability & Expected Value
+        short: Probability & EV
+        goal: Random variables, expectation, variance, conditioning and Bayes — the language of every bet and every interview question.
+        prereqs: ["2.3"]
+        owns: [random variable, expected value, variance, conditional probability, Bayes' rule, independence, law of large numbers, central limit theorem]
+        deps: [core]
+        status: planned
+      - id: "3.2"
+        slug: distributions-fat-tails
+        title: Distributions & Fat Tails
+        short: Fat Tails
+        goal: Normal, lognormal and Student-t; skewness, kurtosis and tail indices — and why the normal distribution will eventually lie to you.
+        prereqs: ["3.1"]
+        owns: [normal distribution, lognormal distribution, Student-t distribution, skewness, kurtosis, fat tails, tail index, QQ plot, power law]
+        deps: [core]
+        status: planned
+      - id: "3.3"
+        slug: linear-algebra-portfolios
+        title: Linear Algebra for Portfolios
+        short: Linear Algebra
+        goal: Weights as vectors, risk as a quadratic form, PCA as the hidden structure of a market — linear algebra through the portfolio lens.
+        prereqs: ["3.1"]
+        owns: [weight vector, covariance matrix, correlation matrix, portfolio variance, eigenvalue, eigenvector, principal component analysis, positive semi-definite, condition number]
+        deps: [core]
+        status: planned
+      - id: "3.4"
+        slug: convex-optimization
+        title: Convex Optimization
+        short: Optimization
+        goal: Objectives, constraints, convexity, quadratic programs and Lagrange multipliers — and how to state a portfolio problem so cvxpy can solve it.
+        prereqs: ["3.3"]
+        owns: [objective function, constraint, convex set, convex function, quadratic program, Lagrange multiplier, KKT conditions, cvxpy]
+        deps: [core, portfolio]
+        status: planned
+      - id: "3.5"
+        slug: simulation-monte-carlo
+        title: Simulation & Monte Carlo
+        short: Monte Carlo
+        goal: Simulate prices, strategies and uncertainty with seeded Monte Carlo — random walks, GBM, bootstraps and variance reduction.
+        prereqs: ["3.2"]
+        owns: [Monte Carlo simulation, random walk, geometric Brownian motion, bootstrap, variance reduction, antithetic variates, Monte Carlo standard error]
+        deps: [core]
+        status: planned
+      - id: "3.6"
+        slug: kelly-bet-sizing
+        title: Bet Sizing, Kelly & Ruin
+        short: Kelly & Ruin
+        goal: Why the size of a bet matters as much as its edge — Kelly growth, the cost of over-betting, fractional Kelly and risk of ruin.
+        prereqs: ["3.5"]
+        owns: [Kelly criterion, fractional Kelly, growth rate, risk of ruin, log utility, bet sizing]
+        deps: [core]
+        status: planned
+
+  - id: 4
+    slug: data-engineering
+    name: Financial Data Engineering
+    level: Foundations
+    tracks: [QR, QD, IND]
+    thread: "Your backtest can only be as honest as your data — point-in-time, or it didn't happen."
+    sessions:
+      - id: "4.1"
+        slug: data-landscape
+        title: The Data Landscape, Vendors & Licensing
+        short: Data Landscape
+        goal: Bars, ticks, quotes, books, fundamentals and macro — who sells what, what it costs, and what the licence lets you do with it.
+        prereqs: ["2.1"]
+        owns: [OHLCV bar, tick data, quote data, level 1 data, level 2 data, fundamental data, data vendor, data licence, redistribution]
+        deps: [core]
+        status: planned
+      - id: "4.2"
+        slug: point-in-time-biases
+        title: Point-in-Time Data & Data Biases
+        short: Point-in-Time
+        goal: Look-ahead, survivorship, restatements, vintages and delistings — the data biases that manufacture fake alpha, and how to engineer them out.
+        prereqs: ["4.1"]
+        owns: [point-in-time data, look-ahead bias, survivorship bias, restatement, data vintage, delisting return, backfill bias]
+        deps: [core]
+        status: planned
+      - id: "4.3"
+        slug: corporate-actions-security-master
+        title: Corporate Actions, Security Master & Continuous Futures
+        short: Security Master
+        goal: Adjust prices correctly, keep identifiers straight through ticker changes, and stitch futures into continuous series without inventing returns.
+        prereqs: ["4.2", "2.4"]
+        owns: [adjustment factor, adjusted price, total-return index, security master, security identifier, continuous futures, back-adjustment, ratio adjustment, roll schedule]
+        deps: [core]
+        status: planned
+      - id: "4.4"
+        slug: time-calendars-bars
+        title: Time, Calendars, As-of Joins & Bars
+        short: Time & Bars
+        goal: Timestamps and time zones, exchange calendars, as-of joins that never peek, and information-driven bars (volume, dollar, imbalance).
+        prereqs: ["4.2"]
+        owns: [timestamp, time zone, exchange calendar, as-of join, time bars, volume bars, dollar bars, imbalance bars]
+        deps: [core]
+        status: planned
+      - id: "4.5"
+        slug: research-storage-stack
+        title: The Research Storage Stack
+        short: Storage Stack
+        goal: Parquet, Arrow, DuckDB and polars — a fast, local, columnar research stack — plus when kdb+ and managed warehouses earn their cost.
+        prereqs: ["4.4"]
+        owns: [Parquet, Apache Arrow, DuckDB, polars, lazy evaluation, partitioning, columnar storage, kdb+]
+        deps: [core]
+        status: planned
+      - id: "4.6"
+        slug: lab-research-data-lake
+        title: "Lab: Build Your Research Data Lake"
+        short: "Lab: Data Lake"
+        goal: Build an idempotent, tested, point-in-time data pipeline with quality checks and lineage — the foundation for every later lab.
+        prereqs: ["4.3", "4.5"]
+        owns: [data quality check, data lineage, idempotent pipeline, data contract]
+        deps: [core]
+        status: planned
+
+  - id: 5
+    slug: statistics-time-series
+    name: Statistics & Time Series of Returns
+    level: Intermediate
+    tracks: [QR, QT, IND]
+    thread: "Returns are noisy, fat-tailed and barely predictable — good statistics tells you exactly how little you know."
+    sessions:
+      - id: "5.1"
+        slug: stylized-facts
+        title: Stylized Facts of Returns
+        short: Stylized Facts
+        goal: The empirical regularities every model must respect — fat tails, volatility clustering, the leverage effect, and near-zero autocorrelation.
+        prereqs: ["3.2", "4.6"]
+        owns: [stylized facts, volatility clustering, leverage effect, autocorrelation, aggregational Gaussianity]
+        deps: [core]
+        status: planned
+      - id: "5.2"
+        slug: regression-inference
+        title: Regression & Inference That Doesn't Lie
+        short: Honest Inference
+        goal: OLS alpha and beta, HAC standard errors, overlapping observations, the standard error of a Sharpe ratio, bootstraps and multiple testing.
+        prereqs: ["5.1"]
+        owns: [ordinary least squares, t-statistic, p-value, HAC standard errors, Newey-West estimator, overlapping observations, standard error of the Sharpe ratio, multiple testing, family-wise error rate, false discovery rate, SPA test, model confidence set]
+        deps: [core]
+        status: planned
+      - id: "5.3"
+        slug: bayesian-thinking
+        title: "Bayesian Thinking: Priors, Shrinkage & Updating"
+        short: Bayesian Thinking
+        goal: Priors, posteriors and shrinkage — the machinery behind Ledoit-Wolf, Black-Litterman and Kalman filters, and the honest answer to "is my Sharpe real?"
+        prereqs: ["5.2"]
+        owns: [prior, posterior, likelihood, conjugate prior, shrinkage, credible interval, empirical Bayes]
+        deps: [core]
+        status: planned
+      - id: "5.4"
+        slug: stationarity-arma
+        title: Stationarity & ARMA Models
+        short: Stationarity & ARMA
+        goal: Unit roots, ADF and KPSS, AR/MA/ARMA, ACF and PACF — and why returns are close to unpredictable while prices are not stationary.
+        prereqs: ["5.2"]
+        owns: [stationarity, unit root, ADF test, KPSS test, autoregressive model, moving-average model, ARMA model, ACF, PACF]
+        deps: [core]
+        status: planned
+      - id: "5.5"
+        slug: volatility-modeling
+        title: Modeling Volatility
+        short: Volatility
+        goal: Realized-volatility estimators from OHLC data, EWMA and GARCH forecasts — volatility is the one thing you can forecast well.
+        prereqs: ["5.4"]
+        owns: [realized volatility, Parkinson estimator, Garman-Klass estimator, Yang-Zhang estimator, EWMA volatility, GARCH model, GJR-GARCH model, volatility forecast]
+        deps: [core]
+        status: planned
+      - id: "5.6"
+        slug: cointegration-mean-reversion
+        title: Cointegration & Mean Reversion
+        short: Cointegration
+        goal: Engle-Granger and Johansen tests, hedge ratios, spreads, the Ornstein-Uhlenbeck process as a continuous AR(1), and half-lives.
+        prereqs: ["5.4"]
+        owns: [cointegration, Engle-Granger test, Johansen test, hedge ratio, spread, Ornstein-Uhlenbeck process, half-life of mean reversion]
+        deps: [core]
+        status: planned
+      - id: "5.7"
+        slug: kalman-regimes
+        title: Kalman Filters & Regime Models
+        short: Kalman & Regimes
+        goal: State-space models, the Kalman filter for time-varying hedge ratios, hidden Markov regimes and structural breaks.
+        prereqs: ["5.3", "5.6"]
+        owns: [state-space model, Kalman filter, dynamic hedge ratio, hidden Markov model, market regime, structural break]
+        deps: [core]
+        status: planned
+
+  - id: 6
+    slug: backtesting-discipline
+    name: Backtesting & Research Discipline
+    level: Intermediate
+    tracks: [QR, QT, QD, IND]
+    thread: "A backtest is a unit test that can lie — the discipline is designing it so that it can't."
+    sessions:
+      - id: "6.1"
+        slug: what-a-backtest-is
+        title: What a Backtest Is (and Isn't)
+        short: What a Backtest Is
+        goal: A backtest is a historical simulation under assumptions, not a research tool — what it can prove, what it cannot, and why the gap to live trading exists.
+        prereqs: ["1.3", "5.2"]
+        owns: [strategy specification, historical simulation, fill assumption, backtest–live gap, in-sample]
+        deps: [core]
+        status: planned
+      - id: "6.2"
+        slug: vectorized-backtester
+        title: Build a Vectorized Backtester
+        short: Vectorized Backtest
+        goal: Signals to positions to returns in a few lines of pandas/polars — and the shift discipline that keeps the future out.
+        prereqs: ["6.1"]
+        owns: [vectorized backtest, position, turnover, signal lag, equity curve]
+        deps: [core]
+        status: planned
+      - id: "6.3"
+        slug: event-driven-backtester
+        title: Build an Event-Driven Backtester
+        short: Event-Driven
+        goal: An event loop with orders, fills and portfolio state — slower, but realistic, and the same shape as a live trading system.
+        prereqs: ["6.2"]
+        owns: [event-driven backtest, event loop, order, fill, portfolio state, backtest–live parity]
+        deps: [core]
+        status: planned
+      - id: "6.4"
+        slug: bias-hall-of-fame
+        title: The Bias Hall of Fame
+        short: Bias Hall of Fame
+        goal: Live demos of every classic way a backtest lies — look-ahead, survivorship, data snooping, selection, stale and untradable prices.
+        prereqs: ["6.2", "4.2"]
+        owns: [data snooping, selection bias, untradable price, stale price, publication bias]
+        deps: [core]
+        status: planned
+      - id: "6.5"
+        slug: costs-capacity
+        title: Transaction Costs & Capacity
+        short: Costs & Capacity
+        goal: Spread, commission, slippage, market impact, borrow and funding — and how costs cap how much capital a strategy can ever run.
+        prereqs: ["6.2", "2.1"]
+        owns: [transaction cost, commission, slippage, market impact, borrow cost, capacity, break-even cost]
+        deps: [core]
+        status: planned
+      - id: "6.6"
+        slug: validation-schemes
+        title: "Validation: Walk-Forward, Purged K-Fold & CPCV"
+        short: Validation
+        goal: Walk-forward analysis, purging and embargo, and combinatorial purged cross-validation — train/test splits that respect time.
+        prereqs: ["6.4"]
+        owns: [walk-forward analysis, purging, embargo, purged k-fold cross-validation, combinatorial purged cross-validation, leakage]
+        deps: [core, portfolio]
+        status: planned
+      - id: "6.7"
+        slug: overfitting-statistics
+        title: "Overfitting Statistics: PSR, DSR, MinTRL & PBO"
+        short: Overfitting Stats
+        goal: The probabilistic and deflated Sharpe ratios, minimum track record length, and the probability of backtest overfitting — how to price in the number of things you tried.
+        prereqs: ["6.6", "5.2"]
+        owns: [probabilistic Sharpe ratio, deflated Sharpe ratio, minimum track record length, probability of backtest overfitting, CSCV, false strategy theorem, number of trials]
+        deps: [core]
+        status: planned
+      - id: "6.8"
+        slug: lab-research-protocol
+        title: "Lab: The Research Protocol"
+        short: "Lab: Protocol"
+        goal: Pre-register a hypothesis, log every trial, sweep parameters, score them with PBO and DSR, and write the go/no-go memo.
+        prereqs: ["6.7"]
+        owns: [trial log, parameter sweep, experiment tracking, go/no-go memo]
+        deps: [core, backtest, tracking]
+        status: planned
+
+  - id: 7
+    slug: factor-investing
+    name: Asset Pricing & Factor Investing
+    level: Intermediate
+    tracks: [QR, IND]
+    thread: "Factors are the vocabulary of returns — but most of the dictionary is fake."
+    sessions:
+      - id: "7.1"
+        slug: efficient-markets
+        title: Efficient Markets & the Limits to Arbitrage
+        short: Efficient Markets
+        goal: What market efficiency really claims, where it bends, and why mispricings can persist even when smart money sees them.
+        prereqs: ["1.2", "5.2"]
+        owns: [efficient market hypothesis, arbitrage, limits to arbitrage, noise trader, behavioural bias]
+        deps: [core]
+        status: planned
+      - id: "7.2"
+        slug: capm-apt-factor-regressions
+        title: CAPM, APT & Factor Regressions
+        short: CAPM & APT
+        goal: From one factor to many — CAPM, APT and time-series factor regressions that separate alpha from exposure.
+        prereqs: ["7.1"]
+        owns: [CAPM, market beta, APT, factor model, factor loading, Jensen's alpha, time-series regression]
+        deps: [core]
+        status: planned
+      - id: "7.3"
+        slug: building-factors
+        title: "Building Factors: Sorts & Fama-MacBeth"
+        short: Building Factors
+        goal: Portfolio sorts, long-short factor construction, Fama-French methodology and Fama-MacBeth cross-sectional regressions — done without look-ahead.
+        prereqs: ["7.2", "6.4"]
+        owns: [portfolio sort, long-short portfolio, breakpoints, Fama-French factors, SMB, HML, cross-sectional regression, Fama-MacBeth regression]
+        deps: [core]
+        status: planned
+      - id: "7.4"
+        slug: factor-zoo-replication
+        title: The Factor Zoo & the Replication Debate
+        short: Factor Zoo
+        goal: Hundreds of published factors, the t > 3 hurdle, post-publication decay, and the two sides of the replication debate — risk vs mispricing.
+        prereqs: ["7.3", "6.7"]
+        owns: [factor zoo, t-statistic hurdle, replication crisis, post-publication decay, risk-based explanation, mispricing explanation]
+        deps: [core]
+        status: planned
+      - id: "7.5"
+        slug: causal-factor-investing
+        title: Causal Factor Investing
+        short: Causal Factors
+        goal: Causal graphs, confounders and colliders — why a factor model can be statistically significant and still causally wrong.
+        prereqs: ["7.4"]
+        owns: [causal graph, confounder, collider, specification error, factor mirage]
+        deps: [core]
+        status: planned
+
+  - id: 8
+    slug: strategy-families
+    name: Strategy Families
+    level: Intermediate
+    tracks: [QR, QT, IND]
+    thread: "A handful of economically motivated ideas explain most systematic returns — the craft is in the implementation."
+    sessions:
+      - id: "8.1"
+        slug: trend-following
+        title: Time-Series Momentum & Trend Following
+        short: Trend Following
+        goal: Trend following across futures with volatility-scaled EWMA crossovers — the most robust systematic strategy family, built properly.
+        prereqs: ["6.8", "2.4", "5.5"]
+        owns: [time-series momentum, trend following, EWMA crossover, volatility scaling, forecast]
+        deps: [core]
+        status: planned
+      - id: "8.2"
+        slug: cross-sectional-momentum
+        title: Cross-Sectional Momentum & Reversal
+        short: XS Momentum
+        goal: Ranking winners against losers, short-term reversal, and the momentum crashes that make position sizing matter.
+        prereqs: ["7.3", "8.1"]
+        owns: [cross-sectional momentum, short-term reversal, momentum crash, winners minus losers]
+        deps: [core]
+        status: planned
+      - id: "8.3"
+        slug: pairs-stat-arb
+        title: Pairs Trading & Statistical Arbitrage
+        short: Stat Arb
+        goal: Distance, cointegration and PCA-residual stat arb — entries, exits, hedge ratios and why the edge has shrunk.
+        prereqs: ["5.6", "5.7", "6.5"]
+        owns: [pairs trading, statistical arbitrage, distance method, PCA residual strategy, z-score, s-score]
+        deps: [core]
+        status: planned
+      - id: "8.4"
+        slug: carry
+        title: Carry Across Asset Classes
+        short: Carry
+        goal: FX carry, futures roll yield, bond carry and roll-down — one unifying definition of carry and its crash risk.
+        prereqs: ["2.4", "2.5", "8.1"]
+        owns: [carry, carry trade, roll-down, carry-to-risk ratio]
+        deps: [core]
+        status: planned
+      - id: "8.5"
+        slug: value-quality-fundamental
+        title: Value, Quality & Fundamental Quant
+        short: Value & Quality
+        goal: Point-in-time fundamentals from EDGAR XBRL, value and quality signals, accruals — and why value has been so painful.
+        prereqs: ["7.3", "4.2"]
+        owns: [value factor, book-to-market ratio, earnings yield, quality factor, profitability, accruals, XBRL]
+        deps: [core]
+        status: planned
+      - id: "8.6"
+        slug: event-driven
+        title: Event-Driven Strategies
+        short: Event-Driven
+        goal: Event studies, post-earnings-announcement drift, index rebalances — trading around information with precise timestamps.
+        prereqs: ["8.5", "4.4"]
+        owns: [event study, abnormal return, cumulative abnormal return, post-earnings-announcement drift, standardized unexpected earnings, index rebalance]
+        deps: [core]
+        status: planned
+      - id: "8.7"
+        slug: combining-signals
+        title: Combining Signals
+        short: Combining Signals
+        goal: Information coefficient, the fundamental law of active management, forecast scaling and combination — many weak signals into one strong book.
+        prereqs: ["8.1", "8.2", "8.3", "8.4"]
+        owns: [information coefficient, information ratio, fundamental law of active management, breadth, forecast scaling, forecast combination, signal correlation]
+        deps: [core]
+        status: planned
+
+  - id: 9
+    slug: portfolio-risk
+    name: Portfolio Construction & Risk
+    level: Intermediate
+    tracks: [QR, QT, IND]
+    thread: "Returns are forecast, risk is measured; the portfolio is where the two meet — under costs and constraints."
+    sessions:
+      - id: "9.1"
+        slug: mean-variance
+        title: Mean-Variance & Why It Breaks
+        short: Mean-Variance
+        goal: Markowitz, the efficient frontier and the tangency portfolio — and why naive mean-variance is an error-maximiser.
+        prereqs: ["3.4", "8.7"]
+        owns: [mean-variance optimisation, efficient frontier, tangency portfolio, estimation error, error maximisation]
+        deps: [core, portfolio]
+        status: planned
+      - id: "9.2"
+        slug: covariance-estimation
+        title: Covariance Estimation
+        short: Covariance
+        goal: Sample covariance and its failure modes, Ledoit-Wolf and OAS shrinkage, random-matrix denoising and EWMA covariance.
+        prereqs: ["9.1", "5.3"]
+        owns: [sample covariance, Ledoit-Wolf shrinkage, oracle approximating shrinkage, random matrix theory, Marchenko-Pastur distribution, covariance denoising, EWMA covariance]
+        deps: [core, portfolio]
+        status: planned
+      - id: "9.3"
+        slug: risk-parity-hrp
+        title: Risk Parity & HRP
+        short: Risk Parity & HRP
+        goal: Risk contributions, inverse-vol and equal-risk-contribution portfolios, hierarchical risk parity and HERC — allocation without return forecasts.
+        prereqs: ["9.2"]
+        owns: [risk contribution, inverse-volatility weighting, risk parity, equal risk contribution, hierarchical risk parity, HERC]
+        deps: [core, portfolio]
+        status: planned
+      - id: "9.4"
+        slug: factor-risk-models
+        title: Factor Risk Models
+        short: Factor Risk Models
+        goal: Build a mini Barra-style model — exposures, factor covariance and specific risk — and use it to decompose where your risk comes from.
+        prereqs: ["9.2", "7.3"]
+        owns: [factor risk model, factor exposure, factor covariance, specific risk, risk decomposition]
+        deps: [core, portfolio]
+        status: planned
+      - id: "9.5"
+        slug: sizing-vol-targeting
+        title: Sizing, Vol Targeting & Allocating Across Strategies
+        short: Sizing & Vol Target
+        goal: Carver-style volatility targeting, position buffering, diversification multipliers and allocating capital across strategies with fractional Kelly.
+        prereqs: ["3.6", "8.7"]
+        owns: [volatility targeting, position sizing, diversification multiplier, position buffering, strategy allocation]
+        deps: [core]
+        status: planned
+      - id: "9.6"
+        slug: optimization-constraints-costs
+        title: Optimization with Constraints & Costs
+        short: Constrained Opt
+        goal: Real portfolio optimisation — turnover penalties, cost-aware objectives, leverage and exposure constraints, and Black-Litterman views.
+        prereqs: ["9.4", "6.5"]
+        owns: [turnover penalty, cost-aware optimisation, exposure constraint, Black-Litterman model, investor view]
+        deps: [core, portfolio]
+        status: planned
+      - id: "9.7"
+        slug: var-es-evt
+        title: VaR, ES, EVT & VaR Backtests
+        short: VaR & ES
+        goal: Value at risk and expected shortfall — historical, parametric and filtered — extreme value theory for the tail, and testing whether your VaR is honest.
+        prereqs: ["5.5", "3.2"]
+        owns: [value at risk, expected shortfall, historical simulation VaR, filtered historical simulation, extreme value theory, generalised Pareto distribution, Kupiec test, Christoffersen test]
+        deps: [core]
+        status: planned
+      - id: "9.8"
+        slug: drawdowns-tail-stress
+        title: Drawdowns, Copulas, Tail Risk & Stress Tests
+        short: Tails & Stress
+        goal: Drawdown statistics, tail dependence and copulas, and stress tests from 2008, March 2020 and 2022 — with LTCM and the 2007 quant quake as cautionary tales.
+        prereqs: ["9.7"]
+        owns: [maximum drawdown, drawdown duration, conditional drawdown at risk, copula, tail dependence, stress test, scenario analysis]
+        deps: [core, portfolio]
+        status: planned
+      - id: "9.9"
+        slug: performance-attribution-decay
+        title: Performance, Attribution & When to Switch Off
+        short: Attribution & Decay
+        goal: Measure performance honestly, attribute it to factors and skill, monitor live decay, and decide in advance when a strategy is retired.
+        prereqs: ["9.4", "6.7"]
+        owns: [Sortino ratio, Calmar ratio, performance attribution, factor attribution, CUSUM monitoring, strategy retirement]
+        deps: [core]
+        status: planned
+
+  - id: 10
+    slug: derivatives-volatility
+    name: Derivatives & Volatility
+    level: Advanced
+    tracks: [QR, QT]
+    thread: "Price by replication, hedge by the Greeks, and trade the gap between implied and realized."
+    sessions:
+      - id: "10.1"
+        slug: no-arbitrage-binomial
+        title: No-Arbitrage & Binomial Trees
+        short: No-Arbitrage
+        goal: Replication and the law of one price, risk-neutral probabilities, and pricing European and American options on a binomial tree.
+        prereqs: ["2.7", "3.1"]
+        owns: [no-arbitrage pricing, replicating portfolio, law of one price, risk-neutral measure, risk-neutral probability, binomial tree]
+        deps: [core]
+        status: planned
+      - id: "10.2"
+        slug: stochastic-calculus
+        title: Stochastic Calculus for Engineers
+        short: Stochastic Calculus
+        goal: Brownian motion, quadratic variation, SDEs and Itô's lemma — built by simulation first, formalism second.
+        prereqs: ["10.1", "3.5"]
+        owns: [Brownian motion, quadratic variation, stochastic differential equation, Itô's lemma, martingale, Euler-Maruyama scheme]
+        deps: [core]
+        status: planned
+      - id: "10.3"
+        slug: black-scholes-merton
+        title: Black-Scholes-Merton
+        short: Black-Scholes
+        goal: Derive BSM two ways (PDE and risk-neutral expectation), implement it, and list precisely which assumptions markets violate.
+        prereqs: ["10.2"]
+        owns: [Black-Scholes-Merton model, Black-Scholes PDE, risk-neutral pricing, d1 and d2]
+        deps: [core, deriv]
+        status: planned
+      - id: "10.4"
+        slug: greeks-hedging
+        title: The Greeks & Hedging P&L
+        short: Greeks & Hedging
+        goal: Delta, gamma, vega and theta; delta hedging in simulation; and the P&L identity that links hedging to realized minus implied variance.
+        prereqs: ["10.3"]
+        owns: [delta, gamma, vega, theta, rho, delta hedging, gamma scalping, hedging P&L]
+        deps: [core, deriv]
+        status: planned
+      - id: "10.5"
+        slug: vol-surface
+        title: The Implied Volatility Surface
+        short: Vol Surface
+        goal: Smiles, skews and term structures; fitting SVI and SSVI; and checking the surface for static arbitrage.
+        prereqs: ["10.4"]
+        owns: [volatility surface, volatility smile, volatility skew, volatility term structure, SVI parameterisation, SSVI, static arbitrage]
+        deps: [core, deriv]
+        status: planned
+      - id: "10.6"
+        slug: stochastic-vol-numerics
+        title: Stochastic Volatility & Numerical Methods
+        short: Heston & Numerics
+        goal: Local vol vs stochastic vol, the Heston model, Monte Carlo and finite-difference pricing, calibration — with QuantLib as the reference.
+        prereqs: ["10.5"]
+        owns: [local volatility, Dupire formula, Heston model, characteristic function, finite-difference method, model calibration, QuantLib]
+        deps: [core, deriv]
+        status: planned
+      - id: "10.7"
+        slug: trading-volatility
+        title: Trading Volatility
+        short: Trading Vol
+        goal: The volatility risk premium, straddles and variance swaps, dispersion, the VIX complex — and the crash risk that pays for all of it.
+        prereqs: ["10.4", "10.5"]
+        owns: [volatility risk premium, variance swap, straddle, strangle, dispersion trade, VIX index, VIX futures]
+        deps: [core, deriv]
+        status: planned
+
+  - id: 11
+    slug: rates-credit-macro
+    name: Rates, Credit & Macro
+    level: Advanced
+    tracks: [QR, QT]
+    thread: "Money has a price that changes with time and with trust — curves encode both."
+    sessions:
+      - id: "11.1"
+        slug: yield-curves
+        title: Yield Curves & Bootstrapping
+        short: Yield Curves
+        goal: Discount factors, zero, forward and par rates, day counts, and bootstrapping a curve from market instruments.
+        prereqs: ["2.3", "3.4"]
+        owns: [yield curve, discount factor, zero rate, forward rate, par yield, curve bootstrapping, day count convention]
+        deps: [core, deriv]
+        status: planned
+      - id: "11.2"
+        slug: duration-convexity-pca
+        title: Duration, Convexity & Curve PCA
+        short: Duration & PCA
+        goal: DV01, duration, convexity and key-rate risk — and the three PCA factors (level, slope, curvature) that drive almost every curve.
+        prereqs: ["11.1", "3.3"]
+        owns: [duration, modified duration, DV01, convexity, key rate duration, level-slope-curvature factors]
+        deps: [core]
+        status: planned
+      - id: "11.3"
+        slug: short-rate-swaps
+        title: Short-Rate Models & Swaps
+        short: Rates Models
+        goal: Interest-rate swaps and SOFR, Vasicek, CIR and Hull-White short-rate models, and what a swaption is.
+        prereqs: ["11.2", "10.2"]
+        owns: [interest rate swap, swap rate, SOFR, short-rate model, Vasicek model, CIR model, Hull-White model, swaption]
+        deps: [core, deriv]
+        status: planned
+      - id: "11.4"
+        slug: credit
+        title: "Credit: Spreads, CDS & Merton"
+        short: Credit
+        goal: Credit spreads, default intensities and recovery, credit default swaps, and the Merton structural model of default.
+        prereqs: ["11.1", "10.3"]
+        owns: [credit spread, probability of default, hazard rate, recovery rate, credit default swap, Merton model, distance to default]
+        deps: [core]
+        status: planned
+      - id: "11.5"
+        slug: fx-macro-regimes
+        title: FX & Macro Regimes
+        short: FX & Macro
+        goal: Uncovered interest parity and the forward-premium puzzle, nowcasting with point-in-time macro data, and growth-inflation regimes across assets.
+        prereqs: ["2.5", "5.7", "8.4"]
+        owns: [uncovered interest parity, forward premium puzzle, nowcasting, macro regime, growth-inflation quadrant]
+        deps: [core]
+        status: planned
+
+  - id: 12
+    slug: machine-learning
+    name: Machine Learning for Trading
+    level: Advanced
+    tracks: [QR, QD]
+    thread: "In markets, machine learning is a low signal-to-noise game where validation — not model capacity — decides who wins."
+    sessions:
+      - id: "12.1"
+        slug: why-finance-ml-is-different
+        title: Why Finance ML Is Different
+        short: Why It's Different
+        goal: Non-IID samples, concept drift, adversarial markets and tiny signal-to-noise — why ML habits from vision and NLP backfire here.
+        prereqs: ["6.6", "1.4"]
+        owns: [IID assumption, concept drift, adversarial environment, target leakage]
+        deps: [core]
+        status: planned
+      - id: "12.2"
+        slug: labeling
+        title: "Labeling: Triple Barrier & Meta-Labeling"
+        short: Labeling
+        goal: Fixed-horizon labels and their flaws, the triple-barrier method, and meta-labeling to size bets from a primary model.
+        prereqs: ["12.1"]
+        owns: [fixed-horizon label, triple-barrier method, profit-taking barrier, stop-loss barrier, vertical barrier, meta-labeling]
+        deps: [core, ml]
+        status: planned
+      - id: "12.3"
+        slug: features-sample-weights
+        title: Features & Sample Weights
+        short: Features & Weights
+        goal: Stationary features that keep memory (fractional differentiation), sample uniqueness, the sequential bootstrap and time-decay weights.
+        prereqs: ["12.2", "5.4"]
+        owns: [fractional differentiation, sample uniqueness, sequential bootstrap, time-decay weighting, feature stationarity]
+        deps: [core, ml]
+        status: planned
+      - id: "12.4"
+        slug: gbm-cross-sectional-alpha
+        title: Gradient Boosting for Cross-Sectional Alpha
+        short: Gradient Boosting
+        goal: Predict cross-sectional returns with LightGBM on point-in-time features, validated with purged CV and scored on IC after costs.
+        prereqs: ["12.3", "8.7", "6.7"]
+        owns: [gradient boosting, LightGBM, cross-sectional return prediction, early stopping, hyperparameter search]
+        deps: [core, ml, portfolio]
+        status: planned
+      - id: "12.5"
+        slug: feature-importance
+        title: Feature Importance & Interpretability
+        short: Feature Importance
+        goal: MDI, MDA, single-feature importance and SHAP — and clustered importance to survive correlated features.
+        prereqs: ["12.4"]
+        owns: [mean decrease impurity, mean decrease accuracy, single feature importance, SHAP values, clustered feature importance, substitution effect]
+        deps: [core, ml]
+        status: planned
+      - id: "12.6"
+        slug: deep-learning-rl-complexity
+        title: Deep Learning, RL & the Complexity Debate
+        short: DL, RL & Complexity
+        goal: Sequence models, reinforcement learning and the "virtue of complexity" debate — where deep models help, and where they are hype.
+        prereqs: ["12.4"]
+        owns: [recurrent neural network, transformer model, reinforcement learning, virtue of complexity, double descent, random features]
+        deps: [core, ml]
+        status: planned
+
+  - id: 13
+    slug: nlp-llms-alt-data
+    name: NLP, LLMs & Alternative Data
+    level: Advanced
+    tracks: [QR, QD]
+    thread: "Text and alternative data are new sources of information — and new ways to leak the future into your backtest."
+    sessions:
+      - id: "13.1"
+        slug: alternative-data
+        title: Alternative Data
+        short: Alt Data
+        goal: A taxonomy of alternative data, how to evaluate a dataset before buying it, and the legal lines (MNPI, scraping, privacy) you must not cross.
+        prereqs: ["4.2", "6.7"]
+        owns: [alternative data, data exhaust, material non-public information, data due diligence, dataset coverage]
+        deps: [core]
+        status: planned
+      - id: "13.2"
+        slug: text-as-data
+        title: Text as Data
+        short: Text as Data
+        goal: From dictionaries (Loughran-McDonald) to TF-IDF to embeddings — turning filings, calls and news into point-in-time features.
+        prereqs: ["13.1"]
+        owns: [tokenisation, bag of words, Loughran-McDonald dictionary, TF-IDF, text embedding, sentiment score]
+        deps: [core, ml]
+        status: planned
+      - id: "13.3"
+        slug: llms-return-prediction
+        title: LLMs for Return Prediction — and the Look-Ahead Trap
+        short: LLMs & Look-Ahead
+        goal: What the evidence says about LLM signals, and how training-data leakage fakes their performance — with a lab that tests only after the model's cutoff.
+        prereqs: ["13.2"]
+        owns: [large language model, knowledge cutoff, LLM look-ahead bias, entity masking, point-in-time language model]
+        deps: [core, ml]
+        status: planned
+      - id: "13.4"
+        slug: llm-research-agents
+        title: LLM Agents as Research Assistants
+        short: Research Agents
+        goal: Using LLM agents to speed up research without letting them inflate your trial count — guardrails, logging and mandatory deflation.
+        prereqs: ["13.3", "6.8"]
+        owns: [LLM agent, tool use, trial inflation, research guardrail]
+        deps: [core]
+        status: planned
+
+  - id: 14
+    slug: microstructure-execution
+    name: Microstructure, Execution & Market Making
+    level: Advanced
+    tracks: [QT, QD]
+    thread: "Every trade has a counterparty who may know more than you — the order book is where you pay for that."
+    sessions:
+      - id: "14.1"
+        slug: limit-order-book
+        title: The Limit Order Book
+        short: Order Book
+        goal: Price-time priority, queues, tick size, maker-taker fees and auctions — how a modern electronic order book actually matches trades.
+        prereqs: ["2.1", "6.5"]
+        owns: [limit order book, price-time priority, queue position, tick size, maker-taker fee, opening auction, closing auction, market depth]
+        deps: [core]
+        status: planned
+      - id: "14.2"
+        slug: microstructure-models
+        title: Microstructure Models
+        short: Micro Models
+        goal: The Roll, Kyle and Glosten-Milgrom models — spreads as the price of adverse selection, and how informed traders move prices.
+        prereqs: ["14.1", "3.1"]
+        owns: [Roll model, Kyle model, Kyle's lambda, Glosten-Milgrom model, adverse selection, informed trader, effective spread]
+        deps: [core]
+        status: planned
+      - id: "14.3"
+        slug: market-impact
+        title: Market Impact & the Square-Root Law
+        short: Market Impact
+        goal: Temporary vs permanent impact, the square-root law and its evidence, and measuring impact from your own fills.
+        prereqs: ["14.2"]
+        owns: [temporary impact, permanent impact, square-root law, participation rate]
+        deps: [core]
+        status: planned
+      - id: "14.4"
+        slug: optimal-execution-tca
+        title: Optimal Execution & TCA
+        short: Execution & TCA
+        goal: TWAP, VWAP and implementation shortfall; the Almgren-Chriss trade-off; and transaction cost analysis against the arrival price.
+        prereqs: ["14.3", "3.4"]
+        owns: [TWAP, VWAP, implementation shortfall, arrival price, Almgren-Chriss model, transaction cost analysis, execution algorithm]
+        deps: [core]
+        status: planned
+      - id: "14.5"
+        slug: market-making
+        title: Market Making
+        short: Market Making
+        goal: Inventory risk and adverse selection, the Avellaneda-Stoikov model, and a queue-aware market-making backtest in hftbacktest.
+        prereqs: ["14.2", "14.4"]
+        owns: [inventory risk, Avellaneda-Stoikov model, reservation price, optimal quote spread, fill probability]
+        deps: [core, hft]
+        status: planned
+      - id: "14.6"
+        slug: latency-performance
+        title: Latency & Performance Engineering
+        short: Latency & Perf
+        goal: Profiling Python, numba and Rust/C++ hot paths, tick-to-trade latency — and an honest map of what speed buys a non-HFT trader.
+        prereqs: ["14.1"]
+        owns: [latency, tick-to-trade latency, colocation, profiling, hot path, kernel bypass, latency arbitrage]
+        deps: [core, hft]
+        status: planned
+
+  - id: 15
+    slug: production-systems
+    name: Production Trading Systems
+    level: Advanced
+    tracks: [QT, QD, IND]
+    thread: "A live trading system is a distributed system that loses money when it is wrong — build it like one."
+    sessions:
+      - id: "15.1"
+        slug: live-system-architecture
+        title: Architecture of a Live Trading System
+        short: Live Architecture
+        goal: Feed, strategy, portfolio, OMS, EMS and broker — the components, their contracts, and the state machine at the heart of an order.
+        prereqs: ["6.3", "2.1"]
+        owns: [order management system, execution management system, market data feed, strategy engine, order state machine, position keeping]
+        deps: [core]
+        status: planned
+      - id: "15.2"
+        slug: backtest-to-live-nautilus
+        title: Backtest-to-Live with NautilusTrader
+        short: NautilusTrader
+        goal: One strategy class that runs in a backtest, on a simulated exchange and against a paper account — with NautilusTrader.
+        prereqs: ["15.1"]
+        owns: [NautilusTrader, venue adapter, simulated exchange]
+        deps: [core, live]
+        status: planned
+      - id: "15.3"
+        slug: broker-apis-fix
+        title: Broker APIs & FIX
+        short: Brokers & FIX
+        goal: alpaca-py and ib_async against paper accounts, the FIX protocol's core messages, rate limits and idempotent order submission.
+        prereqs: ["15.1"]
+        owns: [broker API, FIX protocol, NewOrderSingle, ExecutionReport, rate limit, idempotency key]
+        deps: [core, live]
+        status: planned
+      - id: "15.4"
+        slug: pretrade-risk-kill-switch
+        title: Pre-Trade Risk & Kill Switches
+        short: Risk Controls
+        goal: Fat-finger checks, price collars, position and loss limits, and the kill switch — with Knight Capital as the case study.
+        prereqs: ["15.1"]
+        owns: [pre-trade risk check, fat-finger check, price collar, position limit, loss limit, kill switch, Market Access Rule]
+        deps: [core]
+        status: planned
+      - id: "15.5"
+        slug: operations-mlops
+        title: Operations & MLOps
+        short: Ops & MLOps
+        goal: Reconciliation, monitoring, alerting, runbooks and restarts — plus model registries, retraining and drift detection for live models.
+        prereqs: ["15.4", "9.9"]
+        owns: [reconciliation, monitoring, alerting, runbook, idempotent restart, model registry, drift detection]
+        deps: [core]
+        status: planned
+      - id: "15.6"
+        slug: market-conduct-compliance
+        title: Market Conduct & Compliance
+        short: Conduct & Compliance
+        goal: Insider trading and MNPI, spoofing and layering, wash trading, front-running and best execution — the rules under SEC/FINRA and MiFID II/MAR.
+        prereqs: ["13.1", "14.1"]
+        owns: [insider trading, spoofing, layering, wash trading, front-running, best execution, market abuse regulation]
+        deps: [core]
+        status: planned
+      - id: "15.7"
+        slug: lab-paper-trading-bot
+        title: "Lab: Deploy a Paper-Trading Bot"
+        short: "Lab: Paper Bot"
+        goal: Deploy an end-to-end paper-trading system — scheduled, monitored, reconciled and protected by a kill switch.
+        prereqs: ["15.2", "15.3", "15.4", "15.5"]
+        owns: [deployment, heartbeat, job scheduler, paper account]
+        deps: [core, live]
+        status: planned
+
+  - id: 16
+    slug: career-professional
+    name: Career, Interviews & Your Own Book
+    level: Advanced
+    tracks: [QR, QT, QD, IND]
+    thread: "Skill compounds when it is visible — build the evidence, rehearse the interviews, respect the odds."
+    sessions:
+      - id: "16.1"
+        slug: careers-job-market
+        title: Career Paths & the Quant Job Market
+        short: Careers
+        goal: Roles, firms, pay structures and hiring pipelines in 2026 — and the portfolio of evidence that gets an engineer hired.
+        prereqs: ["1.1"]
+        owns: [recruiting pipeline, research portfolio, non-compete agreement, garden leave, IP assignment]
+        deps: [core]
+        status: planned
+      - id: "16.2"
+        slug: interview-drills
+        title: "Interview Drills: Probability, Mental Math & Market-Making Games"
+        short: Interview Drills
+        goal: The probability, expected-value, mental-math and market-making-game rounds — with drills and the reasoning interviewers want to hear.
+        prereqs: ["3.1", "14.2"]
+        owns: [brainteaser, mental math, market-making game, Figgie]
+        deps: [core]
+        status: planned
+      - id: "16.3"
+        slug: technical-research-interviews
+        title: Stats, ML, Coding & Research-Case Interviews
+        short: Technical Interviews
+        goal: The statistics, ML and coding rounds, trading-system design, and the multi-hour research case — and how to write the report.
+        prereqs: ["16.2", "12.4"]
+        owns: [research case study, take-home assignment, trading system design interview]
+        deps: [core]
+        status: planned
+      - id: "16.4"
+        slug: running-your-own-capital
+        title: Running Your Own Capital
+        short: Your Own Capital
+        goal: Capital, costs, brokers, taxes and rules by jurisdiction, psychology and discipline, and how to build a verifiable track record.
+        prereqs: ["9.5", "15.7"]
+        owns: [track record, trading journal, pattern day trader rule, wash sale rule, tax lot]
+        deps: [core]
+        status: planned
+      - id: "16.5"
+        slug: capstone
+        title: "Capstone: Brief & Rubric"
+        short: Capstone
+        goal: The capstone — research, validate, size, paper-trade and report one strategy end to end — with the rubric professionals would use.
+        prereqs: ["16.4"]
+        owns: [capstone project, research report, grading rubric]
+        deps: [core]
+        status: planned

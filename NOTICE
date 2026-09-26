@@ -1,0 +1,35 @@
+Quant Notebook
+Copyright (c) 2026 Georges Verouchis
+
+This project includes or builds on the following work.
+
+Design
+------
+The "notebook" visual design system — site/assets/brand.css (above its "Quant Notebook
+extensions" block), the page templates in tools/templates/, and the forked tools
+tools/scaffold.py and tools/check_session.py — comes from the course-notebook-design skill
+by Georges Verouchis, released here under the MIT licence.
+
+Fonts (site/assets/fonts/)
+--------------------------
+- Space Grotesk — Copyright 2020 The Space Grotesk Project Authors. SIL Open Font License 1.1.
+  See site/assets/fonts/LICENSE-SpaceGrotesk-OFL.txt. Files via Fontsource (@fontsource/space-grotesk).
+- IBM Plex Sans and IBM Plex Mono — Copyright IBM Corp. SIL Open Font License 1.1.
+  See site/assets/fonts/LICENSE-IBMPlex-OFL.txt. Files via Fontsource (@fontsource/ibm-plex-*).
+- Latin Modern Math — GUST e-foundry. GUST Font License.
+  See site/assets/fonts/LICENSE-LatinModernMath-GUST.txt.
+- Temml.woff2 — from Temml by Ron Kok, MIT licence (a clone of KaTeX_Script-Regular).
+  See site/assets/fonts/LICENSE-Temml-MIT.txt.
+
+Software
+--------
+- site/assets/temml.css is derived from Temml's Temml-Latin-Modern.css (MIT licence,
+  https://github.com/ronkok/Temml). Math is rendered to MathML at build time with Temml.
+- Build and lab dependencies are listed in pyproject.toml and package.json and are used under
+  their own licences; none of their code is vendored in this repository beyond the files above.
+
+Data
+----
+No third-party market data is committed to this repository. Labs generate seeded synthetic data
+or download public data at runtime into a local, git-ignored cache; each source's terms apply to
+what you download. See data/SOURCES.md.

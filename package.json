@@ -1,0 +1,22 @@
+{
+  "name": "quant-notebook-tools",
+  "private": true,
+  "description": "Build tooling for Quant Notebook: TeX to MathML (Temml), screenshots (playwright-core + system Edge), HTML validation.",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "math": "node tools/render_math.mjs site",
+    "math:check": "node tools/render_math.mjs --check site",
+    "shoot": "node tools/shoot.mjs",
+    "validate": "html-validate \"site/**/*.html\"",
+    "test": "node --test \"tools/tests/*.test.mjs\""
+  },
+  "devDependencies": {
+    "@fontsource/ibm-plex-mono": "5.3.0",
+    "@fontsource/ibm-plex-sans": "5.3.0",
+    "@fontsource/space-grotesk": "5.3.0",
+    "html-validate": "11.16.0",
+    "playwright-core": "1.63.0",
+    "temml": "0.13.5"
+  }
+}

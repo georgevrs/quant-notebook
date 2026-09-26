@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- nav:head -->
+<title>Start Here · Quant Notebook</title>
+<meta name="description" content="How to use Quant Notebook: who it is for, the tracks, the lab setup, how sessions work, and the disclaimer.">
+<link rel="canonical" href="https://georgevrs.github.io/quant-notebook/start-here.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Quant Notebook">
+<meta property="og:title" content="Start Here · Quant Notebook">
+<meta property="og:description" content="How to use Quant Notebook: who it is for, the tracks, the lab setup, how sessions work, and the disclaimer.">
+<meta property="og:url" content="https://georgevrs.github.io/quant-notebook/start-here.html">
+<meta name="twitter:card" content="summary">
+<link rel="stylesheet" href="assets/brand.css">
+<link rel="stylesheet" href="assets/temml.css">
+<!-- /nav:head -->
+</head>
+<body><div class="page" id="top">
+<!-- nav:hubtabs -->
+<nav class="tabs">
+<a href="index.html">⌂ Course home</a>
+<a class="active" href="start-here.html">🧭 Start here</a>
+<a href="roadmap.html">🗺 Roadmap</a>
+<a href="glossary.html">📖 Glossary</a>
+</nav>
+<!-- /nav:hubtabs -->
+
+<header class="cover">
+<p class="eyebrow">Quant Notebook · Start Here</p>
+<h1>Start Here</h1>
+<p class="subtitle">Fifteen minutes to get oriented: who this course is for, how long it takes, how to run the labs, how to read the pages — and the disclaimer. The one habit to bring to every session: <mark>run the lab, don't just read about it</mark>.</p>
+<div class="toc">
+<b>On this page</b>
+<ol>
+<li><a href="#who">Who this is for</a></li>
+<li><a href="#pace">How long it takes</a></li>
+<li><a href="#setup">Set up the labs</a></li>
+<li><a href="#read">How to read a page</a></li>
+<li><a href="#help">Errata &amp; contributing</a></li>
+<li><a href="#disclaimer">Disclaimer</a></li>
+</ol>
+</div>
+</header>
+
+<main>
+
+<section id="who">
+<h2><span class="no">1</span> Who this is for</h2>
+<p class="lede">Engineers who can already build things — and want to build them in markets.</p>
+<p>The course assumes you are comfortable with <strong>Python</strong>, <strong>SQL</strong>, version control, basic statistics and the ideas behind machine learning. It assumes <em>nothing</em> about finance: every instrument, every convention and every piece of jargon is introduced from zero. The math is taught intuition-first; if you once passed a calculus and a linear-algebra course, you have enough to start.</p>
+<table>
+<thead><tr><th>You bring</th><th>The course adds</th><th>Where</th></tr></thead>
+<tbody>
+<tr><td>Software engineering, testing, CI</td><td>Backtests designed so they cannot lie; live systems with kill switches</td><td>Units 6, 15</td></tr>
+<tr><td>Data engineering</td><td>Point-in-time data, corporate actions, survivorship, market data at tick level</td><td>Unit 4</td></tr>
+<tr><td>ML / AI</td><td>Finance-specific validation, labeling and leakage; where ML genuinely helps</td><td>Units 12, 13</td></tr>
+<tr><td>Statistics basics</td><td>Fat tails, volatility, inference under multiple testing, the math of overfitting</td><td>Units 3, 5, 6</td></tr>
+<tr><td>—</td><td>Markets, instruments, derivatives, portfolio construction, risk, execution, careers</td><td>Units 1–2, 7–11, 14, 16</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="pace">
+<h2><span class="no">2</span> How long it takes</h2>
+<p class="lede">About three hundred hours, end to end — one hundred sessions of roughly an hour and a half, plus the labs and homework.</p>
+<table>
+<thead><tr><th>Pace</th><th>Hours / week</th><th>Spine only (U1–U6, U9)</th><th>Whole course</th></tr></thead>
+<tbody>
+<tr><td>Evenings &amp; weekends</td><td>~8</td><td>~4 months</td><td>~9 months</td></tr>
+<tr><td>Serious part-time</td><td>~15</td><td>~2 months</td><td>~5 months</td></tr>
+<tr><td>Full-time sprint</td><td>~35</td><td>~3 weeks</td><td>~2 months</td></tr>
+</tbody>
+</table>
+<div class="co tip"><span class="co-t">💡 Tip — pick a track, but finish the spine</span>
+<p>The spine (Units 1–6 and 9) is what every quant role shares. The <a href="index.html#tracks">track matrix</a> on the home page shows which of the remaining units matter most for researchers, traders, quant developers and independent traders.</p>
+</div>
+</section>
+
+<section id="setup">
+<h2><span class="no">3</span> Set up the labs</h2>
+<p class="lede">Two ways to run a lab: one click in Colab, or locally in a reproducible environment. Session 1.5 walks through the local setup in depth.</p>
+<ol class="steps">
+<li><h3>Fastest: open in Colab</h3><p>Every session page has a <strong>📓 Companion lab</strong> strip under its title. <em>Open in Colab</em> runs the notebook in your browser; its first cell installs the course package.</p></li>
+<li><h3>Local: clone and sync</h3><p>Install <a href="https://docs.astral.sh/uv/">uv</a>, then clone the repository and create the environment — uv reads the lockfile, so you get exactly the versions the labs were tested with.</p></li>
+<li><h3>Run a lab</h3><p>Open any <code>labs/uNN/sSS_*.ipynb</code> in Jupyter or VS Code, or run its <code>.py</code> twin from the terminal. Labs are seeded: you get the same numbers the page quotes.</p></li>
+</ol>
+<pre><span class="p">$</span> git clone https://github.com/georgevrs/quant-notebook
+<span class="p">$</span> cd quant-notebook
+<span class="p">$</span> uv sync                      <span class="c"># core labs; add --all-extras for derivatives, ML, live trading</span>
+<span class="p">$</span> uv run python labs/u02/s03_returns_pnl_leverage.py</pre>
+<div class="co note"><span class="co-t">🧭 Margin note — why synthetic data by default</span>
+<p>Most financial data cannot legally be redistributed, and free sources change or disappear. So labs default to <strong>seeded synthetic data</strong> generated to have the properties of real markets (fat tails, volatility clustering, factor structure). It has a second, bigger advantage: with synthetic data you <em>know the truth</em>, so you can test whether a method finds a real signal — and whether it "finds" one that isn't there. Labs that need real data fetch it from free sources into a local cache.</p>
+</div>
+</section>
+
+<section id="read">
+<h2><span class="no">4</span> How to read a page</h2>
+<p class="lede">Colour means the same thing everywhere — in callouts, diagrams, badges and charts — so you learn to read it once.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 200" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <rect x="20" y="14" width="680" height="170" rx="12" fill="#fff" stroke="#1F2C38" stroke-width="1.5"/>
+  <text x="40" y="38" font-size="12" fill="#4A5A68" font-family="IBM Plex Mono,monospace">THE COLOUR LANGUAGE OF THE NOTEBOOK</text>
+  <rect x="45" y="54" width="140" height="100" rx="8" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="115" y="84" font-size="14" font-weight="600" text-anchor="middle" fill="#3A56C5">ULTRAMARINE</text>
+  <text x="115" y="106" font-size="11" text-anchor="middle" fill="#4A5A68">concepts, doing,</text>
+  <text x="115" y="122" font-size="11" text-anchor="middle" fill="#4A5A68">your strategy</text>
+  <rect x="210" y="54" width="140" height="100" rx="8" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="280" y="84" font-size="14" font-weight="600" text-anchor="middle" fill="#1F7A55">PINE</text>
+  <text x="280" y="106" font-size="11" text-anchor="middle" fill="#4A5A68">success, the right way,</text>
+  <text x="280" y="122" font-size="11" text-anchor="middle" fill="#4A5A68">out-of-sample</text>
+  <rect x="375" y="54" width="140" height="100" rx="8" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="445" y="84" font-size="14" font-weight="600" text-anchor="middle" fill="#8A6D00">STICKY</text>
+  <text x="445" y="106" font-size="11" text-anchor="middle" fill="#4A5A68">checking, waiting,</text>
+  <text x="445" y="122" font-size="11" text-anchor="middle" fill="#4A5A68">hands-on labs</text>
+  <rect x="540" y="54" width="140" height="100" rx="8" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="610" y="84" font-size="14" font-weight="600" text-anchor="middle" fill="#D64B2A">CORAL</text>
+  <text x="610" y="106" font-size="11" text-anchor="middle" fill="#4A5A68">danger, losses,</text>
+  <text x="610" y="122" font-size="11" text-anchor="middle" fill="#4A5A68">the naive way</text>
+  <text x="360" y="174" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">If something is coral, something can go wrong. If it is pine, it is the version you want.</text>
+</svg>
+<figcaption>fig 0.3 — four colours, one meaning each, used the same way on every page</figcaption>
+</figure>
+
+<table>
+<thead><tr><th>Callout</th><th>What it holds</th></tr></thead>
+<tbody>
+<tr><td>📌 <strong>Key idea</strong></td><td>The takeaway of a section — if you remember one thing, remember this.</td></tr>
+<tr><td>💡 <strong>Tip / Looking ahead</strong></td><td>A shortcut, or where this idea returns later in the course.</td></tr>
+<tr><td>⚠️ <strong>Pitfall</strong></td><td>The common mistake — usually the one that costs money.</td></tr>
+<tr><td>🔧 <strong>Try it / Homework / Lab</strong></td><td>Hands-on work with a time estimate and a checkable result.</td></tr>
+<tr><td>🧭 <strong>Margin note</strong></td><td>A clarifying aside or a rule of thumb.</td></tr>
+</tbody>
+</table>
+<p>Formulas are real MathML rendered by your browser — no JavaScript, and they work offline. Numbers in the text that come from a lab are generated from the lab's output, so they always match what you get when you run it. Diagrams are drawn by hand; charts are drawn from lab data.</p>
+</section>
+
+<section id="help">
+<h2><span class="no">5</span> Errata &amp; contributing</h2>
+<p class="lede">Finance moves and mistakes happen. If something is wrong, out of date or unclear, say so.</p>
+<ul>
+<li><a href="https://github.com/georgevrs/quant-notebook/issues/new?template=errata.yml">Report an erratum</a> — session, section, what is wrong, what it should say.</li>
+<li><a href="https://github.com/georgevrs/quant-notebook">The repository</a> — every page, lab and tool is open source. Read <code>CONTRIBUTING.md</code> before a pull request.</li>
+<li>Licences: text and diagrams <strong>CC BY 4.0</strong>; code (labs, <code>quantnb</code>, tools, and code blocks in pages) <strong>MIT</strong>. Reuse it, teach with it, credit it.</li>
+</ul>
+</section>
+
+<section id="disclaimer">
+<h2><span class="no">6</span> Disclaimer</h2>
+<p class="lede">Read this once, and take it seriously.</p>
+<div class="co warn"><span class="co-t">⚠️ Not investment advice</span>
+<p>Quant Notebook is <strong>educational material only</strong>. Nothing in it is investment, financial, legal, tax or accounting advice, or a recommendation to buy, sell or hold any instrument or to follow any strategy. The authors are not registered investment advisers, broker-dealers or financial planners.</p>
+<p>Backtests, simulations and examples are <strong>hypothetical</strong>: they are built with hindsight, ignore or approximate real-world frictions, and do not represent actual trading. Past performance — real or simulated — does not predict future results. Trading and investing involve substantial risk, including the loss of more than your initial capital when leverage or derivatives are used.</p>
+<p>Laws, tax rules and market regulations differ by jurisdiction and change over time; any regulatory detail in the course is a dated example, not guidance for your situation. You are solely responsible for your own decisions; consult a qualified professional before acting. The material is provided "as is", without warranty of any kind.</p>
+</div>
+</section>
+
+<!-- nav:hubfoot -->
+<div class="foot">
+<a href="#top">↑ Back to top</a>
+<span class="soon" title="Coming soon">Start: Session 1.1 — What Quants Actually Do →</span>
+</div>
+<p class="legal">Educational material only — not investment, legal or tax advice. Backtests and simulations are hypothetical. <a href="start-here.html#disclaimer">Disclaimer</a> · Text CC BY 4.0 · Code MIT.</p>
+<!-- /nav:hubfoot -->
+</main>
+</div></body></html>

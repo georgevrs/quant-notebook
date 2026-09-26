@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- nav:head -->
+<title>Roadmap · Quant Notebook</title>
+<meta name="description" content="All 100 sessions of Quant Notebook — five phases, sixteen units — with goals, prerequisites and publication status.">
+<link rel="canonical" href="https://georgevrs.github.io/quant-notebook/roadmap.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Quant Notebook">
+<meta property="og:title" content="Roadmap · Quant Notebook">
+<meta property="og:description" content="All 100 sessions of Quant Notebook — five phases, sixteen units — with goals, prerequisites and publication status.">
+<meta property="og:url" content="https://georgevrs.github.io/quant-notebook/roadmap.html">
+<meta name="twitter:card" content="summary">
+<link rel="stylesheet" href="assets/brand.css">
+<link rel="stylesheet" href="assets/temml.css">
+<!-- /nav:head -->
+</head>
+<body><div class="page" id="top">
+<!-- Roadmap: the body is generated from course.yaml by tools/sync_nav.py. -->
+<!-- nav:hubtabs -->
+<nav class="tabs">
+<a href="index.html">⌂ Course home</a>
+<a href="start-here.html">🧭 Start here</a>
+<a class="active" href="roadmap.html">🗺 Roadmap</a>
+<a href="glossary.html">📖 Glossary</a>
+</nav>
+<!-- /nav:hubtabs -->
+
+<header class="cover">
+<p class="eyebrow">Quant Notebook · Roadmap</p>
+<h1>The Roadmap</h1>
+<p class="subtitle">All one hundred sessions on one page — what each gives you, what it builds on, and whether it is published yet. Use it to plan a route through the course: <mark>never skip a session another one builds on</mark>.</p>
+<div class="co note"><span class="co-t">🧭 Margin note — reading the table</span>
+<p>"Builds on" lists the sessions a session assumes you know. If you arrive at a session from a search engine, work backwards through that column until everything is familiar, then read forward.</p>
+</div>
+</header>
+
+<main>
+<!-- nav:roadmap -->
+<section id="phase1">
+<h2><span class="no">Phase 1</span> Foundations</h2>
+<p class="lede">Milestone: <strong>Your own research data lake</strong>.</p>
+<h3 id="u1">Unit 1 · The Quant Landscape</h3>
+<p>Quant finance is engineering for decisions under uncertainty with money on the line — and the job is mostly not fooling yourself.</p>
+<table>
+<thead><tr><th>Session</th><th>What you walk away with</th><th>Builds on</th><th>Status</th></tr></thead>
+<tbody>
+<tr><td><span class="soon" title="Coming soon">1.1 · What Quants Actually Do</span></td><td>Map the roles, the firms and how each one actually makes money — so you know which game you are training for.</td><td>—</td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">1.2 · Where Returns Come From</span></td><td>The five honest sources of edge — risk premia, behavioural anomalies, liquidity provision, information and speed — and why most apparent edges are none of them.</td><td><span class="soon" title="Coming soon">1.1</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">1.3 · The Quant Research Lifecycle</span></td><td>The master workflow of the whole course — hypothesis to data to signal to validation to sizing to paper to live to decay — and the gates between the stages.</td><td><span class="soon" title="Coming soon">1.2</span></td><td><span class="badge doing">🟡 in progress</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">1.4 · The Engineer&#x27;s Edge, Blind Spots &amp; Honest Odds</span></td><td>What transfers from software and ML, what breaks in markets, and the evidence on who actually makes money.</td><td><span class="soon" title="Coming soon">1.3</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">1.5 · Set Up Your Quant Lab</span></td><td>A reproducible workbench — uv, Python 3.12, Jupyter, DuckDB, the quantnb package, a research repo layout and a data cache.</td><td><span class="soon" title="Coming soon">1.3</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+</tbody>
+</table>
+<h3 id="u2">Unit 2 · Markets &amp; Instruments</h3>
+<p>Every instrument is a contract with a cash-flow profile — learn the plumbing and the P&amp;L arithmetic before you model anything.</p>
+<table>
+<thead><tr><th>Session</th><th>What you walk away with</th><th>Builds on</th><th>Status</th></tr></thead>
+<tbody>
+<tr><td><span class="soon" title="Coming soon">2.1 · Market Anatomy &amp; the Life of an Order</span></td><td>Follow one order from your code through broker, venue, clearing house and custodian — and see where every fee and risk sits.</td><td><span class="soon" title="Coming soon">1.1</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">2.2 · Equities, Indices &amp; ETFs</span></td><td>Shares, dividends, splits, index construction, ETF creation/redemption, and the mechanics and costs of shorting.</td><td><span class="soon" title="Coming soon">2.1</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">2.3 · Returns, P&amp;L, Compounding &amp; Leverage</span></td><td>The arithmetic every later session relies on — simple vs log returns, compounding, annualisation, volatility drag, Sharpe, drawdown and leverage.</td><td><span class="soon" title="Coming soon">2.2</span></td><td><span class="badge doing">🟡 in progress</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">2.4 · Futures: Carry, Basis, Roll &amp; Margin</span></td><td>How futures are priced from cost of carry, why curves slope, what roll yield really is, and how margin creates leverage and liquidation risk.</td><td><span class="soon" title="Coming soon">2.3</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">2.5 · FX &amp; Commodities</span></td><td>Currency quoting, forwards and covered interest parity; commodity term structures, storage and convenience yield.</td><td><span class="soon" title="Coming soon">2.4</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">2.6 · Crypto Market Structure</span></td><td>Centralised vs decentralised venues, AMMs, perpetual futures and funding, basis trades, and the custody and counterparty risks that traditional markets hide from you.</td><td><span class="soon" title="Coming soon">2.4</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">2.7 · Options Primer</span></td><td>Calls, puts, payoffs, put-call parity, intrinsic vs time value, and a first look at implied volatility — enough to read any options discussion.</td><td><span class="soon" title="Coming soon">2.3</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+</tbody>
+</table>
+<h3 id="u3">Unit 3 · The Quant Math Toolkit</h3>
+<p>The math is a toolkit, not a hurdle — every tool here earns its place by answering a trading question.</p>
+<table>
+<thead><tr><th>Session</th><th>What you walk away with</th><th>Builds on</th><th>Status</th></tr></thead>
+<tbody>
+<tr><td><span class="soon" title="Coming soon">3.1 · Probability &amp; Expected Value</span></td><td>Random variables, expectation, variance, conditioning and Bayes — the language of every bet and every interview question.</td><td><span class="soon" title="Coming soon">2.3</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">3.2 · Distributions &amp; Fat Tails</span></td><td>Normal, lognormal and Student-t; skewness, kurtosis and tail indices — and why the normal distribution will eventually lie to you.</td><td><span class="soon" title="Coming soon">3.1</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">3.3 · Linear Algebra for Portfolios</span></td><td>Weights as vectors, risk as a quadratic form, PCA as the hidden structure of a market — linear algebra through the portfolio lens.</td><td><span class="soon" title="Coming soon">3.1</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">3.4 · Convex Optimization</span></td><td>Objectives, constraints, convexity, quadratic programs and Lagrange multipliers — and how to state a portfolio problem so cvxpy can solve it.</td><td><span class="soon" title="Coming soon">3.3</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">3.5 · Simulation &amp; Monte Carlo</span></td><td>Simulate prices, strategies and uncertainty with seeded Monte Carlo — random walks, GBM, bootstraps and variance reduction.</td><td><span class="soon" title="Coming soon">3.2</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">3.6 · Bet Sizing, Kelly &amp; Ruin</span></td><td>Why the size of a bet matters as much as its edge — Kelly growth, the cost of over-betting, fractional Kelly and risk of ruin.</td><td><span class="soon" title="Coming soon">3.5</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+</tbody>
+</table>
+<h3 id="u4">Unit 4 · Financial Data Engineering</h3>
+<p>Your backtest can only be as honest as your data — point-in-time, or it didn&#x27;t happen.</p>
+<table>
+<thead><tr><th>Session</th><th>What you walk away with</th><th>Builds on</th><th>Status</th></tr></thead>
+<tbody>
+<tr><td><span class="soon" title="Coming soon">4.1 · The Data Landscape, Vendors &amp; Licensing</span></td><td>Bars, ticks, quotes, books, fundamentals and macro — who sells what, what it costs, and what the licence lets you do with it.</td><td><span class="soon" title="Coming soon">2.1</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">4.2 · Point-in-Time Data &amp; Data Biases</span></td><td>Look-ahead, survivorship, restatements, vintages and delistings — the data biases that manufacture fake alpha, and how to engineer them out.</td><td><span class="soon" title="Coming soon">4.1</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">4.3 · Corporate Actions, Security Master &amp; Continuous Futures</span></td><td>Adjust prices correctly, keep identifiers straight through ticker changes, and stitch futures into continuous series without inventing returns.</td><td><span class="soon" title="Coming soon">4.2</span>, <span class="soon" title="Coming soon">2.4</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">4.4 · Time, Calendars, As-of Joins &amp; Bars</span></td><td>Timestamps and time zones, exchange calendars, as-of joins that never peek, and information-driven bars (volume, dollar, imbalance).</td><td><span class="soon" title="Coming soon">4.2</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">4.5 · The Research Storage Stack</span></td><td>Parquet, Arrow, DuckDB and polars — a fast, local, columnar research stack — plus when kdb+ and managed warehouses earn their cost.</td><td><span class="soon" title="Coming soon">4.4</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">4.6 · Lab: Build Your Research Data Lake</span></td><td>Build an idempotent, tested, point-in-time data pipeline with quality checks and lineage — the foundation for every later lab.</td><td><span class="soon" title="Coming soon">4.3</span>, <span class="soon" title="Coming soon">4.5</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+</tbody>
+</table>
+</section>
+<section id="phase2">
+<h2><span class="no">Phase 2</span> Research Craft</h2>
+<p class="lede">Milestone: <strong>A strategy report that survives DSR/PBO</strong>.</p>
+<h3 id="u5">Unit 5 · Statistics &amp; Time Series of Returns</h3>
+<p>Returns are noisy, fat-tailed and barely predictable — good statistics tells you exactly how little you know.</p>
+<table>
+<thead><tr><th>Session</th><th>What you walk away with</th><th>Builds on</th><th>Status</th></tr></thead>
+<tbody>
+<tr><td><span class="soon" title="Coming soon">5.1 · Stylized Facts of Returns</span></td><td>The empirical regularities every model must respect — fat tails, volatility clustering, the leverage effect, and near-zero autocorrelation.</td><td><span class="soon" title="Coming soon">3.2</span>, <span class="soon" title="Coming soon">4.6</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">5.2 · Regression &amp; Inference That Doesn&#x27;t Lie</span></td><td>OLS alpha and beta, HAC standard errors, overlapping observations, the standard error of a Sharpe ratio, bootstraps and multiple testing.</td><td><span class="soon" title="Coming soon">5.1</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">5.3 · Bayesian Thinking: Priors, Shrinkage &amp; Updating</span></td><td>Priors, posteriors and shrinkage — the machinery behind Ledoit-Wolf, Black-Litterman and Kalman filters, and the honest answer to &quot;is my Sharpe real?&quot;</td><td><span class="soon" title="Coming soon">5.2</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">5.4 · Stationarity &amp; ARMA Models</span></td><td>Unit roots, ADF and KPSS, AR/MA/ARMA, ACF and PACF — and why returns are close to unpredictable while prices are not stationary.</td><td><span class="soon" title="Coming soon">5.2</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">5.5 · Modeling Volatility</span></td><td>Realized-volatility estimators from OHLC data, EWMA and GARCH forecasts — volatility is the one thing you can forecast well.</td><td><span class="soon" title="Coming soon">5.4</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">5.6 · Cointegration &amp; Mean Reversion</span></td><td>Engle-Granger and Johansen tests, hedge ratios, spreads, the Ornstein-Uhlenbeck process as a continuous AR(1), and half-lives.</td><td><span class="soon" title="Coming soon">5.4</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">5.7 · Kalman Filters &amp; Regime Models</span></td><td>State-space models, the Kalman filter for time-varying hedge ratios, hidden Markov regimes and structural breaks.</td><td><span class="soon" title="Coming soon">5.3</span>, <span class="soon" title="Coming soon">5.6</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+</tbody>
+</table>
+<h3 id="u6">Unit 6 · Backtesting &amp; Research Discipline</h3>
+<p>A backtest is a unit test that can lie — the discipline is designing it so that it can&#x27;t.</p>
+<table>
+<thead><tr><th>Session</th><th>What you walk away with</th><th>Builds on</th><th>Status</th></tr></thead>
+<tbody>
+<tr><td><span class="soon" title="Coming soon">6.1 · What a Backtest Is (and Isn&#x27;t)</span></td><td>A backtest is a historical simulation under assumptions, not a research tool — what it can prove, what it cannot, and why the gap to live trading exists.</td><td><span class="soon" title="Coming soon">1.3</span>, <span class="soon" title="Coming soon">5.2</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">6.2 · Build a Vectorized Backtester</span></td><td>Signals to positions to returns in a few lines of pandas/polars — and the shift discipline that keeps the future out.</td><td><span class="soon" title="Coming soon">6.1</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">6.3 · Build an Event-Driven Backtester</span></td><td>An event loop with orders, fills and portfolio state — slower, but realistic, and the same shape as a live trading system.</td><td><span class="soon" title="Coming soon">6.2</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">6.4 · The Bias Hall of Fame</span></td><td>Live demos of every classic way a backtest lies — look-ahead, survivorship, data snooping, selection, stale and untradable prices.</td><td><span class="soon" title="Coming soon">6.2</span>, <span class="soon" title="Coming soon">4.2</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">6.5 · Transaction Costs &amp; Capacity</span></td><td>Spread, commission, slippage, market impact, borrow and funding — and how costs cap how much capital a strategy can ever run.</td><td><span class="soon" title="Coming soon">6.2</span>, <span class="soon" title="Coming soon">2.1</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">6.6 · Validation: Walk-Forward, Purged K-Fold &amp; CPCV</span></td><td>Walk-forward analysis, purging and embargo, and combinatorial purged cross-validation — train/test splits that respect time.</td><td><span class="soon" title="Coming soon">6.4</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">6.7 · Overfitting Statistics: PSR, DSR, MinTRL &amp; PBO</span></td><td>The probabilistic and deflated Sharpe ratios, minimum track record length, and the probability of backtest overfitting — how to price in the number of things you tried.</td><td><span class="soon" title="Coming soon">6.6</span>, <span class="soon" title="Coming soon">5.2</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">6.8 · Lab: The Research Protocol</span></td><td>Pre-register a hypothesis, log every trial, sweep parameters, score them with PBO and DSR, and write the go/no-go memo.</td><td><span class="soon" title="Coming soon">6.7</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+</tbody>
+</table>
+<h3 id="u7">Unit 7 · Asset Pricing &amp; Factor Investing</h3>
+<p>Factors are the vocabulary of returns — but most of the dictionary is fake.</p>
+<table>
+<thead><tr><th>Session</th><th>What you walk away with</th><th>Builds on</th><th>Status</th></tr></thead>
+<tbody>
+<tr><td><span class="soon" title="Coming soon">7.1 · Efficient Markets &amp; the Limits to Arbitrage</span></td><td>What market efficiency really claims, where it bends, and why mispricings can persist even when smart money sees them.</td><td><span class="soon" title="Coming soon">1.2</span>, <span class="soon" title="Coming soon">5.2</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">7.2 · CAPM, APT &amp; Factor Regressions</span></td><td>From one factor to many — CAPM, APT and time-series factor regressions that separate alpha from exposure.</td><td><span class="soon" title="Coming soon">7.1</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">7.3 · Building Factors: Sorts &amp; Fama-MacBeth</span></td><td>Portfolio sorts, long-short factor construction, Fama-French methodology and Fama-MacBeth cross-sectional regressions — done without look-ahead.</td><td><span class="soon" title="Coming soon">7.2</span>, <span class="soon" title="Coming soon">6.4</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">7.4 · The Factor Zoo &amp; the Replication Debate</span></td><td>Hundreds of published factors, the t &gt; 3 hurdle, post-publication decay, and the two sides of the replication debate — risk vs mispricing.</td><td><span class="soon" title="Coming soon">7.3</span>, <span class="soon" title="Coming soon">6.7</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">7.5 · Causal Factor Investing</span></td><td>Causal graphs, confounders and colliders — why a factor model can be statistically significant and still causally wrong.</td><td><span class="soon" title="Coming soon">7.4</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+</tbody>
+</table>
+<h3 id="u8">Unit 8 · Strategy Families</h3>
+<p>A handful of economically motivated ideas explain most systematic returns — the craft is in the implementation.</p>
+<table>
+<thead><tr><th>Session</th><th>What you walk away with</th><th>Builds on</th><th>Status</th></tr></thead>
+<tbody>
+<tr><td><span class="soon" title="Coming soon">8.1 · Time-Series Momentum &amp; Trend Following</span></td><td>Trend following across futures with volatility-scaled EWMA crossovers — the most robust systematic strategy family, built properly.</td><td><span class="soon" title="Coming soon">6.8</span>, <span class="soon" title="Coming soon">2.4</span>, <span class="soon" title="Coming soon">5.5</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">8.2 · Cross-Sectional Momentum &amp; Reversal</span></td><td>Ranking winners against losers, short-term reversal, and the momentum crashes that make position sizing matter.</td><td><span class="soon" title="Coming soon">7.3</span>, <span class="soon" title="Coming soon">8.1</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">8.3 · Pairs Trading &amp; Statistical Arbitrage</span></td><td>Distance, cointegration and PCA-residual stat arb — entries, exits, hedge ratios and why the edge has shrunk.</td><td><span class="soon" title="Coming soon">5.6</span>, <span class="soon" title="Coming soon">5.7</span>, <span class="soon" title="Coming soon">6.5</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">8.4 · Carry Across Asset Classes</span></td><td>FX carry, futures roll yield, bond carry and roll-down — one unifying definition of carry and its crash risk.</td><td><span class="soon" title="Coming soon">2.4</span>, <span class="soon" title="Coming soon">2.5</span>, <span class="soon" title="Coming soon">8.1</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">8.5 · Value, Quality &amp; Fundamental Quant</span></td><td>Point-in-time fundamentals from EDGAR XBRL, value and quality signals, accruals — and why value has been so painful.</td><td><span class="soon" title="Coming soon">7.3</span>, <span class="soon" title="Coming soon">4.2</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">8.6 · Event-Driven Strategies</span></td><td>Event studies, post-earnings-announcement drift, index rebalances — trading around information with precise timestamps.</td><td><span class="soon" title="Coming soon">8.5</span>, <span class="soon" title="Coming soon">4.4</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">8.7 · Combining Signals</span></td><td>Information coefficient, the fundamental law of active management, forecast scaling and combination — many weak signals into one strong book.</td><td><span class="soon" title="Coming soon">8.1</span>, <span class="soon" title="Coming soon">8.2</span>, <span class="soon" title="Coming soon">8.3</span>, <span class="soon" title="Coming soon">8.4</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+</tbody>
+</table>
+</section>
+<section id="phase3">
+<h2><span class="no">Phase 3</span> Portfolio, Risk &amp; Derivatives</h2>
+<p class="lede">Milestone: <strong>A risk-managed multi-strategy portfolio</strong>.</p>
+<h3 id="u9">Unit 9 · Portfolio Construction &amp; Risk</h3>
+<p>Returns are forecast, risk is measured; the portfolio is where the two meet — under costs and constraints.</p>
+<table>
+<thead><tr><th>Session</th><th>What you walk away with</th><th>Builds on</th><th>Status</th></tr></thead>
+<tbody>
+<tr><td><span class="soon" title="Coming soon">9.1 · Mean-Variance &amp; Why It Breaks</span></td><td>Markowitz, the efficient frontier and the tangency portfolio — and why naive mean-variance is an error-maximiser.</td><td><span class="soon" title="Coming soon">3.4</span>, <span class="soon" title="Coming soon">8.7</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">9.2 · Covariance Estimation</span></td><td>Sample covariance and its failure modes, Ledoit-Wolf and OAS shrinkage, random-matrix denoising and EWMA covariance.</td><td><span class="soon" title="Coming soon">9.1</span>, <span class="soon" title="Coming soon">5.3</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">9.3 · Risk Parity &amp; HRP</span></td><td>Risk contributions, inverse-vol and equal-risk-contribution portfolios, hierarchical risk parity and HERC — allocation without return forecasts.</td><td><span class="soon" title="Coming soon">9.2</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">9.4 · Factor Risk Models</span></td><td>Build a mini Barra-style model — exposures, factor covariance and specific risk — and use it to decompose where your risk comes from.</td><td><span class="soon" title="Coming soon">9.2</span>, <span class="soon" title="Coming soon">7.3</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">9.5 · Sizing, Vol Targeting &amp; Allocating Across Strategies</span></td><td>Carver-style volatility targeting, position buffering, diversification multipliers and allocating capital across strategies with fractional Kelly.</td><td><span class="soon" title="Coming soon">3.6</span>, <span class="soon" title="Coming soon">8.7</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">9.6 · Optimization with Constraints &amp; Costs</span></td><td>Real portfolio optimisation — turnover penalties, cost-aware objectives, leverage and exposure constraints, and Black-Litterman views.</td><td><span class="soon" title="Coming soon">9.4</span>, <span class="soon" title="Coming soon">6.5</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">9.7 · VaR, ES, EVT &amp; VaR Backtests</span></td><td>Value at risk and expected shortfall — historical, parametric and filtered — extreme value theory for the tail, and testing whether your VaR is honest.</td><td><span class="soon" title="Coming soon">5.5</span>, <span class="soon" title="Coming soon">3.2</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">9.8 · Drawdowns, Copulas, Tail Risk &amp; Stress Tests</span></td><td>Drawdown statistics, tail dependence and copulas, and stress tests from 2008, March 2020 and 2022 — with LTCM and the 2007 quant quake as cautionary tales.</td><td><span class="soon" title="Coming soon">9.7</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">9.9 · Performance, Attribution &amp; When to Switch Off</span></td><td>Measure performance honestly, attribute it to factors and skill, monitor live decay, and decide in advance when a strategy is retired.</td><td><span class="soon" title="Coming soon">9.4</span>, <span class="soon" title="Coming soon">6.7</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+</tbody>
+</table>
+<h3 id="u10">Unit 10 · Derivatives &amp; Volatility</h3>
+<p>Price by replication, hedge by the Greeks, and trade the gap between implied and realized.</p>
+<table>
+<thead><tr><th>Session</th><th>What you walk away with</th><th>Builds on</th><th>Status</th></tr></thead>
+<tbody>
+<tr><td><span class="soon" title="Coming soon">10.1 · No-Arbitrage &amp; Binomial Trees</span></td><td>Replication and the law of one price, risk-neutral probabilities, and pricing European and American options on a binomial tree.</td><td><span class="soon" title="Coming soon">2.7</span>, <span class="soon" title="Coming soon">3.1</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">10.2 · Stochastic Calculus for Engineers</span></td><td>Brownian motion, quadratic variation, SDEs and Itô&#x27;s lemma — built by simulation first, formalism second.</td><td><span class="soon" title="Coming soon">10.1</span>, <span class="soon" title="Coming soon">3.5</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">10.3 · Black-Scholes-Merton</span></td><td>Derive BSM two ways (PDE and risk-neutral expectation), implement it, and list precisely which assumptions markets violate.</td><td><span class="soon" title="Coming soon">10.2</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">10.4 · The Greeks &amp; Hedging P&amp;L</span></td><td>Delta, gamma, vega and theta; delta hedging in simulation; and the P&amp;L identity that links hedging to realized minus implied variance.</td><td><span class="soon" title="Coming soon">10.3</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">10.5 · The Implied Volatility Surface</span></td><td>Smiles, skews and term structures; fitting SVI and SSVI; and checking the surface for static arbitrage.</td><td><span class="soon" title="Coming soon">10.4</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">10.6 · Stochastic Volatility &amp; Numerical Methods</span></td><td>Local vol vs stochastic vol, the Heston model, Monte Carlo and finite-difference pricing, calibration — with QuantLib as the reference.</td><td><span class="soon" title="Coming soon">10.5</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">10.7 · Trading Volatility</span></td><td>The volatility risk premium, straddles and variance swaps, dispersion, the VIX complex — and the crash risk that pays for all of it.</td><td><span class="soon" title="Coming soon">10.4</span>, <span class="soon" title="Coming soon">10.5</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+</tbody>
+</table>
+<h3 id="u11">Unit 11 · Rates, Credit &amp; Macro</h3>
+<p>Money has a price that changes with time and with trust — curves encode both.</p>
+<table>
+<thead><tr><th>Session</th><th>What you walk away with</th><th>Builds on</th><th>Status</th></tr></thead>
+<tbody>
+<tr><td><span class="soon" title="Coming soon">11.1 · Yield Curves &amp; Bootstrapping</span></td><td>Discount factors, zero, forward and par rates, day counts, and bootstrapping a curve from market instruments.</td><td><span class="soon" title="Coming soon">2.3</span>, <span class="soon" title="Coming soon">3.4</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">11.2 · Duration, Convexity &amp; Curve PCA</span></td><td>DV01, duration, convexity and key-rate risk — and the three PCA factors (level, slope, curvature) that drive almost every curve.</td><td><span class="soon" title="Coming soon">11.1</span>, <span class="soon" title="Coming soon">3.3</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">11.3 · Short-Rate Models &amp; Swaps</span></td><td>Interest-rate swaps and SOFR, Vasicek, CIR and Hull-White short-rate models, and what a swaption is.</td><td><span class="soon" title="Coming soon">11.2</span>, <span class="soon" title="Coming soon">10.2</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">11.4 · Credit: Spreads, CDS &amp; Merton</span></td><td>Credit spreads, default intensities and recovery, credit default swaps, and the Merton structural model of default.</td><td><span class="soon" title="Coming soon">11.1</span>, <span class="soon" title="Coming soon">10.3</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">11.5 · FX &amp; Macro Regimes</span></td><td>Uncovered interest parity and the forward-premium puzzle, nowcasting with point-in-time macro data, and growth-inflation regimes across assets.</td><td><span class="soon" title="Coming soon">2.5</span>, <span class="soon" title="Coming soon">5.7</span>, <span class="soon" title="Coming soon">8.4</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+</tbody>
+</table>
+</section>
+<section id="phase4">
+<h2><span class="no">Phase 4</span> Machines &amp; Markets</h2>
+<p class="lede">Milestone: <strong>A paper-trading system running</strong>.</p>
+<h3 id="u12">Unit 12 · Machine Learning for Trading</h3>
+<p>In markets, machine learning is a low signal-to-noise game where validation — not model capacity — decides who wins.</p>
+<table>
+<thead><tr><th>Session</th><th>What you walk away with</th><th>Builds on</th><th>Status</th></tr></thead>
+<tbody>
+<tr><td><span class="soon" title="Coming soon">12.1 · Why Finance ML Is Different</span></td><td>Non-IID samples, concept drift, adversarial markets and tiny signal-to-noise — why ML habits from vision and NLP backfire here.</td><td><span class="soon" title="Coming soon">6.6</span>, <span class="soon" title="Coming soon">1.4</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">12.2 · Labeling: Triple Barrier &amp; Meta-Labeling</span></td><td>Fixed-horizon labels and their flaws, the triple-barrier method, and meta-labeling to size bets from a primary model.</td><td><span class="soon" title="Coming soon">12.1</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">12.3 · Features &amp; Sample Weights</span></td><td>Stationary features that keep memory (fractional differentiation), sample uniqueness, the sequential bootstrap and time-decay weights.</td><td><span class="soon" title="Coming soon">12.2</span>, <span class="soon" title="Coming soon">5.4</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">12.4 · Gradient Boosting for Cross-Sectional Alpha</span></td><td>Predict cross-sectional returns with LightGBM on point-in-time features, validated with purged CV and scored on IC after costs.</td><td><span class="soon" title="Coming soon">12.3</span>, <span class="soon" title="Coming soon">8.7</span>, <span class="soon" title="Coming soon">6.7</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">12.5 · Feature Importance &amp; Interpretability</span></td><td>MDI, MDA, single-feature importance and SHAP — and clustered importance to survive correlated features.</td><td><span class="soon" title="Coming soon">12.4</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">12.6 · Deep Learning, RL &amp; the Complexity Debate</span></td><td>Sequence models, reinforcement learning and the &quot;virtue of complexity&quot; debate — where deep models help, and where they are hype.</td><td><span class="soon" title="Coming soon">12.4</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+</tbody>
+</table>
+<h3 id="u13">Unit 13 · NLP, LLMs &amp; Alternative Data</h3>
+<p>Text and alternative data are new sources of information — and new ways to leak the future into your backtest.</p>
+<table>
+<thead><tr><th>Session</th><th>What you walk away with</th><th>Builds on</th><th>Status</th></tr></thead>
+<tbody>
+<tr><td><span class="soon" title="Coming soon">13.1 · Alternative Data</span></td><td>A taxonomy of alternative data, how to evaluate a dataset before buying it, and the legal lines (MNPI, scraping, privacy) you must not cross.</td><td><span class="soon" title="Coming soon">4.2</span>, <span class="soon" title="Coming soon">6.7</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">13.2 · Text as Data</span></td><td>From dictionaries (Loughran-McDonald) to TF-IDF to embeddings — turning filings, calls and news into point-in-time features.</td><td><span class="soon" title="Coming soon">13.1</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">13.3 · LLMs for Return Prediction — and the Look-Ahead Trap</span></td><td>What the evidence says about LLM signals, and how training-data leakage fakes their performance — with a lab that tests only after the model&#x27;s cutoff.</td><td><span class="soon" title="Coming soon">13.2</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">13.4 · LLM Agents as Research Assistants</span></td><td>Using LLM agents to speed up research without letting them inflate your trial count — guardrails, logging and mandatory deflation.</td><td><span class="soon" title="Coming soon">13.3</span>, <span class="soon" title="Coming soon">6.8</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+</tbody>
+</table>
+<h3 id="u14">Unit 14 · Microstructure, Execution &amp; Market Making</h3>
+<p>Every trade has a counterparty who may know more than you — the order book is where you pay for that.</p>
+<table>
+<thead><tr><th>Session</th><th>What you walk away with</th><th>Builds on</th><th>Status</th></tr></thead>
+<tbody>
+<tr><td><span class="soon" title="Coming soon">14.1 · The Limit Order Book</span></td><td>Price-time priority, queues, tick size, maker-taker fees and auctions — how a modern electronic order book actually matches trades.</td><td><span class="soon" title="Coming soon">2.1</span>, <span class="soon" title="Coming soon">6.5</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">14.2 · Microstructure Models</span></td><td>The Roll, Kyle and Glosten-Milgrom models — spreads as the price of adverse selection, and how informed traders move prices.</td><td><span class="soon" title="Coming soon">14.1</span>, <span class="soon" title="Coming soon">3.1</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">14.3 · Market Impact &amp; the Square-Root Law</span></td><td>Temporary vs permanent impact, the square-root law and its evidence, and measuring impact from your own fills.</td><td><span class="soon" title="Coming soon">14.2</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">14.4 · Optimal Execution &amp; TCA</span></td><td>TWAP, VWAP and implementation shortfall; the Almgren-Chriss trade-off; and transaction cost analysis against the arrival price.</td><td><span class="soon" title="Coming soon">14.3</span>, <span class="soon" title="Coming soon">3.4</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">14.5 · Market Making</span></td><td>Inventory risk and adverse selection, the Avellaneda-Stoikov model, and a queue-aware market-making backtest in hftbacktest.</td><td><span class="soon" title="Coming soon">14.2</span>, <span class="soon" title="Coming soon">14.4</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">14.6 · Latency &amp; Performance Engineering</span></td><td>Profiling Python, numba and Rust/C++ hot paths, tick-to-trade latency — and an honest map of what speed buys a non-HFT trader.</td><td><span class="soon" title="Coming soon">14.1</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+</tbody>
+</table>
+<h3 id="u15">Unit 15 · Production Trading Systems</h3>
+<p>A live trading system is a distributed system that loses money when it is wrong — build it like one.</p>
+<table>
+<thead><tr><th>Session</th><th>What you walk away with</th><th>Builds on</th><th>Status</th></tr></thead>
+<tbody>
+<tr><td><span class="soon" title="Coming soon">15.1 · Architecture of a Live Trading System</span></td><td>Feed, strategy, portfolio, OMS, EMS and broker — the components, their contracts, and the state machine at the heart of an order.</td><td><span class="soon" title="Coming soon">6.3</span>, <span class="soon" title="Coming soon">2.1</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">15.2 · Backtest-to-Live with NautilusTrader</span></td><td>One strategy class that runs in a backtest, on a simulated exchange and against a paper account — with NautilusTrader.</td><td><span class="soon" title="Coming soon">15.1</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">15.3 · Broker APIs &amp; FIX</span></td><td>alpaca-py and ib_async against paper accounts, the FIX protocol&#x27;s core messages, rate limits and idempotent order submission.</td><td><span class="soon" title="Coming soon">15.1</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">15.4 · Pre-Trade Risk &amp; Kill Switches</span></td><td>Fat-finger checks, price collars, position and loss limits, and the kill switch — with Knight Capital as the case study.</td><td><span class="soon" title="Coming soon">15.1</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">15.5 · Operations &amp; MLOps</span></td><td>Reconciliation, monitoring, alerting, runbooks and restarts — plus model registries, retraining and drift detection for live models.</td><td><span class="soon" title="Coming soon">15.4</span>, <span class="soon" title="Coming soon">9.9</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">15.6 · Market Conduct &amp; Compliance</span></td><td>Insider trading and MNPI, spoofing and layering, wash trading, front-running and best execution — the rules under SEC/FINRA and MiFID II/MAR.</td><td><span class="soon" title="Coming soon">13.1</span>, <span class="soon" title="Coming soon">14.1</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">15.7 · Lab: Deploy a Paper-Trading Bot</span></td><td>Deploy an end-to-end paper-trading system — scheduled, monitored, reconciled and protected by a kill switch.</td><td><span class="soon" title="Coming soon">15.2</span>, <span class="soon" title="Coming soon">15.3</span>, <span class="soon" title="Coming soon">15.4</span>, <span class="soon" title="Coming soon">15.5</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+</tbody>
+</table>
+</section>
+<section id="phase5">
+<h2><span class="no">Phase 5</span> The Professional</h2>
+<p class="lede">Milestone: <strong>Capstone + interview-ready</strong>.</p>
+<h3 id="u16">Unit 16 · Career, Interviews &amp; Your Own Book</h3>
+<p>Skill compounds when it is visible — build the evidence, rehearse the interviews, respect the odds.</p>
+<table>
+<thead><tr><th>Session</th><th>What you walk away with</th><th>Builds on</th><th>Status</th></tr></thead>
+<tbody>
+<tr><td><span class="soon" title="Coming soon">16.1 · Career Paths &amp; the Quant Job Market</span></td><td>Roles, firms, pay structures and hiring pipelines in 2026 — and the portfolio of evidence that gets an engineer hired.</td><td><span class="soon" title="Coming soon">1.1</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">16.2 · Interview Drills: Probability, Mental Math &amp; Market-Making Games</span></td><td>The probability, expected-value, mental-math and market-making-game rounds — with drills and the reasoning interviewers want to hear.</td><td><span class="soon" title="Coming soon">3.1</span>, <span class="soon" title="Coming soon">14.2</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">16.3 · Stats, ML, Coding &amp; Research-Case Interviews</span></td><td>The statistics, ML and coding rounds, trading-system design, and the multi-hour research case — and how to write the report.</td><td><span class="soon" title="Coming soon">16.2</span>, <span class="soon" title="Coming soon">12.4</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">16.4 · Running Your Own Capital</span></td><td>Capital, costs, brokers, taxes and rules by jurisdiction, psychology and discipline, and how to build a verifiable track record.</td><td><span class="soon" title="Coming soon">9.5</span>, <span class="soon" title="Coming soon">15.7</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+<tr><td><span class="soon" title="Coming soon">16.5 · Capstone: Brief &amp; Rubric</span></td><td>The capstone — research, validate, size, paper-trade and report one strategy end to end — with the rubric professionals would use.</td><td><span class="soon" title="Coming soon">16.4</span></td><td><span class="badge todo">⬜ planned</span></td></tr>
+</tbody>
+</table>
+</section>
+<!-- /nav:roadmap -->
+<!-- nav:hubfoot -->
+<div class="foot">
+<a href="#top">↑ Back to top</a>
+<span class="soon" title="Coming soon">Start: Session 1.1 — What Quants Actually Do →</span>
+</div>
+<p class="legal">Educational material only — not investment, legal or tax advice. Backtests and simulations are hypothetical. <a href="start-here.html#disclaimer">Disclaimer</a> · Text CC BY 4.0 · Code MIT.</p>
+<!-- /nav:hubfoot -->
+</main>
+</div></body></html>

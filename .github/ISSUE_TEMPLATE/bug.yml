@@ -1,0 +1,37 @@
+name: Lab or tooling bug
+description: A companion lab fails, or a build tool misbehaves.
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: input
+    id: where
+    attributes:
+      label: Lab or tool
+      description: e.g. "labs/u02/s03_returns_pnl_leverage.py" or "tools/build.py"
+    validations:
+      required: true
+  - type: dropdown
+    id: env
+    attributes:
+      label: Where did you run it?
+      options:
+        - Google Colab
+        - Local (uv sync)
+        - Local (other environment)
+        - GitHub Actions
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: The command you ran and the full error output.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: versions
+    attributes:
+      label: Versions
+      description: Output of `uv run python -c "import sys, pandas, numpy; print(sys.version, pandas.__version__, numpy.__version__)"`
+      render: text
