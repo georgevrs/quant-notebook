@@ -148,12 +148,20 @@ def test_verify_labs_skips_wall_clock_timings():
     assert verify_labs.compare({"tol_daily_scs_dw": 1.0}, {}) == ["tol_daily_scs_dw: missing after re-run"]
 
 
-def test_verify_labs_skips_csv_bytes_and_garch_mle_fits():
+def test_verify_labs_skips_csv_bytes_key():
     # A CSV byte count is sensitive to the last digit of each float's text representation.
     assert verify_labs.compare({"compression_ratio": 2.611, "csv_bytes": 162060}, {"compression_ratio": 2.562, "csv_bytes": 159788}) == []
-    # GARCH/GJR-GARCH MLE fits are more BLAS-sensitive than closed-form arithmetic.
-    assert verify_labs.compare({"garch_alpha_hat": 0.10216521188802603}, {"garch_alpha_hat": 0.10216533378050499}) == []
-    # a "_hat" or "garch" substring used elsewhere for an ordinary closed-form value is NOT
-    # exempted — only these exact, named MLE/CSV-byte-count keys are.
+    # a "_hat" substring used elsewhere for an ordinary closed-form value is NOT exempted —
+    # only these exact, named CSV-byte-count keys are.
     assert verify_labs.compare({"alpha_hat": 1.0}, {"alpha_hat": 1.1}) != []
+
+
+def test_verify_labs_rel_tol_covers_garch_mle_noise_but_not_a_real_regression():
+    # GARCH/GJR-GARCH MLE fits are more BLAS-sensitive than closed-form arithmetic: two independent
+    # Linux CI runs each exceeded the old 1e-6 tolerance on a different set of keys (up to ~6e-6
+    # relative), which an exact-name exclusion list can't keep up with. The module-wide REL_TOL
+    # (1e-5) covers this directly instead.
+    assert verify_labs.compare({"garch_alpha_hat": 0.10216521188802603}, {"garch_alpha_hat": 0.10216533378050499}) == []
+    assert verify_labs.compare({"gjr_gamma_hat": 0.07677403741821932}, {"gjr_gamma_hat": 0.07677385499971123}) == []
+    # a real regression (orders of magnitude larger than any observed BLAS noise) still fails
     assert verify_labs.compare({"garch_a": 0.08}, {"garch_a": 0.09}) != []
