@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- nav:head -->
+<title>5.7 · Kalman Filters &amp; Regime Models</title>
+<meta name="description" content="State-space models, the Kalman filter for time-varying hedge ratios, hidden Markov regimes and structural breaks.">
+<link rel="canonical" href="https://georgevrs.github.io/quant-notebook/unit05-statistics-time-series/session07-kalman-regimes.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Quant Notebook">
+<meta property="og:title" content="5.7 · Kalman Filters &amp; Regime Models">
+<meta property="og:description" content="State-space models, the Kalman filter for time-varying hedge ratios, hidden Markov regimes and structural breaks.">
+<meta property="og:url" content="https://georgevrs.github.io/quant-notebook/unit05-statistics-time-series/session07-kalman-regimes.html">
+<meta name="twitter:card" content="summary">
+<link rel="stylesheet" href="../assets/brand.css">
+<link rel="stylesheet" href="../assets/temml.css">
+<!-- /nav:head -->
+</head>
+<body><div class="page" id="top">
+<!-- nav:tabs -->
+<nav class="tabs">
+<a href="../index.html">⌂ Course home</a>
+<span class="soon" title="Coming soon">5.1 · Stylized Facts</span>
+<span class="soon" title="Coming soon">5.2 · Honest Inference</span>
+<span class="soon" title="Coming soon">5.3 · Bayesian Thinking</span>
+<span class="soon" title="Coming soon">5.4 · Stationarity &amp; ARMA</span>
+<span class="soon" title="Coming soon">5.5 · Volatility</span>
+<span class="soon" title="Coming soon">5.6 · Cointegration</span>
+<a class="active" href="session07-kalman-regimes.html">5.7 · Kalman &amp; Regimes</a>
+<a href="../roadmap.html">🗺 Roadmap</a>
+</nav>
+<!-- /nav:tabs -->
+
+<header class="cover">
+<!-- nav:heading -->
+<p class="eyebrow">Unit 5 · Statistics &amp; Time Series of Returns — Session 07 of 07</p>
+<h1>Kalman Filters &amp; Regime Models</h1>
+<!-- /nav:heading -->
+<p class="subtitle">Every model earlier in this unit has quietly assumed its parameters hold still. Real hedge ratios drift and jump; real markets switch between a small number of distinct worlds. This closing session gives you two tools built for exactly that: a filter that updates a running estimate as each new price arrives, and a model that assigns each day to one of a few hidden regimes. <mark>The core move: stop re-estimating from scratch and start updating a belief.</mark></p>
+<div class="meta">
+<span>DURATION <b>1.5 h + lab</b></span>
+<span>LEVEL <b>Intermediate</b></span>
+<span>TRACKS <b>QR · QT · IND</b></span>
+<span>HANDS-ON <b>Kalman filter vs. rolling OLS on a broken hedge ratio; an EM-fit HMM recovers hidden regimes</b></span>
+</div>
+<!-- nav:labstrip -->
+<div class="labstrip"><b>📓 Companion lab</b>
+<a href="https://colab.research.google.com/github/georgevrs/quant-notebook/blob/main/labs/u05/s07_kalman_regimes.ipynb">Open in Colab</a>
+<a href="https://github.com/georgevrs/quant-notebook/blob/main/labs/u05/s07_kalman_regimes.ipynb">Notebook on GitHub</a>
+<a href="https://github.com/georgevrs/quant-notebook/blob/main/labs/u05/s07_kalman_regimes.py">Source (.py)</a>
+</div>
+<!-- /nav:labstrip -->
+<div class="toc">
+<b>On this page</b>
+<ol>
+<li><a href="#s1">A hidden state, seen only through noise</a></li>
+<li><a href="#s2">How the Kalman filter works</a></li>
+<li><a href="#s3">The math of the Kalman filter</a></li>
+<li><a href="#s4">Dynamic hedge ratios, in code</a></li>
+<li><a href="#s5">Where people go wrong: tuning the filter</a></li>
+<li><a href="#s6">Hidden Markov models: when the state is discrete</a></li>
+<li><a href="#s7">Recovering regimes, in code</a></li>
+<li><a href="#s8">Try it</a></li>
+<li><a href="#s9">Glossary · Check yourself · Go deeper</a></li>
+</ol>
+</div>
+</header>
+
+<main>
+
+<section id="s1">
+<h2><span class="no">5.7.1</span> A hidden state, seen only through noise</h2>
+<p class="lede">Two sessions back you built models that assume a fixed relationship. This one drops that assumption on purpose.</p>
+
+<p><span class="xref soon" data-xref="5.4" data-auto="" title="Coming soon">Session 5.4 — Stationarity &amp; ARMA Models</span> fit one <span class="term soon" data-term="ARMA model" title="Defined in Session 5.4 (coming soon)">ARMA model</span> to a return series and used it throughout — the coefficients were treated as fixed, unknown constants to be estimated once. <span class="xref soon" data-xref="5.6" data-auto="" title="Coming soon">Session 5.6 — Cointegration &amp; Mean Reversion</span> extended that idea to a pair of prices: if they are <span class="term soon" data-term="cointegration" title="Defined in Session 5.6 (coming soon)">cointegrated</span>, a fixed <span class="term soon" data-term="hedge ratio" title="Defined in Session 5.6 (coming soon)">hedge ratio</span> combines them into a <span class="term soon" data-term="spread" title="Defined in Session 5.6 (coming soon)">spread</span> that mean-reverts. Both are honest simplifications, and both can quietly stop being true. A merger changes what a stock's beta means overnight; an ETF's index reweighting changes a hedge ratio it took months to estimate; a market's whole character can shift from calm to panicked and back. This session is about parameters that move.</p>
+
+<p>The trick that handles all of these is the same trick, wearing two costumes. A <strong>state-space model</strong> splits a system into two layers: a <strong>hidden state</strong> that evolves on its own, mostly out of sight, and a stream of <strong>observations</strong> that are all you ever get to see of it. When the hidden state is a continuous number that drifts a little each period — a hedge ratio, say — the standard tool is the <strong>Kalman filter</strong> (§5.7.2–§5.7.5). When the hidden state instead jumps between a small number of discrete labels — calm versus crisis — the standard tool is a <strong>hidden Markov model</strong> (§5.7.6–§5.7.7). Same skeleton, different kind of state.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 236" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">STATE-SPACE MODEL — a hidden sequence, seen only through noise</text>
+  <rect x="40" y="38" width="150" height="60" rx="8" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5" stroke-dasharray="5 3"/>
+  <text x="115" y="63" font-size="12" font-weight="600" text-anchor="middle" fill="#3A56C5">STATE (t−1)</text>
+  <text x="115" y="80" font-size="9.5" text-anchor="middle" fill="#4A5A68">hidden — β or a regime</text>
+  <text x="115" y="93" font-size="9.5" text-anchor="middle" fill="#4A5A68">never seen directly</text>
+  <rect x="285" y="38" width="150" height="60" rx="8" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5" stroke-dasharray="5 3"/>
+  <text x="360" y="63" font-size="12" font-weight="600" text-anchor="middle" fill="#3A56C5">STATE (t)</text>
+  <text x="360" y="80" font-size="9.5" text-anchor="middle" fill="#4A5A68">hidden — β or a regime</text>
+  <text x="360" y="93" font-size="9.5" text-anchor="middle" fill="#4A5A68">never seen directly</text>
+  <rect x="530" y="38" width="150" height="60" rx="8" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5" stroke-dasharray="5 3"/>
+  <text x="605" y="63" font-size="12" font-weight="600" text-anchor="middle" fill="#3A56C5">STATE (t+1)</text>
+  <text x="605" y="80" font-size="9.5" text-anchor="middle" fill="#4A5A68">hidden — β or a regime</text>
+  <text x="605" y="93" font-size="9.5" text-anchor="middle" fill="#4A5A68">never seen directly</text>
+  <path d="M190 68 H283" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s1a)"/>
+  <path d="M435 68 H528" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s1a)"/>
+  <text x="236" y="58" font-size="9" text-anchor="middle" fill="#4A5A68">+ process noise</text>
+  <text x="481" y="58" font-size="9" text-anchor="middle" fill="#4A5A68">+ process noise</text>
+  <path d="M115 98 V148" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s1a)"/>
+  <path d="M360 98 V148" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s1a)"/>
+  <path d="M605 98 V148" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s1a)"/>
+  <text x="124" y="126" font-size="9" fill="#4A5A68">+ obs. noise</text>
+  <rect x="40" y="150" width="150" height="52" rx="8" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="115" y="174" font-size="12" font-weight="600" text-anchor="middle" fill="#1F7A55">OBSERVED</text>
+  <text x="115" y="190" font-size="9.5" text-anchor="middle" fill="#4A5A68" font-family="IBM Plex Mono,monospace">y(t−1)</text>
+  <rect x="285" y="150" width="150" height="52" rx="8" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="360" y="174" font-size="12" font-weight="600" text-anchor="middle" fill="#1F7A55">OBSERVED</text>
+  <text x="360" y="190" font-size="9.5" text-anchor="middle" fill="#4A5A68" font-family="IBM Plex Mono,monospace">y(t)</text>
+  <rect x="530" y="150" width="150" height="52" rx="8" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="605" y="174" font-size="12" font-weight="600" text-anchor="middle" fill="#1F7A55">OBSERVED</text>
+  <text x="605" y="190" font-size="9.5" text-anchor="middle" fill="#4A5A68" font-family="IBM Plex Mono,monospace">y(t+1)</text>
+  <text x="360" y="222" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">The state moves on its own; you only ever see it through a noisy window.</text>
+  <defs><marker id="s1a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F2C38"/></marker></defs>
+</svg>
+<figcaption>fig 5.7.1 — a state-space model: a hidden sequence evolving under process noise, observed only under observation noise</figcaption>
+</figure>
+
+<div class="co key"><span class="co-t">📌 Key idea — two layers, one skeleton</span>
+<p>Every model in this session has the same shape: something true you cannot see, moving a little (or jumping) between periods, and a noisy reading of it that is all the data gives you. The whole session is one question asked twice — continuous state (§5.7.2) or discrete state (§5.7.6) — with the same underlying logic both times: combine what you believed with what you just saw, weighted by how much you trust each.</p>
+</div>
+</section>
+
+<section id="s2">
+<h2><span class="no">5.7.2</span> How the Kalman filter works</h2>
+<p class="lede">The Kalman filter is Bayesian updating running on a schedule: predict, look, weigh the surprise, update.</p>
+
+<p>The <strong>Kalman filter</strong> is the recursive recipe for tracking a continuous hidden state when the state evolves linearly and every noise term is Gaussian. Concretely, for a time-varying hedge ratio <math><semantics><msub><mi>β</mi><mi>t</mi></msub><annotation encoding="application/x-tex">\beta_t</annotation></semantics></math> linking two legs' daily returns <math><semantics><msub><mi>x</mi><mi>t</mi></msub><annotation encoding="application/x-tex">x_t</annotation></semantics></math> and <math><semantics><msub><mi>y</mi><mi>t</mi></msub><annotation encoding="application/x-tex">y_t</annotation></semantics></math>: the state takes a small random step each day, <math><semantics><mrow><msub><mi>β</mi><mi>t</mi></msub><mo>=</mo><msub><mi>β</mi><mrow><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub><mo>+</mo><msub><mi>η</mi><mi>t</mi></msub></mrow><annotation encoding="application/x-tex">\beta_t = \beta_{t-1} + \eta_t</annotation></semantics></math>, and you observe it only through a noisy regression, <math><semantics><mrow><msub><mi>y</mi><mi>t</mi></msub><mo>=</mo><msub><mi>x</mi><mi>t</mi></msub><msub><mi>β</mi><mi>t</mi></msub><mo>+</mo><msub><mi>ε</mi><mi>t</mi></msub></mrow><annotation encoding="application/x-tex">y_t = x_t \beta_t + \varepsilon_t</annotation></semantics></math>. Nothing here is specific to hedge ratios — the same recursion tracks any slowly-moving regression coefficient.</p>
+
+<p>There is also a purely engineering reason to prefer this over the obvious alternative of "just re-fit OLS on everything so far". An expanding-window OLS needs to revisit every observation you have ever collected each time it is asked for an answer — memory and compute both grow with history. The filter needs exactly two numbers, <math><semantics><mover><mi>β</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><annotation encoding="application/x-tex">\hat\beta</annotation></semantics></math> and <math><semantics><mi>P</mi><annotation encoding="application/x-tex">P</annotation></semantics></math>, no matter whether it is on day 10 or day 10,000: it is a streaming algorithm in the same sense a running mean or an EWMA is, and for the same reason — you update a small summary and throw the raw observation away. That is what lets a Kalman filter sit inside a live trading system re-quoting a hedge ratio on every tick, where re-running a regression from scratch would not keep up.</p>
+
+<p>Each day the filter does the same four things, in the same order, and never needs to remember anything from before yesterday — the whole history of the pair is compressed into two numbers, the current estimate <math><semantics><mover><mi>β</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><annotation encoding="application/x-tex">\hat\beta</annotation></semantics></math> and its variance <math><semantics><mi>P</mi><annotation encoding="application/x-tex">P</annotation></semantics></math>. That is what makes it cheap enough to run on every tick: this is <span class="term soon" data-term="empirical Bayes" title="Defined in Session 5.3 (coming soon)">Bayesian</span> updating with the previous posterior serving as today's prior, exactly the machinery <span class="xref soon" data-xref="5.3" data-auto="" title="Coming soon">Session 5.3 — Bayesian Thinking: Priors, Shrinkage &amp; Updating</span> built for shrinkage estimators — applied here to a moving target instead of a fixed one.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 240" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <rect x="60" y="30" width="170" height="62" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="145" y="57" font-size="11" font-weight="600" text-anchor="middle" fill="#3A56C5">1 · PREDICT</text>
+  <text x="145" y="75" font-size="9.5" text-anchor="middle" fill="#4A5A68">carry β̂, P forward,</text>
+  <text x="145" y="88" font-size="9.5" text-anchor="middle" fill="#4A5A68">one day less certain</text>
+  <rect x="490" y="30" width="170" height="62" rx="9" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="575" y="57" font-size="11" font-weight="600" text-anchor="middle" fill="#8A6D00">2 · COMPARE</text>
+  <text x="575" y="75" font-size="9.5" text-anchor="middle" fill="#4A5A68">prediction vs. today's</text>
+  <text x="575" y="88" font-size="9.5" text-anchor="middle" fill="#4A5A68">actual y — the surprise</text>
+  <rect x="490" y="150" width="170" height="62" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="575" y="177" font-size="11" font-weight="600" text-anchor="middle" fill="#1F7A55">3 · UPDATE</text>
+  <text x="575" y="195" font-size="9.5" text-anchor="middle" fill="#4A5A68">blend prediction + data,</text>
+  <text x="575" y="208" font-size="9.5" text-anchor="middle" fill="#4A5A68">weighted by the gain</text>
+  <rect x="60" y="150" width="170" height="62" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="145" y="177" font-size="11" font-weight="600" text-anchor="middle" fill="#3A56C5">4 · ADVANCE</text>
+  <text x="145" y="195" font-size="9.5" text-anchor="middle" fill="#4A5A68">move to t+1,</text>
+  <text x="145" y="208" font-size="9.5" text-anchor="middle" fill="#4A5A68">then predict again</text>
+  <path d="M234 61 H484" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M575 96 V144" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M486 181 H236" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M145 146 V96" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <text x="360" y="122" font-size="12" text-anchor="middle" fill="#4A5A68" font-style="italic">one pass per day — nothing before yesterday needs to be remembered</text>
+  <defs><marker id="s2a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F2C38"/></marker></defs>
+</svg>
+<figcaption>fig 5.7.2 — the Kalman filter's daily cycle: predict, compare, update, advance</figcaption>
+</figure>
+
+<table>
+<thead><tr><th>Step</th><th>In words</th><th>Formula</th></tr></thead>
+<tbody>
+<tr><td>Predict</td><td>carry yesterday's estimate forward, one day less certain</td><td><math><semantics><mrow><msub><mover><mi>β</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><mrow><mi>t</mi><mo lspace="0.22em" rspace="0.22em" stretchy="false">|</mo><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub><mo>=</mo><msub><mover><mi>β</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><mrow><mi>t</mi><mo>−</mo><mn>1</mn><mo lspace="0.22em" rspace="0.22em" stretchy="false">|</mo><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub></mrow><annotation encoding="application/x-tex">\hat\beta_{t\mid t-1} = \hat\beta_{t-1\mid t-1}</annotation></semantics></math>, <math><semantics><mrow><msub><mi>P</mi><mrow><mi>t</mi><mo lspace="0.22em" rspace="0.22em" stretchy="false">|</mo><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub><mo>=</mo><msub><mi>P</mi><mrow><mi>t</mi><mo>−</mo><mn>1</mn><mo lspace="0.22em" rspace="0.22em" stretchy="false">|</mo><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub><mo>+</mo><mi>q</mi></mrow><annotation encoding="application/x-tex">P_{t\mid t-1} = P_{t-1\mid t-1} + q</annotation></semantics></math></td></tr>
+<tr><td>Innovation</td><td>how wrong the prediction turned out to be, in <math><semantics><mi>y</mi><annotation encoding="application/x-tex">y</annotation></semantics></math>'s units</td><td><math><semantics><mrow><msub><mi>e</mi><mi>t</mi></msub><mo>=</mo><msub><mi>y</mi><mi>t</mi></msub><mo>−</mo><msub><mi>x</mi><mi>t</mi></msub><msub><mover><mi>β</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><mrow><mi>t</mi><mo lspace="0.22em" rspace="0.22em" stretchy="false">|</mo><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub></mrow><annotation encoding="application/x-tex">e_t = y_t - x_t \hat\beta_{t\mid t-1}</annotation></semantics></math></td></tr>
+<tr><td>Innovation variance</td><td>how much of that miss is "expected" noise</td><td><math><semantics><mrow><msub><mi>F</mi><mi>t</mi></msub><mo>=</mo><msubsup><mi>x</mi><mi>t</mi><mn class="tml-sml-pad">2</mn></msubsup><msub><mi>P</mi><mrow><mi>t</mi><mo lspace="0.22em" rspace="0.22em" stretchy="false">|</mo><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub><mo>+</mo><msubsup><mi>σ</mi><mi>ε</mi><mn>2</mn></msubsup></mrow><annotation encoding="application/x-tex">F_t = x_t^2 P_{t\mid t-1} + \sigma_\varepsilon^2</annotation></semantics></math></td></tr>
+<tr><td>Kalman gain</td><td>the fraction of the surprise worth believing</td><td><math><semantics><mrow><msub><mi>K</mi><mi>t</mi></msub><mo>=</mo><msub><mi>P</mi><mrow><mi>t</mi><mo lspace="0.22em" rspace="0.22em" stretchy="false">|</mo><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub><msub><mi>x</mi><mi>t</mi></msub><mi>/</mi><msub><mi>F</mi><mi>t</mi></msub></mrow><annotation encoding="application/x-tex">K_t = P_{t\mid t-1} x_t / F_t</annotation></semantics></math></td></tr>
+<tr><td>Update</td><td>blend the prediction and the surprise</td><td><math><semantics><mrow><msub><mover><mi>β</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><mrow><mi>t</mi><mo lspace="0.22em" rspace="0.22em" stretchy="false">|</mo><mi>t</mi></mrow></msub><mo>=</mo><msub><mover><mi>β</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><mrow><mi>t</mi><mo lspace="0.22em" rspace="0.22em" stretchy="false">|</mo><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub><mo>+</mo><msub><mi>K</mi><mi>t</mi></msub><msub><mi>e</mi><mi>t</mi></msub></mrow><annotation encoding="application/x-tex">\hat\beta_{t\mid t} = \hat\beta_{t\mid t-1} + K_t e_t</annotation></semantics></math></td></tr>
+</tbody>
+</table>
+
+<div class="co tip"><span class="co-t">💡 Looking ahead</span>
+<p>Notice the shape: new belief = old belief + gain × surprise. That is the entire idea behind every adaptive estimator in this course, from the EWMA volatility forecasts you may meet later to the online learners of <span class="xref soon" data-xref="12.4" data-auto="" title="Coming soon">Session 12.4 — Gradient Boosting for Cross-Sectional Alpha</span> — only the definition of "gain" changes.</p>
+</div>
+</section>
+
+<section id="s3">
+<h2><span class="no">5.7.3</span> The math of the Kalman filter</h2>
+<p class="lede">Two equations describe the world; four more describe how to learn from it. All of it falls out of one idea: minimise the variance of the updated estimate.</p>
+
+<p>The model is a pair of linear-Gaussian equations — a state equation for how the truth moves, and an observation equation for what you see:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><msub><mi>β</mi><mi>t</mi></msub><mo>=</mo><msub><mi>β</mi><mrow><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub><mo>+</mo><msub><mi>η</mi><mi>t</mi></msub><mo separator="true">,</mo><mspace width="1em"></mspace><msub><mi>η</mi><mi>t</mi></msub><mo>∼</mo><mi>N</mi><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mn>0</mn><mo separator="true">,</mo><mi>q</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mo separator="true">,</mo><mspace width="2em"></mspace><msub><mi>y</mi><mi>t</mi></msub><mo>=</mo><msub><mi>x</mi><mi>t</mi></msub><msub><mi>β</mi><mi>t</mi></msub><mo>+</mo><msub><mi>ε</mi><mi>t</mi></msub><mo separator="true">,</mo><mspace width="1em"></mspace><msub><mi>ε</mi><mi>t</mi></msub><mo>∼</mo><mi>N</mi><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mn>0</mn><mo separator="true">,</mo><msubsup><mi>σ</mi><mi>ε</mi><mn>2</mn></msubsup><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">\beta_t = \beta_{t-1} + \eta_t, \quad \eta_t \sim N(0, q), \qquad y_t = x_t \beta_t + \varepsilon_t, \quad \varepsilon_t \sim N(0, \sigma_\varepsilon^2)</annotation></semantics></math></div>
+
+<p>Given a prior belief <math><semantics><msub><mover><mi>β</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><mrow><mi>t</mi><mo>−</mo><mn>1</mn><mo lspace="0.22em" rspace="0.22em" stretchy="false">|</mo><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub><annotation encoding="application/x-tex">\hat\beta_{t-1\mid t-1}</annotation></semantics></math> with variance <math><semantics><msub><mi>P</mi><mrow><mi>t</mi><mo>−</mo><mn>1</mn><mo lspace="0.22em" rspace="0.22em" stretchy="false">|</mo><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub><annotation encoding="application/x-tex">P_{t-1\mid t-1}</annotation></semantics></math>, the predict step just adds the process-noise variance <math><semantics><mi>q</mi><annotation encoding="application/x-tex">q</annotation></semantics></math> to that variance: the estimate itself does not move (a random walk's best forecast of tomorrow is today), but the uncertainty grows. The update step is the one worth deriving in words: among every linear rule of the form new estimate <math><semantics><mo lspace="0em" rspace="0em">=</mo><annotation encoding="application/x-tex">=</annotation></semantics></math> prediction <math><semantics><mrow><mo form="prefix" stretchy="false">+</mo><mspace width="0.1667em"></mspace><msub><mi>K</mi><mi>t</mi></msub><msub><mi>e</mi><mi>t</mi></msub></mrow><annotation encoding="application/x-tex">+\, K_t e_t</annotation></semantics></math>, the value of <math><semantics><msub><mi>K</mi><mi>t</mi></msub><annotation encoding="application/x-tex">K_t</annotation></semantics></math> that minimises the variance of the new estimate is exactly the Kalman gain of §5.7.2's table — the ratio of "how uncertain was I" to "how uncertain am I about this observation, all in". That is the whole derivation: least-squares projection under uncertainty, repeated once per period.</p>
+
+<p>Everything above specialises the general Kalman filter — a state <em>vector</em>, a transition <em>matrix</em>, an observation <em>matrix</em> — to a single scalar coefficient with no drift and no covariates beyond <math><semantics><msub><mi>x</mi><mi>t</mi></msub><annotation encoding="application/x-tex">x_t</annotation></semantics></math>. The scalar case is the one worth memorising by hand, because the multi-dimensional version resurfaces anywhere a system tracks several hidden quantities at once from noisy readings — a yield curve's level, slope and curvature factors in <span class="xref soon" data-xref="11.2" data-auto="" title="Coming soon">Session 11.2 — Duration, Convexity &amp; Curve PCA</span>, for instance, or a robot's position and velocity in the textbook engineering example. The predict/update logic does not change; only the algebra of the noise terms grows from scalars to matrices.</p>
+
+<div class="co note"><span class="co-t">🧭 Margin note — two limits worth knowing by heart</span>
+<p>Send <math><semantics><mrow><msubsup><mi>σ</mi><mi>ε</mi><mn>2</mn></msubsup><mo>→</mo><mi>∞</mi></mrow><annotation encoding="application/x-tex">\sigma_\varepsilon^2 \to \infty</annotation></semantics></math> (the observation is pure noise) and <math><semantics><mrow><msub><mi>K</mi><mi>t</mi></msub><mo>→</mo><mn>0</mn></mrow><annotation encoding="application/x-tex">K_t \to 0</annotation></semantics></math>: the filter ignores today entirely and keeps yesterday's estimate. Send <math><semantics><mrow><mi>q</mi><mo>→</mo><mn>0</mn></mrow><annotation encoding="application/x-tex">q \to 0</annotation></semantics></math> (the state never truly moves) and the filter turns into the recursive form of ordinary least squares on all the data so far — proven directly in the lab, and used as the sanity check before anything else is trusted (§5.7.4).</p>
+</div>
+</section>
+
+<section id="s4">
+<h2><span class="no">5.7.4</span> Dynamic hedge ratios, in code</h2>
+<p class="lede">A hedge ratio that is updated every day, rather than re-fit from a fixed window, is worth a name of its own.</p>
+
+<p>Call the output of this recursion a <strong>dynamic hedge ratio</strong>: a hedge ratio produced by a filter that updates on every new observation instead of being re-estimated from scratch on a fixed historical window. Before trusting the filter on anything realistic, the lab checks the limit from §5.7.3's margin note: with <math><semantics><mrow><mi>q</mi><mo>=</mo><mn>0</mn></mrow><annotation encoding="application/x-tex">q = 0</annotation></semantics></math> and a diffuse starting variance, the filtered estimate must equal plain <span class="term soon" data-term="ordinary least squares" title="Defined in Session 5.2 (coming soon)">ordinary least squares</span> (OLS) through the origin. It does, to six decimal places (<span data-lab="qzero_kalman_beta" data-fmt=".6f">0.807758</span> from the filter versus <span data-lab="qzero_ols_beta" data-fmt=".6f">0.807758</span> from <code>np.linalg.lstsq</code>) — the filter is not a different idea from OLS, only a more general one.</p>
+
+<pre><span class="c"># y = x * beta + eps, beta_t = beta_{t-1} + eta_t</span>
+<span class="k">def</span> kalman_beta(x, y, q, sigma_eps2, beta0=<span class="s">0.0</span>, p0=<span class="s">1.0</span>):
+    beta_pred, p_pred = beta0, p0
+    <span class="k">for</span> t <span class="k">in</span> range(len(x)):
+        e = y[t] - x[t] * beta_pred            <span class="c"># innovation</span>
+        f = x[t] ** <span class="s">2</span> * p_pred + sigma_eps2      <span class="c"># innovation variance</span>
+        k = p_pred * x[t] / f                   <span class="c"># Kalman gain</span>
+        beta_pred = beta_pred + k * e            <span class="c"># update</span>
+        p_pred = (<span class="s">1</span> - k * x[t]) * p_pred
+        p_pred = p_pred + q                      <span class="c"># predict the next step</span></pre>
+
+<p>The real test is a hedge ratio that actually shifts. The lab simulates <span data-lab="hedge_n_days" data-fmt=",.0f">1,500</span> days of two legs whose true ratio wanders gently (an ordinary day-to-day process-noise wobble) and then, at year <span data-lab="hedge_break_year" data-fmt=".1f">3.0</span>, takes one deliberate, much larger jump — from <span data-lab="beta_before" data-fmt=".2f">0.80</span> to about <span data-lab="beta_after" data-fmt=".2f">1.63</span>. `q` is chosen honestly: maximise the one-step-ahead likelihood using only the data <em>before</em> the jump (§5.7.5 explains why the jump itself must stay out of that calculation). Over the first 60 days after the break, the tuned Kalman filter's tracking error is lower than a <span data-lab="roll_window" data-fmt=".0f">60</span>-day rolling-OLS hedge ratio's: RMSE <span data-lab="rmse_kalman_after" data-fmt=".3f">0.418</span> against <span data-lab="rmse_roll_after" data-fmt=".3f">0.444</span> (fig 5.7.3). Before the jump, with nothing unusual to react to, the two are indistinguishable — <span data-lab="rmse_kalman_before" data-fmt=".3f">0.025</span> versus <span data-lab="rmse_roll_before" data-fmt=".3f">0.025</span> — which is exactly what you want: no penalty for being adaptive when nothing needs adapting to.</p>
+
+<figure class="diagram chart">
+<!-- chart:hedge_ratio -->
+<svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Tracking a hedge ratio that jumps once, mid-sample">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">TRACKING A HEDGE RATIO THAT JUMPS ONCE, MID-SAMPLE</text>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#4A5A68" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">true hedge ratio</text>
+  <line x1="172.4" y1="32" x2="188.4" y2="32" stroke="#3A56C5" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="194.4" y="36" font-size="11" fill="#4A5A68">Kalman filter</text>
+  <line x1="299.6" y1="32" x2="315.6" y2="32" stroke="#E8850C" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="321.6" y="36" font-size="11" fill="#4A5A68">rolling OLS (60d)</text>
+  <rect x="332.8" y="52" width="0.7" height="212" fill="#1F7A55" fill-opacity="0.07"/>
+  <text x="338.8" y="65" font-size="10.5" fill="#4A5A68" font-style="italic">ratio jumps</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="268" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.25</text>
+  <line x1="64" y1="228.7" x2="602" y2="228.7" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="232.7" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.50</text>
+  <line x1="64" y1="193.3" x2="602" y2="193.3" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="197.3" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.75</text>
+  <line x1="64" y1="158" x2="602" y2="158" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="162" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">1.00</text>
+  <line x1="64" y1="122.7" x2="602" y2="122.7" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="126.7" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">1.25</text>
+  <line x1="64" y1="87.3" x2="602" y2="87.3" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="91.3" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">1.50</text>
+  <line x1="64" y1="52" x2="602" y2="52" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="56" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">1.75</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#C9CFC6" stroke-width="1"/>
+  <line x1="63.6" y1="264" x2="63.6" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="63.6" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">0</text>
+  <line x1="154.1" y1="264" x2="154.1" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="154.1" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">1</text>
+  <line x1="244.5" y1="264" x2="244.5" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="244.5" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">2</text>
+  <line x1="335" y1="264" x2="335" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="335" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">3</text>
+  <line x1="425.4" y1="264" x2="425.4" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="425.4" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">4</text>
+  <line x1="515.9" y1="264" x2="515.9" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="515.9" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">5</text>
+  <polyline points="64,186.3 64.4,185.4 65.4,186 67.2,185.2 68.7,187.1 70.5,187.7 71.5,189 73,186.9 74,189.3 75.5,190.1 76.6,190.5 78.4,186.9 79.1,189.7 80.5,188.9 81.9,190.1 84.1,187.9 84.5,187.4 85.9,189.9 87.3,189.6 89.5,191.9 90.2,190.6 91.3,193.3 93.4,190.2 94.5,190.1 95.9,193.5 96.7,194.3 98.1,192.9 99.5,194.6 101.3,191.4 103.1,193.5 103.5,191.8 104.6,193.2 106.4,192.3 108.5,191 108.9,191.2 110.3,192.6 112.1,196.1 112.8,196.6 114.6,196.2 115.7,192.9 117.1,195.1 118.6,191.8 119.6,194 121.8,193.2 123.2,196.3 124.3,193.7 126.1,194.3 126.4,192.9 127.9,189.8 129,189.5 130.8,191.3 132.2,190.5 133.6,187.3 135.4,186.9 136.9,186 137.6,188.7 139.4,187.3 140.4,187.9 141.9,187.8 143,184.3 144.4,184.8 145.5,186.5 147.6,184.3 148,185.7 150.1,185.4 150.9,185.6 153,188.9 154.4,189.8 154.8,187.2 157,186.2 157.7,185.9 159.5,187.4 160.5,185.8 161.6,186.3 163.1,184 164.5,185 165.6,183 167,182.4 169.2,182.9 169.5,184.4 171,186.5 172.4,186.5 173.8,188.9 175.3,189.9 176.3,188 178.1,186.3 179.9,183 181.4,186.1 181.7,184.8 183.5,186.7 185,184.8 186,181.9 187.5,180.5 188.5,182.8 190.3,180.3 191.8,179.9 192.8,181.8 193.9,181.6 195.7,176.7 197.2,174.9 198.2,177.9 200.4,178.7 201.5,176.6 202.2,178.4 203.6,179.5 205.1,177.6 206.5,179.1 207.6,176.4 208.6,175.2 210.1,174.6 211.5,174.8 212.9,177.2 214.4,174.8 216.5,176.5 217.6,179.2 219,178.3 220.5,175.2 221.6,173.7 222.6,173.8 224.1,175.8 225.1,178.9 227.3,180.8 228.7,179 229.5,179.8 230.5,178.3 232,180.7 233,178.5 234.5,180.6 236.6,179.5 237.7,181.8 238.4,181.4 239.9,181.3 241.7,183.7 242.7,181.1 244.5,184 246,181.3 247.4,181.2 248.1,179 249.2,180.4 251.3,176.2 252.4,175.7 253.9,181.2 255.3,180.8 256,182.5 257.8,181.6 259.2,183 260.3,182.6 262.5,181.7 263.2,183.3 264.6,179.9 265.3,178.5 267.9,181.5 268.9,178.5 269.7,179.1 270.7,178.8 272.5,176.1 274.7,176.7 275.4,175 276.8,176.5 278.6,173.9 280.1,176.6 280.8,175.6 281.5,174.4 283.7,172.5 285.1,173.6 286.2,176.3 287.6,177.2 288.7,175.8 290.5,178.5 292.3,179.2 293.3,177.1 293.7,176 295.9,177.6 297.6,175.9 298.4,177.9 299.8,178.9 301.2,177.6 302,178.9 304.1,178.4 305.2,175.2 306.6,174.2 307.7,175.8 309.1,177 310.2,176.8 311.6,173.4 313.1,174.1 314.9,172.9 316,174.1 317.7,177.6 319.2,177.8 319.9,180.5 321.7,181.5 322.8,182 323.8,179.6 324.9,179.7 327.1,182.8 327.4,183.7 329.6,184.4 331,182 332.8,183 333.2,68.6 334.3,69.6 335.7,68.1 338.2,69.7 338.9,68.4 340,66.7 341.1,68.9 342.9,70.9 343.9,70.9 345.7,69.3 346.8,68.6 348.3,69.1 349.7,74.1 350.4,75.4 352.9,72.4 353.6,74.7 355.1,74.4 356.1,74.6 357.6,76.7 358.7,77.7 360.5,75.6 361.9,77.6 363,75.9 364,77.8 366.6,75.5 367.6,78.5 368.4,79.5 369.8,80.4 370.9,80.9 372.3,78.5 374.1,83.9 375.2,80.1 376.6,79.5 378.4,82.1 379.8,80.9 381.3,80.5 381.6,81.6 383.1,81.4 384.5,84.3 386.7,84.2 387.7,86 389.5,86.9 390.6,84.1 391.3,83.1 393.5,86.3 394.2,84.5 396,81.8 396.3,82.4 397.8,82.4 399.6,78.4 401.4,79 402.4,77 403.5,76.2 405.7,77.3 406.8,80 407.8,79.7 408.5,80.7 410.3,81.1 412.1,80.6 413.2,77.3 414.3,75.7 416.4,80.2 417.2,79.5 419,80.3 419.7,78.4 421.1,77.2 422.2,78.6 424,79.6 425.8,79.9 426.1,78.6 427.6,76.1 429.4,74 430.1,75.7 432.6,77.2 434,80.2 435.5,79 436.2,79.8 436.9,78.6 439.1,77.3 440.5,74.1 441.2,76.7 442.3,74.3 444.1,72.1 445.5,71 447,70.5 448.4,71.9 450.2,71.1 451.6,68.6 452.7,68.7 453.4,70.2 454.8,67.9 457,70 457.7,68.6 459.5,69.6 460.6,71.4 462,69 463.8,68.5 464.2,70.2 466,71.4 466.7,69.6 468.1,71.7 469.6,71.7 471,68.8 473.2,71.7 474.6,68 475.3,67.7 476,70.2 478.5,69.5 479.3,71.1 481,70.8 482.5,70.7 483.2,72.4 485,72.5 486.4,76.3 487.5,75.9 488.9,72.1 490.4,73.3 491.1,70.6 493.3,72 494.3,70.7 495,72.8 496.8,69.5 497.9,70.6 499.4,71.9 500.8,70.6 502.6,66.2 504,67.7 505.1,63.2 506.5,63.6 508.3,64.4 509.8,66.2 510.8,70.1 511.9,72.2 513.7,70.4 514.4,72.6 515.9,73 517.3,73.3 518.7,71.3 519.8,73.8 520.9,75.1 522.3,73.9 524.1,74.6 525.2,71.7 526.3,73.8 528.4,73.9 528.8,75.6 530.6,77.6 531.7,79.2 533.4,79.7 535.2,76.3 536,77.4 537,76.6 538.5,78.5 539.6,77.3 541,73.8 542.8,72.9 544.6,75 545.7,77.6 546.7,75.8 548.5,79.3 549.2,78.6 550.7,80 552.8,77.2 554.3,78.5 555,79 556.8,83.9 558.2,84.9 559.6,84 561.1,83.9 561.4,84.8 563.2,85 565,81.6 566.1,83.6 567.2,80.9 569,79.7 569.3,81 571.5,81.6 572.6,81.1 573.6,79.2 575.4,78 576.9,79.6 578.3,77.5 579,78 580.1,78.8 582.3,76.9 583.3,79.4 585.1,76.5 586.6,75.2 586.9,74.7 588.4,76.8 589.8,74.8 591.2,77 592.7,74.5 594.8,74.4 595.9,72.4 596.6,72.7 598.8,70.1 600.2,72.7 600.6,71.7 602,70.6" fill="none" stroke="#4A5A68" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><title>true hedge ratio</title></polyline>
+  <circle cx="602" cy="70.6" r="4" fill="#4A5A68" stroke="#FBFBF8" stroke-width="2"><title>true hedge ratio: 1.62</title></circle>
+  <polyline points="64,236.7 64.7,172.7 66.2,187.5 67.6,184.4 68.7,183.1 69.7,185.5 71.2,184.9 72.6,185.9 74.4,184 75.1,185.9 76.2,187 78.7,188.2 79.1,187.3 81.2,187.7 82.7,186.7 83.7,187.9 84.8,187 86.3,188 87,188 88.4,189 89.8,187.4 91.3,187.7 93.1,192.1 94.9,192.2 95.9,194 97,194 98.1,192.3 99.5,191.8 101,191.9 102.4,193.7 103.5,192.2 104.6,194.6 106,192.2 108.1,191.9 108.9,192.6 109.9,191.7 112.1,191.8 113.5,191 115.3,192.2 116.4,193.6 116.8,193.1 119.3,194.1 120.7,193.6 121.4,194.5 122.5,194.4 124.7,193.7 125.7,192.9 126.4,191.2 128.6,192.1 130,190.6 130.8,194.2 131.8,195.3 133.6,192.8 135.4,193.1 136.5,189 137.6,188.4 139,189 139.7,188.6 141.5,188.2 142.6,189.8 144.8,187.4 145.8,187.6 147.3,188.8 148,187.3 149.4,187 151.2,187.4 151.9,185.6 154.4,185.2 155.5,186.2 155.9,183.9 157.3,184 159.1,186.5 160.2,186.6 162.3,186.1 163.8,184.8 164.9,186.9 166.6,187.4 167.7,186.6 168.8,186.8 169.9,185.4 171.3,185.8 172.7,187.2 173.5,186.9 175.6,187.4 177.1,187.3 177.8,186.6 179.2,186 181,187.5 182.8,185.8 183.5,186.6 184.6,187.2 186.7,187 187.5,185.9 188.9,184.1 190.7,184.6 191.1,182.5 192.5,182.7 194.6,180.9 196.1,182.6 197.2,181 198.9,181.5 199.7,181.8 201.5,177 202.5,179.2 204,180.1 205.8,179.3 206.1,179.3 207.9,180.2 209,178.2 210.4,177.2 211.5,178.4 213.3,179.6 214.4,178.7 216.2,179.5 217.3,178.4 219,179.5 220.5,179.5 221.9,180.5 223,179.9 224.4,180.2 225.5,179.2 227.3,179.7 228.4,179.9 229.8,178.4 230.2,179 232.7,180.2 233,178.2 234.8,177.2 236.3,177 238.1,179.3 238.8,178.6 240.2,178.4 242,180.3 242.4,183.3 244.5,183.5 245.6,186.3 247.4,185.1 248.5,184.6 249.6,185.6 251.7,184.4 252.4,184.1 253.5,186.5 255.7,186.1 256.4,185.3 257.5,184.5 259.6,183.8 260.3,184.1 261.8,183.5 263.2,186 264.6,184.7 265.7,184.5 267.9,185.6 269.3,182.6 269.7,183 271.1,183.3 273.2,180.8 273.6,180.7 275.8,181.7 276.1,181.1 277.5,182 279,182.2 280.8,182.1 282.2,181.5 283.3,181 284.4,178.9 286.2,177.5 288,175.3 288.7,176.6 290.1,176.2 291.9,177.1 293.3,176.8 294.8,178.5 295.1,175.7 297.6,174.3 298.7,174.2 299.1,173.3 300.9,172.1 302,173.7 304.1,175.3 305.5,175.6 305.9,175.5 307.3,178.6 309.9,179.3 310.6,178.8 311.3,179.7 312.7,179.7 314.5,179 316,179.3 317.4,182.6 318.1,180.3 320.6,181.2 321.3,181.3 323.1,179.3 323.8,177.3 325.3,177.1 326.7,178 328.5,177.7 329.2,178.6 331.4,177.5 332.8,178.9 333.5,169 335.3,163.4 335.7,155.5 337.8,140.4 338.9,140 340.4,131.7 341.4,129.4 343.6,113.1 343.9,112.8 346.1,112.6 346.5,111.4 347.9,110.4 349.7,107.3 350.4,103 352.2,97.6 354,97.5 354.7,95.9 356.1,94.9 358.3,94.7 359,93 361.2,92 361.9,90.3 362.6,90.4 365.1,89.2 366.2,84.4 367.6,84.2 368.4,83.2 370.5,83.7 370.9,83.5 372.7,83.4 373.4,81.6 375.2,84.5 376.6,83.7 378,83.8 379.8,83.2 380.6,82.5 382.3,82.6 383.1,83.7 384.9,83.4 386.7,83.3 387.4,85.4 389.5,86.2 389.9,87 391.7,88 393.1,86.3 394.6,87.2 396,86.9 396.7,86.1 398.9,84.9 399.9,85.5 401.4,84.5 402.1,85.4 403.2,85.5 405.3,83.4 406.4,83.3 407.5,81.1 409.6,83.9 411.1,83.1 411.8,80.8 413.2,79.7 414.7,79.6 415.7,78.3 417.2,78.3 419,79.6 420.4,79.5 421.5,79.9 422.2,83.4 424,82.5 425.1,83.2 426.1,81.3 427.9,82.3 429,79.7 430.4,80.3 432.6,80 433,80.8 434.7,80.6 436.2,78.4 437.6,78.6 438.7,80.7 439.8,81.9 441.9,81.2 442.6,79.9 444.8,80 445.5,78.7 447.3,78.5 448.4,79.5 450.2,79 450.5,76.8 452.7,72 454.1,72.4 454.8,73.9 456.6,74.9 458.1,75.3 458.8,72.7 459.9,71.3 462,72.2 462.7,70.9 464.9,71.4 465.6,70 467.8,70.6 469.2,73.2 470.3,73.1 471.4,71.5 472.8,70.8 474.6,71.1 475.7,71.8 476,73.2 477.8,75.7 478.9,75.8 480.7,73 481.8,73.3 483.9,72.8 484.3,71.6 486.4,71.2 487.5,72.8 488.2,73.2 490.7,72.4 491.5,73.5 493.3,74.3 494.7,73.9 495.4,75 496.8,75.5 497.9,73.3 499.7,72.6 501.5,73.8 502.2,73.8 503.3,71.7 504.7,70.5 506.2,70.7 508,69.4 509.4,69.7 510.8,68.8 511.9,70.1 512.6,72.8 514.1,73.5 515.9,73.8 516.9,73.2 518.4,73.2 520.2,75.5 521.2,75.1 522,73.4 523.8,75.2 525.2,75.9 527,74.5 528.1,74.9 528.8,73.9 530.9,74.8 532.7,74.5 533.4,75.5 535.2,75.4 536.3,76.3 537.8,75.1 538.5,76.9 540.3,77.4 542.1,75.9 542.4,75.5 543.9,74.9 544.9,75.6 546.4,75.6 547.8,74.2 549.2,74.1 550.7,77.3 552.1,75.6 553.9,76 555.7,74.3 556.8,74.8 557.1,76.5 559.3,76.4 560,79.1 561.8,78.1 562.9,79.3 564,78.7 565.4,78.8 567.2,79.7 569,80 569.3,80.7 571.1,81.7 572.2,80.7 573.3,80.6 575.8,81.9 576.9,79.8 577.6,81.1 579.7,82.7 580.8,83 581.5,82.3 584.1,82.7 584.8,80.8 585.8,80.8 588,79.8 589.1,78.2 590.5,78.7 591.2,79.7 593,77.8 594.1,78 595.5,76.9 597.3,75.7 598.4,77.1 600.2,75.4 600.6,76.8 602,77.8" fill="none" stroke="#3A56C5" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>Kalman filter</title></polyline>
+  <circle cx="602" cy="77.8" r="4" fill="#3A56C5" stroke="#FBFBF8" stroke-width="2"><title>Kalman filter: 1.57</title></circle>
+  <polyline points="64,225.9 64.7,171.8 66.2,187 67.6,184.1 68.7,182.9 69.7,185.2 71.2,184.7 72.6,185.7 74.4,184 75.1,185.7 76.2,186.6 78.7,187.7 79.1,187 81.2,187.3 82.7,186.6 83.7,187.4 84.8,186.8 86.3,188.6 87.7,187.8 88.4,188.5 90.9,188.4 91.6,188.7 93.4,192 94.9,191.8 95.9,194.2 97.7,192.5 98.8,193.2 100.2,192.5 101.7,193.7 103.1,193.3 104.2,194.1 104.6,194.5 106,193.3 107.4,193.5 109.6,193.5 110.3,192.9 111.4,193.7 113.2,193.7 115,192.2 116.4,193.3 117.5,191.9 119.3,193.6 120.3,193.1 121.1,194.1 122.5,194.2 124.7,193.3 126.1,190.9 127.2,192.5 128.6,192.7 130,191.5 130.8,193.9 131.8,194.9 133.6,193.5 135.4,194.1 135.8,192.1 137.6,189.9 139,190.1 140.8,189.1 142.2,189.7 143,188.8 144.4,188.8 145.1,187.9 147.6,188.9 148.7,187.8 150.1,187.3 151.6,187.9 152.3,185 154.4,183.4 155.2,184.4 156.6,182.6 158,185 159.1,186 160.5,185.6 162.3,185.6 163.8,184.2 164.9,185.4 166.3,186.3 167,186.2 168.4,185.1 170.2,185.1 171.3,185.3 173.1,186 173.8,186.9 174.9,186.6 176.7,186.5 178.1,187.8 179.2,186.8 181,187.2 182.8,186.4 183.9,186.8 185,188 185.7,188 187.5,185.8 188.5,184.8 190,185.4 191.1,184.3 192.5,184.4 194.3,182.7 196.1,183.2 197.5,181.5 197.9,181.8 199.7,181.8 201.5,178.8 202.5,179.1 203.6,178.3 204.7,179.1 206.1,177.5 207.9,178.3 208.6,177.1 210.8,175.3 212.6,177.2 212.9,177 214,178 216.2,178.8 217.6,177.3 219,178.5 220.5,178.3 221.2,178.3 223,180.2 224.4,179.7 225.5,178.7 227.3,179.3 228.4,179.2 229.5,178.3 230.5,179.6 232.7,180.5 233,179.1 234.8,177.9 236.6,178.7 237.7,177.7 238.8,179.4 240.6,178.5 242,179.5 242.4,181.7 244.5,182 245.6,183.8 247,184.1 248.5,183.6 249.6,184.2 251.3,185 252.4,184.2 254.2,185.5 254.6,187.1 256.4,187.5 257.8,187.5 259.6,186.2 260.3,186.7 261.4,186.4 263.6,187.2 264.6,185.4 266.1,185.8 267.1,184.4 268.2,184.8 270.4,183.3 271.8,183.4 272.5,182.4 274,182.4 275,180.8 276.1,180.6 277.9,181.5 279,182 281.1,181.9 282.2,181.5 283.3,181.5 285.1,177.5 286.2,177.9 288,175.7 289.4,175.8 290.8,177.3 291.5,176.6 293,176.1 294.8,177.9 295.5,175.7 296.9,175 298,174 299.1,171.9 301.6,171.1 302,171.9 303.4,172.1 305.5,172.9 306.3,174.3 307.3,175.8 309.5,177.6 310.6,176.8 311.3,177.7 313.4,177.2 315.2,177.5 316,176.5 316.7,180.4 318.1,179.7 320.3,181.6 321.3,184.7 322.8,184 323.8,181.2 325.6,180.2 326.7,180.3 327.4,180.4 328.9,178.7 331.4,178.1 332.8,178.6 333.5,172.8 335.3,168.8 335.7,164.3 337.8,150.5 338.9,148.5 340.4,141.1 341.4,139.1 343.2,124.1 344.3,122 345.4,118.1 347.2,101.7 348.3,96.8 349.7,95.4 351.1,81.5 351.8,78.5 354.4,72.6 354.7,72.8 356.1,75.5 357.9,76.2 359,75.5 361.2,77.6 361.5,78.8 363.3,77.8 365.1,81.3 366.2,79.2 367.6,79.9 368.7,79.7 369.8,80.3 371.9,80.2 373,80.4 373.4,79.9 375.2,82 376.2,81.8 377.7,80.9 379.8,80.5 380.2,80.4 382.7,81.2 383.1,80.8 385.2,81.6 386.7,81.4 387.7,84.1 389.5,85.2 389.9,86 391,86.7 393.1,85.9 394.9,87.8 395.3,86.9 396.7,86 398.9,85.9 399.9,86.6 401.4,86.3 402.1,87.2 403.5,87.1 405.7,86.3 406.4,86.1 407.5,84 408.5,84.9 411.1,83.4 411.8,81.2 413.2,79.5 413.9,79.6 415.7,77.7 417.2,77.6 418.2,78.3 420.4,78.9 421.5,78.7 422.2,80.9 424,80.2 425.4,80.7 426.1,80.1 427.9,80.7 429.4,80.3 431.2,78.7 432.6,78.9 433.3,80.3 434.7,81.2 436.2,79.8 437.3,80.8 438.7,82 439.8,82.2 441.9,81.7 443.4,80.6 443.7,78.7 445.2,78.8 447.3,78 447.7,78.9 450.2,78.5 451.3,77.4 452.7,74.4 453.1,74.7 454.5,73.6 457,75.7 458.1,76 458.8,74.3 460.2,71.8 462,71.6 462.7,70.3 464.2,70.8 465.6,69.3 467.8,68.9 468.5,69.5 469.6,69.6 471.7,68.6 472.1,69.5 474.2,71.8 474.9,71.6 476.4,71.4 477.5,73.1 479.6,72.2 480.3,73.7 482.5,73 483.9,73.5 485,72.7 486.4,72.5 487.2,73.8 489.3,74.5 490.7,72.5 491.8,73.2 492.9,74.7 494.7,75 495.8,76.1 497.2,75.7 497.9,74 499.4,71.2 500.4,71.3 502.2,73.8 503.3,72 504.7,71.3 506.2,72.5 507.2,71.1 508.7,70.9 510.8,69.8 511.9,70.2 512.6,72.1 515.1,71.6 515.9,72.1 516.9,71.2 518.4,70.7 520.2,73.6 521.2,73.6 523,72.4 524.5,74.8 525.6,74.8 526.3,75.6 527.3,75.2 529.5,76.5 530.2,76.1 532,76 533.4,77.3 534.9,75.9 536.3,76.7 537.4,75.7 538.5,76.9 540.3,77.2 542.1,75.5 543.5,76.6 543.9,76 544.9,75.9 546.7,74.6 548.9,75 549.2,74.9 550.7,77 552.1,76.1 553.9,76.6 555.7,74.9 556.8,75.3 557.1,76.2 559.6,76.2 560,77.1 561.8,76.6 562.5,77.4 565,77.8 565.4,78.2 567.5,78.8 568.3,79.5 570.4,80.5 571.9,80.5 572.6,79.3 573.6,80.9 575.4,81 576.2,82.1 577.6,82.8 579,82.7 580.8,83.6 581.5,82 583.3,83.3 584.8,82 585.5,82.6 588,81.7 589.1,80.3 590.5,80.4 591.2,80.4 592.7,78.7 594.1,79.1 595.5,78.1 597.3,77 598.4,78.4 599.1,76.8 600.9,76.5 602,75.4" fill="none" stroke="#E8850C" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>rolling OLS (60d)</title></polyline>
+  <circle cx="602" cy="75.4" r="4" fill="#E8850C" stroke="#FBFBF8" stroke-width="2"><title>rolling OLS (60d): 1.58</title></circle>
+  <text x="614" y="74.6" font-size="11" fill="#1F2C38">true: 1.62</text>
+  <line x1="607" y1="75.4" x2="614" y2="80.6" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="614" y="88.6" font-size="11" fill="#1F2C38">rolling OLS: 1.58</text>
+  <line x1="607" y1="77.8" x2="614" y2="94.6" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="614" y="102.6" font-size="11" fill="#1F2C38">Kalman: 1.57</text>
+</svg>
+<!-- /chart:hedge_ratio -->
+<figcaption>fig 5.7.3 — the Kalman filter and a rolling-window hedge ratio, tracking one deliberate jump</figcaption>
+</figure>
+
+<figure class="diagram chart">
+<!-- chart:hedge_rmse -->
+<svg viewBox="0 0 720 280" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Tracking error (RMSE) before and after the jump">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">TRACKING ERROR (RMSE) BEFORE AND AFTER THE JUMP</text>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#3A56C5" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">Kalman filter</text>
+  <line x1="153.2" y1="32" x2="169.2" y2="32" stroke="#E8850C" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="175.2" y="36" font-size="11" fill="#4A5A68">rolling OLS (60d)</text>
+  <line x1="64" y1="236" x2="690" y2="236" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="240" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.00</text>
+  <line x1="64" y1="200" x2="690" y2="200" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="204" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.10</text>
+  <line x1="64" y1="164" x2="690" y2="164" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="168" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.20</text>
+  <line x1="64" y1="128" x2="690" y2="128" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="132" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.30</text>
+  <line x1="64" y1="92" x2="690" y2="92" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="96" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.40</text>
+  <line x1="64" y1="56" x2="690" y2="56" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="60" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.50</text>
+  <line x1="64" y1="236" x2="690" y2="236" stroke="#C9CFC6" stroke-width="1"/>
+  <path d="M195.5,236 V231.1 Q195.5,227.1 199.5,227.1 H215.5 Q219.5,227.1 219.5,231.1 V236 Z" fill="#3A56C5"><title>before the jump · Kalman filter: 0.02</title></path>
+  <path d="M221.5,236 V231.1 Q221.5,227.1 225.5,227.1 H241.5 Q245.5,227.1 245.5,231.1 V236 Z" fill="#E8850C"><title>before the jump · rolling OLS (60d): 0.02</title></path>
+  <text x="220.5" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">before the jump</text>
+  <path d="M508.5,236 V89.4 Q508.5,85.4 512.5,85.4 H528.5 Q532.5,85.4 532.5,89.4 V236 Z" fill="#3A56C5"><title>first 60d after · Kalman filter: 0.42</title></path>
+  <path d="M534.5,236 V80.1 Q534.5,76.1 538.5,76.1 H554.5 Q558.5,76.1 558.5,80.1 V236 Z" fill="#E8850C"><title>first 60d after · rolling OLS (60d): 0.44</title></path>
+  <text x="533.5" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">first 60d after</text>
+</svg>
+<!-- /chart:hedge_rmse -->
+<figcaption>fig 5.7.4 — tracking error before and after the jump: indistinguishable in quiet times, a real gap right after the break</figcaption>
+</figure>
+
+<p>One path, however good, is not evidence — <span class="xref soon" data-xref="5.2" data-auto="" title="Coming soon">Session 5.2 — Regression &amp; Inference That Doesn&#x27;t Lie</span> exists for a reason. The lab re-draws the noise 300 times, keeping the same jump and the same tuned <math><semantics><mi>q</mi><annotation encoding="application/x-tex">q</annotation></semantics></math>, and computes the average gap between the two methods' post-break RMSE: <span data-lab="mc_hedge_diff_mean" data-fmt=".3f">0.044</span>, a standard error of <span data-lab="mc_hedge_diff_se" data-fmt=".4f">0.0008</span> away from zero, or <span data-lab="mc_hedge_diff_z" data-fmt=".0f">52</span> standard errors — not a lucky seed.</p>
+</section>
+
+<section id="s5">
+<h2><span class="no">5.7.5</span> Where people go wrong: tuning the filter</h2>
+<p class="lede">The Kalman filter has exactly one knob, and it is tempting to turn it by looking at the answer.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 220" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">SAME HEDGE RATIO, TWO APPROACHES</text>
+  <rect x="26" y="32" width="326" height="176" rx="9" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="189" y="54" font-size="11" font-weight="700" text-anchor="middle" fill="#D64B2A">THE NAIVE WAY — rolling OLS</text>
+  <rect x="46" y="66" width="286" height="24" rx="5" fill="#fff" stroke="#F2CDBF"/>
+  <text x="58" y="82" font-size="9.5" fill="#1F2C38">re-fit β from the last W days only</text>
+  <rect x="46" y="96" width="286" height="24" rx="5" fill="#fff" stroke="#F2CDBF"/>
+  <text x="58" y="112" font-size="9.5" fill="#1F2C38">a day beyond W vanishes completely</text>
+  <text x="189" y="148" font-size="9.5" text-anchor="middle" fill="#D64B2A" font-weight="600">Blind until the window clears.</text>
+  <text x="189" y="166" font-size="9" text-anchor="middle" fill="#4A5A68">Narrow W: less blind, but whipsaws daily.</text>
+  <rect x="368" y="32" width="326" height="176" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="531" y="54" font-size="11" font-weight="700" text-anchor="middle" fill="#1F7A55">THE DISCIPLINED WAY — Kalman</text>
+  <rect x="388" y="66" width="286" height="24" rx="5" fill="#fff" stroke="#BFE0CF"/>
+  <text x="400" y="82" font-size="9.5" fill="#1F2C38">1 · keep a running (β̂, P), not a window</text>
+  <rect x="388" y="96" width="286" height="24" rx="5" fill="#fff" stroke="#BFE0CF"/>
+  <text x="400" y="112" font-size="9.5" fill="#1F2C38">2 · weigh today's surprise by the gain</text>
+  <text x="531" y="148" font-size="9.5" text-anchor="middle" fill="#1F7A55" font-weight="600">Starts correcting on day one.</text>
+  <text x="531" y="166" font-size="9" text-anchor="middle" fill="#4A5A68">But only as fast as q says a jump is likely.</text>
+</svg>
+<figcaption>fig 5.7.5 — a fixed window is blind, then all at once; a well-tuned filter reacts immediately, at a pace it was told to expect</figcaption>
+</figure>
+
+<p>The pitfall is not "pick the wrong number" — it is picking <math><semantics><mi>q</mi><annotation encoding="application/x-tex">q</annotation></semantics></math> by fitting the very jump you are being graded on. Maximise the likelihood over data that includes the break, and you will find whatever <math><semantics><mi>q</mi><annotation encoding="application/x-tex">q</annotation></semantics></math> makes that one jump look inevitable — a filter tuned to catch a break it has already seen, which is <span class="xref soon" data-xref="6.1" data-auto="" title="Coming soon">Session 6.1 — What a Backtest Is (and Isn&#x27;t)</span>'s look-ahead bias wearing a different hat. §5.7.4's <math><semantics><mi>q</mi><annotation encoding="application/x-tex">q</annotation></semantics></math> was chosen on the pre-break segment alone for exactly this reason.</p>
+
+<table>
+<thead><tr><th>Setting</th><th>Tracking a quiet period</th><th>Closing a real gap (150 days)</th><th>Verdict</th></tr></thead>
+<tbody>
+<tr><td>too small (q*/15)</td><td>std of daily Δβ̂: <span data-lab="q_small_quiet_noise" data-fmt=".4f">0.0011</span></td><td>RMSE <span data-lab="q_small_rmse150" data-fmt=".3f">0.484</span></td><td>smooth, but slow to admit anything changed</td></tr>
+<tr><td>well-tuned (q*)</td><td>std of daily Δβ̂: <span data-lab="q_tuned_quiet_noise" data-fmt=".4f">0.0038</span></td><td>RMSE <span data-lab="q_tuned_rmse150" data-fmt=".3f">0.270</span></td><td>a reasoned middle ground</td></tr>
+<tr><td>too large (q*×15)</td><td>std of daily Δβ̂: <span data-lab="q_large_quiet_noise" data-fmt=".4f">0.0139</span></td><td>RMSE <span data-lab="q_large_rmse150" data-fmt=".3f">0.129</span></td><td>catches the break fast, chases noise daily</td></tr>
+</tbody>
+</table>
+
+<div class="co warn"><span class="co-t">⚠️ Pitfall — "a bigger q is just more responsive, so why not use one?"</span>
+<p>Because responsiveness to a real break and sensitivity to ordinary noise are the same knob. The table above is one simulated path, but the direction is not a matter of luck — it is a property of the Kalman recursion itself (a bigger <math><semantics><mi>q</mi><annotation encoding="application/x-tex">q</annotation></semantics></math> mechanically raises the gain every single day, break or not), which is why the lab asserts it directly rather than across replicates. Choosing <math><semantics><mi>q</mi><annotation encoding="application/x-tex">q</annotation></semantics></math> is a bet on how often genuine breaks happen; choose it from history that only shows ordinary days, and you are betting breaks are rarer than they are.</p>
+</div>
+
+<p>There is a second, quieter assumption worth naming: this whole session has treated <math><semantics><mi>q</mi><annotation encoding="application/x-tex">q</annotation></semantics></math> as one fixed number for the entire series. A hedge ratio in a calm market and the same hedge ratio during a liquidity crunch are unlikely to wander at the same rate — the process noise itself may depend on which of §5.7.6's regimes you are in. A single, permanently well-tuned <math><semantics><mi>q</mi><annotation encoding="application/x-tex">q</annotation></semantics></math> is a compromise between "too jumpy in calm times" and "too sluggish in turbulent ones", not a solution to both at once. A regime-dependent <math><semantics><mi>q</mi><annotation encoding="application/x-tex">q</annotation></semantics></math> is a natural next step for anyone who finishes this session wanting more, and it is exactly the kind of extension that becomes easy once §5.7.6's second tool is in your hands.</p>
+</section>
+
+<section id="s6">
+<h2><span class="no">5.7.6</span> Hidden Markov models: when the state is discrete</h2>
+<p class="lede">Sometimes the hidden state isn't a wandering number — it's one of a few distinct worlds, and the interesting question is which one you're in today.</p>
+
+<p>A <strong>hidden Markov model (HMM)</strong> is a state-space model whose hidden state is not a continuous number but one of a handful of discrete labels, each with a fixed probability of persisting or switching to another. Each of those labels is a <strong>market regime</strong> — a persistent, recurring set of statistical conditions the market can return to more than once. Calm and crisis are the classic pair: similar in spirit to <span class="xref soon" data-xref="5.1" data-auto="" title="Coming soon">Session 5.1 — Stylized Facts of Returns</span>'s <span class="term soon" data-term="volatility clustering" title="Defined in Session 5.1 (coming soon)">volatility clustering</span> and <span class="term soon" data-term="leverage effect" title="Defined in Session 5.1 (coming soon)">leverage effect</span>, but now made explicit as two separate worlds with their own mean and volatility, rather than one process whose volatility happens to move around.</p>
+
+<p>This is a good moment to separate two ideas this session has used side by side. §5.7.4's hedge-ratio jump was a <strong>structural break</strong>: a permanent change in the relationship itself, after which the old value never returns — the merger that permanently changes a beta, the index reweighting that permanently changes a hedge ratio. A regime is the opposite kind of change: calm returns after crisis ends, with the <em>same</em> calm-regime statistics as before. Reach for a Kalman filter (or a break test such as Bai &amp; Perron's, in Go deeper) when you suspect something changed for good; reach for an HMM when you suspect the system is cycling between a few worlds it has visited before.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 226" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">TWO REGIMES — both persist; crisis just persists for far less long</text>
+  <path d="M110 70 C110 40 230 40 230 70" fill="none" stroke="#1F7A55" stroke-width="1.7" marker-end="url(#s6p)"/>
+  <text x="170" y="37" font-size="9.5" text-anchor="middle" fill="#1F7A55">usually stays</text>
+  <rect x="60" y="70" width="220" height="100" rx="10" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="170" y="102" font-size="13" font-weight="700" text-anchor="middle" fill="#1F7A55">CALM</text>
+  <text x="170" y="122" font-size="10" text-anchor="middle" fill="#4A5A68">low daily volatility</text>
+  <text x="170" y="137" font-size="10" text-anchor="middle" fill="#4A5A68">mild positive drift</text>
+  <text x="170" y="152" font-size="10" text-anchor="middle" fill="#4A5A68">the usual state</text>
+  <path d="M490 70 C490 40 610 40 610 70" fill="none" stroke="#D64B2A" stroke-width="1.7" marker-end="url(#s6c)"/>
+  <text x="550" y="37" font-size="9.5" text-anchor="middle" fill="#D64B2A">stays, briefly</text>
+  <rect x="440" y="70" width="220" height="100" rx="10" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="550" y="102" font-size="13" font-weight="700" text-anchor="middle" fill="#D64B2A">CRISIS</text>
+  <text x="550" y="122" font-size="10" text-anchor="middle" fill="#4A5A68">high daily volatility</text>
+  <text x="550" y="137" font-size="10" text-anchor="middle" fill="#4A5A68">often negative drift</text>
+  <text x="550" y="152" font-size="10" text-anchor="middle" fill="#4A5A68">much shorter-lived</text>
+  <path d="M280 118 H436" stroke="#D64B2A" stroke-width="1.7" marker-end="url(#s6c)"/>
+  <text x="358" y="111" font-size="9.5" text-anchor="middle" fill="#D64B2A">rarely switches</text>
+  <path d="M436 150 H280" stroke="#1F7A55" stroke-width="1.7" marker-end="url(#s6p)"/>
+  <text x="358" y="165" font-size="9.5" text-anchor="middle" fill="#1F7A55">reverts eventually</text>
+  <text x="360" y="204" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">Both states can return; crisis just doesn't stay as long as calm does.</text>
+  <defs>
+    <marker id="s6p" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F7A55"/></marker>
+    <marker id="s6c" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#D64B2A"/></marker>
+  </defs>
+</svg>
+<figcaption>fig 5.7.6 — a 2-state Markov chain: two persistent regimes with different average lifetimes</figcaption>
+</figure>
+
+<p>Fitting one means estimating, from data alone, each regime's mean and volatility <em>and</em> the transition probabilities — the classic algorithm is Baum–Welch, an instance of the EM algorithm. Two passes alternate: <strong>forward–backward</strong> turns a current guess of the parameters into a probability of being in each state on each day; the M-step turns those probabilities into a better guess of the parameters. Repeat until the fit stops improving. In production you would likely reach for statsmodels' <code>MarkovRegression</code> rather than hand-rolling this — but seeing the recursion once, in §5.7.7, is what makes that function something other than a black box.</p>
+
+<div class="co tip"><span class="co-t">💡 Tip — why the means barely matter here</span>
+<p>Daily means are tiny next to daily volatilities, exactly as in <a class="xref" href="../unit02-markets-instruments/session03-returns-pnl-leverage.html" data-xref="2.3" data-auto="">Session 2.3 — Returns, P&amp;L, Compounding &amp; Leverage</a>'s arithmetic. A calm regime earning 10% a year and a crisis regime losing 15% a year differ, per day, by a few basis points — utterly swamped by volatilities several times larger. The regimes below are identified almost entirely by the <em>change in variance</em>, not the change in mean, which is exactly how a real crisis looks: the direction is uncertain in real time; the turbulence is not.</p>
+</div>
+</section>
+
+<section id="s7">
+<h2><span class="no">5.7.7</span> Recovering regimes, in code</h2>
+<p class="lede">Simulate a truth you know, hide it, and see how much of it an algorithm that never saw the labels can put back together.</p>
+
+<p>The lab simulates <span data-lab="regime_t" data-fmt=",.0f">3,000</span> days (about <span data-lab="regime_years" data-fmt=".1f">11.9</span> years) of a 2-state Markov chain: calm persists with probability <span data-lab="p_stay_calm" data-fmt=".3f">0.995</span> per day (an average run of <span data-lab="avg_duration_calm" data-fmt=".0f">200</span> trading days), crisis with probability <span data-lab="p_stay_crisis" data-fmt=".3f">0.970</span> (an average run of only <span data-lab="avg_duration_crisis" data-fmt=".0f">33</span> days) — so in the long run the market sits in crisis about <span data-lab="stationary_p_crisis" data-fmt=".1%">14.3%</span> of the time. This one simulated run spent <span data-lab="frac_time_crisis" data-fmt=".1%">19.5%</span> of its days there — a reminder, straight out of <span class="xref soon" data-xref="5.2" data-auto="" title="Coming soon">Session 5.2 — Regression &amp; Inference That Doesn&#x27;t Lie</span>, that one draw of even 3,000 days doesn't land exactly on a long-run average.</p>
+
+<pre><span class="c"># forward-backward in log space (np.logaddexp is the stable log-sum-exp)</span>
+<span class="k">def</span> forward_backward(log_b, log_trans, log_pi0):
+    log_alpha[<span class="s">0</span>] = log_pi0 + log_b[<span class="s">0</span>]
+    <span class="k">for</span> t <span class="k">in</span> range(<span class="s">1</span>, T):
+        log_alpha[t] = log_b[t] + np.logaddexp.reduce(
+            log_alpha[t - <span class="s">1</span>][:, None] + log_trans, axis=<span class="s">0</span>)
+    <span class="c"># ...symmetric backward pass, then gamma = posterior state probabilities</span></pre>
+
+<p>Fit from a deliberately uninformative starting guess — not the true means, variances or persistence — the EM algorithm converges in <span data-lab="em_iters" data-fmt=".0f">11</span> iterations. A Viterbi decode of the fitted model recovers the correct regime on <span data-lab="viterbi_accuracy" data-fmt=".1%">98.0%</span> of days. Table below: the recovered parameters against the truth the simulation used but the algorithm never saw.</p>
+
+<table>
+<thead><tr><th>Parameter</th><th>True</th><th>Recovered by EM</th></tr></thead>
+<tbody>
+<tr><td>Calm mean (annualised)</td><td><span data-lab="mu_calm_annual" data-fmt=".0%">10%</span></td><td><span data-lab="em_mu_calm_annual" data-fmt=".1%">13.6%</span></td></tr>
+<tr><td>Crisis mean (annualised)</td><td><span data-lab="mu_crisis_annual" data-fmt=".0%">−15%</span></td><td><span data-lab="em_mu_crisis_annual" data-fmt=".1%">−16.7%</span></td></tr>
+<tr><td>Calm volatility (annualised)</td><td><span data-lab="sigma_calm_annual" data-fmt=".0%">12%</span></td><td><span data-lab="em_sigma_calm_annual" data-fmt=".1%">12.2%</span></td></tr>
+<tr><td>Crisis volatility (annualised)</td><td><span data-lab="sigma_crisis_annual" data-fmt=".0%">35%</span></td><td><span data-lab="em_sigma_crisis_annual" data-fmt=".1%">34.4%</span></td></tr>
+<tr><td>P(stay calm)</td><td><span data-lab="p_stay_calm" data-fmt=".3f">0.995</span></td><td><span data-lab="em_p_stay_calm" data-fmt=".3f">0.994</span></td></tr>
+<tr><td>P(stay crisis)</td><td><span data-lab="p_stay_crisis" data-fmt=".3f">0.970</span></td><td><span data-lab="em_p_stay_crisis" data-fmt=".3f">0.978</span></td></tr>
+</tbody>
+</table>
+
+<p>The volatilities and persistence probabilities land close to the truth; the means, as §5.7.6 warned, are the least reliable numbers in the table — exactly because they carry the least information relative to their own noise. As in §5.7.4, one lucky fit proves nothing: refit on 25 fresh simulations and the mean recovery accuracy is <span data-lab="mc_hmm_mean_accuracy" data-fmt=".1%">98.8%</span>, with a standard error of only <span data-lab="mc_hmm_se_accuracy" data-fmt=".2%">0.18%</span> — even four standard errors below that mean, <span data-lab="mc_hmm_lower_bound" data-fmt=".1%">98.1%</span>, is nowhere near a coin flip.</p>
+
+<p>Nothing in the forward–backward recursion or the M-step above assumed exactly two states — the lab's <code>fit_gaussian_hmm</code> takes the number of states as an argument, and the same code fits three or five regimes just as readily. Two is the right number to start with here because two is the number the simulation actually used, which is the whole point of teaching on synthetic data: you can check the algorithm against a truth you chose yourself before ever trusting it on a market where nobody hands you the answer. On real returns, the honest next question is not "does the model fit" — a third state will always fit at least as well as two — but "does a third state earn its extra parameters", the same model-selection question <span class="xref soon" data-xref="5.4" data-auto="" title="Coming soon">Session 5.4 — Stationarity &amp; ARMA Models</span> asked of AR and MA lag lengths, now asked of the number of regimes instead.</p>
+
+<figure class="diagram chart">
+<!-- chart:regime_probability -->
+<svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Smoothed P(crisis) vs. when it was actually true, over a representative 1.2-year window">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">SMOOTHED P(CRISIS) VS. WHEN IT WAS ACTUALLY TRUE, OVER A REPRESENTATIVE 1.2-YEAR WINDOW</text>
+  <rect x="239.2" y="40" width="185.8" height="224" fill="#1F7A55" fill-opacity="0.07"/>
+  <text x="245.2" y="53" font-size="10.5" fill="#4A5A68" font-style="italic">true crisis</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="268" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0%</text>
+  <line x1="64" y1="219.2" x2="602" y2="219.2" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="223.2" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">20%</text>
+  <line x1="64" y1="174.4" x2="602" y2="174.4" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="178.4" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">40%</text>
+  <line x1="64" y1="129.6" x2="602" y2="129.6" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="133.6" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">60%</text>
+  <line x1="64" y1="84.8" x2="602" y2="84.8" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="88.8" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">80%</text>
+  <line x1="64" y1="40" x2="602" y2="40" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="44" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">100%</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#C9CFC6" stroke-width="1"/>
+  <line x1="173.7" y1="264" x2="173.7" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="173.7" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">0.25</text>
+  <line x1="285.2" y1="264" x2="285.2" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="285.2" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">0.5</text>
+  <line x1="396.7" y1="264" x2="396.7" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="396.7" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">0.75</text>
+  <line x1="508.2" y1="264" x2="508.2" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="508.2" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">1</text>
+  <polyline points="64,40 65.8,40 67.5,40 69.3,40.2 71.1,40.2 72.8,40.3 74.6,40.7 76.4,40.7 78.2,40.4 79.9,40.4 81.7,40.8 83.5,41 85.2,40.9 87,40.4 88.8,40.2 90.5,40 92.3,40 94.1,40 95.9,43.4 97.6,45.2 99.4,45.7 101.2,46.2 102.9,46.3 104.7,45.5 106.5,42.6 108.2,43.6 110,142.2 111.8,202.6 113.6,232.3 115.3,245.7 117.1,253 118.9,258.4 120.6,260.4 122.4,261.6 124.2,262.3 125.9,262.7 127.7,263.2 129.5,263.6 131.2,263.8 133,263.8 134.8,263.8 136.6,263.7 138.3,263.7 140.1,263.9 141.9,263.9 143.6,263.9 145.4,263.9 147.2,263.9 148.9,263.9 150.7,263.9 152.5,263.9 154.3,263.9 156,263.9 157.8,264 159.6,264 161.3,264 163.1,264 164.9,263.9 166.6,263.8 168.4,263.9 170.2,263.9 172,263.9 173.7,263.9 175.5,263.9 177.3,263.9 179,263.8 180.8,263.9 182.6,263.9 184.3,263.9 186.1,264 187.9,264 189.7,263.9 191.4,263.9 193.2,264 195,264 196.7,263.9 198.5,263.9 200.3,263.9 202,263.9 203.8,264 205.6,264 207.3,263.9 209.1,263.9 210.9,263.9 212.7,263.9 214.4,263.9 216.2,263.9 218,263.9 219.7,264 221.5,264 223.3,264 225,264 226.8,264 228.6,264 230.4,264 232.1,264 233.9,263.9 235.7,263.8 237.4,263.6 239.2,263.1 241,262.2 242.7,260.5 244.5,257.3 246.3,255 248.1,252.1 249.8,247.3 251.6,241.4 253.4,234.3 255.1,231.6 256.9,225 258.7,208.4 260.4,193.2 262.2,171.5 264,109.4 265.8,93.9 267.5,57.4 269.3,55.3 271.1,49.6 272.8,49 274.6,47.2 276.4,46.6 278.1,45.1 279.9,41.3 281.7,41.1 283.4,40.7 285.2,40.9 287,40.7 288.8,40 290.5,40 292.3,40 294.1,40.2 295.8,40.3 297.6,40.2 299.4,40 301.1,40.1 302.9,40 304.7,40.1 306.5,40 308.2,40 310,40 311.8,40 313.5,40 315.3,40.1 317.1,40 318.8,43.9 320.6,48.2 322.4,49.6 324.2,49.8 325.9,49.6 327.7,49.1 329.5,46.8 331.2,40 333,40.1 334.8,40 336.5,40 338.3,41 340.1,41.3 341.8,41.6 343.6,41.5 345.4,41 347.2,40 348.9,40 350.7,40.2 352.5,40.3 354.2,40.2 356,40.5 357.8,40.5 359.5,40.3 361.3,40 363.1,40 364.9,40 366.6,40 368.4,40 370.2,40 371.9,40.1 373.7,40.2 375.5,40.2 377.2,40.1 379,40 380.8,40.1 382.6,40 384.3,40.1 386.1,40 387.9,40 389.6,42.2 391.4,42.9 393.2,43.1 394.9,43 396.7,42 398.5,40.2 400.2,40.1 402,40.1 403.8,41.1 405.6,41.3 407.3,41.1 409.1,40.2 410.9,40.1 412.6,40 414.4,40.1 416.2,40.1 417.9,40.3 419.7,40.5 421.5,41.9 423.3,43.1 425,44.4 426.8,160.6 428.6,206.8 430.3,236.7 432.1,249.2 433.9,256.5 435.6,261.2 437.4,262.9 439.2,263.5 441,263.7 442.7,263.9 444.5,263.9 446.3,263.9 448,263.9 449.8,263.9 451.6,263.9 453.3,263.9 455.1,263.9 456.9,263.9 458.7,263.9 460.4,263.9 462.2,263.9 464,263.9 465.7,263.9 467.5,263.9 469.3,264 471,263.9 472.8,263.9 474.6,263.8 476.3,263.6 478.1,263.5 479.9,263 481.7,261.5 483.4,257.4 485.2,251.8 487,240.8 488.7,232.8 490.5,211.6 492.3,153.1 494,64.3 495.8,40.6 497.6,40.4 499.4,40.2 501.1,40.1 502.9,40.1 504.7,40.1 506.4,40.1 508.2,40.1 510,40 511.7,40 513.5,40.1 515.3,40 517.1,40 518.8,40 520.6,40.1 522.4,40 524.1,40 525.9,40 527.7,140.3 529.4,192.3 531.2,232 533,249.9 534.8,257.7 536.5,260.6 538.3,262.5 540.1,263.2 541.8,263.5 543.6,263.7 545.4,263.8 547.1,263.8 548.9,263.9 550.7,263.9 552.4,263.8 554.2,263.9 556,263.9 557.8,263.9 559.5,263.9 561.3,264 563.1,264 564.8,263.9 566.6,263.9 568.4,263.8 570.1,263.9 571.9,263.9 573.7,263.9 575.5,263.9 577.2,263.9 579,263.9 580.8,263.8 582.5,263.9 584.3,263.9 586.1,263.9 587.8,263.9 589.6,263.9 591.4,263.9 593.2,263.9 594.9,263.9 596.7,263.8 598.5,263.8 600.2,263.9 602,263.9" fill="none" stroke="#3A56C5" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>P(crisis | data)</title></polyline>
+</svg>
+<!-- /chart:regime_probability -->
+<figcaption>fig 5.7.7 — the fitted model's day-by-day probability of crisis; one true crisis episode is shaded for reference, and the model's other spikes line up with the (unshaded) true crisis episodes on either side of it</figcaption>
+</figure>
+
+<p>None of this is only a research curiosity. A regime-probability series like fig 5.7.7's is exactly the kind of signal a risk desk uses to cut gross exposure when <math><semantics><mrow><mi>P</mi><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mtext>crisis</mtext><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">P(\text{crisis})</annotation></semantics></math> rises — a preview of the volatility targeting of <span class="xref soon" data-xref="9.5" data-auto="" title="Coming soon">Session 9.5 — Sizing, Vol Targeting &amp; Allocating Across Strategies</span> — and a pairs desk uses to decide when a hedge ratio needs rechecking rather than trusting blindly (<span class="xref soon" data-xref="8.3" data-auto="" title="Coming soon">Session 8.3 — Pairs Trading &amp; Statistical Arbitrage</span>). Two honest caveats before you reach for it live: the smoothed probabilities above use the whole sample, including days after the one being labelled, so a live system only ever has the noisier one-sided version; and a 2-state Gaussian model is a simplification real markets sometimes outgrow, wanting a third state or fatter-tailed emissions than <span class="xref soon" data-xref="5.1" data-auto="" title="Coming soon">Session 5.1 — Stylized Facts of Returns</span>'s Gaussian assumption allows.</p>
+</section>
+
+<section id="s8">
+<h2><span class="no">5.7.8</span> Try it</h2>
+<p class="lede">The trade-off in §5.7.5's table is worth feeling with your own hands, not just reading in a table.</p>
+
+<div class="co lab"><span class="co-t">🔧 Try it (12 min, in the lab)</span>
+<p>1. Open the companion notebook and run through the process-noise cells (§2–§4 of the lab).<br>
+2. In the <code>Q_SETTINGS</code> line, change the "too large" multiplier from <code>15</code> to <code>200</code> and re-run; watch the quiet-period noise number grow much faster than the post-break RMSE improves.<br>
+3. Change <code>ROLL_WINDOW</code> from <code>60</code> to <code>20</code> and re-run the hedge-ratio cells; a shorter window should close the gap with the Kalman filter — open the <code>hedge_ratio</code> chart and see it wobble more on ordinary days in exchange.<br>
+Success looks like: you can name one specific number that got worse whenever you made another one better. That trade-off, not a magic setting, is the actual lesson.</p>
+</div>
+</section>
+
+<hr>
+
+<section id="s9">
+<h2><span class="no">5.7.9</span> Glossary · Check yourself · Go deeper</h2>
+<div class="gloss" id="glossary">
+<div id="g-state-space-model"><b>State-space model</b> — a system split into a hidden state that evolves on its own and noisy observations that are all you ever see of it.</div>
+<div id="g-kalman-filter"><b>Kalman filter</b> — the recursive predict/update recipe for tracking a continuous hidden state when the state and every noise term are linear-Gaussian.</div>
+<div id="g-dynamic-hedge-ratio"><b>Dynamic hedge ratio</b> — a hedge ratio produced by a filter that updates on every new observation, instead of being re-estimated from a fixed historical window.</div>
+<div id="g-hidden-markov-model"><b>Hidden Markov model</b> — a state-space model whose hidden state is one of a handful of discrete labels, with fixed probabilities of persisting or switching.</div>
+<div id="g-market-regime"><b>Market regime</b> — a persistent, recurring set of statistical conditions (e.g. calm or crisis) that the market can revisit more than once.</div>
+<div id="g-structural-break"><b>Structural break</b> — a permanent change in the relationship itself, after which the old parameter value never returns.</div>
+</div>
+
+<h3>Check yourself</h3>
+<details class="q"><summary>1. A colleague says: "the Kalman filter is basically Bayesian updating with a name recruiters recognise." Fair or not?</summary><div>Fair. Treat yesterday's posterior (<math><semantics><mrow><msub><mover><mi>β</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><mrow><mi>t</mi><mo>−</mo><mn>1</mn><mo lspace="0.22em" rspace="0.22em" stretchy="false">|</mo><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub><mo separator="true">,</mo><msub><mi>P</mi><mrow><mi>t</mi><mo>−</mo><mn>1</mn><mo lspace="0.22em" rspace="0.22em" stretchy="false">|</mo><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub></mrow><annotation encoding="application/x-tex">\hat\beta_{t-1\mid t-1}, P_{t-1\mid t-1}</annotation></semantics></math>) as today's prior, combine it with the new observation weighted by the Kalman gain, and the result is today's posterior — the same machinery as Session 5.3's shrinkage, run once per period instead of once per dataset.</div></details>
+<details class="q"><summary>2. If the observation noise σ_ε² is much larger than the process noise q, does the filter mostly trust yesterday's estimate or today's new data point? Why?</summary><div>Yesterday's estimate. The Kalman gain K_t = P x / (x²P + σ_ε²) shrinks toward zero as σ_ε² dominates the denominator, so the update barely moves — the filter is, correctly, unwilling to let one very noisy observation override a stable belief.</div></details>
+<details class="q"><summary>3. A pairs trader sets q = 0 in the code of §5.7.4. What have they actually built, and would you recommend it for a pair whose hedge ratio has broken before?</summary><div>A recursive form of static (expanding-window) OLS — the sanity check earlier in the session proves the two are numerically identical. Not recommended for a pair with a history of breaks: with q = 0 the state can never move again once P has shrunk, so the "filter" can never adapt at all, however long you run it.</div></details>
+<details class="q"><summary>4. Two analysts each tune q for the same pair — one maximises pre-break likelihood only, the other maximises fit including the jump itself. Whose choice would you trust in production?</summary><div>The first. The second has already seen the answer it is being asked to predict (look-ahead bias, §6.1's theme under a new name): it will pick a q that makes this one jump look perfectly ordinary, then chase noise on every future day that isn't actually a break.</div></details>
+<details class="q"><summary>5. A merger permanently doubles a stock's beta to the market; a currency's volatility spikes for two months during a crisis, then returns to its old range. Which is a structural break and which is a regime — and why does the distinction matter for choosing a tool?</summary><div>The merger is a structural break: permanent, one-off, no reversion — track it with a filter (or test for it directly, e.g. Bai–Perron) rather than a model that expects the old value to come back. The volatility spike is a regime: the market revisits its old calm state, so a hidden Markov model, which explicitly allows returning to a previously-seen state, is the right tool.</div></details>
+<details class="q"><summary>6. You fit a 2-state HMM twice from different random starting guesses and get what look like contradictory results: run A calls state 1 "calm", run B calls state 1 "crisis". Is the model broken?</summary><div>No — label switching. EM has no notion of which index means what; it only fits distributions to data. The fix is mechanical: sort the fitted states by a fixed criterion (here, ascending volatility) before comparing runs or reporting results, exactly as the lab does.</div></details>
+
+<div class="co lab"><span class="co-t">🔧 Homework (~1 h before Session 6.1)</span>
+<p>1. In the lab, multiply q* by 100 and re-run the hedge-ratio cells; record the new post-break RMSE and the new quiet-period noise, and note which one got worse and by how much.<br>
+2. In the lab, lower <code>P_STAY_CRISIS</code> from 0.97 to 0.90 (crisis regimes end faster) and refit the HMM; does Viterbi accuracy hold up, and can you explain why a shorter-lived regime is harder to recover from the same amount of data?<br>
+3. Read Chan (2013)'s original EWA/EWC Kalman-filter pairs trade (Go deeper, below) before Session 6.1, which opens by asking the harder question this whole unit has been building toward: does any of it survive being backtested honestly?</p>
+</div>
+
+<h3>📚 Go deeper</h3>
+<ol class="refs">
+<li>Kalman, R. E. (1960). "A New Approach to Linear Filtering and Prediction Problems." <em>Journal of Basic Engineering</em> 82(1), 35–45. <span class="rid">doi:10.1115/1.3662552</span></li>
+<li>Durbin, J. &amp; Koopman, S. J. (2012). <em>Time Series Analysis by State Space Methods</em> (2nd ed.). Oxford University Press. <span class="rid">ISBN 9780199641178</span></li>
+<li>Chan, E. P. (2013). <em>Algorithmic Trading: Winning Strategies and Their Rationale</em>. Wiley. <span class="rid">ISBN 9781118460146</span></li>
+<li>Hamilton, J. D. (1989). "A New Approach to the Economic Analysis of Nonstationary Time Series and the Business Cycle." <em>Econometrica</em> 57(2), 357–384. <span class="rid">doi:10.2307/1912559</span></li>
+<li>Rabiner, L. R. (1989). "A Tutorial on Hidden Markov Models and Selected Applications in Speech Recognition." <em>Proceedings of the IEEE</em> 77(2), 257–286. <span class="rid">doi:10.1109/5.18626</span></li>
+</ol>
+
+<h3>Sources for the numbers</h3>
+<ol class="refs">
+<li>Ang, A. &amp; Timmermann, A. (2012). "Regime Changes and Financial Markets." <em>Annual Review of Financial Economics</em> 4, 313–337. <span class="rid">doi:10.1146/annurev-financial-110311-101808</span></li>
+<li>Bai, J. &amp; Perron, P. (1998). "Estimating and Testing Linear Models with Multiple Structural Changes." <em>Econometrica</em> 66(1), 47–78. <span class="rid">doi:10.2307/2998540</span></li>
+</ol>
+</section>
+
+<!-- nav:foot -->
+<div class="foot">
+<span class="soon" title="Coming soon">← Prev: 5.6 · Cointegration</span>
+<span class="soon" title="Coming soon">Next: 6.1 · What a Backtest Is →</span>
+</div>
+<p class="legal">Educational material only — not investment, legal or tax advice. Backtests and simulations are hypothetical. <a href="../start-here.html#disclaimer">Disclaimer</a> · Text CC BY 4.0 · Code MIT.</p>
+<!-- /nav:foot -->
+</main>
+</div></body></html>

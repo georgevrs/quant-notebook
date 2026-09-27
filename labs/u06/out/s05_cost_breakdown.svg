@@ -1,0 +1,28 @@
+<svg viewBox="0 0 720 260" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Annual cost drag by component at $1bn of assumed capital">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">ANNUAL COST DRAG BY COMPONENT AT $1BN OF ASSUMED CAPITAL</text>
+  <line x1="64" y1="216" x2="690" y2="216" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="220" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.00%</text>
+  <line x1="64" y1="181.6" x2="690" y2="181.6" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="185.6" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.50%</text>
+  <line x1="64" y1="147.2" x2="690" y2="147.2" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="151.2" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">1.00%</text>
+  <line x1="64" y1="112.8" x2="690" y2="112.8" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="116.8" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">1.50%</text>
+  <line x1="64" y1="78.4" x2="690" y2="78.4" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="82.4" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">2.00%</text>
+  <line x1="64" y1="44" x2="690" y2="44" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="48" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">2.50%</text>
+  <line x1="64" y1="216" x2="690" y2="216" stroke="#C9CFC6" stroke-width="1"/>
+  <path d="M130.2,216 V215.3 Q130.2,214.6 130.9,214.6 H153.6 Q154.2,214.6 154.2,215.3 V216 Z" fill="#3A56C5"><title>Commission: 0.02%</title></path>
+  <text x="142.2" y="207.6" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.02%</text>
+  <text x="142.2" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">Commission</text>
+  <path d="M286.8,216 V213.3 Q286.8,210.5 289.5,210.5 H308 Q310.8,210.5 310.8,213.3 V216 Z" fill="#3A56C5"><title>Half-spread: 0.08%</title></path>
+  <text x="298.8" y="203.5" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.08%</text>
+  <text x="298.8" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">Half-spread</text>
+  <path d="M443.2,216 V88.8 Q443.2,84.8 447.2,84.8 H463.2 Q467.2,84.8 467.2,88.8 V216 Z" fill="#3A56C5"><title>Market impact: 1.91%</title></path>
+  <text x="455.2" y="77.8" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">1.91%</text>
+  <text x="455.2" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">Market impact</text>
+  <path d="M599.8,216 V206.2 Q599.8,202.2 603.8,202.2 H619.8 Q623.8,202.2 623.8,206.2 V216 Z" fill="#3A56C5"><title>Borrow cost: 0.20%</title></path>
+  <text x="611.8" y="195.2" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.20%</text>
+  <text x="611.8" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">Borrow cost</text>
+</svg>

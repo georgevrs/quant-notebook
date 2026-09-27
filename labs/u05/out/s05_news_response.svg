@@ -1,0 +1,40 @@
+<svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Next-day volatility implied by a shock of a given size (in long-run daily σ)">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">NEXT-DAY VOLATILITY IMPLIED BY A SHOCK OF A GIVEN SIZE (IN LONG-RUN DAILY σ)</text>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#4A5A68" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">true model</text>
+  <line x1="134.0" y1="32" x2="150.0" y2="32" stroke="#D64B2A" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="156.0" y="36" font-size="11" fill="#4A5A68">symmetric GARCH fit</text>
+  <line x1="299.6" y1="32" x2="315.6" y2="32" stroke="#3A56C5" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="321.6" y="36" font-size="11" fill="#4A5A68">GJR-GARCH fit</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="268" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">15.0%</text>
+  <line x1="64" y1="211" x2="602" y2="211" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="215" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">20.0%</text>
+  <line x1="64" y1="158" x2="602" y2="158" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="162" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">25.0%</text>
+  <line x1="64" y1="105" x2="602" y2="105" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="109" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">30.0%</text>
+  <line x1="64" y1="52" x2="602" y2="52" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="56" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">35.0%</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#C9CFC6" stroke-width="1"/>
+  <line x1="64" y1="264" x2="64" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="64" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">-4</text>
+  <line x1="198.5" y1="264" x2="198.5" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="198.5" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">-2</text>
+  <line x1="333" y1="264" x2="333" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="333" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">0</text>
+  <line x1="467.5" y1="264" x2="467.5" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="467.5" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">2</text>
+  <line x1="602" y1="264" x2="602" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="602" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">4</text>
+  <polyline points="64,95.3 77.5,106.2 90.9,117 104.4,127.5 117.8,137.8 131.2,147.9 144.7,157.6 158.2,167 171.6,176 185,184.6 198.5,192.7 212,200.3 225.4,207.3 238.8,213.7 252.3,219.4 265.8,224.4 279.2,228.5 292.7,231.8 306.1,234.2 319.6,235.6 333,236.1 346.4,236 359.9,235.6 373.4,235 386.8,234.2 400.2,233.1 413.7,231.8 427.2,230.3 440.6,228.5 454.1,226.6 467.5,224.4 480.9,222 494.4,219.4 507.9,216.7 521.3,213.7 534.8,210.6 548.2,207.3 561.7,203.9 575.1,200.3 588.6,196.6 602,192.7" fill="none" stroke="#4A5A68" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><title>true model</title></polyline>
+  <circle cx="602" cy="192.7" r="4" fill="#4A5A68" stroke="#FBFBF8" stroke-width="2"><title>true model: 21.7%</title></circle>
+  <polyline points="64,160.1 77.5,167.4 90.9,174.6 104.4,181.5 117.8,188.3 131.2,194.8 144.7,201.1 158.2,207.1 171.6,212.8 185,218.2 198.5,223.3 212,228 225.4,232.3 238.8,236.2 252.3,239.6 265.8,242.5 279.2,245 292.7,246.9 306.1,248.3 319.6,249.1 333,249.4 346.4,249.1 359.9,248.3 373.4,246.9 386.8,245 400.2,242.5 413.7,239.6 427.2,236.2 440.6,232.3 454.1,228 467.5,223.3 480.9,218.2 494.4,212.8 507.9,207.1 521.3,201.1 534.8,194.8 548.2,188.3 561.7,181.5 575.1,174.6 588.6,167.4 602,160.1" fill="none" stroke="#D64B2A" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>symmetric GARCH fit</title></polyline>
+  <circle cx="602" cy="160.1" r="4" fill="#D64B2A" stroke="#FBFBF8" stroke-width="2"><title>symmetric GARCH fit: 24.8%</title></circle>
+  <polyline points="64,111.1 77.5,121 90.9,130.6 104.4,140.1 117.8,149.3 131.2,158.2 144.7,166.9 158.2,175.2 171.6,183.2 185,190.8 198.5,197.9 212,204.6 225.4,210.7 238.8,216.2 252.3,221.2 265.8,225.5 279.2,229 292.7,231.9 306.1,233.9 319.6,235.1 333,235.6 346.4,235.5 359.9,235.1 373.4,234.6 386.8,233.9 400.2,232.9 413.7,231.8 427.2,230.5 440.6,228.9 454.1,227.2 467.5,225.3 480.9,223.2 494.4,221 507.9,218.5 521.3,216 534.8,213.2 548.2,210.3 561.7,207.3 575.1,204.1 588.6,200.8 602,197.4" fill="none" stroke="#3A56C5" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>GJR-GARCH fit</title></polyline>
+  <circle cx="602" cy="197.4" r="4" fill="#3A56C5" stroke="#FBFBF8" stroke-width="2"><title>GJR-GARCH fit: 21.3%</title></circle>
+  <text x="614" y="164.1" font-size="11" fill="#1F2C38">GARCH: 24.8%</text>
+  <text x="614" y="196.7" font-size="11" fill="#1F2C38">true: 21.7%</text>
+  <line x1="607" y1="197.4" x2="614" y2="202.7" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="614" y="210.7" font-size="11" fill="#1F2C38">GJR: 21.3%</text>
+</svg>

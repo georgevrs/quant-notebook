@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- nav:head -->
+<title>5.2 · Regression &amp; Inference That Doesn&#x27;t Lie</title>
+<meta name="description" content="OLS alpha and beta, HAC standard errors, overlapping observations, the standard error of a Sharpe ratio, bootstraps and multiple testing.">
+<link rel="canonical" href="https://georgevrs.github.io/quant-notebook/unit05-statistics-time-series/session02-regression-inference.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Quant Notebook">
+<meta property="og:title" content="5.2 · Regression &amp; Inference That Doesn&#x27;t Lie">
+<meta property="og:description" content="OLS alpha and beta, HAC standard errors, overlapping observations, the standard error of a Sharpe ratio, bootstraps and multiple testing.">
+<meta property="og:url" content="https://georgevrs.github.io/quant-notebook/unit05-statistics-time-series/session02-regression-inference.html">
+<meta name="twitter:card" content="summary">
+<link rel="stylesheet" href="../assets/brand.css">
+<link rel="stylesheet" href="../assets/temml.css">
+<!-- /nav:head -->
+</head>
+<body><div class="page" id="top">
+<!-- Session 5.2 — the rigor session: OLS, HAC, overlapping observations, the SE of the Sharpe
+     ratio, FWER/FDR, White's SPA and Hansen's MCS. 6.7 and 9.7 data-xref back to these definitions. -->
+<!-- nav:tabs -->
+<nav class="tabs">
+<a href="../index.html">⌂ Course home</a>
+<span class="soon" title="Coming soon">5.1 · Stylized Facts</span>
+<a class="active" href="session02-regression-inference.html">5.2 · Honest Inference</a>
+<span class="soon" title="Coming soon">5.3 · Bayesian Thinking</span>
+<span class="soon" title="Coming soon">5.4 · Stationarity &amp; ARMA</span>
+<span class="soon" title="Coming soon">5.5 · Volatility</span>
+<span class="soon" title="Coming soon">5.6 · Cointegration</span>
+<span class="soon" title="Coming soon">5.7 · Kalman &amp; Regimes</span>
+<a href="../roadmap.html">🗺 Roadmap</a>
+</nav>
+<!-- /nav:tabs -->
+
+<header class="cover">
+<!-- nav:heading -->
+<p class="eyebrow">Unit 5 · Statistics &amp; Time Series of Returns — Session 02 of 07</p>
+<h1>Regression &amp; Inference That Doesn&#x27;t Lie</h1>
+<!-- /nav:heading -->
+<p class="subtitle">A regression hands you a slope and a p-value whether or not you earned them. <mark>The textbook standard error assumes independent errors, one test, and no memory in the data</mark> — finance routinely breaks all three, always in the direction of making you more confident than you should be.</p>
+<div class="meta">
+<span>DURATION <b>1.5 h + lab</b></span>
+<span>LEVEL <b>Intermediate</b></span>
+<span>TRACKS <b>QR · QT · IND</b></span>
+<span>HANDS-ON <b>Companion lab, 7 experiments</b></span>
+</div>
+<!-- nav:labstrip -->
+<div class="labstrip"><b>📓 Companion lab</b>
+<a href="https://colab.research.google.com/github/georgevrs/quant-notebook/blob/main/labs/u05/s02_regression_inference.ipynb">Open in Colab</a>
+<a href="https://github.com/georgevrs/quant-notebook/blob/main/labs/u05/s02_regression_inference.ipynb">Notebook on GitHub</a>
+<a href="https://github.com/georgevrs/quant-notebook/blob/main/labs/u05/s02_regression_inference.py">Source (.py)</a>
+</div>
+<!-- /nav:labstrip -->
+<div class="toc">
+<b>On this page</b>
+<ol>
+<li><a href="#s1">Why a p-value can lie</a></li>
+<li><a href="#s2">Ordinary least squares, properly standard-erred</a></li>
+<li><a href="#s3">HAC, Newey-West &amp; overlapping observations</a></li>
+<li><a href="#s4">The standard error of the Sharpe ratio</a></li>
+<li><a href="#s5">In code</a></li>
+<li><a href="#s6">Multiple testing: FWER, FDR, SPA &amp; the model confidence set</a></li>
+<li><a href="#s7">Try it</a></li>
+<li><a href="#s8">Glossary · Check yourself · Go deeper</a></li>
+</ol>
+</div>
+</header>
+
+<main>
+
+<!-- ============ §1 — mental model ============ -->
+<section id="s1">
+<h2><span class="no">5.2.1</span> Why a p-value can lie</h2>
+<p class="lede"><span class="xref soon" data-xref="5.1" data-auto="" title="Coming soon">Session 5.1 — Stylized Facts of Returns</span> catalogued the regularities of returns — fat tails, clustered volatility, near-zero autocorrelation in the level of returns. This session is about what those regularities do to the arithmetic you use to judge a result.</p>
+
+<p>An <strong>ordinary least squares</strong> regression fits a line and, alongside it, a promise: "the slope is this far from zero, and here is how sure you can be." That promise is a <strong>p-value</strong> — the probability, if the true effect were exactly zero, of seeing a result at least this extreme by chance alone. The promise is only as good as three assumptions baked into the textbook formula: the errors are independent of each other, each row of data is genuinely new information, and you asked the question once. Financial research routinely violates all three — a stale month-end price echoes into the next day's return, a "21-day forward return" reuses 20 of yesterday's days, and nobody backtests a strategy exactly once. Every one of these violations makes the reported standard error <em>smaller</em> than the truth, never larger, which means the p-value looks <em>better</em> than it should, never worse. That asymmetry is the reason this session exists: undiscovered edges do not disappear when you fix the arithmetic, but a great many discovered ones do.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 220" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="24" font-size="12" fill="#4A5A68" font-family="IBM Plex Mono,monospace">THREE WAYS A TEXTBOOK STANDARD ERROR GETS TOO SMALL</text>
+  <rect x="26" y="42" width="204" height="140" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="128" y="70" font-size="13" font-weight="600" text-anchor="middle" fill="#3A56C5">AUTOCORRELATION</text>
+  <text x="128" y="94" font-size="10" text-anchor="middle" fill="#4A5A68">today's error echoes</text>
+  <text x="128" y="108" font-size="10" text-anchor="middle" fill="#4A5A68">yesterday's — momentum,</text>
+  <text x="128" y="122" font-size="10" text-anchor="middle" fill="#4A5A68">smoothed or stale prices</text>
+  <text x="128" y="152" font-size="9.5" text-anchor="middle" fill="#3A56C5" font-weight="600">§5.2.3 · HAC</text>
+  <rect x="258" y="42" width="204" height="140" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="360" y="70" font-size="13" font-weight="600" text-anchor="middle" fill="#1F7A55">OVERLAPPING WINDOWS</text>
+  <text x="360" y="94" font-size="10" text-anchor="middle" fill="#4A5A68">a k-day return shares</text>
+  <text x="360" y="108" font-size="10" text-anchor="middle" fill="#4A5A68">k−1 days with its</text>
+  <text x="360" y="122" font-size="10" text-anchor="middle" fill="#4A5A68">neighbour — not new data</text>
+  <text x="360" y="152" font-size="9.5" text-anchor="middle" fill="#1F7A55" font-weight="600">§5.2.3 · overlap</text>
+  <rect x="490" y="42" width="204" height="140" rx="9" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="592" y="70" font-size="13" font-weight="600" text-anchor="middle" fill="#8A6D00">MULTIPLE LOOKS</text>
+  <text x="592" y="94" font-size="10" text-anchor="middle" fill="#4A5A68">test enough noise and</text>
+  <text x="592" y="108" font-size="10" text-anchor="middle" fill="#4A5A68">something clears the bar</text>
+  <text x="592" y="122" font-size="10" text-anchor="middle" fill="#4A5A68">— that's what "5%" means</text>
+  <text x="592" y="152" font-size="9.5" text-anchor="middle" fill="#8A6D00" font-weight="600">§5.2.6 · FWER/FDR</text>
+  <text x="360" y="205" font-size="12" text-anchor="middle" fill="#4A5A68" font-style="italic">Each one shrinks the reported uncertainty without shrinking the true uncertainty.</text>
+</svg>
+<figcaption>fig 5.2.1 — three routine features of financial data, and where this session fixes each one</figcaption>
+</figure>
+
+<div class="co key"><span class="co-t">📌 Key idea — the bias only runs one way</span>
+<p>None of the three problems above ever make a result look <em>less</em> significant than it truly is. A naive standard error is a floor you fall through, not a safety margin. <a class="xref" href="../unit01-quant-landscape/session04-engineers-edge-and-odds.html" data-xref="1.4" data-auto="">Session 1.4 — The Engineer&#x27;s Edge, Blind Spots &amp; Honest Odds</a> already showed that a one-year Sharpe ratio has a standard error of about 1 — this session shows how much worse that gets once you account for autocorrelation, overlap and search.</p>
+</div>
+</section>
+
+<!-- ============ §2 — how it works ============ -->
+<section id="s2">
+<h2><span class="no">5.2.2</span> Ordinary least squares, properly standard-erred</h2>
+<p class="lede">The mechanics are five minutes of linear algebra. Getting the standard error right is the part of the job that actually takes judgement.</p>
+
+<p>Say a strategy's daily excess returns <math><semantics><msub><mi>r</mi><mi>t</mi></msub><annotation encoding="application/x-tex">r_t</annotation></semantics></math> move with a benchmark's excess returns <math><semantics><msub><mi>f</mi><mi>t</mi></msub><annotation encoding="application/x-tex">f_t</annotation></semantics></math>: <math><semantics><mrow><msub><mi>r</mi><mi>t</mi></msub><mo>=</mo><mi>α</mi><mo>+</mo><mi>β</mi><msub><mi>f</mi><mi>t</mi></msub><mo>+</mo><msub><mi>ε</mi><mi>t</mi></msub></mrow><annotation encoding="application/x-tex">r_t = \alpha + \beta f_t + \varepsilon_t</annotation></semantics></math>. Ordinary least squares picks the <strong><math><semantics><mover><mi>α</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><annotation encoding="application/x-tex">\hat\alpha</annotation></semantics></math></strong> and <strong><math><semantics><mover><mi>β</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><annotation encoding="application/x-tex">\hat\beta</annotation></semantics></math></strong> that minimise the sum of squared residuals, <math><semantics><mrow><mover><mi>α</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><mo separator="true">,</mo><mover><mi>β</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><mo>=</mo><msub><mi>arg min</mi><mrow><mi>a</mi><mo separator="true">,</mo><mi>b</mi></mrow></msub><mo>⁡</mo><mspace width="0.1667em"></mspace><msub><mo movablelimits="false">∑</mo><mi>t</mi></msub><msup><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><msub><mi>r</mi><mi>t</mi></msub><mo>−</mo><mi>a</mi><mo>−</mo><mi>b</mi><msub><mi>f</mi><mi>t</mi></msub><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mn>2</mn></msup></mrow><annotation encoding="application/x-tex">\hat\alpha,\hat\beta = \argmin_{a,b}\sum_t (r_t - a - b f_t)^2</annotation></semantics></math> — a closed-form calculation, not a search. Here <math><semantics><mi>α</mi><annotation encoding="application/x-tex">\alpha</annotation></semantics></math> is the part of the return the <a class="term" href="../unit01-quant-landscape/session02-where-returns-come-from.html#g-beta" data-term="beta">benchmark</a> doesn't explain and <math><semantics><mi>β</mi><annotation encoding="application/x-tex">\beta</annotation></semantics></math> is the <a class="term" href="../unit01-quant-landscape/session02-where-returns-come-from.html#g-beta" data-term="beta">exposure</a> to it (both named and owned by <a class="xref" href="../unit01-quant-landscape/session02-where-returns-come-from.html" data-xref="1.2" data-auto="">Session 1.2 — Where Returns Come From</a>); this session is not about which benchmark belongs on the right-hand side — <span class="xref soon" data-xref="7.2" data-auto="" title="Coming soon">Session 7.2 — CAPM, APT &amp; Factor Regressions</span> builds the full CAPM/APT machinery for that — it is about whether you can trust the <math><semantics><mover><mi>α</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><annotation encoding="application/x-tex">\hat\alpha</annotation></semantics></math> and <math><semantics><mover><mi>β</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><annotation encoding="application/x-tex">\hat\beta</annotation></semantics></math> a regression like this hands you.</p>
+
+<p>Once you have <math><semantics><mover><mi>β</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><annotation encoding="application/x-tex">\hat\beta</annotation></semantics></math> you need its <strong>standard error</strong> to say anything about confidence. A <strong>t-statistic</strong> is the estimate divided by its standard error, <math><semantics><mrow><mi>t</mi><mo>=</mo><mover><mi>β</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><mi>/</mi><mpadded lspace="0"><mi>SE</mi></mpadded><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mover><mi>β</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">t = \hat\beta / \mathrm{SE}(\hat\beta)</annotation></semantics></math>; a <strong>p-value</strong> converts <math><semantics><mi>t</mi><annotation encoding="application/x-tex">t</annotation></semantics></math> into "how surprising is this, if the true <math><semantics><mi>β</mi><annotation encoding="application/x-tex">\beta</annotation></semantics></math> were zero" using the t-distribution. Every one of those steps is arithmetic — the judgement is entirely in which formula computes <math><semantics><mrow><mpadded lspace="0"><mi>SE</mi></mpadded><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mover><mi>β</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">\mathrm{SE}(\hat\beta)</annotation></semantics></math>, because the "classical" textbook formula is only correct when the residuals <math><semantics><msub><mi>ε</mi><mi>t</mi></msub><annotation encoding="application/x-tex">\varepsilon_t</annotation></semantics></math> are independent and identically distributed.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 150" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <rect x="18" y="40" width="118" height="70" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="77" y="65" font-size="11" text-anchor="middle" fill="#3A56C5" font-weight="600">1 · COLLECT</text>
+  <text x="77" y="82" font-size="9.5" text-anchor="middle" fill="#4A5A68">paired returns</text>
+  <text x="77" y="95" font-size="9.5" text-anchor="middle" fill="#4A5A68">(strategy, factor)</text>
+  <rect x="160" y="40" width="118" height="70" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="219" y="65" font-size="11" text-anchor="middle" fill="#3A56C5" font-weight="600">2 · FIT</text>
+  <text x="219" y="82" font-size="9.5" text-anchor="middle" fill="#4A5A68">OLS: minimise</text>
+  <text x="219" y="95" font-size="9.5" text-anchor="middle" fill="#4A5A68">squared residuals</text>
+  <rect x="302" y="40" width="132" height="70" rx="9" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="368" y="60" font-size="11" text-anchor="middle" fill="#8A6D00" font-weight="600">3 · CHOOSE SE</text>
+  <text x="368" y="77" font-size="9.5" text-anchor="middle" fill="#4A5A68">independent errors?</text>
+  <text x="368" y="90" font-size="9.5" text-anchor="middle" fill="#4A5A68">classical : HAC</text>
+  <rect x="454" y="40" width="118" height="70" rx="9" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="513" y="65" font-size="11" text-anchor="middle" fill="#8A6D00" font-weight="600">4 · t AND p</text>
+  <text x="513" y="82" font-size="9.5" text-anchor="middle" fill="#4A5A68">estimate ÷ SE,</text>
+  <text x="513" y="95" font-size="9.5" text-anchor="middle" fill="#4A5A68">then a p-value</text>
+  <rect x="596" y="40" width="104" height="70" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="648" y="65" font-size="11" text-anchor="middle" fill="#1F7A55" font-weight="600">5 · JUDGE</text>
+  <text x="648" y="82" font-size="9.5" text-anchor="middle" fill="#4A5A68">small p AND</text>
+  <text x="648" y="95" font-size="9.5" text-anchor="middle" fill="#4A5A68">tested once?</text>
+  <path d="M139 74 H157" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M281 74 H299" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M437 74 H451" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M575 74 H593" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <text x="360" y="134" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">Steps 1, 2 and 4 are arithmetic; step 3 is the only place judgement enters — and the only step most backtests skip.</text>
+  <defs><marker id="s2a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F2C38"/></marker></defs>
+</svg>
+<figcaption>fig 5.2.2 — from paired returns to a judgement; §5.2.3–§5.2.6 are all about step 3 and step 5</figcaption>
+</figure>
+
+<table>
+<thead><tr><th>Classical OLS assumes</th><th>What financial data actually gives you</th><th>The fix</th></tr></thead>
+<tbody>
+<tr><td>Errors independent across time</td><td>Returns cluster and echo — momentum, smoothed marks</td><td><a class="term" href="#g-hac-standard-errors" data-term="HAC standard errors">HAC standard errors</a> (§5.2.3)</td></tr>
+<tr><td>Each row is new information</td><td>A k-day return shares k−1 days with its neighbour</td><td>HAC with at least k−1 lags (§5.2.3)</td></tr>
+<tr><td>Homoskedastic (constant-variance) errors</td><td>Volatility clusters into calm and turbulent spells</td><td>HAC's "H" — heteroskedasticity-consistent too</td></tr>
+<tr><td>One hypothesis, tested once</td><td>Hundreds of parameter combinations tried first</td><td>FWER/FDR, or SPA/MCS (§5.2.6)</td></tr>
+</tbody>
+</table>
+
+<div class="co tip"><span class="co-t">💡 Looking ahead</span>
+<p>Everything in this session is infrastructure other sessions lean on: <span class="xref soon" data-xref="6.7" data-auto="" title="Coming soon">Session 6.7 — Overfitting Statistics: PSR, DSR, MinTRL &amp; PBO</span> uses the standard error of the Sharpe ratio to price in how many strategies you tried, <span class="xref soon" data-xref="9.7" data-auto="" title="Coming soon">Session 9.7 — VaR, ES, EVT &amp; VaR Backtests</span> uses these same inference tools to backtest a risk model, and <span class="xref soon" data-xref="5.3" data-auto="" title="Coming soon">Session 5.3 — Bayesian Thinking: Priors, Shrinkage &amp; Updating</span> asks the Bayesian version of §5.2.1's question — not "does this clear a p-value bar" but "how much should this result move my belief."</p>
+</div>
+</section>
+
+<!-- ============ §3 — the math: HAC / Newey-West / overlap ============ -->
+<section id="s3">
+<h2><span class="no">5.2.3</span> HAC, Newey-West &amp; overlapping observations</h2>
+<p class="lede">One formula fixes both autocorrelation and volatility clustering — the trick is knowing how far to trust it.</p>
+
+<p>When residuals are autocorrelated, the sample size <math><semantics><mi>T</mi><annotation encoding="application/x-tex">T</annotation></semantics></math> overstates how much independent information you have. <strong>HAC standard errors</strong> ("heteroskedasticity- and autocorrelation-consistent") replace the classical variance with one that adds in the covariance between an error and its neighbours, weighted so the estimate stays valid. Newey &amp; West (1987) gave the standard construction, the <strong>Newey-West estimator</strong>: weight the sample autocorrelations <math><semantics><msub><mover><mi>ρ</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><mi>k</mi></msub><annotation encoding="application/x-tex">\hat\rho_k</annotation></semantics></math> of the residuals with a Bartlett kernel (weights that taper linearly to zero) out to a chosen number of lags <math><semantics><mi>L</mi><annotation encoding="application/x-tex">L</annotation></semantics></math>, so that the reported variance is inflated by</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><mrow><mi mathvariant="normal">Ψ</mi><mspace></mspace></mrow><mo>=</mo><mn>1</mn><mo>+</mo><mn>2</mn><mrow><munderover><mo movablelimits="false">∑</mo><mrow><mi>k</mi><mo>=</mo><mn>1</mn></mrow><mi>L</mi></munderover></mrow><mrow><mo fence="true" form="prefix" stretchy="true">(</mo><mn>1</mn><mo>−</mo><mfrac><mi>k</mi><mrow><mi>L</mi><mo>+</mo><mn>1</mn></mrow></mfrac><mo fence="true" form="postfix" stretchy="true">)</mo></mrow><msub><mover><mi>ρ</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><mi>k</mi></msub></mrow><annotation encoding="application/x-tex">\Psi = 1 + 2\sum_{k=1}^{L}\left(1-\frac{k}{L+1}\right)\hat\rho_k</annotation></semantics></math></div>
+<p>relative to the classical formula — statsmodels computes the full matrix sandwich for a regression with several regressors, but for a single slope this <math><semantics><mrow><mi mathvariant="normal">Ψ</mi><mspace></mspace></mrow><annotation encoding="application/x-tex">\Psi</annotation></semantics></math> is exactly the factor involved: <math><semantics><mrow><msub><mpadded lspace="0"><mi>SE</mi></mpadded><mpadded lspace="0"><mi>HAC</mi></mpadded></msub><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mover><mi>β</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mo>≈</mo><msqrt><mrow><mi mathvariant="normal">Ψ</mi><mspace></mspace></mrow></msqrt><mo>⋅</mo><msub><mpadded lspace="0"><mi>SE</mi></mpadded><mpadded lspace="0"><mi>classical</mi></mpadded></msub><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mover><mi>β</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">\mathrm{SE}_{\mathrm{HAC}}(\hat\beta) \approx \sqrt{\Psi}\cdot \mathrm{SE}_{\mathrm{classical}}(\hat\beta)</annotation></semantics></math>. Set <math><semantics><mrow><mi>L</mi><mo>=</mo><mn>0</mn></mrow><annotation encoding="application/x-tex">L=0</annotation></semantics></math> and <math><semantics><mrow><mrow><mi mathvariant="normal">Ψ</mi><mspace></mspace></mrow><mo>=</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">\Psi=1</annotation></semantics></math>: HAC reduces to the classical formula, which is why it is always safe to prefer HAC when you are unsure — it costs some precision, never correctness.</p>
+
+<p><strong>Overlapping observations</strong> are the cleanest way to see why this matters. Build a <math><semantics><mi>k</mi><annotation encoding="application/x-tex">k</annotation></semantics></math>-day return by summing <math><semantics><mi>k</mi><annotation encoding="application/x-tex">k</annotation></semantics></math> consecutive daily returns and rolling the window forward one day at a time — exactly what a "21-day forward return" regression, or a monthly-rebalanced backtest measured daily, does. Two windows that are <math><semantics><mrow><mi>k</mi><mo>−</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">k-1</annotation></semantics></math> days apart share all but one observation, which manufactures autocorrelation out of thin air even when the underlying daily shocks are perfectly independent: the classical formula counts each overlapping window as a fresh, independent data point, when in truth roughly one in every <math><semantics><mi>k</mi><annotation encoding="application/x-tex">k</annotation></semantics></math> is new. The companion lab regresses <math><semantics><mn>21</mn><annotation encoding="application/x-tex">21</annotation></semantics></math>-day overlapping returns on a synthetic factor with a known true <math><semantics><mrow><mi>β</mi><mo>=</mo></mrow><annotation encoding="application/x-tex">\beta =</annotation></semantics></math><span data-lab="overlap_true_beta" data-fmt=".1f">0.8</span> across <span data-lab="overlap_n_sims" data-fmt="d">300</span> independent five-year samples, so the TRUE sampling spread of <math><semantics><mover><mi>β</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><annotation encoding="application/x-tex">\hat\beta</annotation></semantics></math> is known exactly (the empirical standard deviation of <math><semantics><mover><mi>β</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><annotation encoding="application/x-tex">\hat\beta</annotation></semantics></math> across samples) rather than guessed at.</p>
+
+<figure class="diagram chart">
+<!-- chart:overlap_se -->
+<svg viewBox="0 0 720 260" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="SE of β on 21-day overlapping returns — naive vs HAC vs the truth">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">SE OF β ON 21-DAY OVERLAPPING RETURNS — NAIVE VS HAC VS THE TRUTH</text>
+  <line x1="64" y1="216" x2="690" y2="216" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="220" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.00</text>
+  <line x1="64" y1="173" x2="690" y2="173" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="177" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.05</text>
+  <line x1="64" y1="130" x2="690" y2="130" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="134" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.10</text>
+  <line x1="64" y1="87" x2="690" y2="87" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="91" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.15</text>
+  <line x1="64" y1="44" x2="690" y2="44" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="48" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.20</text>
+  <line x1="64" y1="216" x2="690" y2="216" stroke="#C9CFC6" stroke-width="1"/>
+  <path d="M156.3,216 V181.6 Q156.3,177.6 160.3,177.6 H176.3 Q180.3,177.6 180.3,181.6 V216 Z" fill="#D64B2A"><title>Naive OLS: 0.04</title></path>
+  <text x="168.3" y="170.6" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.04</text>
+  <text x="168.3" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">Naive OLS</text>
+  <path d="M365,216 V100.5 Q365,96.5 369,96.5 H385 Q389,96.5 389,100.5 V216 Z" fill="#3A56C5"><title>HAC (Newey-West): 0.14</title></path>
+  <text x="377" y="89.5" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.14</text>
+  <text x="377" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">HAC (Newey-West)</text>
+  <path d="M573.7,216 V76 Q573.7,72 577.7,72 H593.7 Q597.7,72 597.7,76 V216 Z" fill="#4A5A68"><title>Empirical (Monte Carlo): 0.17</title></path>
+  <text x="585.7" y="65" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.17</text>
+  <text x="585.7" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">Empirical (Monte Carlo)</text>
+</svg>
+<!-- /chart:overlap_se -->
+<figcaption>fig 5.2.3 — reported standard error of β on 21-day overlapping returns: naive OLS, HAC, and the Monte Carlo truth</figcaption>
+</figure>
+
+<table>
+<thead><tr><th>Estimator</th><th>Reported SE of β</th><th>Share of the true sampling spread</th></tr></thead>
+<tbody>
+<tr><td>Naive OLS (classical)</td><td><span data-lab="overlap_mean_classical_se" data-fmt=".3f">0.045</span></td><td><span data-lab="overlap_ratio_classical" data-fmt=".0%">27%</span></td></tr>
+<tr><td>HAC, Newey-West, <span data-lab="overlap_hac_maxlags" data-fmt="d">20</span> lags (k−1)</td><td><span data-lab="overlap_mean_hac_se" data-fmt=".3f">0.139</span></td><td><span data-lab="overlap_ratio_hac" data-fmt=".0%">83%</span></td></tr>
+<tr><td>Empirical (Monte Carlo truth)</td><td><span data-lab="overlap_empirical_sd" data-fmt=".3f">0.167</span></td><td>100%</td></tr>
+</tbody>
+</table>
+
+<p>The naive standard error is not "a bit optimistic" — it reports barely a quarter of the true uncertainty, which would make a perfectly ordinary sampling fluctuation look like a t-statistic of nearly 4. HAC with the textbook rule of thumb of <math><semantics><mrow><mi>k</mi><mo>−</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">k-1</annotation></semantics></math> lags recovers most, but honestly not all, of the gap: more lags trade bias for variance, since each additional <math><semantics><msub><mover><mi>ρ</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><mi>k</mi></msub><annotation encoding="application/x-tex">\hat\rho_k</annotation></semantics></math> is itself estimated with noise, so an over-long window can make the correction worse rather than better.</p>
+
+<div class="co note"><span class="co-t">🧭 Margin note — how many lags?</span>
+<p>Two rules of thumb, both defensible: if you built the overlap yourself (a <math><semantics><mi>k</mi><annotation encoding="application/x-tex">k</annotation></semantics></math>-day window), use at least <math><semantics><mrow><mi>k</mi><mo>−</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">k-1</annotation></semantics></math> lags — the source of the autocorrelation is known exactly (Hansen &amp; Hodrick, 1980, used this reasoning first, before Newey-West's kernel made the resulting covariance matrix reliably valid). If you don't know the source, let the data choose: statsmodels defaults to <math><semantics><mrow><mi>L</mi><mo>=</mo><mrow><mo fence="true" form="prefix" stretchy="false">⌊</mo><mn>4</mn><msup><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>T</mi><mi>/</mi><mn>100</mn><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mrow><mn>2</mn><mi>/</mi><mn>9</mn></mrow></msup><mo fence="true" form="postfix" stretchy="false">⌋</mo></mrow></mrow><annotation encoding="application/x-tex">L = \lfloor 4(T/100)^{2/9}\rfloor</annotation></semantics></math> lags (Newey &amp; West, 1994) when none is given. Never tune <math><semantics><mi>L</mi><annotation encoding="application/x-tex">L</annotation></semantics></math> until a result looks significant — that swaps one honesty problem for another.</p>
+</div>
+</section>
+
+<!-- ============ §4 — the math: SE of the Sharpe ratio ============ -->
+<section id="s4">
+<h2><span class="no">5.2.4</span> The standard error of the Sharpe ratio</h2>
+<p class="lede">The same long-run-variance idea that fixes a regression's standard error fixes the Sharpe ratio's — because underneath, they are the same problem.</p>
+
+<p><a class="xref" href="../unit01-quant-landscape/session04-engineers-edge-and-odds.html" data-xref="1.4" data-auto="">Session 1.4 — The Engineer&#x27;s Edge, Blind Spots &amp; Honest Odds</a> and <a class="xref" href="../unit02-markets-instruments/session03-returns-pnl-leverage.html" data-xref="2.3" data-auto="">Session 2.3 — Returns, P&amp;L, Compounding &amp; Leverage</a> used <math><semantics><mrow><mpadded lspace="0"><mi>SE</mi></mpadded><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mpadded lspace="0"><mi>SR</mi></mpadded><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mo>≈</mo><mn>1</mn><mi>/</mi><msqrt><mi>Y</mi></msqrt></mrow><annotation encoding="application/x-tex">\mathrm{SE}(\SR) \approx 1/\sqrt{Y}</annotation></semantics></math> for <math><semantics><mi>Y</mi><annotation encoding="application/x-tex">Y</annotation></semantics></math> years of daily data. That is the small-<math><semantics><mpadded lspace="0"><mi>SR</mi></mpadded><annotation encoding="application/x-tex">\SR</annotation></semantics></math> special case of Lo (2002)'s exact i.i.d. result for the <strong>standard error of the Sharpe ratio</strong>, on the per-period Sharpe ratio <math><semantics><msub><mpadded lspace="0"><mi>SR</mi></mpadded><mi>p</mi></msub><annotation encoding="application/x-tex">\SR_p</annotation></semantics></math> estimated from <math><semantics><mi>T</mi><annotation encoding="application/x-tex">T</annotation></semantics></math> periods:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><mpadded lspace="0"><mi>SE</mi></mpadded><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><msub><mpadded lspace="0"><mi>SR</mi></mpadded><mi>p</mi></msub><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mo>=</mo><msqrt><mfrac><mrow><mn>1</mn><mo>+</mo><msubsup><mpadded lspace="0"><mi>SR</mi></mpadded><mi>p</mi><mn>2</mn></msubsup><mi>/</mi><mn>2</mn></mrow><mi>T</mi></mfrac></msqrt></mrow><annotation encoding="application/x-tex">\mathrm{SE}(\SR_p) = \sqrt{\frac{1+\SR_p^2/2}{T}}</annotation></semantics></math></div>
+<p>(implemented as <code>quantnb.stats.sharpe_se</code>). This assumes returns are independent — exactly the assumption §5.2.1–§5.2.3 spent three sections breaking. When returns are autocorrelated, the sample mean and sample variance that make up <math><semantics><msub><mpadded lspace="0"><mi>SR</mi></mpadded><mi>p</mi></msub><annotation encoding="application/x-tex">\SR_p</annotation></semantics></math> are both estimated from fewer independent observations than <math><semantics><mi>T</mi><annotation encoding="application/x-tex">T</annotation></semantics></math> suggests, by precisely the <math><semantics><mrow><mi mathvariant="normal">Ψ</mi><mspace></mspace></mrow><annotation encoding="application/x-tex">\Psi</annotation></semantics></math> inflation of §5.2.3. To first order,</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><msub><mpadded lspace="0"><mi>SE</mi></mpadded><mpadded lspace="0"><mi>HAC</mi></mpadded></msub><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><msub><mpadded lspace="0"><mi>SR</mi></mpadded><mi>p</mi></msub><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mo>≈</mo><msqrt><mrow><mi mathvariant="normal">Ψ</mi><mspace></mspace></mrow></msqrt><mo>⋅</mo><mpadded lspace="0"><mi>SE</mi></mpadded><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><msub><mpadded lspace="0"><mi>SR</mi></mpadded><mi>p</mi></msub><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">\mathrm{SE}_{\mathrm{HAC}}(\SR_p) \approx \sqrt{\Psi}\cdot \mathrm{SE}(\SR_p)</annotation></semantics></math></div>
+<p>(a fuller treatment also accounts for the autocorrelation of squared returns — volatility clustering — which Lo, 2002, folds into the same GMM derivation; the <math><semantics><mrow><mi mathvariant="normal">Ψ</mi><mspace></mspace></mrow><annotation encoding="application/x-tex">\Psi</annotation></semantics></math> term above is the dominant piece and the one worth carrying by hand). The same <math><semantics><mrow><mi mathvariant="normal">Ψ</mi><mspace></mspace></mrow><annotation encoding="application/x-tex">\Psi</annotation></semantics></math>, applied to <em>aggregating</em> rather than estimating, gives the honest way to annualise a Sharpe ratio computed on autocorrelated returns: a <math><semantics><mi>q</mi><annotation encoding="application/x-tex">q</annotation></semantics></math>-period Sharpe ratio is <math><semantics><mrow><mpadded lspace="0"><mi>SR</mi></mpadded><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>q</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mo>=</mo><msqrt><mi>q</mi></msqrt><mspace width="0.1667em"></mspace><mpadded lspace="0"><mi>SR</mi></mpadded><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mn>1</mn><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mi>/</mi><msqrt><mrow><mrow><mi mathvariant="normal">Ψ</mi><mspace></mspace></mrow><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>q</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow></msqrt></mrow><annotation encoding="application/x-tex">\SR(q) = \sqrt{q}\,\SR(1)/\sqrt{\Psi(q)}</annotation></semantics></math>, not the naive <math><semantics><mrow><msqrt><mi>q</mi></msqrt><mspace width="0.1667em"></mspace><mpadded lspace="0"><mi>SR</mi></mpadded><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mn>1</mn><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">\sqrt{q}\,\SR(1)</annotation></semantics></math> — the reason a fund with smoothed, stale month-end marks can report a Sharpe ratio that partly reflects illiquidity rather than skill (Getmansky, Lo &amp; Makarov, 2004).</p>
+
+<p>The lab checks this on a synthetic three-year track record with a modest, known autocorrelation of <math><semantics><mrow><mi>ρ</mi><mo>=</mo></mrow><annotation encoding="application/x-tex">\rho=</annotation></semantics></math><span data-lab="sr_rho" data-fmt=".2f">0.15</span> in daily returns — the kind produced by month-end-marked or lightly smoothed pricing — and a true annualised Sharpe ratio of <span data-lab="sr_true" data-fmt=".1f">0.8</span>. Over <span data-lab="sr_n_sims" data-fmt=",d">2,000</span> independent samples, <math><semantics><mrow><mrow><mi mathvariant="normal">Ψ</mi><mspace></mspace></mrow><mo>=</mo></mrow><annotation encoding="application/x-tex">\Psi=</annotation></semantics></math><span data-lab="sr_psi" data-fmt=".3f">1.352</span> (its large-sample limit for an AR(1) process, <math><semantics><mrow><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mn>1</mn><mo>+</mo><mi>ρ</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mi>/</mi><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mn>1</mn><mo>−</mo><mi>ρ</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">(1+\rho)/(1-\rho)</annotation></semantics></math>, is <span data-lab="sr_psi_asymptotic" data-fmt=".3f">1.353</span> — indistinguishable here, since three years is long relative to how fast the autocorrelation decays):</p>
+
+<figure class="diagram chart">
+<!-- chart:sharpe_se -->
+<svg viewBox="0 0 720 260" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="SE of the annualised Sharpe ratio under mild autocorrelation">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">SE OF THE ANNUALISED SHARPE RATIO UNDER MILD AUTOCORRELATION</text>
+  <line x1="64" y1="216" x2="690" y2="216" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="220" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.00</text>
+  <line x1="64" y1="173" x2="690" y2="173" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="177" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.20</text>
+  <line x1="64" y1="130" x2="690" y2="130" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="134" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.40</text>
+  <line x1="64" y1="87" x2="690" y2="87" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="91" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.60</text>
+  <line x1="64" y1="44" x2="690" y2="44" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="48" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.80</text>
+  <line x1="64" y1="216" x2="690" y2="216" stroke="#C9CFC6" stroke-width="1"/>
+  <path d="M156.3,216 V95.7 Q156.3,91.7 160.3,91.7 H176.3 Q180.3,91.7 180.3,95.7 V216 Z" fill="#D64B2A"><title>Naive (i.i.d.): 0.58</title></path>
+  <text x="168.3" y="84.7" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.58</text>
+  <text x="168.3" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">Naive (i.i.d.)</text>
+  <path d="M365,216 V75.5 Q365,71.5 369,71.5 H385 Q389,71.5 389,75.5 V216 Z" fill="#3A56C5"><title>Autocorrelation-corrected: 0.67</title></path>
+  <text x="377" y="64.5" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.67</text>
+  <text x="377" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">Autocorrelation-corrected</text>
+  <path d="M573.7,216 V76.7 Q573.7,72.7 577.7,72.7 H593.7 Q597.7,72.7 597.7,76.7 V216 Z" fill="#4A5A68"><title>Empirical (Monte Carlo): 0.67</title></path>
+  <text x="585.7" y="65.7" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.67</text>
+  <text x="585.7" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">Empirical (Monte Carlo)</text>
+</svg>
+<!-- /chart:sharpe_se -->
+<figcaption>fig 5.2.4 — standard error of a 3-year annualised Sharpe ratio: naive, autocorrelation-corrected, and the Monte Carlo truth</figcaption>
+</figure>
+
+<table>
+<thead><tr><th>Estimator</th><th>Reported SE of the annualised Sharpe ratio</th><th>Share of the true sampling spread</th></tr></thead>
+<tbody>
+<tr><td>Naive (i.i.d., Lo 2002)</td><td><span data-lab="sr_mean_naive_se" data-fmt=".3f">0.578</span></td><td><span data-lab="sr_ratio_naive" data-fmt=".0%">87%</span></td></tr>
+<tr><td>Autocorrelation-corrected (×√Ψ)</td><td><span data-lab="sr_mean_corrected_se" data-fmt=".3f">0.672</span></td><td><span data-lab="sr_ratio_corrected" data-fmt=".0%">101%</span></td></tr>
+<tr><td>Empirical (Monte Carlo truth)</td><td><span data-lab="sr_empirical_sd" data-fmt=".3f">0.666</span></td><td>100%</td></tr>
+</tbody>
+</table>
+
+<p>Even this mild, entirely plausible amount of autocorrelation understates the true uncertainty by over ten percentage points if you use the textbook i.i.d. formula unmodified. A fund whose reported Sharpe ratio owes something to smoothed marks looks both better <em>and</em> more certain than it is — the two errors compound.</p>
+
+<div class="co tip"><span class="co-t">💡 Looking ahead</span>
+<p>"Is my Sharpe ratio real" has a frequentist half — this standard error — and a Bayesian half that asks what you believed before you saw the data; <span class="xref soon" data-xref="5.3" data-auto="" title="Coming soon">Session 5.3 — Bayesian Thinking: Priors, Shrinkage &amp; Updating</span> builds the second half. <span class="xref soon" data-xref="6.7" data-auto="" title="Coming soon">Session 6.7 — Overfitting Statistics: PSR, DSR, MinTRL &amp; PBO</span> combines both with the number of strategies you tried into the probabilistic and deflated Sharpe ratios.</p>
+</div>
+</section>
+
+<!-- ============ §5 — in code ============ -->
+<section id="s5">
+<h2><span class="no">5.2.5</span> In code</h2>
+<p class="lede">Four lines get you from returns to a defensible standard error — the same four lines run in the companion lab.</p>
+
+<pre><span class="c"># classical OLS, then a HAC-robust refit — same fit, different covariance</span>
+<span class="k">import</span> statsmodels.api <span class="k">as</span> sm
+ols = sm.OLS(strategy_excess, sm.add_constant(factor_excess)).fit()
+hac = ols.get_robustcov_results(cov_type=<span class="s">"HAC"</span>, maxlags=L)</pre>
+
+<p>On the lab's ten-year, non-overlapping factor model, <math><semantics><mrow><mover><mi>β</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><mo>=</mo></mrow><annotation encoding="application/x-tex">\hat\beta=</annotation></semantics></math><span data-lab="beta_hat" data-fmt=".2f">1.17</span> with a classical standard error of <span data-lab="beta_se_classical" data-fmt=".3f">0.031</span> and a HAC standard error of <span data-lab="beta_se_hac" data-fmt=".3f">0.031</span> — the two agree closely, exactly as theory predicts when the underlying shocks really are independent (<math><semantics><mrow><mi>t</mi><mo>=</mo></mrow><annotation encoding="application/x-tex">t=</annotation></semantics></math><span data-lab="beta_t_classical" data-fmt=".1f">37.9</span>, so the exposure is not in doubt). The annualised alpha is a different story: <math><semantics><mrow><mover><mi>α</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><mo>=</mo></mrow><annotation encoding="application/x-tex">\hat\alpha=</annotation></semantics></math><span data-lab="alpha_hat" data-fmt=".2%">−2.75%</span> against a true value of <span data-lab="true_alpha" data-fmt=".0%">2%</span>, with a standard error of <span data-lab="alpha_se_classical" data-fmt=".2%">7.87%</span> (<math><semantics><mrow><mi>p</mi><mo>=</mo></mrow><annotation encoding="application/x-tex">p=</annotation></semantics></math><span data-lab="alpha_p_classical" data-fmt=".2f">0.73</span>) — even ten years of daily data barely pins down alpha, which is why the estimate can land on the wrong side of zero without anything being wrong. This is the same lesson <a class="xref" href="../unit02-markets-instruments/session03-returns-pnl-leverage.html" data-xref="2.3" data-auto="">Session 2.3 — Returns, P&amp;L, Compounding &amp; Leverage</a> drew about mean returns, applied to a regression intercept instead of a raw average.</p>
+
+<p>White's SPA test and Hansen's model confidence set are one line each once the losses are laid out as a matrix, one column per candidate:</p>
+
+<pre><span class="c"># benchmark and models are arrays of LOSSES (lower is better) — negative excess return here</span>
+<span class="k">from</span> arch.bootstrap <span class="k">import</span> SPA, MCS
+spa = SPA(benchmark_loss, model_losses, reps=<span class="s">500</span>).compute()
+mcs = MCS(model_losses, size=<span class="s">0.10</span>, reps=<span class="s">500</span>).compute()</pre>
+
+<p>Neither test is reimplemented here — both come straight from `arch.bootstrap`, built on the stationary <a class="term" href="../unit03-math-toolkit/session05-simulation-monte-carlo.html#g-bootstrap" data-term="bootstrap">bootstrap</a> of Politis &amp; Romano (1994). §5.2.6 puts them to work on a pile of noise.</p>
+</section>
+
+<!-- ============ §6 — multiple testing ============ -->
+<section id="s6">
+<h2><span class="no">5.2.6</span> Multiple testing: FWER, FDR, SPA &amp; the model confidence set</h2>
+<p class="lede">Test one idea and a 5% threshold means what it says. Test two hundred and it doesn't.</p>
+
+<p><strong>Multiple testing</strong> is the general name for the problem: the more hypotheses you test, the more likely at least one clears a fixed bar by chance. The <strong>family-wise error rate</strong> (FWER) is the probability of at least one false positive among all the tests; for <math><semantics><mi>N</mi><annotation encoding="application/x-tex">N</annotation></semantics></math> independent tests each run at size <math><semantics><mi>s</mi><annotation encoding="application/x-tex">s</annotation></semantics></math>, <math><semantics><mrow><mpadded lspace="0"><mi>FWER</mi></mpadded><mo>=</mo><mn>1</mn><mo>−</mo><msup><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mn>1</mn><mo>−</mo><mi>s</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mi>N</mi></msup></mrow><annotation encoding="application/x-tex">\mathrm{FWER} = 1-(1-s)^N</annotation></semantics></math> — with <math><semantics><mrow><mi>N</mi><mo>=</mo></mrow><annotation encoding="application/x-tex">N=</annotation></semantics></math><span data-lab="mt_n_trials" data-fmt="d">200</span> <a class="term" href="../unit01-quant-landscape/session03-research-lifecycle.html#g-backtest" data-term="backtest">strategies</a> tested at a size of <span data-lab="mt_alpha" data-fmt=".0%">5%</span>, that is <span data-lab="mt_fwer" data-fmt=".1%">100.0%</span>: a false positive is nearly certain, not a risk. The classical fix is the Bonferroni correction — test each hypothesis at size <math><semantics><mrow><mi>s</mi><mi>/</mi><mi>N</mi></mrow><annotation encoding="application/x-tex">s/N</annotation></semantics></math> instead of <math><semantics><mi>s</mi><annotation encoding="application/x-tex">s</annotation></semantics></math> — which controls FWER but is famously conservative once <math><semantics><mi>N</mi><annotation encoding="application/x-tex">N</annotation></semantics></math> is large.</p>
+
+<p>The <strong>false discovery rate</strong> (FDR) asks a gentler question: not "what is the chance of any false positive," but "of the results I call discoveries, what share are false?" The Benjamini &amp; Hochberg (1995) procedure ranks the <math><semantics><mi>N</mi><annotation encoding="application/x-tex">N</annotation></semantics></math> p-values <math><semantics><mrow><msub><mi>p</mi><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mn>1</mn><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></msub><mo>≤</mo><mo>⋯</mo><mo>≤</mo><msub><mi>p</mi><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>N</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></msub></mrow><annotation encoding="application/x-tex">p_{(1)} \le \cdots \le p_{(N)}</annotation></semantics></math> and finds the largest <math><semantics><mi>i</mi><annotation encoding="application/x-tex">i</annotation></semantics></math> with <math><semantics><mrow><msub><mi>p</mi><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>i</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></msub><mo>≤</mo><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>i</mi><mi>/</mi><mi>N</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mo>⋅</mo><mi>s</mi></mrow><annotation encoding="application/x-tex">p_{(i)} \le (i/N)\cdot s</annotation></semantics></math>; every hypothesis up to that rank is called a discovery. FDR control has more power than Bonferroni — it accepts a controlled rate of false positives among what it flags, which is the right trade when a false lead costs you a week of research rather than a fund's capital.</p>
+
+<p>The lab draws <span data-lab="mt_n_trials" data-fmt="d">200</span> pure-noise return series — zero true skill, by construction — over <span data-lab="mt_years" data-fmt="d">5</span> years, and tests each at a size of <span data-lab="mt_alpha" data-fmt=".0%">5%</span>. <span data-lab="mt_naive_discoveries" data-fmt="d">9</span> clear the bar (close to the <span data-lab="mt_expected_discoveries" data-fmt=".0f">10</span> a 5% size predicts — the test is working exactly as advertised for any <em>one</em> of them). Bonferroni and Benjamini-Hochberg both correctly call <span data-lab="mt_bonferroni_discoveries" data-fmt="d">0</span> and <span data-lab="mt_bh_discoveries" data-fmt="d">0</span> discoveries: neither procedure is fooled. The single best trial has <math><semantics><mrow><mi>p</mi><mo>=</mo></mrow><annotation encoding="application/x-tex">p=</annotation></semantics></math><span data-lab="mt_best_p" data-fmt=".4f">0.0044</span> and an annualised Sharpe ratio of <span data-lab="mt_best_sharpe" data-fmt=".2f">1.27</span> — a number that would look outstanding in a pitch deck — and it is pure luck: the maximum Sharpe ratio among <span data-lab="mt_n_trials" data-fmt="d">200</span> skill-less trials matches <a class="xref" href="../unit01-quant-landscape/session04-engineers-edge-and-odds.html" data-xref="1.4" data-auto="">Session 1.4 — The Engineer&#x27;s Edge, Blind Spots &amp; Honest Odds</a>'s expected-maximum calculation almost exactly (<span data-lab="mt_theory_max_sharpe" data-fmt=".2f">1.24</span> predicted).</p>
+
+<figure class="diagram chart">
+<!-- chart:noise_tstats -->
+<svg viewBox="0 0 720 280" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="t-statistics of 200 pure-noise ‘strategies’">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">T-STATISTICS OF 200 PURE-NOISE ‘STRATEGIES’</text>
+  <line x1="64" y1="197.7" x2="680" y2="197.7" stroke="#E4E8EC" stroke-width="1"/>
+  <line x1="64" y1="151.4" x2="680" y2="151.4" stroke="#E4E8EC" stroke-width="1"/>
+  <line x1="64" y1="105.1" x2="680" y2="105.1" stroke="#E4E8EC" stroke-width="1"/>
+  <line x1="64" y1="58.8" x2="680" y2="58.8" stroke="#E4E8EC" stroke-width="1"/>
+  <line x1="64" y1="244" x2="680" y2="244" stroke="#C9CFC6" stroke-width="1"/>
+  <line x1="105.4" y1="244" x2="105.4" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="105.4" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">−2.0</text>
+  <line x1="224" y1="244" x2="224" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="224" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">−1.0</text>
+  <line x1="342.5" y1="244" x2="342.5" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="342.5" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">0.0</text>
+  <line x1="461.1" y1="244" x2="461.1" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="461.1" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">1.0</text>
+  <line x1="579.7" y1="244" x2="579.7" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="579.7" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">2.0</text>
+  <rect x="64.5" y="230.8" width="14.4" height="13.2" fill="#3A56C5" fill-opacity="0.55"><title>−2.3 to −2.2</title></rect>
+  <rect x="95.3" y="230.8" width="14.4" height="13.2" fill="#3A56C5" fill-opacity="0.55"><title>−2.1 to −2.0</title></rect>
+  <rect x="110.7" y="217.5" width="14.4" height="26.5" fill="#3A56C5" fill-opacity="0.55"><title>−2.0 to −1.8</title></rect>
+  <rect x="141.5" y="204.3" width="14.4" height="39.7" fill="#3A56C5" fill-opacity="0.55"><title>−1.7 to −1.6</title></rect>
+  <rect x="156.9" y="164.6" width="14.4" height="79.4" fill="#3A56C5" fill-opacity="0.55"><title>−1.6 to −1.4</title></rect>
+  <rect x="172.3" y="138.2" width="14.4" height="105.8" fill="#3A56C5" fill-opacity="0.55"><title>−1.4 to −1.3</title></rect>
+  <rect x="187.7" y="151.4" width="14.4" height="92.6" fill="#3A56C5" fill-opacity="0.55"><title>−1.3 to −1.2</title></rect>
+  <rect x="203.1" y="177.9" width="14.4" height="66.1" fill="#3A56C5" fill-opacity="0.55"><title>−1.2 to −1.1</title></rect>
+  <rect x="218.5" y="138.2" width="14.4" height="105.8" fill="#3A56C5" fill-opacity="0.55"><title>−1.1 to −0.9</title></rect>
+  <rect x="233.9" y="164.6" width="14.4" height="79.4" fill="#3A56C5" fill-opacity="0.55"><title>−0.9 to −0.8</title></rect>
+  <rect x="249.3" y="98.5" width="14.4" height="145.5" fill="#3A56C5" fill-opacity="0.55"><title>−0.8 to −0.7</title></rect>
+  <rect x="264.7" y="138.2" width="14.4" height="105.8" fill="#3A56C5" fill-opacity="0.55"><title>−0.7 to −0.5</title></rect>
+  <rect x="280.1" y="125" width="14.4" height="119" fill="#3A56C5" fill-opacity="0.55"><title>−0.5 to −0.4</title></rect>
+  <rect x="295.5" y="98.5" width="14.4" height="145.5" fill="#3A56C5" fill-opacity="0.55"><title>−0.4 to −0.3</title></rect>
+  <rect x="310.9" y="151.4" width="14.4" height="92.6" fill="#3A56C5" fill-opacity="0.55"><title>−0.3 to −0.1</title></rect>
+  <rect x="326.3" y="164.6" width="14.4" height="79.4" fill="#3A56C5" fill-opacity="0.55"><title>−0.1 to 0.0</title></rect>
+  <rect x="341.7" y="72" width="14.4" height="172" fill="#3A56C5" fill-opacity="0.55"><title>0.0 to 0.1</title></rect>
+  <rect x="357.1" y="138.2" width="14.4" height="105.8" fill="#3A56C5" fill-opacity="0.55"><title>0.1 to 0.2</title></rect>
+  <rect x="372.5" y="125" width="14.4" height="119" fill="#3A56C5" fill-opacity="0.55"><title>0.2 to 0.4</title></rect>
+  <rect x="387.9" y="164.6" width="14.4" height="79.4" fill="#3A56C5" fill-opacity="0.55"><title>0.4 to 0.5</title></rect>
+  <rect x="403.3" y="58.8" width="14.4" height="185.2" fill="#3A56C5" fill-opacity="0.55"><title>0.5 to 0.6</title></rect>
+  <rect x="418.7" y="151.4" width="14.4" height="92.6" fill="#3A56C5" fill-opacity="0.55"><title>0.6 to 0.8</title></rect>
+  <rect x="434.1" y="177.9" width="14.4" height="66.1" fill="#3A56C5" fill-opacity="0.55"><title>0.8 to 0.9</title></rect>
+  <rect x="449.5" y="151.4" width="14.4" height="92.6" fill="#3A56C5" fill-opacity="0.55"><title>0.9 to 1.0</title></rect>
+  <rect x="464.9" y="177.9" width="14.4" height="66.1" fill="#3A56C5" fill-opacity="0.55"><title>1.0 to 1.2</title></rect>
+  <rect x="480.3" y="164.6" width="14.4" height="79.4" fill="#3A56C5" fill-opacity="0.55"><title>1.2 to 1.3</title></rect>
+  <rect x="495.7" y="230.8" width="14.4" height="13.2" fill="#3A56C5" fill-opacity="0.55"><title>1.3 to 1.4</title></rect>
+  <rect x="511.1" y="138.2" width="14.4" height="105.8" fill="#3A56C5" fill-opacity="0.55"><title>1.4 to 1.5</title></rect>
+  <rect x="526.5" y="204.3" width="14.4" height="39.7" fill="#3A56C5" fill-opacity="0.55"><title>1.5 to 1.7</title></rect>
+  <rect x="541.9" y="217.5" width="14.4" height="26.5" fill="#3A56C5" fill-opacity="0.55"><title>1.7 to 1.8</title></rect>
+  <rect x="572.7" y="230.8" width="14.4" height="13.2" fill="#3A56C5" fill-opacity="0.55"><title>1.9 to 2.1</title></rect>
+  <rect x="588.1" y="217.5" width="14.4" height="26.5" fill="#3A56C5" fill-opacity="0.55"><title>2.1 to 2.2</title></rect>
+  <rect x="603.5" y="217.5" width="14.4" height="26.5" fill="#3A56C5" fill-opacity="0.55"><title>2.2 to 2.3</title></rect>
+  <rect x="634.3" y="230.8" width="14.4" height="13.2" fill="#3A56C5" fill-opacity="0.55"><title>2.5 to 2.6</title></rect>
+  <rect x="665.1" y="230.8" width="14.4" height="13.2" fill="#3A56C5" fill-opacity="0.55"><title>2.7 to 2.8</title></rect>
+</svg>
+<!-- /chart:noise_tstats -->
+<figcaption>fig 5.2.5 — t-statistics of 200 pure-noise "strategies"; a handful clear ±1.96 exactly as chance predicts</figcaption>
+</figure>
+
+<figure class="diagram chart">
+<!-- chart:fwer_curve -->
+<svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Chance of at least one false positive, by number of strategies tried">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">CHANCE OF AT LEAST ONE FALSE POSITIVE, BY NUMBER OF STRATEGIES TRIED</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="268" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0%</text>
+  <line x1="64" y1="219.2" x2="602" y2="219.2" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="223.2" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">20%</text>
+  <line x1="64" y1="174.4" x2="602" y2="174.4" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="178.4" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">40%</text>
+  <line x1="64" y1="129.6" x2="602" y2="129.6" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="133.6" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">60%</text>
+  <line x1="64" y1="84.8" x2="602" y2="84.8" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="88.8" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">80%</text>
+  <line x1="64" y1="40" x2="602" y2="40" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="44" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">100%</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#C9CFC6" stroke-width="1"/>
+  <line x1="196.5" y1="264" x2="196.5" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="196.5" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">50</text>
+  <line x1="331.6" y1="264" x2="331.6" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="331.6" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">100</text>
+  <line x1="466.8" y1="264" x2="466.8" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="466.8" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">150</text>
+  <line x1="602" y1="264" x2="602" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="602" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">200</text>
+  <polygon points="64,264 64,252.8 74.8,213.3 88.3,174.1 115.4,120.3 196.5,57.2 331.6,41.3 466.8,40.1 602,40 602,264" fill="#D64B2A" fill-opacity="0.10"/>
+  <polyline points="64,252.8 74.8,213.3 88.3,174.1 115.4,120.3 196.5,57.2 331.6,41.3 466.8,40.1 602,40" fill="none" stroke="#D64B2A" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>FWER at α = 5%</title></polyline>
+  <circle cx="602" cy="40" r="4" fill="#D64B2A" stroke="#FBFBF8" stroke-width="2"><title>FWER at α = 5%: 100%</title></circle>
+  <text x="614" y="44" font-size="11" fill="#1F2C38">100%</text>
+</svg>
+<!-- /chart:fwer_curve -->
+<figcaption>fig 5.2.6 — the chance of at least one false positive climbs to near-certainty long before 200 strategies</figcaption>
+</figure>
+
+<p>Bonferroni and FDR both need you to test every candidate at the same threshold, which is awkward when what you actually want to ask is narrower: <em>does the single best strategy I found really beat a benchmark, once I account for having looked at all the others?</em> That is White's <strong>SPA test</strong> ("reality check for data snooping," White, 2000; refined by Hansen, 2005, into the version the lab uses) — a bootstrap test of whether the best of many candidates truly beats a benchmark, rather than merely looking best by chance. Run on the same 200 noise trials against a zero benchmark, its p-value is <span data-lab="spa_p_consistent" data-fmt=".2f">0.33</span> — correctly failing to reject "none of these really beats doing nothing," even though the best trial's own p-value was <span data-lab="mt_best_p" data-fmt=".4f">0.0044</span>. Hansen's <strong>model confidence set</strong> (Hansen, Lunde &amp; Nason, 2011) asks a related question for a whole group of candidates at once: which ones can you <em>not</em> statistically tell apart from the best? On the same data, at a target confidence of <span data-lab="mcs_size" data-fmt=".0%">10%</span>, it keeps <span data-lab="mcs_included" data-fmt="d">200</span> of <span data-lab="mt_n_trials" data-fmt="d">200</span> models and excludes <span data-lab="mcs_excluded" data-fmt="d">0</span> — an honest admission that the data cannot crown a winner, where picking "the best" by eye would have crowned one anyway.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 220" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">ONE STRATEGY, OR THE BEST OF MANY?</text>
+  <rect x="26" y="32" width="326" height="176" rx="9" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="189" y="54" font-size="11" font-weight="700" text-anchor="middle" fill="#D64B2A">THE NAIVE WAY</text>
+  <rect x="46" y="66" width="286" height="24" rx="5" fill="#fff" stroke="#F2CDBF"/>
+  <text x="58" y="82" font-size="9.5" fill="#1F2C38">try many variants, report only the best</text>
+  <rect x="46" y="96" width="286" height="24" rx="5" fill="#fff" stroke="#F2CDBF"/>
+  <text x="58" y="112" font-size="9.5" fill="#1F2C38">judge it by its own, single p-value</text>
+  <text x="189" y="148" font-size="9.5" text-anchor="middle" fill="#D64B2A" font-weight="600">Looks like skill.</text>
+  <text x="189" y="166" font-size="9" text-anchor="middle" fill="#4A5A68">It's the best of N coin flips.</text>
+  <rect x="368" y="32" width="326" height="176" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="531" y="54" font-size="11" font-weight="700" text-anchor="middle" fill="#1F7A55">THE DISCIPLINED WAY</text>
+  <rect x="388" y="66" width="286" height="24" rx="5" fill="#fff" stroke="#BFE0CF"/>
+  <text x="400" y="82" font-size="9.5" fill="#1F2C38">1 · record N before you see any results</text>
+  <rect x="388" y="96" width="286" height="24" rx="5" fill="#fff" stroke="#BFE0CF"/>
+  <text x="400" y="112" font-size="9.5" fill="#1F2C38">2 · correct with Bonferroni/BH, or ask SPA/MCS</text>
+  <text x="531" y="148" font-size="9.5" text-anchor="middle" fill="#1F7A55" font-weight="600">Usually: can't tell it apart from noise.</text>
+  <text x="531" y="166" font-size="9" text-anchor="middle" fill="#4A5A68">The honest answer, most of the time.</text>
+</svg>
+<figcaption>fig 5.2.7 — the same backtest results, judged two ways</figcaption>
+</figure>
+
+<table>
+<thead><tr><th>Procedure</th><th>Controls</th><th>Answers</th></tr></thead>
+<tbody>
+<tr><td>Bonferroni</td><td>Family-wise error rate, at a chosen size</td><td>"Does <em>this</em> p-value survive N tests?"</td></tr>
+<tr><td>Benjamini-Hochberg</td><td>False discovery rate among flagged results</td><td>"Which of my N candidates deserve a second look?"</td></tr>
+<tr><td>White's SPA test</td><td>One benchmark vs. many alternatives (bootstrap)</td><td>"Does the <em>best</em> of my N really beat doing nothing?"</td></tr>
+<tr><td>Hansen's model confidence set</td><td>A set statistically tied for best</td><td>"Which of my N can't I tell apart from the best?"</td></tr>
+</tbody>
+</table>
+
+<div class="co warn"><span class="co-t">⚠️ Pitfall — "it backtested great, so it must be real"</span>
+<p>Nobody writes down every parameter combination, data window and filter they tried before landing on the one they show you — which means nobody can compute an honest <math><semantics><mi>N</mi><annotation encoding="application/x-tex">N</annotation></semantics></math> after the fact. Pre-register how many variants you will test <em>before</em> you test them, keep every result (not just the survivors), and treat a single great-looking <a class="term" href="../unit01-quant-landscape/session03-research-lifecycle.html#g-backtest" data-term="backtest">backtest</a> chosen from an unrecorded search as having no p-value at all, however good its own one looks.</p>
+</div>
+</section>
+
+<!-- ============ §7 — try it ============ -->
+<section id="s7">
+<h2><span class="no">5.2.7</span> Try it</h2>
+<p class="lede">Open the companion lab and watch a naive standard error fail in real time.</p>
+
+<div class="co lab"><span class="co-t">🔧 Try it (15 min, in the lab)</span>
+<p>1. In §2 of the lab (the overlapping-observations experiment), change <code>K</code> from 21 to 63 (a quarterly window) and rerun. Does the naive standard error's share of the truth get better or worse? Why?<br>
+2. In §3 (the Sharpe ratio experiment), change <code>RHO</code> from 0.15 to 0.35 and recompute <code>psi_factor(RHO, n3)</code> by hand before rerunning. Check your number against the printed value.<br>
+3. Success looks like this: at <code>K=63</code> the naive SE's share of the truth drops further below the 21-day figure, and your hand-computed <math><semantics><mrow><mi mathvariant="normal">Ψ</mi><mspace></mspace></mrow><annotation encoding="application/x-tex">\Psi</annotation></semantics></math> at <math><semantics><mrow><mi>ρ</mi><mo>=</mo><mn>0.35</mn></mrow><annotation encoding="application/x-tex">\rho=0.35</annotation></semantics></math> matches the lab's to two decimal places.</p>
+</div>
+</section>
+
+<hr>
+
+<!-- ============ §8 — close ============ -->
+<section id="s8">
+<h2><span class="no">5.2.8</span> Glossary · Check yourself · Go deeper</h2>
+<div class="gloss" id="glossary">
+<div id="g-ordinary-least-squares"><b>Ordinary least squares</b> — the estimator that picks the intercept and slope minimising the sum of squared residuals.</div>
+<div id="g-t-statistic"><b>t-statistic</b> — an estimate divided by its standard error; how many standard errors it sits from zero.</div>
+<div id="g-p-value"><b>p-value</b> — the probability of a result at least this extreme if the true effect were zero.</div>
+<div id="g-hac-standard-errors"><b>HAC standard errors</b> — standard errors that stay valid when errors are autocorrelated and heteroskedastic.</div>
+<div id="g-newey-west-estimator"><b>Newey-West estimator</b> — the standard HAC construction: a Bartlett-weighted sum of sample autocovariances out to a chosen lag.</div>
+<div id="g-overlapping-observations"><b>Overlapping observations</b> — rolling k-period windows that share data with their neighbours, manufacturing autocorrelation.</div>
+<div id="g-standard-error-of-the-sharpe-ratio"><b>Standard error of the Sharpe ratio</b> — Lo's <math><semantics><mrow><msqrt><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mn>1</mn><mo>+</mo><msubsup><mi>SR</mi><mi>p</mi><mn>2</mn></msubsup><mi>/</mi><mn>2</mn><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mi>/</mi><mi>T</mi></msqrt></mrow><annotation encoding="application/x-tex">\sqrt{(1+SR_p^2/2)/T}</annotation></semantics></math> under independence, inflated by Ψ under autocorrelation.</div>
+<div id="g-multiple-testing"><b>Multiple testing</b> — the inflation of false-positive risk that comes from testing more than one hypothesis on the same data.</div>
+<div id="g-family-wise-error-rate"><b>Family-wise error rate</b> — the probability of at least one false positive among all tests run.</div>
+<div id="g-false-discovery-rate"><b>False discovery rate</b> — the expected share of false positives among the results called discoveries.</div>
+<div id="g-spa-test"><b>SPA test</b> — White's bootstrap test of whether the best of many candidates truly beats a benchmark.</div>
+<div id="g-model-confidence-set"><b>Model confidence set</b> — Hansen's procedure for finding the set of models statistically indistinguishable from the best.</div>
+</div>
+
+<h3>Check yourself</h3>
+<details class="q"><summary>1. A colleague reports a regression p-value of 0.03 on daily strategy returns and calls it significant. What's the first question to ask?</summary><div>Are the residuals actually independent — or is this built from overlapping or autocorrelated returns? If so, the classical p-value understates the true uncertainty and 0.03 may not survive a HAC refit.</div></details>
+<details class="q"><summary>2. Why does building a longer overlap window (bigger k) make the naive OLS standard error worse, not better?</summary><div>More overlap means each new observation shares more of its information with its neighbours, so the number of genuinely independent data points grows much slower than the raw row count. The classical formula only counts rows, so its understatement of the true standard error gets worse as k grows.</div></details>
+<details class="q"><summary>3. A three-year track record has an annualised Sharpe ratio of 0.8 and mild positive autocorrelation from month-end-marked positions (ρ ≈ 0.15). Is its true uncertainty bigger or smaller than the textbook i.i.d. formula says?</summary><div>Bigger — the lab found the honest standard error is about √Ψ ≈ 1.16 times the naive one at this ρ. Smoothed or stale marks make a Sharpe ratio look both better and more certain than it is; the two errors compound.</div></details>
+<details class="q"><summary>4. You tested 200 parameter combinations and the best one has p = 0.0044. Is that strategy real?</summary><div>You cannot tell from that p-value alone. With 200 independent tests at a 5% size, the family-wise error rate is essentially 100% — a false positive is nearly guaranteed. Run White's SPA test or Hansen's MCS on the full set; in the lab, the identical data gave an SPA p-value of 0.33 — not significant, once the search is accounted for.</div></details>
+<details class="q"><summary>5. What's the practical difference between controlling the family-wise error rate (Bonferroni) and the false discovery rate (Benjamini-Hochberg)?</summary><div>FWER guards against ANY false positive among all tests — conservative, appropriate when a single wrong call is costly. FDR tolerates a controlled proportion of false positives among the results you flag — more power, appropriate for a first screen among many candidates where a false lead just costs a closer look.</div></details>
+<details class="q"><summary>6. HAC with more lags sounds strictly safer than fewer. Why isn't it?</summary><div>Each additional lag adds another sample autocorrelation that must itself be estimated, and that estimate gets noisier the further out you go. Too many lags trade a smaller bias for a larger variance in the covariance estimate — which is why even the "correct" k−1 lags in §5.2.3 recovered most, not all, of the true standard error.</div></details>
+
+<div class="co lab"><span class="co-t">🔧 Homework (~1 h before Session 5.3)</span>
+<p>1. In the lab, refit §1's factor regression with a deliberately mis-specified 63-day overlap (build overlapping 63-day returns from the same daily data) and compare the classical and HAC standard errors — confirm the gap widens the way §5.2.3's reasoning predicts.<br>
+2. Read White (2000) §1–2 (below) and write, in your own words, what "data snooping" means and why a single bootstrap p-value fixes it.<br>
+3. Before Session 5.3: write down, without doing any calculation, what you would guess a brand-new strategy's true Sharpe ratio is before you have seen a single day of its returns. You'll need that number.</p>
+</div>
+
+<h3>📚 Go deeper</h3>
+<ol class="refs">
+<li>Newey, W. K. &amp; West, K. D. (1987). "A Simple, Positive Semi-Definite, Heteroskedasticity and Autocorrelation Consistent Covariance Matrix." <em>Econometrica</em> 55(3), 703–708. <span class="rid">doi:10.2307/1913610</span></li>
+<li>White, H. (2000). "A Reality Check for Data Snooping." <em>Econometrica</em> 68(5), 1097–1126. <span class="rid">doi:10.1111/1468-0262.00152</span></li>
+<li>Hansen, P. R. (2005). "A Test for Superior Predictive Ability." <em>Journal of Business &amp; Economic Statistics</em> 23(4), 365–380. <span class="rid">doi:10.1198/073500105000000063</span></li>
+<li>Hansen, P. R., Lunde, A. &amp; Nason, J. M. (2011). "The Model Confidence Set." <em>Econometrica</em> 79(2), 453–497. <span class="rid">doi:10.3982/ECTA5771</span></li>
+<li>Benjamini, Y. &amp; Hochberg, Y. (1995). "Controlling the False Discovery Rate: A Practical and Powerful Approach to Multiple Testing." <em>Journal of the Royal Statistical Society, Series B</em> 57(1), 289–300. <span class="rid">doi:10.1111/j.2517-6161.1995.tb02031.x</span></li>
+<li>Lo, A. W. (2002). "The Statistics of Sharpe Ratios." <em>Financial Analysts Journal</em> 58(4), 36–52. <span class="rid">doi:10.2469/faj.v58.n4.2453</span></li>
+</ol>
+
+<h3>Sources for the numbers</h3>
+<ol class="refs">
+<li>Newey, W. K. &amp; West, K. D. (1994). "Automatic Lag Selection in Covariance Matrix Estimation." <em>Review of Economic Studies</em> 61(4), 631–653. <span class="rid">https://academic.oup.com/restud/article-abstract/61/4/631/1590368</span></li>
+<li>Hansen, L. P. &amp; Hodrick, R. J. (1980). "Forward Exchange Rates as Optimal Predictors of Future Spot Rates: An Econometric Analysis." <em>Journal of Political Economy</em> 88(5), 829–853. <span class="rid">doi:10.1086/260910</span></li>
+<li>Getmansky, M., Lo, A. W. &amp; Makarov, I. (2004). "An Econometric Model of Serial Correlation and Illiquidity in Hedge Fund Returns." <em>Journal of Financial Economics</em> 74(3), 529–609. <span class="rid">SSRN 387578</span></li>
+<li>Politis, D. N. &amp; Romano, J. P. (1994). "The Stationary Bootstrap." <em>Journal of the American Statistical Association</em> 89(428), 1303–1313. <span class="rid">doi:10.1080/01621459.1994.10476870</span></li>
+</ol>
+</section>
+
+<!-- nav:foot -->
+<div class="foot">
+<span class="soon" title="Coming soon">← Prev: 5.1 · Stylized Facts</span>
+<span class="soon" title="Coming soon">Next: 5.3 · Bayesian Thinking →</span>
+</div>
+<p class="legal">Educational material only — not investment, legal or tax advice. Backtests and simulations are hypothetical. <a href="../start-here.html#disclaimer">Disclaimer</a> · Text CC BY 4.0 · Code MIT.</p>
+<!-- /nav:foot -->
+</main>
+</div></body></html>

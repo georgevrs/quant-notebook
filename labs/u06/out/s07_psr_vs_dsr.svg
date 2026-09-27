@@ -1,0 +1,45 @@
+<svg viewBox="0 0 720 280" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Naive PSR is fooled by N; DSR is not (5 years, 200 repeats)">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">NAIVE PSR IS FOOLED BY N; DSR IS NOT (5 YEARS, 200 REPEATS)</text>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#D64B2A" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">naive PSR (ignores N)</text>
+  <line x1="204.4" y1="32" x2="220.4" y2="32" stroke="#3A56C5" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="226.4" y="36" font-size="11" fill="#4A5A68">deflated Sharpe ratio</text>
+  <line x1="64" y1="236" x2="690" y2="236" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="240" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.00</text>
+  <line x1="64" y1="200" x2="690" y2="200" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="204" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.25</text>
+  <line x1="64" y1="164" x2="690" y2="164" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="168" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.50</text>
+  <line x1="64" y1="128" x2="690" y2="128" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="132" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.75</text>
+  <line x1="64" y1="92" x2="690" y2="92" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="96" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">1.00</text>
+  <line x1="64" y1="56" x2="690" y2="56" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="60" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">1.25</text>
+  <line x1="64" y1="236" x2="690" y2="236" stroke="#C9CFC6" stroke-width="1"/>
+  <path d="M101.6,236 V165.1 Q101.6,161.1 105.6,161.1 H121.6 Q125.6,161.1 125.6,165.1 V236 Z" fill="#D64B2A"><title>N = 1 · naive PSR (ignores N): 0.52</title></path>
+  <text x="113.6" y="155.1" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.52</text>
+  <path d="M127.6,236 V165.1 Q127.6,161.1 131.6,161.1 H147.6 Q151.6,161.1 151.6,165.1 V236 Z" fill="#3A56C5"><title>N = 1 · deflated Sharpe ratio: 0.52</title></path>
+  <text x="139.6" y="155.1" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.52</text>
+  <text x="126.6" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">N = 1</text>
+  <path d="M226.8,236 V109.9 Q226.8,105.9 230.8,105.9 H246.8 Q250.8,105.9 250.8,109.9 V236 Z" fill="#D64B2A"><title>N = 10 · naive PSR (ignores N): 0.90</title></path>
+  <text x="238.8" y="99.9" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.90</text>
+  <path d="M252.8,236 V169 Q252.8,165 256.8,165 H272.8 Q276.8,165 276.8,169 V236 Z" fill="#3A56C5"><title>N = 10 · deflated Sharpe ratio: 0.49</title></path>
+  <text x="264.8" y="159" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.49</text>
+  <text x="251.8" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">N = 10</text>
+  <path d="M352,236 V98.8 Q352,94.8 356,94.8 H372 Q376,94.8 376,98.8 V236 Z" fill="#D64B2A"><title>N = 50 · naive PSR (ignores N): 0.98</title></path>
+  <text x="364" y="88.8" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.98</text>
+  <path d="M378,236 V168.9 Q378,164.9 382,164.9 H398 Q402,164.9 402,168.9 V236 Z" fill="#3A56C5"><title>N = 50 · deflated Sharpe ratio: 0.49</title></path>
+  <text x="390" y="158.9" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.49</text>
+  <text x="377" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">N = 50</text>
+  <path d="M477.2,236 V96.6 Q477.2,92.6 481.2,92.6 H497.2 Q501.2,92.6 501.2,96.6 V236 Z" fill="#D64B2A"><title>N = 200 · naive PSR (ignores N): 1.00</title></path>
+  <text x="489.2" y="86.6" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">1.00</text>
+  <path d="M503.2,236 V166.7 Q503.2,162.7 507.2,162.7 H523.2 Q527.2,162.7 527.2,166.7 V236 Z" fill="#3A56C5"><title>N = 200 · deflated Sharpe ratio: 0.51</title></path>
+  <text x="515.2" y="156.7" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.51</text>
+  <text x="502.2" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">N = 200</text>
+  <path d="M602.4,236 V96.1 Q602.4,92.1 606.4,92.1 H622.4 Q626.4,92.1 626.4,96.1 V236 Z" fill="#D64B2A"><title>N = 1,000 · naive PSR (ignores N): 1.00</title></path>
+  <text x="614.4" y="86.1" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">1.00</text>
+  <path d="M628.4,236 V168.2 Q628.4,164.2 632.4,164.2 H648.4 Q652.4,164.2 652.4,168.2 V236 Z" fill="#3A56C5"><title>N = 1,000 · deflated Sharpe ratio: 0.50</title></path>
+  <text x="640.4" y="158.2" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.50</text>
+  <text x="627.4" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">N = 1,000</text>
+</svg>

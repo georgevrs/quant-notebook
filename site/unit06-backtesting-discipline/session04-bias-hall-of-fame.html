@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- nav:head -->
+<title>6.4 · The Bias Hall of Fame</title>
+<meta name="description" content="Live demos of every classic way a backtest lies — look-ahead, survivorship, data snooping, selection, stale and untradable prices.">
+<link rel="canonical" href="https://georgevrs.github.io/quant-notebook/unit06-backtesting-discipline/session04-bias-hall-of-fame.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Quant Notebook">
+<meta property="og:title" content="6.4 · The Bias Hall of Fame">
+<meta property="og:description" content="Live demos of every classic way a backtest lies — look-ahead, survivorship, data snooping, selection, stale and untradable prices.">
+<meta property="og:url" content="https://georgevrs.github.io/quant-notebook/unit06-backtesting-discipline/session04-bias-hall-of-fame.html">
+<meta name="twitter:card" content="summary">
+<link rel="stylesheet" href="../assets/brand.css">
+<link rel="stylesheet" href="../assets/temml.css">
+<!-- /nav:head -->
+</head>
+<body><div class="page" id="top">
+<!-- nav:tabs -->
+<nav class="tabs">
+<a href="../index.html">⌂ Course home</a>
+<span class="soon" title="Coming soon">6.1 · What a Backtest Is</span>
+<span class="soon" title="Coming soon">6.2 · Vectorized Backtest</span>
+<span class="soon" title="Coming soon">6.3 · Event-Driven</span>
+<a class="active" href="session04-bias-hall-of-fame.html">6.4 · Bias Hall of Fame</a>
+<span class="soon" title="Coming soon">6.5 · Costs &amp; Capacity</span>
+<span class="soon" title="Coming soon">6.6 · Validation</span>
+<span class="soon" title="Coming soon">6.7 · Overfitting Stats</span>
+<span class="soon" title="Coming soon">6.8 · Lab: Protocol</span>
+<a href="../roadmap.html">🗺 Roadmap</a>
+</nav>
+<!-- /nav:tabs -->
+
+<header class="cover">
+<!-- nav:heading -->
+<p class="eyebrow">Unit 6 · Backtesting &amp; Research Discipline — Session 04 of 08</p>
+<h1>The Bias Hall of Fame</h1>
+<!-- /nav:heading -->
+<p class="subtitle">A backtest is a unit test that can pass by luck. This session builds seven synthetic markets where the true edge is known in advance — usually zero, sometimes small — then runs the buggy backtest each classic mistake produces, followed by the fix, so you watch every inflated Sharpe ratio collapse back toward the truth. <mark>The core move: never trust a backtest number until you have tried, on purpose, to make it lie.</mark></p>
+<div class="meta">
+<span>DURATION <b>1.5 h + lab</b></span>
+<span>LEVEL <b>Intermediate</b></span>
+<span>TRACKS <b>QR · QT · QD · IND</b></span>
+<span>HANDS-ON <b>Seven buggy-vs-fixed backtests, one seed</b></span>
+</div>
+<!-- nav:labstrip -->
+<div class="labstrip"><b>📓 Companion lab</b>
+<a href="https://colab.research.google.com/github/georgevrs/quant-notebook/blob/main/labs/u06/s04_bias_hall_of_fame.ipynb">Open in Colab</a>
+<a href="https://github.com/georgevrs/quant-notebook/blob/main/labs/u06/s04_bias_hall_of_fame.ipynb">Notebook on GitHub</a>
+<a href="https://github.com/georgevrs/quant-notebook/blob/main/labs/u06/s04_bias_hall_of_fame.py">Source (.py)</a>
+</div>
+<!-- /nav:labstrip -->
+<div class="toc">
+<b>On this page</b>
+<ol>
+<li><a href="#s1">The mental model: four places a backtest can lie</a></li>
+<li><a href="#s2">Universe bias: survivorship and selection</a></li>
+<li><a href="#s3">Timing bias: look-ahead and data snooping</a></li>
+<li><a href="#s4">Execution bias: stale and untradable prices</a></li>
+<li><a href="#s5">Reporting bias: publication and the file drawer</a></li>
+<li><a href="#s6">The hall of fame, side by side</a></li>
+<li><a href="#s7">Try it</a></li>
+<li><a href="#s8">Glossary · Check yourself · Go deeper</a></li>
+</ol>
+</div>
+</header>
+
+<main>
+
+<section id="s1">
+<h2><span class="no">6.4.1</span> The mental model: four places a backtest can lie</h2>
+<p class="lede">A backtest is a unit test that can pass by luck — and unlike a unit test, nobody else's code review catches it before it costs real money. Every classic way it lies enters at exactly one of four stages.</p>
+
+<p>Feed a strategy the wrong history, the wrong timing, the wrong price, or the wrong audience, and it will report a Sharpe ratio that has nothing to do with reality. Those four failure points map onto the same pipeline you build in a <span class="term soon" data-term="vectorized backtest" title="Defined in Session 6.2 (coming soon)">vectorized backtest</span> (<span class="xref soon" data-xref="6.2" data-auto="" title="Coming soon">Session 6.2 — Build a Vectorized Backtester</span>): choose a <strong>universe</strong>, compute a signal with some <span class="term soon" data-term="signal lag" title="Defined in Session 6.2 (coming soon)">timing</span>, decide a position, get a <strong>fill</strong> — plus one stage that happens entirely outside the code: what anyone chooses to <strong>report</strong>. This session is a tour of seven classic bugs, one or two per stage, each demonstrated on a synthetic market where the true edge is known before a single line of backtest code runs — usually zero, because that is the honest baseline every trading idea has to beat. That is also why this unit sits at the centre of the course: everything from <span class="xref soon" data-xref="6.5" data-auto="" title="Coming soon">Session 6.5 — Transaction Costs &amp; Capacity</span> onward assumes you can already tell a genuine edge from one of these seven ghosts, and Unit 7's factor research inherits every one of them, at the scale of hundreds of published factors instead of one backtest. Practitioners have catalogued versions of this list before — Deutsche Bank's "Seven Sins of Quantitative Investing" (Luo et al., 2014, in Go deeper) is a well-known one — but grouping them by <em>where in the pipeline</em> they enter, rather than listing them alphabetically, makes each one easier to defend against with a specific procedural fix.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 232" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <rect x="20" y="14" width="680" height="200" rx="12" fill="#fff" stroke="#1F2C38" stroke-width="1.5"/>
+  <text x="40" y="40" font-size="12" fill="#4A5A68" font-family="IBM Plex Mono,monospace">THE BACKTEST PIPELINE — four places a lie can enter</text>
+  <rect x="45" y="58" width="140" height="112" rx="8" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="115" y="90" font-size="14" font-weight="600" text-anchor="middle" fill="#3A56C5">1 · UNIVERSE</text>
+  <text x="115" y="112" font-size="11" text-anchor="middle" fill="#4A5A68">which names</text>
+  <text x="115" y="127" font-size="11" text-anchor="middle" fill="#4A5A68">you tested on</text>
+  <text x="115" y="150" font-size="9.5" text-anchor="middle" fill="#4A5A68">survivorship,</text>
+  <text x="115" y="163" font-size="9.5" text-anchor="middle" fill="#4A5A68">selection</text>
+  <rect x="210" y="58" width="140" height="112" rx="8" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="280" y="90" font-size="14" font-weight="600" text-anchor="middle" fill="#8A6D00">2 · TIMING</text>
+  <text x="280" y="112" font-size="11" text-anchor="middle" fill="#4A5A68">what you knew,</text>
+  <text x="280" y="127" font-size="11" text-anchor="middle" fill="#4A5A68">and when</text>
+  <text x="280" y="150" font-size="9.5" text-anchor="middle" fill="#4A5A68">look-ahead,</text>
+  <text x="280" y="163" font-size="9.5" text-anchor="middle" fill="#4A5A68">data snooping</text>
+  <rect x="375" y="58" width="140" height="112" rx="8" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="445" y="90" font-size="14" font-weight="600" text-anchor="middle" fill="#D64B2A">3 · EXECUTION</text>
+  <text x="445" y="112" font-size="11" text-anchor="middle" fill="#4A5A68">the price you</text>
+  <text x="445" y="127" font-size="11" text-anchor="middle" fill="#4A5A68">actually got</text>
+  <text x="445" y="150" font-size="9.5" text-anchor="middle" fill="#4A5A68">stale, untradable</text>
+  <rect x="540" y="58" width="140" height="112" rx="8" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="610" y="90" font-size="14" font-weight="600" text-anchor="middle" fill="#1F7A55">4 · REPORTING</text>
+  <text x="610" y="112" font-size="11" text-anchor="middle" fill="#4A5A68">what got shown</text>
+  <text x="610" y="127" font-size="11" text-anchor="middle" fill="#4A5A68">to anyone</text>
+  <text x="610" y="150" font-size="9.5" text-anchor="middle" fill="#4A5A68">publication bias</text>
+  <text x="360" y="200" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">Every exhibit below lives at one of these four stages, and nowhere else.</text>
+</svg>
+<figcaption>fig 6.4.1 — the four stages of a backtest, and the classic bias that lives at each one</figcaption>
+</figure>
+
+<p>The method is the same at every stage, and it is worth naming once instead of seven times. Build a world where you, the author, know the truth. Run the version of the backtest a real researcher writes by accident — buggy, but honestly coded, not a strawman. Run the fixed version, changing exactly one thing. Compare the two numbers to the truth you built in. Nothing below is a strawman: every "buggy" version is code a competent, well-meaning researcher would actually write, because that is the only version worth learning to recognise in someone else's pull request — or your own, six months from now.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 176" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">HOW EVERY EXHIBIT IN THIS HALL OF FAME WAS BUILT</text>
+  <rect x="22" y="38" width="150" height="72" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="97" y="66" font-size="11" text-anchor="middle" fill="#3A56C5" font-weight="600">1 · KNOW THE TRUTH</text>
+  <text x="97" y="84" font-size="9.5" text-anchor="middle" fill="#4A5A68">a synthetic world with</text>
+  <text x="97" y="97" font-size="9.5" text-anchor="middle" fill="#4A5A68">an edge fixed in advance</text>
+  <rect x="197" y="38" width="150" height="72" rx="9" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="272" y="66" font-size="11" text-anchor="middle" fill="#D64B2A" font-weight="600">2 · RUN IT BUGGY</text>
+  <text x="272" y="84" font-size="9.5" text-anchor="middle" fill="#4A5A68">the mistake, coded</text>
+  <text x="272" y="97" font-size="9.5" text-anchor="middle" fill="#4A5A68">the way people really write it</text>
+  <rect x="372" y="38" width="150" height="72" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="447" y="66" font-size="11" text-anchor="middle" fill="#1F7A55" font-weight="600">3 · RUN IT FIXED</text>
+  <text x="447" y="84" font-size="9.5" text-anchor="middle" fill="#4A5A68">the same test, exactly</text>
+  <text x="447" y="97" font-size="9.5" text-anchor="middle" fill="#4A5A68">one bug removed</text>
+  <rect x="547" y="38" width="150" height="72" rx="9" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="622" y="66" font-size="11" text-anchor="middle" fill="#8A6D00" font-weight="600">4 · COMPARE</text>
+  <text x="622" y="84" font-size="9.5" text-anchor="middle" fill="#4A5A68">the gap between the two</text>
+  <text x="622" y="97" font-size="9.5" text-anchor="middle" fill="#4A5A68">numbers IS the bias</text>
+  <path d="M174 74 H195" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s1w)"/>
+  <path d="M349 74 H370" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s1w)"/>
+  <path d="M524 74 H545" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s1w)"/>
+  <text x="360" y="140" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">Every number quoted below is real: the lab's own results, not an illustration.</text>
+  <defs><marker id="s1w" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F2C38"/></marker></defs>
+</svg>
+<figcaption>fig 6.4.2 — the workflow behind every exhibit in this session: know the truth, get it wrong, get it right, measure the gap</figcaption>
+</figure>
+
+<div class="co key"><span class="co-t">📌 Key idea — the same shape, four times</span>
+<p>Every exhibit in this hall of fame does the same trick: it looks at an outcome that already happened and quietly lets the sample, the timing, the price or the audience be chosen by that outcome. The honest fix is always the same move, too — decide the universe, the timing, the price or the reporting rule <em>before</em> you know how it will turn out, exactly the discipline a pre-registered experiment enforces in any other science.</p>
+</div>
+</section>
+
+<section id="s2">
+<h2><span class="no">6.4.2</span> Universe bias: survivorship and selection</h2>
+<p class="lede">The first bug is the easiest to commit by accident: choosing which names, or which sample, you test on using information from the very outcome you are about to measure.</p>
+
+<p><span class="xref soon" data-xref="4.2" data-auto="" title="Coming soon">Session 4.2 — Point-in-Time Data &amp; Data Biases</span> owns <span class="term soon" data-term="survivorship bias" title="Defined in Session 4.2 (coming soon)">survivorship bias</span> as a data-engineering problem — most vendors' default tables only list names that still exist. Here it is live. Five thousand synthetic stocks trade for <span data-lab="surv_years" data-fmt=".0f">20</span> years with zero true average edge: nobody in this universe has any skill, luck or story baked in, only noise. Over two decades, <span data-lab="surv_pct_failed" data-fmt=".0%">40%</span> of them random-walk down more than 80% from where they started — in a real market, most of those would have been delisted, acquired in distress or written off. Pull today's list of "constituents" and backfill each one's full history — the shortcut a vendor's "current members only" table invites — and the survivors' average total return over the period is <span data-lab="surv_buggy_mean" data-fmt=".1%">61.8%</span>. Score every name that ever existed, failures included, and the honest figure is <span data-lab="surv_honest_mean" data-fmt=".2%">0.16%</span> — statistically indistinguishable from the zero edge built into the simulation. The gap is not noise; it is arithmetic. Once you throw out whichever names did worst, averaging what remains can only go up. The fix a data engineer reaches for is a point-in-time universe: store, for every past date, exactly which names existed <em>as of that date</em>, and query only that — 4.2's whole job.</p>
+
+<p><strong>Selection bias</strong> is the general case survivorship is one example of: building a sample using a criterion correlated with the outcome you are about to report, even when nothing failed or delisted at all. In the lab, 1,000 synthetic assets trade for <span data-lab="sel_years" data-fmt=".0f">10</span> years, every one with zero true edge and independent noise. Rank them by their own realised Sharpe ratio and keep the top <span data-lab="sel_k" data-fmt=".0f">20</span> — "our screen found these 20 winners" — and their in-sample average Sharpe ratio is <span data-lab="sel_buggy_sharpe" data-fmt=".2f">0.73</span>, a figure that would read as a genuinely good systematic strategy. Re-measure the exact same 20 names on a fresh, independent draw of returns they were never selected on, and the average collapses to <span data-lab="sel_fixed_sharpe" data-fmt=".2f">0.10</span> — an honest, purged validation of the kind <span class="xref soon" data-xref="6.6" data-auto="" title="Coming soon">Session 6.6 — Validation: Walk-Forward, Purged K-Fold &amp; CPCV</span> turns into a formal procedure. The single best of the 1,000 candidates reached a Sharpe ratio of <span data-lab="sel_best_single_sharpe" data-fmt=".2f">0.99</span>, close to the <span data-lab="sel_theory_max_sharpe" data-fmt=".2f">1.03</span> theory predicts for the best of 1,000 skill-less trials — the <span class="term soon" data-term="false strategy theorem" title="Defined in Session 6.7 (coming soon)">False Strategy Theorem</span> that <span class="xref soon" data-xref="6.7" data-auto="" title="Coming soon">Session 6.7 — Overfitting Statistics: PSR, DSR, MinTRL &amp; PBO</span> owns in full, and the same statistical fact behind the next exhibit. Notice what kind of error this is: every individual Sharpe ratio was computed correctly. The only mistake was choosing which twenty names to report using the very number being reported — a procedural failure, not an arithmetic one, and procedural failures need a procedural fix: write down the universe-selection rule (a market-cap cut-off, a liquidity screen, an economic argument for inclusion) before a single backtest result exists, and never let "the names that already look interesting" become the rule.</p>
+
+<table>
+<thead><tr><th>Exhibit</th><th>What the buggy version does</th><th>Reported</th><th>Honest</th></tr></thead>
+<tbody>
+<tr><td>Survivorship <em>(4.2)</em></td><td>backfills today's survivors only</td><td><span data-lab="surv_buggy_mean" data-fmt=".1%">61.8%</span> mean return</td><td><span data-lab="surv_honest_mean" data-fmt=".2%">0.16%</span> mean return</td></tr>
+<tr><td>Selection bias</td><td>keeps only the best-looking 2% of names</td><td><span data-lab="sel_buggy_sharpe" data-fmt=".2f">0.73</span> Sharpe</td><td><span data-lab="sel_fixed_sharpe" data-fmt=".2f">0.10</span> Sharpe</td></tr>
+</tbody>
+</table>
+
+<div class="co note"><span class="co-t">🧭 Margin note — one root cause</span>
+<p>Both rows are the same mathematical move: truncate a zero-mean sample by its own outcome, and the average of what is left is no longer zero. Econometricians call the general version <strong>sample selection bias</strong> (Heckman, 1979); quants who have never opened that paper rediscover it every time they build a screen and check its own backtest.</p>
+</div>
+</section>
+
+<section id="s3">
+<h2><span class="no">6.4.3</span> Timing bias: look-ahead and data snooping</h2>
+<p class="lede">The second bug is about when you knew something — using, even in one line of code, information that would not have existed yet.</p>
+
+<p><span class="xref soon" data-xref="4.2" data-auto="" title="Coming soon">Session 4.2 — Point-in-Time Data &amp; Data Biases</span> owns <span class="term soon" data-term="look-ahead bias" title="Defined in Session 4.2 (coming soon)">look-ahead bias</span> in general; its most common form inside a vectorized backtest is a missing <span class="term soon" data-term="signal lag" title="Defined in Session 6.2 (coming soon)">signal lag</span> (<span class="xref soon" data-xref="6.2" data-auto="" title="Coming soon">Session 6.2 — Build a Vectorized Backtester</span>). Five years of a fair-game synthetic market have, by construction, zero autocorrelation, so no rule built from past returns should have any edge. Let today's own return decide the position — buy when it was up, sell when it was down — and then apply that position to the very return that produced the signal, and the "strategy" cannot lose: every day's P&amp;L is the absolute value of that day's return, for a Sharpe ratio of <span data-lab="look_buggy_sharpe" data-fmt=".1f">21.3</span>. Lag the signal by one day, as the shift discipline requires, and the Sharpe ratio falls to <span data-lab="look_fixed_sharpe" data-fmt=".2f">0.45</span> — consistent with zero, well inside the ordinary noise of a five-year Sharpe estimate. The tell is the buggy number itself: a Sharpe ratio above about 5 on a liquid, single-line rule is a bug report, not a discovery. In practice the bug is rarely this crude — it hides in a centred rolling window, a join against an unsorted timestamp column, or a feature built from a full-sample mean and standard deviation instead of an expanding one, each of them letting a value from the future leak a few rows sideways into the past.</p>
+
+<p><strong>Data snooping</strong> is look-ahead's sibling: instead of one accidental peek, it is many honest attempts at the same data until one happens to look good. The lab fixes one market — zero true edge, as always — and tries <span data-lab="snoop_n_seeds" data-fmt=",.0f">3,000</span> independent random ±1 position rules, no real signal in any of them, over a five-year search window. The best of the 3,000 reaches a Sharpe ratio of <span data-lab="snoop_best_seed_sharpe" data-fmt=".2f">2.02</span>, close to the <span data-lab="snoop_theory_max_sharpe" data-fmt=".2f">1.59</span> theory predicts for the best of that many skill-less trials (fig 6.4.3 shows the whole crowd of seeds, and how far into the tail the "winner" sits). Notice what this is: exactly the seed-hunting this course's own labs are never allowed to do, since asserting a result against a hand-picked seed is the same manoeuvre with better production values. Walk the identical rule forward onto ten fresh years it never saw, and its Sharpe ratio falls to <span data-lab="snoop_holdout_sharpe" data-fmt=".2f">0.34</span> — indistinguishable from the zero edge that was always there. The fix is not a cleverer search; it is <span class="term soon" data-term="multiple testing" title="Defined in Session 5.2 (coming soon)">accounting for how many things you tried</span> (<span class="xref soon" data-xref="5.2" data-auto="" title="Coming soon">Session 5.2 — Regression &amp; Inference That Doesn&#x27;t Lie</span>) and pre-registering the one rule you will actually trade before you look at any result at all. Nothing about the mechanism is specific to random ±1 rules, either — the identical arithmetic applies to trying many moving-average windows, many stop-loss levels or many neural-network initialisations against one dataset. The number of trials is the hidden variable behind almost every impressively-backtested strategy, and §6.4.6 shows why counting it changes the conclusion.</p>
+
+<figure class="diagram chart">
+<!-- chart:snoop_hist -->
+<svg viewBox="0 0 720 280" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="3,000 skill-less seeds: in-sample Sharpe ratio">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">3,000 SKILL-LESS SEEDS: IN-SAMPLE SHARPE RATIO</text>
+  <line x1="64" y1="197.7" x2="680" y2="197.7" stroke="#E4E8EC" stroke-width="1"/>
+  <line x1="64" y1="151.4" x2="680" y2="151.4" stroke="#E4E8EC" stroke-width="1"/>
+  <line x1="64" y1="105.1" x2="680" y2="105.1" stroke="#E4E8EC" stroke-width="1"/>
+  <line x1="64" y1="58.8" x2="680" y2="58.8" stroke="#E4E8EC" stroke-width="1"/>
+  <line x1="64" y1="244" x2="680" y2="244" stroke="#C9CFC6" stroke-width="1"/>
+  <line x1="159.4" y1="244" x2="159.4" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="159.4" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">−1.0</text>
+  <line x1="332" y1="244" x2="332" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="332" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">0.0</text>
+  <line x1="504.7" y1="244" x2="504.7" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="504.7" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">1.0</text>
+  <line x1="677.3" y1="244" x2="677.3" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="677.3" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">2.0</text>
+  <rect x="64.5" y="242.1" width="11.3" height="1.9" fill="#3A56C5" fill-opacity="0.55"><title>−1.6 to −1.5</title></rect>
+  <rect x="89.1" y="241.1" width="11.3" height="2.9" fill="#3A56C5" fill-opacity="0.55"><title>−1.4 to −1.3</title></rect>
+  <rect x="101.5" y="242.1" width="11.3" height="1.9" fill="#3A56C5" fill-opacity="0.55"><title>−1.3 to −1.3</title></rect>
+  <rect x="113.8" y="242.1" width="11.3" height="1.9" fill="#3A56C5" fill-opacity="0.55"><title>−1.3 to −1.2</title></rect>
+  <rect x="126.1" y="240.1" width="11.3" height="3.9" fill="#3A56C5" fill-opacity="0.55"><title>−1.2 to −1.1</title></rect>
+  <rect x="138.4" y="237.2" width="11.3" height="6.8" fill="#3A56C5" fill-opacity="0.55"><title>−1.1 to −1.1</title></rect>
+  <rect x="150.7" y="233.3" width="11.3" height="10.7" fill="#3A56C5" fill-opacity="0.55"><title>−1.1 to −1.0</title></rect>
+  <rect x="163.1" y="229.5" width="11.3" height="14.5" fill="#3A56C5" fill-opacity="0.55"><title>−1.0 to −0.9</title></rect>
+  <rect x="175.4" y="213" width="11.3" height="31" fill="#3A56C5" fill-opacity="0.55"><title>−0.9 to −0.8</title></rect>
+  <rect x="187.7" y="205.2" width="11.3" height="38.8" fill="#3A56C5" fill-opacity="0.55"><title>−0.8 to −0.8</title></rect>
+  <rect x="200" y="189.7" width="11.3" height="54.3" fill="#3A56C5" fill-opacity="0.55"><title>−0.8 to −0.7</title></rect>
+  <rect x="212.3" y="185.8" width="11.3" height="58.2" fill="#3A56C5" fill-opacity="0.55"><title>−0.7 to −0.6</title></rect>
+  <rect x="224.7" y="172.3" width="11.3" height="71.7" fill="#3A56C5" fill-opacity="0.55"><title>−0.6 to −0.6</title></rect>
+  <rect x="237" y="150" width="11.3" height="94" fill="#3A56C5" fill-opacity="0.55"><title>−0.6 to −0.5</title></rect>
+  <rect x="249.3" y="122.8" width="11.3" height="121.2" fill="#3A56C5" fill-opacity="0.55"><title>−0.5 to −0.4</title></rect>
+  <rect x="261.6" y="125.7" width="11.3" height="118.3" fill="#3A56C5" fill-opacity="0.55"><title>−0.4 to −0.3</title></rect>
+  <rect x="273.9" y="102.4" width="11.3" height="141.6" fill="#3A56C5" fill-opacity="0.55"><title>−0.3 to −0.3</title></rect>
+  <rect x="286.3" y="64.6" width="11.3" height="179.4" fill="#3A56C5" fill-opacity="0.55"><title>−0.3 to −0.2</title></rect>
+  <rect x="298.6" y="62.7" width="11.3" height="181.3" fill="#3A56C5" fill-opacity="0.55"><title>−0.2 to −0.1</title></rect>
+  <rect x="310.9" y="61.7" width="11.3" height="182.3" fill="#3A56C5" fill-opacity="0.55"><title>−0.1 to −0.1</title></rect>
+  <rect x="323.2" y="73.4" width="11.3" height="170.6" fill="#3A56C5" fill-opacity="0.55"><title>−0.1 to 0.0</title></rect>
+  <rect x="335.5" y="58.8" width="11.3" height="185.2" fill="#3A56C5" fill-opacity="0.55"><title>0.0 to 0.1</title></rect>
+  <rect x="347.9" y="65.6" width="11.3" height="178.4" fill="#3A56C5" fill-opacity="0.55"><title>0.1 to 0.2</title></rect>
+  <rect x="360.2" y="84" width="11.3" height="160" fill="#3A56C5" fill-opacity="0.55"><title>0.2 to 0.2</title></rect>
+  <rect x="372.5" y="73.4" width="11.3" height="170.6" fill="#3A56C5" fill-opacity="0.55"><title>0.2 to 0.3</title></rect>
+  <rect x="384.8" y="117" width="11.3" height="127" fill="#3A56C5" fill-opacity="0.55"><title>0.3 to 0.4</title></rect>
+  <rect x="397.1" y="126.7" width="11.3" height="117.3" fill="#3A56C5" fill-opacity="0.55"><title>0.4 to 0.4</title></rect>
+  <rect x="409.5" y="135.4" width="11.3" height="108.6" fill="#3A56C5" fill-opacity="0.55"><title>0.4 to 0.5</title></rect>
+  <rect x="421.8" y="146.1" width="11.3" height="97.9" fill="#3A56C5" fill-opacity="0.55"><title>0.5 to 0.6</title></rect>
+  <rect x="434.1" y="175.2" width="11.3" height="68.8" fill="#3A56C5" fill-opacity="0.55"><title>0.6 to 0.7</title></rect>
+  <rect x="446.4" y="203.3" width="11.3" height="40.7" fill="#3A56C5" fill-opacity="0.55"><title>0.7 to 0.7</title></rect>
+  <rect x="458.7" y="207.2" width="11.3" height="36.8" fill="#3A56C5" fill-opacity="0.55"><title>0.7 to 0.8</title></rect>
+  <rect x="471.1" y="196.5" width="11.3" height="47.5" fill="#3A56C5" fill-opacity="0.55"><title>0.8 to 0.9</title></rect>
+  <rect x="483.4" y="221.7" width="11.3" height="22.3" fill="#3A56C5" fill-opacity="0.55"><title>0.9 to 0.9</title></rect>
+  <rect x="495.7" y="225.6" width="11.3" height="18.4" fill="#3A56C5" fill-opacity="0.55"><title>0.9 to 1.0</title></rect>
+  <rect x="508" y="231.4" width="11.3" height="12.6" fill="#3A56C5" fill-opacity="0.55"><title>1.0 to 1.1</title></rect>
+  <rect x="520.3" y="231.4" width="11.3" height="12.6" fill="#3A56C5" fill-opacity="0.55"><title>1.1 to 1.2</title></rect>
+  <rect x="532.7" y="238.2" width="11.3" height="5.8" fill="#3A56C5" fill-opacity="0.55"><title>1.2 to 1.2</title></rect>
+  <rect x="545" y="241.1" width="11.3" height="2.9" fill="#3A56C5" fill-opacity="0.55"><title>1.2 to 1.3</title></rect>
+  <rect x="557.3" y="240.1" width="11.3" height="3.9" fill="#3A56C5" fill-opacity="0.55"><title>1.3 to 1.4</title></rect>
+  <rect x="569.6" y="242.1" width="11.3" height="1.9" fill="#3A56C5" fill-opacity="0.55"><title>1.4 to 1.4</title></rect>
+  <rect x="581.9" y="243" width="11.3" height="1" fill="#3A56C5" fill-opacity="0.55"><title>1.4 to 1.5</title></rect>
+  <rect x="668.2" y="243" width="11.3" height="1" fill="#3A56C5" fill-opacity="0.55"><title>1.9 to 2.0</title></rect>
+  <polyline points="64,243.6 67.1,243.5 70.2,243.4 73.3,243.3 76.4,243.2 79.5,243.1 82.6,243 85.7,242.9 88.8,242.7 91.9,242.5 95,242.3 98.1,242.1 101.1,241.9 104.2,241.6 107.3,241.3 110.4,241 113.5,240.6 116.6,240.2 119.7,239.8 122.8,239.3 125.9,238.7 129,238.2 132.1,237.5 135.2,236.8 138.3,236 141.4,235.2 144.5,234.3 147.6,233.3 150.7,232.3 153.8,231.1 156.9,229.9 160,228.5 163.1,227.1 166.2,225.6 169.2,223.9 172.3,222.2 175.4,220.3 178.5,218.3 181.6,216.2 184.7,214 187.8,211.6 190.9,209.1 194,206.5 197.1,203.8 200.2,200.9 203.3,197.9 206.4,194.7 209.5,191.4 212.6,188 215.7,184.5 218.8,180.8 221.9,177.1 225,173.2 228.1,169.2 231.2,165.1 234.3,160.9 237.3,156.7 240.4,152.4 243.5,148 246.6,143.6 249.7,139.1 252.8,134.6 255.9,130.1 259,125.6 262.1,121.1 265.2,116.7 268.3,112.3 271.4,108 274.5,103.7 277.6,99.6 280.7,95.6 283.8,91.7 286.9,87.9 290,84.4 293.1,81 296.2,77.8 299.3,74.8 302.4,72 305.4,69.5 308.5,67.2 311.6,65.2 314.7,63.4 317.8,62 320.9,60.8 324,59.8 327.1,59.2 330.2,58.9 333.3,58.9 336.4,59.2 339.5,59.7 342.6,60.6 345.7,61.7 348.8,63.2 351.9,64.9 355,66.9 358.1,69.1 361.2,71.6 364.3,74.3 367.4,77.3 370.5,80.4 373.5,83.8 376.6,87.3 379.7,91 382.8,94.9 385.9,98.9 389,103 392.1,107.2 395.2,111.5 398.3,115.9 401.4,120.4 404.5,124.8 407.6,129.3 410.7,133.8 413.8,138.3 416.9,142.8 420,147.2 423.1,151.6 426.2,156 429.3,160.2 432.4,164.4 435.5,168.5 438.6,172.5 441.6,176.4 444.7,180.2 447.8,183.9 450.9,187.4 454,190.9 457.1,194.2 460.2,197.3 463.3,200.4 466.4,203.3 469.5,206.1 472.6,208.7 475.7,211.2 478.8,213.6 481.9,215.8 485,218 488.1,220 491.2,221.9 494.3,223.6 497.4,225.3 500.5,226.9 503.6,228.3 506.7,229.7 509.7,230.9 512.8,232.1 515.9,233.1 519,234.1 522.1,235.1 525.2,235.9 528.3,236.7 531.4,237.4 534.5,238.1 537.6,238.7 540.7,239.2 543.8,239.7 546.9,240.1 550,240.6 553.1,240.9 556.2,241.3 559.3,241.6 562.4,241.8 565.5,242.1 568.6,242.3 571.7,242.5 574.8,242.7 577.8,242.8 580.9,243 584,243.1 587.1,243.2 590.2,243.3 593.3,243.4 596.4,243.5 599.5,243.5 602.6,243.6 605.7,243.7 608.8,243.7 611.9,243.7 615,243.8 618.1,243.8 621.2,243.8 624.3,243.9 627.4,243.9 630.5,243.9 633.6,243.9 636.7,243.9 639.8,243.9 642.9,243.9 645.9,244 649,244 652.1,244 655.2,244 658.3,244 661.4,244 664.5,244 667.6,244 670.7,244 673.8,244 676.9,244 680,244" fill="none" stroke="#1F2C38" stroke-width="2" stroke-linejoin="round"><title>theory if no edge exists anywhere</title></polyline>
+  <line x1="530" y1="32" x2="546" y2="32" stroke="#1F2C38" stroke-width="2.5"/>
+  <text x="552" y="36" font-size="11" fill="#4A5A68">theory if no edge exists anywhere</text>
+</svg>
+<!-- /chart:snoop_hist -->
+<figcaption>fig 6.4.3 — the in-sample Sharpe ratio of all 3,000 seeds against the theoretical distribution if no edge exists anywhere; the "winner" is the rightmost sliver of pure luck</figcaption>
+</figure>
+
+<table>
+<thead><tr><th>Exhibit</th><th>The peek</th><th>Reported</th><th>Honest</th></tr></thead>
+<tbody>
+<tr><td>Look-ahead <em>(4.2 / 6.2)</em></td><td>trades the same return it signalled on</td><td><span data-lab="look_buggy_sharpe" data-fmt=".1f">21.3</span> Sharpe</td><td><span data-lab="look_fixed_sharpe" data-fmt=".2f">0.45</span> Sharpe</td></tr>
+<tr><td>Data snooping</td><td>keeps searching until one seed wins</td><td><span data-lab="snoop_best_seed_sharpe" data-fmt=".2f">2.02</span> Sharpe</td><td><span data-lab="snoop_holdout_sharpe" data-fmt=".2f">0.34</span> Sharpe</td></tr>
+</tbody>
+</table>
+
+<div class="co warn"><span class="co-t">⚠️ Pitfall — "I tried a few random seeds and this one backtested best"</span>
+<p>Said about anything — a strategy, a train/test split, a neural network's initialisation — that sentence describes data snooping. The fix is not to stop trying seeds; real research tries many things. It is to fix the seed, or the specification, <em>before</em> looking at the result, and then to test only that one choice on data it has never touched.</p>
+</div>
+</section>
+
+<section id="s4">
+<h2><span class="no">6.4.4</span> Execution bias: stale and untradable prices</h2>
+<p class="lede">The third bug survives even a perfectly honest signal, computed at the right time, on the right names: it is the price the backtest assumes you traded at.</p>
+
+<p>A single synthetic asset carries a real, small, known edge: <code>mu=5%</code>, <code>sigma=20%</code> a year, for a true Sharpe ratio of 0.25. Its quoted price, though, only partly catches up each day — the standard model of a smoothed or stale mark in an illiquid name (Getmansky, Lo &amp; Makarov, 2004): today's observed return is 30% of today's true move plus 70% of yesterday's already-stale level. Compute a <strong>stale price</strong> Sharpe ratio on those daily observed marks — the obvious thing to do with the data you were given — and you get <span data-lab="stale_naive_sharpe" data-fmt=".2f">0.52</span>, more than double the true value of <span data-lab="stale_true_sharpe" data-fmt=".2f">0.21</span> (itself consistent with the 0.25 target, within the sampling noise of a ten-year estimate). The mechanism is pure arithmetic, not luck: smoothing a series keeps its mean but shrinks its measured volatility — here to <span data-lab="stale_vol_ratio" data-fmt=".0%">43%</span> of the true volatility — so the same mean divided by a smaller number reports a much larger Sharpe ratio. Aggregating the same observed prices to monthly instead of daily returns, giving the staleness time to catch up, improves the estimate to <span data-lab="stale_fixed_sharpe" data-fmt=".2f">0.32</span>: closer to the truth, though a partial cure rather than a full de-smoothing model. Real hedge-fund return series with this signature — high measured Sharpe ratios, low volatility, and returns that barely move week to week — are the same finding, at scale, and the same mechanism (Getmansky, Lo &amp; Makarov, 2004). A practical tell is a simple regression of today's return on yesterday's: a genuinely liquid, efficiently-traded price has almost no such autocorrelation, so a suspiciously high positive one, sitting next to a suspiciously smooth equity curve, is usually staleness wearing a Sharpe ratio.</p>
+
+<p>A different failure lives at the same stage: an <strong>untradable price</strong> is a printed or quoted level that no real order could ever have transacted at, for any cost — a distinct problem from the transaction costs <span class="xref soon" data-xref="6.5" data-auto="" title="Coming soon">Session 6.5 — Transaction Costs &amp; Capacity</span> covers in full. A thinly-traded synthetic name follows a classic breakout rule: go long when today's close crosses above the prior 20-day high, a signal built entirely from past highs, so this exhibit isolates the fill-price bug with no look-ahead mixed in. Assume every breakout fills exactly at that high, with certainty, and the <span data-lab="untrade_n_signals" data-fmt=".0f">188</span> signals average a return of <span data-lab="untrade_buggy_mean_ret" data-fmt=".2%">0.42%</span> over the following two trading weeks. But in a thin name a day's high is often a single, sizeless print with nobody real behind it (fig 6.4.4). Assume, realistically, that <span data-lab="untrade_pct_phantom" data-fmt=".0%">40%</span> of those prints were phantoms that no order could have touched, and that a genuine fill costs a little more than the printed level, and the average return on the trades that actually happen falls to <span data-lab="untrade_fixed_mean_ret" data-fmt=".2%">−0.69%</span>. A breakout rule on a random walk has no true edge either way; the honest number simply reveals it, exactly as Fama and Blume found for filter rules on the NYSE once realistic fills replaced assumed ones (1966). A practical tell here is different from the stale-price one: check whether the venue, the time of day and the size behind the assumed fill price are ones your own order could plausibly have reached. If the honest answer is "a vendor's daily summary field," assume the worst until proven otherwise.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 200" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <rect x="280" y="14" width="160" height="36" rx="8" fill="#fff" stroke="#1F2C38" stroke-width="1.5"/>
+  <text x="360" y="37" font-size="11" font-weight="600" text-anchor="middle" fill="#1F2C38">PRICE TOUCHES THE TRIGGER</text>
+  <path d="M360 50 V70" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s4dcA)"/>
+  <polygon points="360,74 452,112 360,150 268,112" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="360" y="109" font-size="10" font-weight="600" text-anchor="middle" fill="#8A6D00">REAL DEPTH</text>
+  <text x="360" y="123" font-size="9" text-anchor="middle" fill="#4A5A68">behind the print?</text>
+  <path d="M452 112 H516" stroke="#1F7A55" stroke-width="1.7" marker-end="url(#s4dcY)"/>
+  <text x="484" y="104" font-size="10" text-anchor="middle" fill="#1F7A55" font-weight="600">yes</text>
+  <rect x="520" y="86" width="176" height="52" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="608" y="108" font-size="11" font-weight="600" text-anchor="middle" fill="#1F7A55">A GENUINE FILL</text>
+  <text x="608" y="125" font-size="9.5" text-anchor="middle" fill="#4A5A68">costs a bit more than the print</text>
+  <path d="M268 112 H204" stroke="#D64B2A" stroke-width="1.7" marker-end="url(#s4dcN)"/>
+  <text x="236" y="104" font-size="10" text-anchor="middle" fill="#D64B2A" font-weight="600">no</text>
+  <rect x="24" y="86" width="176" height="52" rx="9" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="112" y="108" font-size="11" font-weight="600" text-anchor="middle" fill="#D64B2A">A PHANTOM PRINT</text>
+  <text x="112" y="125" font-size="9.5" text-anchor="middle" fill="#4A5A68">no order ever fills here</text>
+  <text x="360" y="180" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">A backtest that assumes every touch was a fill assumes every print had a market behind it.</text>
+  <defs>
+    <marker id="s4dcA" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F2C38"/></marker>
+    <marker id="s4dcY" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F7A55"/></marker>
+    <marker id="s4dcN" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#D64B2A"/></marker>
+  </defs>
+</svg>
+<figcaption>fig 6.4.4 — the untradable-price question every fill assumption is implicitly answering</figcaption>
+</figure>
+
+<table>
+<thead><tr><th>Exhibit</th><th>The lie</th><th>Reported</th><th>Honest</th></tr></thead>
+<tbody>
+<tr><td>Stale price</td><td>a mark that barely moves day to day</td><td><span data-lab="stale_naive_sharpe" data-fmt=".2f">0.52</span> Sharpe</td><td><span data-lab="stale_true_sharpe" data-fmt=".2f">0.21</span> Sharpe (true)</td></tr>
+<tr><td>Untradable price</td><td>a print with nobody real behind it</td><td><span data-lab="untrade_buggy_mean_ret" data-fmt=".2%">0.42%</span> mean trade</td><td><span data-lab="untrade_fixed_mean_ret" data-fmt=".2%">−0.69%</span> mean trade</td></tr>
+</tbody>
+</table>
+
+<div class="co tip"><span class="co-t">💡 Looking ahead</span>
+<p>Both exhibits here isolate one execution bug at a time. A real desk stacks spread, commission and financing on top of them — the full cost model is <span class="xref soon" data-xref="6.5" data-auto="" title="Coming soon">Session 6.5 — Transaction Costs &amp; Capacity</span>'s job — and the mechanics of why a large order moves the market on its own is <span class="xref soon" data-xref="14.3" data-auto="" title="Coming soon">Session 14.3 — Market Impact &amp; the Square-Root Law</span>'s.</p>
+</div>
+</section>
+
+<section id="s5">
+<h2><span class="no">6.4.5</span> Reporting bias: publication and the file drawer</h2>
+<p class="lede">The fourth bug needs no buggy code at all: every desk can be perfectly honest, and the bias still appears — in what the world gets shown.</p>
+
+<p><strong>Publication bias</strong> — sometimes called the file drawer problem (Rosenthal, 1979) — sits at the reporting stage, not the computation. Simulate <span data-lab="pub_n_researchers" data-fmt=",.0f">20,000</span> independent research desks, each honestly testing one zero-edge strategy on its own <span data-lab="pub_years" data-fmt=".0f">8</span> years of data. Nobody here is snooping, cherry-picking or peeking; every result is a fair, independent draw with a true Sharpe ratio of exactly zero. Only the results that clear a "statistically significant" bar — here, roughly a t-statistic of 2 — ever get published, pitched to an investor, or survive to next year's performance review. Just <span data-lab="pub_frac_published" data-fmt=".1%">2.2%</span> of desks clear that bar, but the ones that do average a Sharpe ratio of <span data-lab="pub_published_mean" data-fmt=".2f">0.84</span>, even though the honest average across every desk, published or not, is <span data-lab="pub_true_mean" data-fmt=".2f">0.00</span>. This is the same truncated-sample arithmetic as selection bias in §6.4.2, applied one level up the chain: not to which <em>names</em> enter a backtest, but to which <em>backtests</em> ever reach your inbox. It shows up in three familiar places: a pitch deck's "illustrative track record," a conference talk built around the one configuration that worked, and a journal that would never publish "we tested 40 factors and found nothing." Nobody in any of those rooms is lying about their own number — the lie lives in the population of attempts you never get to see.</p>
+
+<div class="co note"><span class="co-t">🧭 Margin note — a cousin, not a duplicate</span>
+<p>Publication bias is about which studies you ever get to see. A related but different problem — <span class="term soon" data-term="post-publication decay" title="Defined in Session 7.4 (coming soon)">post-publication decay</span>, a real edge shrinking once a factor becomes public and crowded — is <span class="xref soon" data-xref="7.4" data-auto="" title="Coming soon">Session 7.4 — The Factor Zoo &amp; the Replication Debate</span>'s to teach in full; the two combine to make published track records look better than the future they predict, twice over.</p>
+</div>
+</section>
+
+<section id="s6">
+<h2><span class="no">6.4.6</span> The hall of fame, side by side</h2>
+<p class="lede">Put all seven exhibits next to each other and the same shape appears every time: an honest, small — often zero — true edge, and a reported number several times larger.</p>
+
+<p>No single later session defends against all seven at once, which is exactly why they stay separate: transaction-cost modelling (<span class="xref soon" data-xref="6.5" data-auto="" title="Coming soon">Session 6.5 — Transaction Costs &amp; Capacity</span>) closes off part of the execution stage, purged validation (<span class="xref soon" data-xref="6.6" data-auto="" title="Coming soon">Session 6.6 — Validation: Walk-Forward, Purged K-Fold &amp; CPCV</span>) closes off part of the universe and timing stages, and the overfitting statistics of <span class="xref soon" data-xref="6.7" data-auto="" title="Coming soon">Session 6.7 — Overfitting Statistics: PSR, DSR, MinTRL &amp; PBO</span> put a number on how much of any remaining edge to discount for how many things were tried. Treat the table below as a checklist, not a museum piece: before trusting any backtest, yours or someone else's, ask which of these seven rows it could be hiding.</p>
+
+<table>
+<thead><tr><th>Bias</th><th>Stage</th><th>Reported</th><th>Honest</th></tr></thead>
+<tbody>
+<tr><td><span class="term soon" data-term="survivorship bias" title="Defined in Session 4.2 (coming soon)">Survivorship</span> <em>(4.2)</em></td><td>Universe</td><td><span data-lab="surv_buggy_mean" data-fmt=".1%">61.8%</span> mean return</td><td><span data-lab="surv_honest_mean" data-fmt=".2%">0.16%</span> mean return</td></tr>
+<tr><td>Selection bias</td><td>Universe</td><td><span data-lab="sel_buggy_sharpe" data-fmt=".2f">0.73</span> Sharpe</td><td><span data-lab="sel_fixed_sharpe" data-fmt=".2f">0.10</span> Sharpe</td></tr>
+<tr><td><span class="term soon" data-term="look-ahead bias" title="Defined in Session 4.2 (coming soon)">Look-ahead</span> <em>(4.2)</em></td><td>Timing</td><td><span data-lab="look_buggy_sharpe" data-fmt=".1f">21.3</span> Sharpe</td><td><span data-lab="look_fixed_sharpe" data-fmt=".2f">0.45</span> Sharpe</td></tr>
+<tr><td>Data snooping</td><td>Timing</td><td><span data-lab="snoop_best_seed_sharpe" data-fmt=".2f">2.02</span> Sharpe</td><td><span data-lab="snoop_holdout_sharpe" data-fmt=".2f">0.34</span> Sharpe</td></tr>
+<tr><td>Stale price</td><td>Execution</td><td><span data-lab="stale_naive_sharpe" data-fmt=".2f">0.52</span> Sharpe</td><td><span data-lab="stale_true_sharpe" data-fmt=".2f">0.21</span> Sharpe</td></tr>
+<tr><td>Untradable price</td><td>Execution</td><td><span data-lab="untrade_buggy_mean_ret" data-fmt=".2%">0.42%</span> mean trade</td><td><span data-lab="untrade_fixed_mean_ret" data-fmt=".2%">−0.69%</span> mean trade</td></tr>
+<tr><td>Publication bias</td><td>Reporting</td><td><span data-lab="pub_published_mean" data-fmt=".2f">0.84</span> Sharpe</td><td><span data-lab="pub_true_mean" data-fmt=".2f">0.00</span> Sharpe</td></tr>
+</tbody>
+</table>
+
+<figure class="diagram chart">
+<!-- chart:hall_of_fame -->
+<svg viewBox="0 0 720 280" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Sharpe ratio: what got reported vs what was actually true">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">SHARPE RATIO: WHAT GOT REPORTED VS WHAT WAS ACTUALLY TRUE</text>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#D64B2A" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">What got reported</text>
+  <line x1="178.8" y1="32" x2="194.8" y2="32" stroke="#3A56C5" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="200.8" y="36" font-size="11" fill="#4A5A68">What was actually true</text>
+  <line x1="64" y1="236" x2="690" y2="236" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="240" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">−1.00</text>
+  <line x1="64" y1="191" x2="690" y2="191" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="195" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.00</text>
+  <line x1="64" y1="146" x2="690" y2="146" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="150" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">1.00</text>
+  <line x1="64" y1="101" x2="690" y2="101" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="105" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">2.00</text>
+  <line x1="64" y1="56" x2="690" y2="56" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="60" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">3.00</text>
+  <line x1="64" y1="191" x2="690" y2="191" stroke="#C9CFC6" stroke-width="1"/>
+  <path d="M117.2,191 V162 Q117.2,158 121.2,158 H137.2 Q141.2,158 141.2,162 V191 Z" fill="#D64B2A"><title>Selection bias · What got reported: 0.73</title></path>
+  <path d="M143.2,191 V188.7 Q143.2,186.5 145.5,186.5 H165 Q167.2,186.5 167.2,188.7 V191 Z" fill="#3A56C5"><title>Selection bias · What was actually true: 0.10</title></path>
+  <text x="142.2" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">Selection bias</text>
+  <path d="M273.8,191 V104.3 Q273.8,100.3 277.8,100.3 H293.8 Q297.8,100.3 297.8,104.3 V191 Z" fill="#D64B2A"><title>Data snooping · What got reported: 2.02</title></path>
+  <path d="M299.8,191 V179.8 Q299.8,175.8 303.8,175.8 H319.8 Q323.8,175.8 323.8,179.8 V191 Z" fill="#3A56C5"><title>Data snooping · What was actually true: 0.34</title></path>
+  <text x="298.8" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">Data snooping</text>
+  <path d="M430.2,191 V171.5 Q430.2,167.5 434.2,167.5 H450.2 Q454.2,167.5 454.2,171.5 V191 Z" fill="#D64B2A"><title>Stale price · What got reported: 0.52</title></path>
+  <path d="M456.2,191 V185.6 Q456.2,181.6 460.2,181.6 H476.2 Q480.2,181.6 480.2,185.6 V191 Z" fill="#3A56C5"><title>Stale price · What was actually true: 0.21</title></path>
+  <text x="455.2" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">Stale price</text>
+  <path d="M586.8,191 V157.2 Q586.8,153.2 590.8,153.2 H606.8 Q610.8,153.2 610.8,157.2 V191 Z" fill="#D64B2A"><title>Publication bias · What got reported: 0.84</title></path>
+  <path d="M612.8,191 V191.1 Q612.8,191.1 612.8,191.1 H636.7 Q636.8,191.1 636.8,191.1 V191 Z" fill="#3A56C5"><title>Publication bias · What was actually true: 0.00</title></path>
+  <text x="611.8" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">Publication bias</text>
+</svg>
+<!-- /chart:hall_of_fame -->
+<figcaption>fig 6.4.6 — four of the seven exhibits, on a shared axis: what got reported vs. what a fully honest measurement found</figcaption>
+</figure>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 224" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">SAME NUMBERS, TWO WAYS OF GETTING THERE</text>
+  <rect x="26" y="32" width="326" height="178" rx="9" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="189" y="54" font-size="11" font-weight="700" text-anchor="middle" fill="#D64B2A">THE NAIVE BACKTEST</text>
+  <rect x="46" y="64" width="286" height="22" rx="5" fill="#fff" stroke="#F2CDBF"/>
+  <text x="58" y="79" font-size="9.5" fill="#1F2C38">today's universe, backfilled</text>
+  <rect x="46" y="90" width="286" height="22" rx="5" fill="#fff" stroke="#F2CDBF"/>
+  <text x="58" y="105" font-size="9.5" fill="#1F2C38">whichever spec searched best</text>
+  <rect x="46" y="116" width="286" height="22" rx="5" fill="#fff" stroke="#F2CDBF"/>
+  <text x="58" y="131" font-size="9.5" fill="#1F2C38">fills at the printed price</text>
+  <text x="189" y="158" font-size="9.5" text-anchor="middle" fill="#D64B2A" font-weight="600">A Sharpe ratio nobody could earn</text>
+  <text x="189" y="175" font-size="9" text-anchor="middle" fill="#4A5A68">— and the one most often published</text>
+  <rect x="368" y="32" width="326" height="178" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="531" y="54" font-size="11" font-weight="700" text-anchor="middle" fill="#1F7A55">THE DISCIPLINED BACKTEST</text>
+  <rect x="388" y="64" width="286" height="22" rx="5" fill="#fff" stroke="#BFE0CF"/>
+  <text x="400" y="79" font-size="9.5" fill="#1F2C38">1 · every name that ever existed</text>
+  <rect x="388" y="90" width="286" height="22" rx="5" fill="#fff" stroke="#BFE0CF"/>
+  <text x="400" y="105" font-size="9.5" fill="#1F2C38">2 · one seed, lagged, pre-registered</text>
+  <rect x="388" y="116" width="286" height="22" rx="5" fill="#fff" stroke="#BFE0CF"/>
+  <text x="400" y="131" font-size="9.5" fill="#1F2C38">3 · only a price you could have traded</text>
+  <text x="531" y="158" font-size="9.5" text-anchor="middle" fill="#1F7A55" font-weight="600">A Sharpe ratio close to what you'll get</text>
+  <text x="531" y="175" font-size="9" text-anchor="middle" fill="#4A5A68">— and the one nobody rushes to show you</text>
+</svg>
+<figcaption>fig 6.4.5 — the naive and disciplined backtest, side by side; every row is one exhibit from this session</figcaption>
+</figure>
+
+<div class="co warn"><span class="co-t">⚠️ Pitfall — "I fixed the look-ahead bug, so the backtest is trustworthy now"</span>
+<p>Removing one bias from a seven-bias hall of fame is necessary, not sufficient. A backtest with an honest signal lag can still run on survivors only, still be the best of fifty parameter sets, and still fill at a printed high nobody could have touched. Check every stage, every time — <span class="xref soon" data-xref="6.8" data-auto="" title="Coming soon">Session 6.8 — Lab: The Research Protocol</span>'s research protocol turns that into a checklist instead of a hope.</p>
+</div>
+</section>
+
+<section id="s7">
+<h2><span class="no">6.4.7</span> Try it</h2>
+<p class="lede">Break something on purpose, then fix it — the fastest way to recognise these bugs in someone else's code.</p>
+
+<div class="co lab"><span class="co-t">🔧 Try it (15 min, in the lab)</span>
+<p>Open Exhibit F (untradable price). Set <code>UNTRADE_PHANTOM_P = 0.0</code> — every print becomes real — and re-run just that cell: the fixed mean trade return should move back toward the buggy one, since only the entry-price markup is left. Then set it to <code>0.8</code> and watch the honest number go further negative as fewer, worse-filled trades remain. Finally, in Exhibit E (stale price), change <code>STALE_THETA</code> from <code>0.30</code> to <code>0.05</code> — a much more illiquid name — and see how much further the naive Sharpe ratio inflates above the unchanged truth.</p>
+</div>
+</section>
+
+<hr>
+
+<section id="s8">
+<h2><span class="no">6.4.8</span> Glossary · Check yourself · Go deeper</h2>
+<div class="gloss" id="glossary">
+<div id="g-data-snooping"><b>Data snooping</b> — testing many strategies, parameters or seeds against the same data until one looks good by chance.</div>
+<div id="g-selection-bias"><b>Selection bias</b> — building a sample using a criterion correlated with the very outcome you are about to report.</div>
+<div id="g-untradable-price"><b>Untradable price</b> — a printed or quoted price that no real order could actually have transacted at.</div>
+<div id="g-stale-price"><b>Stale price</b> — a quoted or marked price that has not fully updated to new information, which understates measured volatility and inflates risk-adjusted returns.</div>
+<div id="g-publication-bias"><b>Publication bias</b> — the tendency for only the most impressive-looking results to be published, pitched or remembered, distorting the average of what anyone gets to see.</div>
+</div>
+
+<h3>Check yourself</h3>
+<details class="q"><summary>1. A vendor's fund database only lists funds still trading today. You backtest a strategy on its full reported history. Which direction is the bias, and why?</summary><div>Upward — the average is conditioned on having survived long enough to still be listed. Exhibit A shows the mechanism directly: a survivors-only average return of <span data-lab="surv_buggy_mean" data-fmt=".1%">61.8%</span> against an honest, whole-population average of <span data-lab="surv_honest_mean" data-fmt=".2%">0.16%</span>, even though every name in the lab has zero true edge.</div></details>
+<details class="q"><summary>2. You tried several random seeds for a strategy's parameters and reported the one with the best out-of-sample Sharpe ratio. Is that a valid out-of-sample result?</summary><div>No — the moment you look at several seeds' results and pick the best, the "out-of-sample" set has been snooped too. Exhibit D shows the scale: the best of 3,000 skill-less seeds reached a Sharpe ratio of <span data-lab="snoop_best_seed_sharpe" data-fmt=".2f">2.02</span> in search, which fell to <span data-lab="snoop_holdout_sharpe" data-fmt=".2f">0.34</span> the moment it met data it had genuinely never touched.</div></details>
+<details class="q"><summary>3. Two backtests of the same breakout strategy on a thin, illiquid name report very different results. One assumes every printed high fills instantly at that price; the other assumes some prints are unreachable and a real fill costs a little more. Which do you trust, and why?</summary><div>The second. The first is guaranteed to overstate performance whenever a price spikes briefly through a level with no depth behind it. Exhibit F shows the same 188 signals swinging from a mean trade return of <span data-lab="untrade_buggy_mean_ret" data-fmt=".2%">0.42%</span> to <span data-lab="untrade_fixed_mean_ret" data-fmt=".2%">−0.69%</span> once realistic fills replace assumed ones.</div></details>
+<details class="q"><summary>4. A colleague fixes the missing signal lag in their backtest and declares it "honest now." What would you check next?</summary><div>Everything else on the four-stage map. Whether the universe includes delisted names, whether the strategy or its parameters were chosen by trying many and keeping the best, and whether the assumed fill price was ever really tradable. One fix removes one bias out of seven, not all of them.</div></details>
+<details class="q"><summary>5. If every research desk in the world tested strategies with zero true edge, but you only ever saw the ones that cleared a "statistically significant" bar, what would the average Sharpe ratio of everything you see look like?</summary><div>Far from zero. In the lab, only <span data-lab="pub_frac_published" data-fmt=".1%">2.2%</span> of 20,000 honest, zero-edge desks cleared the bar, and those that did averaged a Sharpe ratio of <span data-lab="pub_published_mean" data-fmt=".2f">0.84</span> — a completely real number describing a completely fake population average.</div></details>
+
+<div class="co lab"><span class="co-t">🔧 Homework (~1 h before Session 6.5)</span>
+<p>1. In the lab, add an eighth exhibit of your own: pick one assumption from Exhibits A–F (the failure threshold, the smoothing parameter, the number of candidates searched) and show, with a number, how sensitive the buggy result is to it.<br>
+2. Read <span class="xref soon" data-xref="4.2" data-auto="" title="Coming soon">Session 4.2 — Point-in-Time Data &amp; Data Biases</span> in full before the next session — a prerequisite of this one that you have now watched misbehave live.<br>
+3. Skim the "Seven Sins" white paper in Go deeper and match its seven sins to this session's seven exhibits. One does not map cleanly onto anything here — which, and why not?</p>
+</div>
+
+<h3>📚 Go deeper</h3>
+<ol class="refs">
+<li>López de Prado, M. (2018). <em>Advances in Financial Machine Learning</em>, ch. 11 "The Dangers of Backtesting." Wiley. <span class="rid">ISBN 978-1-119-48208-6</span></li>
+<li>Luo, Y., Alvarez, M., Wang, S., Jussa, J., Wang, A. &amp; Rohal, G. (2014). "Seven Sins of Quantitative Investing." <em>Deutsche Bank Markets Research</em>, 8 September 2014. <span class="rid">https://hudsonthames.org/wp-content/uploads/2022/01/DB-201409-Seven_Sins_of_Quantitative_Investing.pdf</span></li>
+<li>Bailey, D. H., Borwein, J. M., López de Prado, M. &amp; Zhu, Q. J. (2014). "Pseudo-Mathematics and Financial Charlatanism: The Effects of Backtest Overfitting on Out-of-Sample Performance." <em>Notices of the American Mathematical Society</em> 61(5), 458–471. <span class="rid">doi:10.1090/noti1105</span></li>
+<li>Lo, A. W. &amp; MacKinlay, A. C. (1990). "Data-Snooping Biases in Tests of Financial Asset Pricing Models." <em>Review of Financial Studies</em> 3(3), 431–467. <span class="rid">https://academic.oup.com/rfs/article-abstract/3/3/431/1592120</span></li>
+<li>Sullivan, R., Timmermann, A. &amp; White, H. (1999). "Data-Snooping, Technical Trading Rule Performance, and the Bootstrap." <em>Journal of Finance</em> 54(5), 1647–1691. <span class="rid">doi:10.1111/0022-1082.00163</span></li>
+<li>Heckman, J. J. (1979). "Sample Selection Bias as a Specification Error." <em>Econometrica</em> 47(1), 153–161. <span class="rid">doi:10.2307/1912352</span></li>
+</ol>
+
+<h3>Sources for the numbers</h3>
+<ol class="refs">
+<li>Fama, E. F. &amp; Blume, M. E. (1966). "Filter Rules and Stock-Market Trading." <em>Journal of Business</em> 39(1), 226–241. <span class="rid">http://history.technicalanalysis.org.uk/FaBl66.pdf</span></li>
+<li>Lo, A. W. &amp; MacKinlay, A. C. (1990). "An Econometric Analysis of Nonsynchronous Trading." <em>Journal of Econometrics</em> 45(1–2), 181–211. <span class="rid">doi:10.1016/0304-4076(90)90098-E</span></li>
+<li>Getmansky, M., Lo, A. W. &amp; Makarov, I. (2004). "An Econometric Model of Serial Correlation and Illiquidity in Hedge Fund Returns." <em>Journal of Financial Economics</em> 74(3), 529–609. <span class="rid">https://www.sciencedirect.com/science/article/abs/pii/S0304405X04000698</span></li>
+<li>Rosenthal, R. (1979). "The 'File Drawer Problem' and Tolerance for Null Results." <em>Psychological Bulletin</em> 86(3), 638–641. <span class="rid">doi:10.1037/0033-2909.86.3.638</span></li>
+<li>Harvey, C. R. (2017). "Presidential Address: The Scientific Outlook in Financial Economics." <em>Journal of Finance</em> 72(4), 1399–1440. <span class="rid">doi:10.1111/jofi.12530</span></li>
+</ol>
+</section>
+
+<!-- nav:foot -->
+<div class="foot">
+<span class="soon" title="Coming soon">← Prev: 6.3 · Event-Driven</span>
+<span class="soon" title="Coming soon">Next: 6.5 · Costs &amp; Capacity →</span>
+</div>
+<p class="legal">Educational material only — not investment, legal or tax advice. Backtests and simulations are hypothetical. <a href="../start-here.html#disclaimer">Disclaimer</a> · Text CC BY 4.0 · Code MIT.</p>
+<!-- /nav:foot -->
+</main>
+</div></body></html>

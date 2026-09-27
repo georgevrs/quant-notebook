@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- nav:head -->
+<title>4.5 · The Research Storage Stack</title>
+<meta name="description" content="Parquet, Arrow, DuckDB and polars — a fast, local, columnar research stack — plus when kdb+ and managed warehouses earn their cost.">
+<link rel="canonical" href="https://georgevrs.github.io/quant-notebook/unit04-data-engineering/session05-research-storage-stack.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Quant Notebook">
+<meta property="og:title" content="4.5 · The Research Storage Stack">
+<meta property="og:description" content="Parquet, Arrow, DuckDB and polars — a fast, local, columnar research stack — plus when kdb+ and managed warehouses earn their cost.">
+<meta property="og:url" content="https://georgevrs.github.io/quant-notebook/unit04-data-engineering/session05-research-storage-stack.html">
+<meta name="twitter:card" content="summary">
+<link rel="stylesheet" href="../assets/brand.css">
+<link rel="stylesheet" href="../assets/temml.css">
+<!-- /nav:head -->
+</head>
+<body><div class="page" id="top">
+<!-- nav:tabs -->
+<nav class="tabs">
+<a href="../index.html">⌂ Course home</a>
+<span class="soon" title="Coming soon">4.1 · Data Landscape</span>
+<span class="soon" title="Coming soon">4.2 · Point-in-Time</span>
+<span class="soon" title="Coming soon">4.3 · Security Master</span>
+<span class="soon" title="Coming soon">4.4 · Time &amp; Bars</span>
+<a class="active" href="session05-research-storage-stack.html">4.5 · Storage Stack</a>
+<span class="soon" title="Coming soon">4.6 · Lab: Data Lake</span>
+<a href="../roadmap.html">🗺 Roadmap</a>
+</nav>
+<!-- /nav:tabs -->
+
+<header class="cover">
+<!-- nav:heading -->
+<p class="eyebrow">Unit 4 · Financial Data Engineering — Session 05 of 06</p>
+<h1>The Research Storage Stack</h1>
+<!-- /nav:heading -->
+<p class="subtitle">A research desk's data starts as one CSV and, within a year, becomes either one file too big to open or a directory of millions of tiny ones. Parquet, Arrow, DuckDB and polars are the free, local stack that sits between those two failure modes — the stack every later lab in this course reads and writes. <mark>Store data column-by-column, split it by what you actually filter on, and let the engine skip everything else.</mark></p>
+<div class="meta">
+<span>DURATION <b>1.5 h + lab</b></span>
+<span>LEVEL <b>Foundations</b></span>
+<span>TRACKS <b>QR · QD · IND</b></span>
+<span>HANDS-ON <b>A 1.9M-row panel: naive pandas vs. partitioned Parquet + DuckDB/polars</b></span>
+</div>
+<!-- nav:labstrip -->
+<div class="labstrip"><b>📓 Companion lab</b>
+<a href="https://colab.research.google.com/github/georgevrs/quant-notebook/blob/main/labs/u04/s05_research_storage_stack.ipynb">Open in Colab</a>
+<a href="https://github.com/georgevrs/quant-notebook/blob/main/labs/u04/s05_research_storage_stack.ipynb">Notebook on GitHub</a>
+<a href="https://github.com/georgevrs/quant-notebook/blob/main/labs/u04/s05_research_storage_stack.py">Source (.py)</a>
+</div>
+<!-- /nav:labstrip -->
+<div class="toc">
+<b>On this page</b>
+<ol>
+<li><a href="#s1">The stack, in one picture</a></li>
+<li><a href="#s2">How a lazy, partitioned query runs</a></li>
+<li><a href="#s3">Partitioning strategy and the arithmetic of pruning</a></li>
+<li><a href="#s4">The same query, four ways</a></li>
+<li><a href="#s5">Where people go wrong: one file, or one file per row</a></li>
+<li><a href="#s6">Try it</a></li>
+<li><a href="#s7">When kdb+ or a managed warehouse earns its cost</a></li>
+<li><a href="#s8">Glossary · Check yourself · Go deeper</a></li>
+</ol>
+</div>
+</header>
+
+<main>
+
+<section id="s1">
+<h2><span class="no">4.5.1</span> The stack, in one picture</h2>
+<p class="lede">Every session so far has read a handful of prices from a CSV or built them in memory. A real research desk stores years of bars for thousands of symbols, and a CSV stops working long before the data gets interesting.</p>
+
+<p>A CSV (or a pickle, or a single giant Parquet file) is <strong>row-oriented</strong>: each record sits together on disk, in the order it was written. That is exactly right for a broker statement — one row, all its fields — and exactly wrong for research, where a typical question touches one or two columns (say, closing price and volume) across millions of rows. Reading a row-oriented file for that question still has to walk past every other column on every row. <strong>Columnar storage</strong> flips the layout: every column is stored contiguously, so a query that needs two columns out of thirteen can skip the other eleven without ever decoding them.</p>
+
+<p>Four pieces make this practical without a database server. <strong>Parquet</strong> is the columnar file format on disk: compressed, self-describing, and splittable into many files. <strong>Apache Arrow</strong> is the columnar format for data sitting in memory — not a file format, a shared in-memory layout that lets one process hand data to another (or to itself, across libraries) without copying or re-encoding it. <strong>DuckDB</strong> is an embedded SQL engine that reads Parquet directly and executes on top of Arrow. <strong>polars</strong> is a DataFrame library, written in Rust, that does the same job as pandas but is built around Arrow and a multi-threaded, lazily-optimised query engine from the start. None of the four needs a server, a port, or an admin: `pip install` (already done for this course) is the whole deployment.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 250" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">THE RESEARCH STORAGE STACK — each layer only talks to the one below</text>
+  <rect x="150" y="34" width="190" height="60" rx="8" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="245" y="60" font-size="12.5" font-weight="700" text-anchor="middle" fill="#3A56C5">DUCKDB</text>
+  <text x="245" y="78" font-size="9.5" text-anchor="middle" fill="#4A5A68">embedded SQL engine</text>
+  <rect x="380" y="34" width="190" height="60" rx="8" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="475" y="60" font-size="12.5" font-weight="700" text-anchor="middle" fill="#1F7A55">POLARS</text>
+  <text x="475" y="78" font-size="9.5" text-anchor="middle" fill="#4A5A68">Rust dataframe engine</text>
+  <rect x="120" y="126" width="480" height="40" rx="6" fill="#20303C"/>
+  <text x="360" y="151" font-size="11.5" text-anchor="middle" fill="#E7EEF3" font-weight="600">APACHE ARROW · the columnar format shared in memory</text>
+  <rect x="120" y="180" width="480" height="36" rx="6" fill="#EDEFEA" stroke="#C9CFC6" stroke-width="1.5"/>
+  <text x="360" y="203" font-size="11.5" text-anchor="middle" fill="#4A5A68">PARQUET · the columnar format on disk (compressed, splittable) — the foundation</text>
+  <path d="M245 100 V122" stroke="#3A56C5" stroke-width="1.7" marker-end="url(#s1a)"/>
+  <path d="M475 100 V122" stroke="#1F7A55" stroke-width="1.7" marker-end="url(#s1a)"/>
+  <path d="M360 170 V176" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s1a)"/>
+  <text x="360" y="236" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">Same columnar idea, three places: on disk, in memory, and in the engine you query with.</text>
+  <defs><marker id="s1a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F2C38"/></marker></defs>
+</svg>
+<figcaption>fig 4.5.1 — the stack: the same columnar idea, on disk (Parquet), in memory (Arrow) and in the two engines that query it</figcaption>
+</figure>
+
+<div class="co key"><span class="co-t">📌 Key idea — the format matters before the engine does</span>
+<p>DuckDB and polars are fast partly because they are well-written, but mostly because <strong>columnar storage plus compression</strong> means there is simply less to read. Section 4.5.4's lab shows the same query on the same data getting faster twice: once from switching CSV to Parquet, and again — by a much larger margin — from adding partitioning and letting the engine skip files it doesn't need.</p>
+</div>
+</section>
+
+<section id="s2">
+<h2><span class="no">4.5.2</span> How a lazy, partitioned query runs</h2>
+<p class="lede">"Partitioned" and "lazy" are not conveniences — they are the two mechanisms that let an engine avoid reading data at all. Neither works without the other.</p>
+
+<p><strong>Partitioning</strong> means writing a dataset as many files, laid out in directories named after column values — <code>year=2012/sector=SEC03/part.parquet</code> is Hive-style partitioning, the convention DuckDB, polars and Spark all read without configuration. A query that filters on the partitioned columns can skip entire directories before opening a single file: this is <strong>partition pruning</strong>, and it is decided from directory names alone, before any Parquet footer is even read.</p>
+
+<p><strong>Lazy evaluation</strong> is the other half. polars' <code>scan_parquet</code> does not read anything — it returns a <code>LazyFrame</code>, a description of the computation, which you then narrow with <code>.filter(...)</code> and <code>.select(...)</code> before finally calling <code>.collect()</code>. Because the whole query is visible before any of it runs, polars' optimiser can push the filter down to the scan itself (only decompress rows that can possibly match) and push the column selection down too (only decode columns the query actually names) — <strong>predicate pushdown</strong> and <strong>column pruning</strong>. DuckDB reaches the same result from SQL: a <code>WHERE</code> clause on partition columns prunes directories, and the columns named in <code>SELECT</code> are the only ones decoded. pandas' <code>read_parquet</code>, by contrast, is eager — it decodes the whole file into a DataFrame before you get to write a single <code>.loc[...]</code>.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 168" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <rect x="14" y="40" width="122" height="66" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="75" y="66" font-size="10.5" text-anchor="middle" fill="#3A56C5" font-weight="600">1 · RAW PANEL</text>
+  <text x="75" y="84" font-size="9" text-anchor="middle" fill="#4A5A68">one DataFrame,</text>
+  <text x="75" y="96" font-size="9" text-anchor="middle" fill="#4A5A68">in memory</text>
+  <rect x="152" y="40" width="122" height="66" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="213" y="66" font-size="10.5" text-anchor="middle" fill="#3A56C5" font-weight="600">2 · WRITE</text>
+  <text x="213" y="84" font-size="9" text-anchor="middle" fill="#4A5A68">Hive dirs:</text>
+  <text x="213" y="96" font-size="9" text-anchor="middle" fill="#4A5A68">year=…/sector=…</text>
+  <rect x="290" y="40" width="122" height="66" rx="9" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="351" y="66" font-size="10.5" text-anchor="middle" fill="#8A6D00" font-weight="600">3 · LAZY SCAN</text>
+  <text x="351" y="84" font-size="9" text-anchor="middle" fill="#4A5A68">a query plan —</text>
+  <text x="351" y="96" font-size="9" text-anchor="middle" fill="#4A5A68">no I/O yet</text>
+  <rect x="428" y="40" width="130" height="66" rx="9" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="493" y="66" font-size="10.5" text-anchor="middle" fill="#8A6D00" font-weight="600">4 · PUSH DOWN</text>
+  <text x="493" y="84" font-size="9" text-anchor="middle" fill="#4A5A68">skip files,</text>
+  <text x="493" y="96" font-size="9" text-anchor="middle" fill="#4A5A68">skip columns</text>
+  <rect x="574" y="40" width="132" height="66" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="640" y="66" font-size="10.5" text-anchor="middle" fill="#1F7A55" font-weight="600">5 · COLLECT</text>
+  <text x="640" y="84" font-size="9" text-anchor="middle" fill="#4A5A68">materialize just</text>
+  <text x="640" y="96" font-size="9" text-anchor="middle" fill="#4A5A68">the small result</text>
+  <path d="M137 73 H150" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M275 73 H288" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M413 73 H426" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M559 73 H572" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <text x="360" y="136" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">Nothing is read from disk until the last step decides it has to be.</text>
+  <defs><marker id="s2a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F2C38"/></marker></defs>
+</svg>
+<figcaption>fig 4.5.2 — from a raw panel to an answer: nothing is scanned until the plan is final</figcaption>
+</figure>
+
+<table>
+<thead><tr><th>Format</th><th>Size on disk</th><th>Write time</th></tr></thead>
+<tbody>
+<tr><td>CSV, one file</td><td><span data-lab="csv_mb" data-fmt=",.0f">207</span> MB</td><td><span data-lab="t_write_csv" data-fmt=".1f">9.5</span> s</td></tr>
+<tr><td>Parquet, one file (no partitioning)</td><td><span data-lab="mono_parquet_mb" data-fmt=",.0f">76</span> MB</td><td><span data-lab="t_write_mono_parquet" data-fmt=".2f">1.04</span> s</td></tr>
+<tr><td>Parquet, partitioned (<span data-lab="n_partition_files" data-fmt=",.0f">50</span> files)</td><td><span data-lab="partitioned_parquet_mb" data-fmt=",.0f">100</span> MB</td><td><span data-lab="t_write_partitioned_parquet" data-fmt=".2f">0.42</span> s</td></tr>
+</tbody>
+</table>
+
+<p>The columnar format alone shrinks the file to <span data-lab="compression_ratio" data-fmt=".1f">2.7</span>× smaller than the CSV holding the identical rows — before partitioning or querying enter the picture at all.</p>
+
+<figure class="diagram chart">
+<!-- chart:file_size -->
+<svg viewBox="0 0 720 260" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Size on disk for the same 1,890,000 rows, three formats">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">SIZE ON DISK FOR THE SAME 1,890,000 ROWS, THREE FORMATS</text>
+  <line x1="64" y1="216" x2="690" y2="216" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="220" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0 MB</text>
+  <line x1="64" y1="181.6" x2="690" y2="181.6" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="185.6" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">50 MB</text>
+  <line x1="64" y1="147.2" x2="690" y2="147.2" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="151.2" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">100 MB</text>
+  <line x1="64" y1="112.8" x2="690" y2="112.8" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="116.8" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">150 MB</text>
+  <line x1="64" y1="78.4" x2="690" y2="78.4" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="82.4" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">200 MB</text>
+  <line x1="64" y1="44" x2="690" y2="44" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="48" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">250 MB</text>
+  <line x1="64" y1="216" x2="690" y2="216" stroke="#C9CFC6" stroke-width="1"/>
+  <path d="M156.3,216 V77.8 Q156.3,73.8 160.3,73.8 H176.3 Q180.3,73.8 180.3,77.8 V216 Z" fill="#D64B2A"><title>CSV: 207 MB</title></path>
+  <text x="168.3" y="66.8" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">207 MB</text>
+  <text x="168.3" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">CSV</text>
+  <path d="M365,216 V168 Q365,164 369,164 H385 Q389,164 389,168 V216 Z" fill="#E8850C"><title>Parquet (1 file): 76 MB</title></path>
+  <text x="377" y="157" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">76 MB</text>
+  <text x="377" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">Parquet (1 file)</text>
+  <path d="M573.7,216 V151 Q573.7,147 577.7,147 H593.7 Q597.7,147 597.7,151 V216 Z" fill="#3A56C5"><title>Parquet (partitioned): 100 MB</title></path>
+  <text x="585.7" y="140" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">100 MB</text>
+  <text x="585.7" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">Parquet (partitioned)</text>
+</svg>
+<!-- /chart:file_size -->
+<figcaption>fig 4.5.3 — the same rows, three formats: columnar compression alone shrinks the file well before any query runs</figcaption>
+</figure>
+
+<div class="co tip"><span class="co-t">💡 Looking ahead</span>
+<p>This session builds the storage layer; <span class="xref soon" data-xref="4.6" data-auto="" title="Coming soon">Session 4.6 — Lab: Build Your Research Data Lake</span> wires it into a pipeline with quality checks and lineage, and every backtest from <span class="xref soon" data-xref="6.2" data-auto="" title="Coming soon">Session 6.2 — Build a Vectorized Backtester</span> onward reads its bars from a partitioned Parquet dataset exactly like the one built here.</p>
+</div>
+</section>
+
+<section id="s3">
+<h2><span class="no">4.5.3</span> Partitioning strategy and the arithmetic of pruning</h2>
+<p class="lede">A partitioning scheme is a bet on how you will filter later. Get it right and most queries touch a sliver of the data; get it wrong and you have either one file too big to skip, or too many files to open.</p>
+
+<p>Partition on the columns your queries actually filter on — for a research panel that is usually <strong>date</strong> (or a coarser bucket of it, like year or month) and, when the query is often about one slice of the universe, something like <strong>sector</strong> or <strong>exchange</strong>. Partitioning on a column with millions of distinct values (a trade ID, a raw timestamp to the microsecond) does the opposite of helping: it turns every partition into a handful of rows and every directory listing into a bottleneck. As a working rule, aim for partitions in the tens of megabytes to low hundreds — small enough to skip, large enough that opening one is not mostly overhead.</p>
+
+<p>The saving from partitioning multiplies with the saving from column pruning, because they cut along different axes — one skips files, the other skips fields within the files that remain:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><mfrac><mtext>bytes scanned</mtext><mtext>bytes total</mtext></mfrac><mspace width="0.2778em"></mspace><mo>≈</mo><mspace width="0.2778em"></mspace><mfrac><mtext>partitions touched</mtext><mtext>partitions total</mtext></mfrac><mspace width="0.2778em"></mspace><mo>×</mo><mspace width="0.2778em"></mspace><mfrac><mtext>columns touched</mtext><mtext>columns total</mtext></mfrac></mrow><annotation encoding="application/x-tex">\frac{\text{bytes scanned}}{\text{bytes total}} \;\approx\; \frac{\text{partitions touched}}{\text{partitions total}} \;\times\; \frac{\text{columns touched}}{\text{columns total}}</annotation></semantics></math></div>
+<p>This is a back-of-envelope estimate, not an exact one — Parquet compresses columns individually, so a column of tightly-clustered floats can compress far better than a column of high-cardinality strings, and the ratio above assumes every column costs the same. It is still the right order of magnitude: the lab's query touches <span data-lab="frac_partitions_touched" data-fmt=".0%">2%</span> of the partitions and <span data-lab="frac_columns_touched" data-fmt=".0%">38%</span> of the columns, for an estimated <span data-lab="frac_estimated_scanned" data-fmt=".2%">0.77%</span> of the bytes — and §4.5.4 shows that estimate landing in the same neighbourhood as the wall-clock speedup actually measured.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">PARTITION PRUNING — the directories one query never opens</text>
+  <rect x="300" y="34" width="120" height="38" rx="8" fill="#fff" stroke="#1F2C38" stroke-width="1.5"/>
+  <text x="360" y="51" font-size="10" text-anchor="middle" fill="#1F2C38" font-weight="600">panel_partitioned/</text>
+  <text x="360" y="65" font-size="9" text-anchor="middle" fill="#4A5A68">50 Parquet files</text>
+  <path d="M360 72 V92" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s3a)"/>
+  <rect x="24" y="96" width="128" height="44" rx="7" fill="#F5F6F2" stroke="#C9CFC6" stroke-width="1.5"/>
+  <text x="88" y="114" font-size="10" text-anchor="middle" fill="#9AA6AF" font-weight="600">year=2010</text>
+  <text x="88" y="130" font-size="8.5" text-anchor="middle" fill="#9AA6AF">skipped</text>
+  <rect x="160" y="96" width="128" height="44" rx="7" fill="#F5F6F2" stroke="#C9CFC6" stroke-width="1.5"/>
+  <text x="224" y="114" font-size="10" text-anchor="middle" fill="#9AA6AF" font-weight="600">year=2011</text>
+  <text x="224" y="130" font-size="8.5" text-anchor="middle" fill="#9AA6AF">skipped</text>
+  <rect x="296" y="96" width="128" height="44" rx="7" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="360" y="114" font-size="10" text-anchor="middle" fill="#1F7A55" font-weight="700">year=2012</text>
+  <text x="360" y="130" font-size="8.5" text-anchor="middle" fill="#1F7A55">touched</text>
+  <rect x="432" y="96" width="128" height="44" rx="7" fill="#F5F6F2" stroke="#C9CFC6" stroke-width="1.5"/>
+  <text x="496" y="114" font-size="10" text-anchor="middle" fill="#9AA6AF" font-weight="600">year=2013</text>
+  <text x="496" y="130" font-size="8.5" text-anchor="middle" fill="#9AA6AF">skipped</text>
+  <rect x="568" y="96" width="128" height="44" rx="7" fill="#F5F6F2" stroke="#C9CFC6" stroke-width="1.5"/>
+  <text x="632" y="114" font-size="10" text-anchor="middle" fill="#9AA6AF" font-weight="600">year=2014</text>
+  <text x="632" y="130" font-size="8.5" text-anchor="middle" fill="#9AA6AF">skipped</text>
+  <path d="M360 140 V160" stroke="#1F7A55" stroke-width="1.7" marker-end="url(#s3b)"/>
+  <rect x="24" y="164" width="128" height="44" rx="7" fill="#F5F6F2" stroke="#C9CFC6" stroke-width="1.5"/>
+  <text x="88" y="182" font-size="10" text-anchor="middle" fill="#9AA6AF" font-weight="600">sector=SEC00</text>
+  <text x="88" y="198" font-size="8.5" text-anchor="middle" fill="#9AA6AF">skipped</text>
+  <rect x="160" y="164" width="128" height="44" rx="7" fill="#F5F6F2" stroke="#C9CFC6" stroke-width="1.5"/>
+  <text x="224" y="182" font-size="10" text-anchor="middle" fill="#9AA6AF" font-weight="600">sector=SEC01</text>
+  <text x="224" y="198" font-size="8.5" text-anchor="middle" fill="#9AA6AF">skipped</text>
+  <rect x="296" y="164" width="128" height="44" rx="7" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="360" y="182" font-size="10" text-anchor="middle" fill="#1F7A55" font-weight="700">sector=SEC03</text>
+  <text x="360" y="198" font-size="8.5" text-anchor="middle" fill="#1F7A55">touched</text>
+  <rect x="432" y="164" width="128" height="44" rx="7" fill="#F5F6F2" stroke="#C9CFC6" stroke-width="1.5"/>
+  <text x="496" y="182" font-size="10" text-anchor="middle" fill="#9AA6AF" font-weight="600">sector=SEC07</text>
+  <text x="496" y="198" font-size="8.5" text-anchor="middle" fill="#9AA6AF">skipped</text>
+  <rect x="568" y="164" width="128" height="44" rx="7" fill="#F5F6F2" stroke="#C9CFC6" stroke-width="1.5"/>
+  <text x="632" y="182" font-size="10" text-anchor="middle" fill="#9AA6AF" font-weight="600">+ 6 more</text>
+  <text x="632" y="198" font-size="8.5" text-anchor="middle" fill="#9AA6AF">skipped</text>
+  <path d="M360 208 V228" stroke="#1F7A55" stroke-width="1.7" marker-end="url(#s3b)"/>
+  <rect x="260" y="232" width="200" height="40" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="360" y="257" font-size="11" text-anchor="middle" fill="#1F7A55" font-weight="700">1 FILE OPENED</text>
+  <text x="360" y="292" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">Grey = never opened. The directory names alone decide this, before any file is read.</text>
+  <defs>
+    <marker id="s3a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F2C38"/></marker>
+    <marker id="s3b" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F7A55"/></marker>
+  </defs>
+</svg>
+<figcaption>fig 4.5.4 — partition pruning: the query's <code>WHERE year = 2012 AND sector = 'SEC03'</code> decides which of 50 files to open from the directory names alone</figcaption>
+</figure>
+
+<table>
+<thead><tr><th>Partition granularity</th><th>What happens</th><th>Cost</th></tr></thead>
+<tbody>
+<tr><td>None — one file for everything</td><td>Every query, however narrow, opens the whole file</td><td>No pruning at all; only column pruning helps</td></tr>
+<tr><td>By year and sector (this lab)</td><td>A date-and-universe filter skips almost every file</td><td>50 files here, each tens of MB — a sensible middle</td></tr>
+<tr><td>By year, sector <em>and</em> symbol</td><td>Every query still finds its file quickly</td><td>Thousands of tiny files: metadata and open() overhead start to dominate (§4.5.5)</td></tr>
+</tbody>
+</table>
+
+<div class="co note"><span class="co-t">🧭 Margin note — partition columns are metadata, not always real columns</span>
+<p>Hive-style writers pull the partition values out of the data and encode them only in the directory names; <code>hive_partitioning=true</code> tells DuckDB and polars to read them back out of the path and re-attach them as columns on the way out. Filtering on a partition column is therefore closer to a directory listing than a table scan.</p>
+</div>
+</section>
+
+<section id="s4">
+<h2><span class="no">4.5.4</span> The same query, four ways</h2>
+<p class="lede">One question — for one sector, in one year, the average close and total dollar volume of every symbol — answered four ways on the same panel. Only the storage layout and the engine change.</p>
+
+<p>The panel underneath: <span data-lab="n_symbols" data-fmt=",.0f">1,500</span> symbols across <span data-lab="n_sectors" data-fmt=",.0f">10</span> sectors, <span data-lab="n_years" data-fmt=",.0f">5</span> years of simulated daily bars with a few extra columns (open, high, low, vwap, trade count, bid, ask) a query never needs — <span data-lab="n_rows" data-fmt=",.0f">1,890,000</span> rows in all.</p>
+
+<p>The naive way reads everything, in a text format, before it can even start filtering:</p>
+<pre><span class="c"># naive: full file, all 13 columns, then filter in memory</span>
+df = pd.read_csv(<span class="s">"panel.csv"</span>, parse_dates=[<span class="s">"date"</span>])
+sub = df[(df[<span class="s">"year"</span>] == YEAR) &amp; (df[<span class="s">"sector"</span>] == SECTOR)]</pre>
+
+<p>Switching to a single Parquet file changes only the format — still one file, still a full scan — and is already faster because the columns are compressed and typed rather than re-parsed from text. Switching to a <em>partitioned</em> Parquet dataset and asking DuckDB to do the filtering changes the shape of the work entirely:</p>
+<pre><span class="c"># DuckDB: the WHERE clause prunes partitions before it decodes anything</span>
+con.execute(<span class="s">"""</span>
+<span class="s">    SELECT symbol, avg(close) AS avg_close, sum(close * volume) AS dollar_volume</span>
+<span class="s">    FROM read_parquet('panel_partitioned/**/*.parquet', hive_partitioning = true)</span>
+<span class="s">    WHERE year = 2012 AND sector = 'SEC03'</span>
+<span class="s">    GROUP BY symbol</span>
+<span class="s">"""</span>).df()</pre>
+
+<p>polars reaches the same plan through its lazy API rather than SQL — the point of <code>scan_parquet</code> returning a <code>LazyFrame</code> is that nothing below has executed yet:</p>
+<pre><span class="c"># polars: still just a plan until .collect() — filter/select push down into the scan</span>
+lf = pl.scan_parquet(<span class="s">"panel_partitioned/"</span>, hive_partitioning=<span class="k">True</span>)
+result = (lf.filter((pl.col(<span class="s">"year"</span>) == YEAR) &amp; (pl.col(<span class="s">"sector"</span>) == SECTOR))
+            .group_by(<span class="s">"symbol"</span>)
+            .agg(pl.col(<span class="s">"close"</span>).mean(), (pl.col(<span class="s">"close"</span>) * pl.col(<span class="s">"volume"</span>)).sum())
+            .collect())</pre>
+
+<p>All four return the identical <span data-lab="n_symbols_in_result" data-fmt=",.0f">150</span> rows — the lab asserts numerical agreement to four significant figures before it trusts any timing number. What changes is only the time it takes to get there:</p>
+
+<table>
+<thead><tr><th>Method</th><th>Wall time</th><th>vs. naive CSV</th></tr></thead>
+<tbody>
+<tr><td>pandas + CSV (full scan)</td><td><span data-lab="t_naive_csv_ms" data-fmt=",.0f">2,162</span> ms</td><td>—</td></tr>
+<tr><td>pandas + 1 Parquet file (full scan)</td><td><span data-lab="t_naive_parquet_ms" data-fmt=",.0f">347</span> ms</td><td><span data-lab="speedup_duckdb_vs_mono" data-fmt=".1f">7.2</span>× slower than partitioned DuckDB</td></tr>
+<tr><td>DuckDB + partitioned Parquet</td><td><span data-lab="t_duckdb_ms" data-fmt=",.1f">48.1</span> ms</td><td><span data-lab="speedup_duckdb_vs_csv" data-fmt=",.0f">45</span>× faster</td></tr>
+<tr><td>polars (lazy) + partitioned Parquet</td><td><span data-lab="t_polars_ms" data-fmt=",.1f">32.7</span> ms</td><td><span data-lab="speedup_polars_vs_csv" data-fmt=",.0f">66</span>× faster</td></tr>
+</tbody>
+</table>
+
+<div class="co note"><span class="co-t">🧭 Margin note — benchmarks are honest only with their caveats stated</span>
+<p>These are single-machine, single-run wall-clock times; disk cache, core count and background load all move the absolute numbers, and the very first query DuckDB or polars ever runs in a process pays a one-off thread-pool warm-up of about a second. The lab reports the steady-state time after that warm-up and takes the minimum of several repeats — what stays robust across machines is the <em>shape</em> of the result (two orders of magnitude), not the exact millisecond.</p>
+</div>
+</section>
+
+<section id="s5">
+<h2><span class="no">4.5.5</span> Where people go wrong: one file, or one file per row</h2>
+<p class="lede">The two failure modes are mirror images: too little structure, and every query pays for everything; too much structure, and the filesystem itself becomes the bottleneck.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 220" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">SAME QUESTION, TWO STORAGE DECISIONS</text>
+  <rect x="26" y="32" width="326" height="176" rx="9" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="189" y="54" font-size="11" font-weight="700" text-anchor="middle" fill="#D64B2A">THE NAIVE WAY</text>
+  <rect x="46" y="66" width="286" height="24" rx="5" fill="#fff" stroke="#F2CDBF"/>
+  <text x="58" y="82" font-size="9.5" fill="#1F2C38">one file (CSV or Parquet) holds everything</text>
+  <rect x="46" y="96" width="286" height="24" rx="5" fill="#fff" stroke="#F2CDBF"/>
+  <text x="58" y="112" font-size="9.5" fill="#1F2C38">load it all into pandas, filter in memory</text>
+  <text x="189" y="148" font-size="9.5" text-anchor="middle" fill="#D64B2A" font-weight="600">Every query pays for every row and column.</text>
+  <text x="189" y="166" font-size="9" text-anchor="middle" fill="#4A5A68">Cost grows with total data size, not query size.</text>
+  <rect x="368" y="32" width="326" height="176" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="531" y="54" font-size="11" font-weight="700" text-anchor="middle" fill="#1F7A55">THE DISCIPLINED WAY</text>
+  <rect x="388" y="66" width="286" height="24" rx="5" fill="#fff" stroke="#BFE0CF"/>
+  <text x="400" y="82" font-size="9.5" fill="#1F2C38">1 · partition by what you filter on</text>
+  <rect x="388" y="96" width="286" height="24" rx="5" fill="#fff" stroke="#BFE0CF"/>
+  <text x="400" y="112" font-size="9.5" fill="#1F2C38">2 · let DuckDB/polars push the filter into the scan</text>
+  <text x="531" y="148" font-size="9.5" text-anchor="middle" fill="#1F7A55" font-weight="600">Cost tracks the size of the answer, not the archive.</text>
+  <text x="531" y="166" font-size="9" text-anchor="middle" fill="#4A5A68">But partitions that are too fine bring their own cost (below).</text>
+</svg>
+<figcaption>fig 4.5.5 — naive vs. disciplined: the same question, sized by how much of the archive it has to touch</figcaption>
+</figure>
+
+<p>The second failure is subtler and hits people who took the first lesson too literally: if partitioning by year and sector helps, why not also partition by symbol, so every query finds an even smaller file? The lab tests this directly — it takes the exact slice one query wants and writes it two ways, as the single file it already is, and again split into one tiny file per symbol. Reading the identical bytes is <span data-lab="slowdown_many_files" data-fmt=".1f">19.4</span>× slower as <span data-lab="n_tiny_files" data-fmt=",.0f">150</span> tiny files than as one: opening a file, reading its footer and its metadata costs roughly the same whether the file holds ten rows or ten million, so once files get small that fixed cost dominates and the filesystem's directory-listing overhead starts to show up too.</p>
+
+<figure class="diagram chart">
+<!-- chart:small_files -->
+<svg viewBox="0 0 720 260" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Reading the identical slice as one file vs one file per symbol">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">READING THE IDENTICAL SLICE AS ONE FILE VS ONE FILE PER SYMBOL</text>
+  <line x1="64" y1="216" x2="690" y2="216" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="220" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.0 ms</text>
+  <line x1="64" y1="158.7" x2="690" y2="158.7" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="162.7" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">50.0 ms</text>
+  <line x1="64" y1="101.3" x2="690" y2="101.3" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="105.3" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">100.0 ms</text>
+  <line x1="64" y1="44" x2="690" y2="44" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="48" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">150.0 ms</text>
+  <line x1="64" y1="216" x2="690" y2="216" stroke="#C9CFC6" stroke-width="1"/>
+  <path d="M208.5,216 V212.7 Q208.5,209.4 211.8,209.4 H229.2 Q232.5,209.4 232.5,212.7 V216 Z" fill="#3A56C5"><title>1 file: 5.7 ms</title></path>
+  <text x="220.5" y="202.4" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">5.7 ms</text>
+  <text x="220.5" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">1 file</text>
+  <path d="M521.5,216 V92.5 Q521.5,88.5 525.5,88.5 H541.5 Q545.5,88.5 545.5,92.5 V216 Z" fill="#D64B2A"><title>150 tiny files: 111.2 ms</title></path>
+  <text x="533.5" y="81.5" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">111.2 ms</text>
+  <text x="533.5" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">150 tiny files</text>
+</svg>
+<!-- /chart:small_files -->
+<figcaption>fig 4.5.6 — the identical data, read as one file vs. as one file per symbol: small files add fixed overhead that no engine can optimise away</figcaption>
+</figure>
+
+<table>
+<thead><tr><th>Situation</th><th>Choose</th><th>Why</th></tr></thead>
+<tbody>
+<tr><td>Small dataset, exploring alone</td><td><strong>one Parquet file</strong></td><td>Partitioning overhead outweighs the pruning benefit below a few hundred MB</td></tr>
+<tr><td>Repeated queries filtered by date and/or a category</td><td><strong>partition by those columns</strong></td><td>Matches the pruning to how you actually query — this lab's case</td></tr>
+<tr><td>A column with millions of distinct values (trade ID, raw tick timestamp)</td><td><strong>never a partition column</strong></td><td>Produces one file per value — the small-files problem, deliberately</td></tr>
+</tbody>
+</table>
+
+<div class="co warn"><span class="co-t">⚠️ Pitfall — "more partitions is always more parallelism"</span>
+<p>More files does mean more units of work an engine <em>could</em> spread across threads — but only up to the point where the fixed cost of opening a file (its footer, its schema, its directory entry) stops being negligible next to the data inside it. Partition by what you filter on, to a size in the tens-to-low-hundreds of MB per file; do not partition by everything you might one day group by.</p>
+</div>
+</section>
+
+<section id="s6">
+<h2><span class="no">4.5.6</span> Try it</h2>
+<p class="lede">Open the companion lab and change the one thing that determines whether partitioning helps at all: what the query filters on.</p>
+
+<div class="co lab"><span class="co-t">🔧 Try it (15 min, in the lab)</span>
+<p>1. In §3 of the lab, change <code>QUERY_SECTOR</code> to a different value and rerun — the wall-clock times should barely move, because the pruning fraction is the same regardless of which sector you pick.<br>
+2. Now change the DuckDB query's <code>WHERE</code> clause to filter only on <code>sector</code>, dropping the <code>year</code> condition (touching all 5 years for that sector instead of 1). Predict, then check: how much of the speedup over the naive CSV does DuckDB lose?<br>
+3. Success looks like this: the prediction from §4.5.3's formula (now 5× as many partitions touched) is within a factor of 2 of what you actually measure — a reminder that partition pruning and column pruning are the two levers, and you can turn either one off to see how much it was carrying.</p>
+</div>
+</section>
+
+<hr>
+
+<section id="s7">
+<h2><span class="no">4.5.7</span> When kdb+ or a managed warehouse earns its cost</h2>
+<p class="lede">Everything above runs on one laptop for free. Two other tools exist for when "one laptop" stops being the right answer — worth recognising, not worth a hands-on lab here.</p>
+
+<p><strong>kdb+</strong> (rebranded KDB-X by its vendor KX in 2025-26) is a proprietary column-oriented time-series database built around the array language q, purpose-built for the thing this lab's stack is not: ingesting a live tick feed at very high message rates with almost no latency and querying it seconds later. Production kdb+ systems on a trading floor typically split the job into a <em>tickerplant</em> that captures and logs the incoming feed, a <em>real-time database</em> (RDB) that holds the current day in memory for intraday queries, and a <em>historical database</em> (HDB) of prior days partitioned on disk by date — an architecture built for the same reason this session partitions by year: so a query for "today" or "last Tuesday" never has to touch the rest. As of 2026, KX offers a free Community Edition (personal and light commercial use, capped at 16 GB of RAM for a single instance) and a Personal Edition for individual non-commercial use; production deployment at real tick-capture scale is a paid, usage-metered commercial licence. That licence, plus q's own learning curve, is why most research desks reach for kdb+ only once they are actually capturing ticks in real time, not for historical research on daily or minute bars.</p>
+
+<p>A <strong>managed warehouse</strong> — Snowflake, BigQuery, or a hosted ClickHouse — solves a different problem: not raw single-query speed, but many people and many jobs querying the same governed dataset concurrently, with someone else responsible for uptime, backups, access control and scaling storage independently of compute. <span class="xref soon" data-xref="4.2" data-auto="" title="Coming soon">Session 4.2 — Point-in-Time Data &amp; Data Biases</span>'s point-in-time discipline and <span class="xref soon" data-xref="4.3" data-auto="" title="Coming soon">Session 4.3 — Corporate Actions, Security Master &amp; Continuous Futures</span>'s security master both get harder, not easier, once a dozen researchers share one dataset — a managed warehouse (or a team-scale variant of this session's own stack, like the open-source Parquet-based ArcticDB from Man Group, whose commercial use needs a licence beyond its Business Source terms) is what makes that sharing safe rather than a source of silently different answers.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 232" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">THREE STORAGE TIERS — pick the one that matches the problem</text>
+  <rect x="26" y="32" width="668" height="56" rx="8" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="46" y="52" font-size="10.5" font-weight="700" fill="#3A56C5">THIS SESSION'S STACK · one machine, one researcher</text>
+  <text x="440" y="52" font-size="9.5" font-family="'IBM Plex Mono',monospace" fill="#1F2C38">Parquet + DuckDB/polars</text>
+  <text x="46" y="72" font-size="9" fill="#4A5A68">No server, no licence — fits any dataset that fits on local disk.</text>
+  <rect x="26" y="96" width="668" height="56" rx="8" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="46" y="116" font-size="10.5" font-weight="700" fill="#8A6D00">KDB+ / KDB-X · live tick capture at a trading desk</text>
+  <text x="440" y="116" font-size="9.5" font-family="'IBM Plex Mono',monospace" fill="#1F2C38">tickerplant → RDB → HDB</text>
+  <text x="46" y="136" font-size="9" fill="#4A5A68">Free tiers exist; production licence is paid and metered. 2026.</text>
+  <rect x="26" y="160" width="668" height="56" rx="8" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="46" y="180" font-size="10.5" font-weight="700" fill="#1F7A55">MANAGED WAREHOUSE · many people, one governed dataset</text>
+  <text x="440" y="180" font-size="9.5" font-family="'IBM Plex Mono',monospace" fill="#1F2C38">Snowflake / BigQuery / …</text>
+  <text x="46" y="200" font-size="9" fill="#4A5A68">Someone else owns uptime, access control and shared consistency.</text>
+</svg>
+<figcaption>fig 4.5.7 — three tiers of the same idea (columnar storage, queried where the data lives) at three different scales of team and latency</figcaption>
+</figure>
+
+<div class="co tip"><span class="co-t">💡 Tip — don't reach for either on day one</span>
+<p>A single laptop with a partitioned Parquet dataset comfortably handles tens of millions of rows and tens of gigabytes — most of a solo researcher's or small team's career, and everything this course's later labs need. Reach for kdb+ when the problem is genuinely real-time tick capture; reach for a managed warehouse when the problem is genuinely concurrent, shared, governed access. Reaching for either to solve "my CSV is slow" is solving the wrong problem.</p>
+</div>
+</section>
+
+<hr>
+
+<section id="s8">
+<h2><span class="no">4.5.8</span> Glossary · Check yourself · Go deeper</h2>
+<div class="gloss" id="glossary">
+<div id="g-parquet"><b>Parquet</b> — a columnar file format: compressed, self-describing, and splittable into many files.</div>
+<div id="g-apache-arrow"><b>Apache Arrow</b> — a columnar format for data in memory, shared across libraries and languages without copying.</div>
+<div id="g-duckdb"><b>DuckDB</b> — an embedded, server-free SQL engine that reads Parquet directly and executes over Arrow.</div>
+<div id="g-polars"><b>polars</b> — a Rust-based DataFrame library with a lazy, multi-threaded query engine built around Arrow.</div>
+<div id="g-lazy-evaluation"><b>Lazy evaluation</b> — building a query plan first and running it only when the result is requested, so filters and column selections can be pushed into the scan.</div>
+<div id="g-partitioning"><b>Partitioning</b> — writing a dataset as many files in directories named after column values, so a filtering query can skip whole files.</div>
+<div id="g-columnar-storage"><b>Columnar storage</b> — laying data out column-by-column on disk or in memory, so a query can decode only the columns it needs.</div>
+<div id="g-kdb"><b>kdb+</b> — a proprietary column-oriented time-series database (language q), built for high-rate tick capture and low-latency query.</div>
+</div>
+
+<h3>Check yourself</h3>
+<details class="q"><summary>1. A single Parquet file is already columnar and compressed. Why does partitioning it further make the lab's query another order of magnitude faster?</summary><div>Columnar format only helps with <em>column</em> pruning — decoding fewer of the file's fields. It does nothing about <em>row</em> pruning: a single file still has to be opened and its matching row groups scanned in full. Partitioning adds a second, independent axis of savings (skip whole files by directory name) that multiplies with column pruning rather than substituting for it — which is exactly why §4.5.4 measures roughly a 12-19× gap between "Parquet, one file" and "Parquet, partitioned."</div></details>
+<details class="q"><summary>2. You partition a dataset by <code>trade_id</code> because "then every query finds its row instantly." What goes wrong?</summary><div>A high-cardinality column produces one partition per distinct value — potentially millions of tiny files. Reading even a small slice now means opening thousands of files, each paying the same fixed footer/metadata/open() cost regardless of how little data it holds; §4.5.5 measures a 7× slowdown from turning one file into 150. Partition on the handful of columns your queries actually filter on, not on the column with the most detail.</div></details>
+<details class="q"><summary>3. Your team's shared research dataset gets slow and inconsistent once eight people query it at once from their own laptops. Is the fix kdb+?</summary><div>No — that is a concurrency and governance problem (many readers, one source of truth, someone accountable for access and uptime), which is what a managed warehouse solves. kdb+ solves a different problem: very high-rate, low-latency live tick capture. Reaching for either tool without matching it to the actual bottleneck just adds licensing cost and operational complexity.</div></details>
+<details class="q"><summary>4. polars' <code>scan_parquet(...).filter(...)</code> hasn't touched disk yet, even though you wrote the filter. Why does that matter?</summary><div>Because nothing has executed, the optimiser can still see the whole query when it finally runs at <code>.collect()</code> — including a later <code>.select()</code> — and push both the filter and the column selection down into the scan itself. If <code>filter</code> ran eagerly the moment it was called, the engine would already have decoded every column of every row before it knew which ones the rest of the query needed.</div></details>
+<details class="q"><summary>5. The lab reports DuckDB at roughly <span data-lab="speedup_duckdb_vs_csv" data-fmt=",.0f">45</span>× faster than naive CSV on this machine. Should you expect exactly that number on yours?</summary><div>No. The <em>ratio</em> is expected to stay large and in the same rough range, because it comes from how much less data is read (a property of the query and the partitioning, not the hardware); the exact millisecond figures depend on disk speed, core count, background load and whether the OS has already cached the files. That is why the lab asserts a wide, conservative margin (5×, not 126×) rather than the specific number it happens to measure.</div></details>
+
+<div class="co lab"><span class="co-t">🔧 Homework (~1 h before Session 4.6)</span>
+<p>1. In the lab, add a fifth method: <code>pyarrow.dataset</code> reading the same partitioned directory with a filter expression, and time it against DuckDB and polars — they should land in the same neighbourhood, since all three ultimately execute over Arrow.<br>
+2. Pick a real dataset you have used before (even a small one) and sketch, on paper, a Hive partitioning scheme for it: which columns, roughly how many resulting files, and roughly how large each one would be.<br>
+3. Read the DuckDB and polars "Go deeper" references below, specifically the sections on partition pruning and predicate pushdown, before <span class="xref soon" data-xref="4.6" data-auto="" title="Coming soon">Session 4.6 — Lab: Build Your Research Data Lake</span> asks you to build a real pipeline on top of this stack.</p>
+</div>
+
+<h3>📚 Go deeper</h3>
+<ol class="refs">
+<li>Mühleisen, H. &amp; Raasveldt, M. (2019). "DuckDB: An Embeddable Analytical Database." <em>Proceedings of the 2019 International Conference on Management of Data (SIGMOD '19)</em>, 1981–1984. <span class="rid">doi:10.1145/3299869.3320212</span></li>
+<li>Melnik, S., Gubarev, A., Long, J. J., Romer, G., Shivakumar, S., Tolton, M. &amp; Vassilakis, T. (2010). "Dremel: Interactive Analysis of Web-Scale Datasets." <em>Proceedings of the VLDB Endowment</em> 3(1-2), 330–339 — the columnar encoding Parquet builds on. <span class="rid">doi:10.14778/1920841.1920886</span></li>
+<li>Apache Arrow project. "Arrow Columnar Format" specification. <span class="rid">https://arrow.apache.org/docs/format/Columnar.html</span></li>
+<li>Polars user guide. "Lazy API" and "The Power of Predicate Pushdown." <span class="rid">https://docs.pola.rs/user-guide/concepts/lazy-api/</span></li>
+</ol>
+
+<h3>Sources for the numbers</h3>
+<ol class="refs">
+<li>DuckDB documentation. "Hive Partitioning" — partition pruning from directory names, and the <code>hive_partitioning</code> option to <code>read_parquet</code>. <span class="rid">https://duckdb.org/docs/lts/data/partitioning/hive_partitioning</span></li>
+<li>KX. "Kdb+ Free Personal Edition License Agreement" and product usage restrictions for the free Community/Personal tiers (16 GB RAM cap, single instance), accessed September 2026. <span class="rid">https://kx.com/kdb-free-personal-edition-license-agreement/</span></li>
+<li>KX. "Tick architecture: simplicity and speed, the kdb+ way" — the tickerplant / RDB / HDB pattern. <span class="rid">https://kx.com/blog/tick-architecture-simplicity-and-speed-the-kdb-way/</span></li>
+<li>Man Group. ArcticDB FAQ — Business Source License terms and the commercial-use requirement. <span class="rid">https://arcticdb.io/faqs/</span></li>
+</ol>
+</section>
+
+<!-- nav:foot -->
+<div class="foot">
+<span class="soon" title="Coming soon">← Prev: 4.4 · Time &amp; Bars</span>
+<span class="soon" title="Coming soon">Next: 4.6 · Lab: Data Lake →</span>
+</div>
+<p class="legal">Educational material only — not investment, legal or tax advice. Backtests and simulations are hypothetical. <a href="../start-here.html#disclaimer">Disclaimer</a> · Text CC BY 4.0 · Code MIT.</p>
+<!-- /nav:foot -->
+</main>
+</div></body></html>

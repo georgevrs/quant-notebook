@@ -1,0 +1,40 @@
+<svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="How often each test rejects its own null, as the AR(1) coefficient approaches 1">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">HOW OFTEN EACH TEST REJECTS ITS OWN NULL, AS THE AR(1) COEFFICIENT APPROACHES 1</text>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#E8850C" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">ADF (H0: unit root)</text>
+  <line x1="191.60000000000002" y1="32" x2="207.60000000000002" y2="32" stroke="#3F8E5A" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="213.60000000000002" y="36" font-size="11" fill="#4A5A68">KPSS (H0: stationary)</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="268" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0%</text>
+  <line x1="64" y1="221.6" x2="602" y2="221.6" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="225.6" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">20%</text>
+  <line x1="64" y1="179.2" x2="602" y2="179.2" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="183.2" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">40%</text>
+  <line x1="64" y1="136.8" x2="602" y2="136.8" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="140.8" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">60%</text>
+  <line x1="64" y1="94.4" x2="602" y2="94.4" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="98.4" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">80%</text>
+  <line x1="64" y1="52" x2="602" y2="52" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="56" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">100%</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#C9CFC6" stroke-width="1"/>
+  <line x1="64" y1="264" x2="64" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="64" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">0.5</text>
+  <line x1="171.6" y1="264" x2="171.6" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="171.6" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">0.6</text>
+  <line x1="279.2" y1="264" x2="279.2" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="279.2" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">0.7</text>
+  <line x1="386.8" y1="264" x2="386.8" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="386.8" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">0.8</text>
+  <line x1="494.4" y1="264" x2="494.4" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="494.4" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">0.9</text>
+  <line x1="602" y1="264" x2="602" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="602" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">1</text>
+  <line x1="64" y1="253.4" x2="602" y2="253.4" stroke="#4A5A68" stroke-width="1"/>
+  <text x="68" y="248.4" font-size="10.5" fill="#4A5A68">5% significance</text>
+  <polyline points="64,52 386.8,52 494.4,56.2 548.2,131.1 569.7,201.8 591.2,247 602,247" fill="none" stroke="#E8850C" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>ADF (H0: unit root)</title></polyline>
+  <circle cx="602" cy="247" r="4" fill="#E8850C" stroke="#FBFBF8" stroke-width="2"><title>ADF (H0: unit root): 8%</title></circle>
+  <polyline points="64,251.3 386.8,234.3 494.4,218.8 548.2,169.3 569.7,135.4 591.2,87.3 602,74.6" fill="none" stroke="#3F8E5A" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>KPSS (H0: stationary)</title></polyline>
+  <circle cx="602" cy="74.6" r="4" fill="#3F8E5A" stroke="#FBFBF8" stroke-width="2"><title>KPSS (H0: stationary): 89%</title></circle>
+  <text x="614" y="78.6" font-size="11" fill="#1F2C38">KPSS (H0: stationary): 89%</text>
+  <text x="614" y="251" font-size="11" fill="#1F2C38">ADF (H0: unit root): 8%</text>
+</svg>

@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- nav:head -->
+<title>6.1 · What a Backtest Is (and Isn&#x27;t)</title>
+<meta name="description" content="A backtest is a historical simulation under assumptions, not a research tool — what it can prove, what it cannot, and why the gap to live trading exists.">
+<link rel="canonical" href="https://georgevrs.github.io/quant-notebook/unit06-backtesting-discipline/session01-what-a-backtest-is.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Quant Notebook">
+<meta property="og:title" content="6.1 · What a Backtest Is (and Isn&#x27;t)">
+<meta property="og:description" content="A backtest is a historical simulation under assumptions, not a research tool — what it can prove, what it cannot, and why the gap to live trading exists.">
+<meta property="og:url" content="https://georgevrs.github.io/quant-notebook/unit06-backtesting-discipline/session01-what-a-backtest-is.html">
+<meta name="twitter:card" content="summary">
+<link rel="stylesheet" href="../assets/brand.css">
+<link rel="stylesheet" href="../assets/temml.css">
+<!-- /nav:head -->
+</head>
+<body><div class="page" id="top">
+<!-- Session 6.1 — the foundation of Unit 6: what a backtest is, a strategy specification, historical simulation, a fill assumption, and in-sample. See AUTHORING.md. -->
+<!-- nav:tabs -->
+<nav class="tabs">
+<a href="../index.html">⌂ Course home</a>
+<a class="active" href="session01-what-a-backtest-is.html">6.1 · What a Backtest Is</a>
+<span class="soon" title="Coming soon">6.2 · Vectorized Backtest</span>
+<span class="soon" title="Coming soon">6.3 · Event-Driven</span>
+<span class="soon" title="Coming soon">6.4 · Bias Hall of Fame</span>
+<span class="soon" title="Coming soon">6.5 · Costs &amp; Capacity</span>
+<span class="soon" title="Coming soon">6.6 · Validation</span>
+<span class="soon" title="Coming soon">6.7 · Overfitting Stats</span>
+<span class="soon" title="Coming soon">6.8 · Lab: Protocol</span>
+<a href="../roadmap.html">🗺 Roadmap</a>
+</nav>
+<!-- /nav:tabs -->
+
+<header class="cover">
+<!-- nav:heading -->
+<p class="eyebrow">Unit 6 · Backtesting &amp; Research Discipline — Session 01 of 08</p>
+<h1>What a Backtest Is (and Isn&#x27;t)</h1>
+<!-- /nav:heading -->
+<p class="subtitle">A backtest is not a crystal ball and not a lab result you can rerun on reality: it is a historical simulation of one fully specified rule, honest only as far as its stated assumptions reach. This session gives Unit 6 its shared vocabulary — <strong>strategy specification</strong>, <strong>historical simulation</strong>, <strong>fill assumption</strong>, <strong>in-sample</strong> — and shows, with one toy trend rule and nothing else changed, how much of a backtest's headline number can come from an assumption nobody wrote down. <mark>The core move: write down every assumption a simulation makes, then ask which of them you could actually keep once real money is on the line.</mark></p>
+<div class="meta">
+<span>DURATION <b>1.5 h + lab</b></span>
+<span>LEVEL <b>Intermediate</b></span>
+<span>TRACKS <b>QR · QT · QD · IND</b></span>
+<span>HANDS-ON <b>Watch one fill assumption fake an edge that was never there</b></span>
+</div>
+<!-- nav:labstrip -->
+<div class="labstrip"><b>📓 Companion lab</b>
+<a href="https://colab.research.google.com/github/georgevrs/quant-notebook/blob/main/labs/u06/s01_what_a_backtest_is.ipynb">Open in Colab</a>
+<a href="https://github.com/georgevrs/quant-notebook/blob/main/labs/u06/s01_what_a_backtest_is.ipynb">Notebook on GitHub</a>
+<a href="https://github.com/georgevrs/quant-notebook/blob/main/labs/u06/s01_what_a_backtest_is.py">Source (.py)</a>
+</div>
+<!-- /nav:labstrip -->
+<div class="toc">
+<b>On this page</b>
+<ol>
+<li><a href="#s1">What a backtest actually is</a></li>
+<li><a href="#s2">The anatomy of a strategy specification</a></li>
+<li><a href="#s3">Simulating history, honestly</a></li>
+<li><a href="#s4">A toy strategy, precisely specified</a></li>
+<li><a href="#s5">The fill assumption that quietly changes the answer</a></li>
+<li><a href="#s6">Try it</a></li>
+<li><a href="#s7">Glossary · Check yourself · Go deeper</a></li>
+</ol>
+</div>
+</header>
+
+<main>
+
+<section id="s1">
+<h2><span class="no">6.1.1</span> What a backtest actually is</h2>
+<p class="lede">Every session in this unit assumes you already believe one plain claim — and that claim hides three separate ideas that are easy to blur together.</p>
+
+<p>As <a class="xref" href="../unit01-quant-landscape/session03-research-lifecycle.html" data-xref="1.3" data-auto="">Session 1.3 — The Quant Research Lifecycle</a> put it, a <a class="term" href="../unit01-quant-landscape/session03-research-lifecycle.html#g-backtest" data-term="backtest">backtest</a> is a simulation of how a trading rule would have performed on historical data. That sentence is correct and, on its own, dangerously incomplete. It doesn't say the rule has to be written down precisely. It doesn't say what price a trade is assumed to fill at. It doesn't say the history has to be data the rule never touched while it was being built. This unit spends eight sessions on those three gaps; this session names them. In López de Prado's blunt framing, backtesting is "one of the most essential, yet least understood, techniques in quantitative finance" precisely because people treat it as a research tool — a place to go looking for a strategy — when in its narrowest, honest definition a backtest is a hypothetical, not an experiment: it tells you what would have happened <em>if</em> a fully specified rule had been followed, once, on a stretch of history it did not influence.</p>
+
+<p>Say the "if" out loud and a <strong>historical simulation</strong> stops being mysterious: it is the mechanical replay, one period at a time, of a rule that was completely nailed down in advance, against price history it played no part in shaping. Nothing in that definition promises the rule was any good. It only promises the replay was faithful to what was written down. Whether the rule was good — whether it captured something real, rather than noise, luck, or a broken assumption — is a separate question, and it is the question the rest of Unit 6 is built to answer.</p>
+
+<p>This course keeps one analogy for exactly this session: a backtest is a unit test that can pass by luck. A unit test in software fails deterministically — the assertion either holds or it doesn't, and rerunning it changes nothing. A backtest can satisfy every assertion you write, run without a single error, and still be describing a coincidence in a decade of noise rather than a real, repeatable mechanism. The code being correct and the strategy being real are two different claims, and a clean run only ever establishes the first one. The reason this bites harder in finance than in most engineering is that markets provide no oracle: a web service either returns the right answer today or it doesn't, but a trading rule's "correctness" is a statistical property that years of history barely constrain. <a class="xref" href="../unit01-quant-landscape/session03-research-lifecycle.html" data-xref="1.3" data-style="short" data-auto="">Session 1.3</a>'s lab already showed the scale of the problem — a rule with <em>zero</em> real skill, tried a thousand times, produces a best backtested Sharpe ratio around 1.4 purely from trying enough variations — so the same bug that a unit test catches in ten seconds can hide in a trading rule for years, if anything ever catches it at all. Everything from here to <span class="xref soon" data-xref="6.8" data-auto="" title="Coming soon">Session 6.8 — Lab: The Research Protocol</span> is about closing that gap in two stages: making the simulation itself trustworthy, which is this session's job, and then pricing in how many chances you gave luck to fool you, which is the second half of the unit.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 250" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <rect x="20" y="20" width="680" height="60" rx="10" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="360" y="43" font-size="13" font-weight="700" text-anchor="middle" fill="#3A56C5">A BACKTEST IS</text>
+  <text x="360" y="63" font-size="11" text-anchor="middle" fill="#1F2C38">a historical simulation of one fully specified rule, replayed once, under stated assumptions</text>
+  <rect x="26" y="112" width="155" height="92" rx="8" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="103" y="134" font-size="11" font-weight="700" text-anchor="middle" fill="#D64B2A">NOT A PREDICTION</text>
+  <text x="103" y="154" font-size="9.5" text-anchor="middle" fill="#4A5A68">no claim about</text>
+  <text x="103" y="168" font-size="9.5" text-anchor="middle" fill="#4A5A68">tomorrow's return</text>
+  <rect x="196" y="112" width="155" height="92" rx="8" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="273" y="134" font-size="11" font-weight="700" text-anchor="middle" fill="#D64B2A">NOT PROOF OF EDGE</text>
+  <text x="273" y="154" font-size="9.5" text-anchor="middle" fill="#4A5A68">could be luck,</text>
+  <text x="273" y="168" font-size="9.5" text-anchor="middle" fill="#4A5A68">not skill</text>
+  <rect x="366" y="112" width="155" height="92" rx="8" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="443" y="134" font-size="11" font-weight="700" text-anchor="middle" fill="#D64B2A">NOT A LIVE RECORD</text>
+  <text x="443" y="154" font-size="9.5" text-anchor="middle" fill="#4A5A68">ignores real</text>
+  <text x="443" y="168" font-size="9.5" text-anchor="middle" fill="#4A5A68">execution frictions</text>
+  <rect x="536" y="112" width="158" height="92" rx="8" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="615" y="134" font-size="11" font-weight="700" text-anchor="middle" fill="#D64B2A">NOT VALIDATION</text>
+  <text x="615" y="154" font-size="9.5" text-anchor="middle" fill="#4A5A68">one run proves</text>
+  <text x="615" y="168" font-size="9.5" text-anchor="middle" fill="#4A5A68">nothing alone</text>
+  <text x="360" y="232" font-size="12" text-anchor="middle" fill="#4A5A68" font-style="italic">The word "backtest" is one claim; treating it as any of these four is where it goes wrong.</text>
+</svg>
+<figcaption>fig 6.1.1 — what a backtest is, and the four things it commonly gets mistaken for</figcaption>
+</figure>
+
+<div class="co key"><span class="co-t">📌 Key idea — a backtest is a conditional claim</span>
+<p>Every backtest secretly begins with an "if": <em>if</em> this exact rule, on this exact data, under this exact fill assumption, had been followed. Change any one of those three and you get a different, equally "true" historical claim about a past that never quite happened. This session's job is to make the "if" visible and inspectable, so you can see exactly which one changed when two backtests of "the same idea" disagree.</p>
+</div>
+</section>
+
+<section id="s2">
+<h2><span class="no">6.1.2</span> The anatomy of a strategy specification</h2>
+<p class="lede">A backtest is only as trustworthy as the rule it replays is exact — and "exact" means a stranger could reproduce your trades from the written spec alone.</p>
+
+<p>A <strong>strategy specification</strong> is everything needed for two independent people, or the same person a year apart, to run identical trades from identical data. Not "buy when it looks strong" — a number, a threshold, a rule for ties. Not "size it reasonably" — a fraction of capital, stated. The table below is the checklist this lab fills in for one toy rule; later sessions generalise almost every row.</p>
+
+<table>
+<thead><tr><th>Component</th><th>This lab's choice</th><th>Generalised in</th></tr></thead>
+<tbody>
+<tr><td>Universe</td><td>one synthetic asset</td><td><span class="xref soon" data-xref="4.2" data-auto="" title="Coming soon">Session 4.2 — Point-in-Time Data &amp; Data Biases</span> (real universes, survivorship)</td></tr>
+<tr><td>Signal</td><td>price vs. its 100-day moving average</td><td><span class="xref soon" data-xref="6.2" data-auto="" title="Coming soon">Session 6.2 — Build a Vectorized Backtester</span> (fast, vectorised signals)</td></tr>
+<tr><td>Entry / exit</td><td>binary: long when the filter is on, flat when it's off</td><td><span class="xref soon" data-xref="6.2" data-auto="" title="Coming soon">Session 6.2 — Build a Vectorized Backtester</span> (<span class="term soon" data-term="position" title="Defined in Session 6.2 (coming soon)">position</span>, <span class="term soon" data-term="turnover" title="Defined in Session 6.2 (coming soon)">turnover</span>)</td></tr>
+<tr><td>Position sizing</td><td>all-in or all-out; no leverage, no shorting</td><td><a class="xref" href="../unit03-math-toolkit/session06-kelly-bet-sizing.html" data-xref="3.6" data-auto="">Session 3.6 — Bet Sizing, Kelly &amp; Ruin</a> (Kelly and fractional sizing)</td></tr>
+<tr><td><strong>Fill assumption</strong></td><td>next close, one full day after the signal</td><td><span class="xref soon" data-xref="6.3" data-auto="" title="Coming soon">Session 6.3 — Build an Event-Driven Backtester</span> (real order objects)</td></tr>
+<tr><td>Costs</td><td>zero — flagged, not hidden</td><td><span class="xref soon" data-xref="6.5" data-auto="" title="Coming soon">Session 6.5 — Transaction Costs &amp; Capacity</span> (spread, slippage, impact)</td></tr>
+<tr><td>Risk-free rate</td><td><span data-lab="rf" data-fmt=".0%">0%</span>, stated once</td><td><a class="xref" href="../unit02-markets-instruments/session03-returns-pnl-leverage.html" data-xref="2.3" data-auto="">Session 2.3 — Returns, P&amp;L, Compounding &amp; Leverage</a> (the course convention)</td></tr>
+</tbody>
+</table>
+
+<p>One row is doing more work than the rest. Universe, signal, sizing and costs describe the rule. The <strong>fill assumption</strong> describes something else: at what price, and after what delay, a decided trade is assumed to actually execute. It is a modelling choice, exactly as inspectable and exactly as falsifiable as the signal itself — and, as §6.1.5 shows with numbers, changing only that one choice can move a Sharpe ratio by more than a real trading idea ever will.</p>
+
+<p>Look at what precision buys, row by row. "Universe: one synthetic asset" rules out an entire family of mistakes at once — a universe that quietly includes companies that have since been delisted, or an index membership list computed with today's constituents applied to yesterday's prices, is one of the more expensive point-in-time mistakes a real desk can make (look-ahead bias, in full in <span class="xref soon" data-xref="4.2" data-style="short" data-auto="" title="Coming soon">Session 4.2</span>). "Signal: price vs. its 100-day moving average" rules out the far more common failure of a rule that only ever lived in someone's head — "the trend looked strong" is not reproducible by anyone, including the person who said it, a week later. "Position sizing: all-in or all-out" is a deliberately blunt choice: a real desk would size with something closer to the fractional-Kelly rules of <a class="xref" href="../unit03-math-toolkit/session06-kelly-bet-sizing.html" data-xref="3.6" data-auto="">Session 3.6 — Bet Sizing, Kelly &amp; Ruin</a>, but layering a sizing model on top of the fill-assumption experiment in §6.1.5 would make it harder to see which change caused which result. Precision is not the same thing as complexity — this lab holds every dimension but one fixed, on purpose, so that the one it varies is the only possible explanation for what changes.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 180" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <rect x="20" y="40" width="124" height="62" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="82" y="66" font-size="11" text-anchor="middle" fill="#3A56C5" font-weight="600">1 · SPECIFY</text>
+  <text x="82" y="84" font-size="9.5" text-anchor="middle" fill="#4A5A68">write the rule down</text>
+  <rect x="164" y="40" width="124" height="62" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="226" y="66" font-size="11" text-anchor="middle" fill="#3A56C5" font-weight="600">2 · REPLAY</text>
+  <text x="226" y="84" font-size="9.5" text-anchor="middle" fill="#4A5A68">history, day by day</text>
+  <rect x="308" y="40" width="124" height="62" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="370" y="66" font-size="11" text-anchor="middle" fill="#3A56C5" font-weight="600">3 · POSITIONS</text>
+  <text x="370" y="84" font-size="9.5" text-anchor="middle" fill="#4A5A68">&amp; returns, in order</text>
+  <rect x="452" y="40" width="124" height="62" rx="9" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="514" y="66" font-size="11" text-anchor="middle" fill="#8A6D00" font-weight="600">4 · REPORT</text>
+  <text x="514" y="84" font-size="9.5" text-anchor="middle" fill="#4A5A68">equity curve, metrics</text>
+  <rect x="596" y="40" width="104" height="62" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="648" y="66" font-size="11" text-anchor="middle" fill="#1F7A55" font-weight="600">5 · VERDICT</text>
+  <text x="648" y="84" font-size="9.5" text-anchor="middle" fill="#4A5A68">one honest number</text>
+  <path d="M144 71 H162" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M288 71 H306" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M432 71 H450" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M576 71 H594" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <text x="360" y="122" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">One historical claim, honestly obtained — not yet evidence of anything repeatable.</text>
+  <path d="M648,102 V160 H82 V106" fill="none" stroke="#D64B2A" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#s2b)"/>
+  <text x="365" y="152" font-size="9.5" text-anchor="middle" fill="#D64B2A" font-style="italic">changed the rule after seeing step 4? this history is now in-sample</text>
+  <defs>
+    <marker id="s2a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F2C38"/></marker>
+    <marker id="s2b" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#D64B2A"/></marker>
+  </defs>
+</svg>
+<figcaption>fig 6.1.2 — from a written rule to a one-line verdict — and what happens if you edit the rule after seeing it</figcaption>
+</figure>
+
+<p>The dashed loop is not decorative. It is the single most common way a backtest quietly stops meaning what you think it means: you see the verdict, tweak the window or the threshold, rerun, and repeat. Nothing about steps 1–5 was done wrong, but the history you are testing against has been looked at, so by <a class="xref" href="../unit01-quant-landscape/session03-research-lifecycle.html" data-xref="1.3" data-style="short" data-auto="">Session 1.3</a>'s definition it is no longer available to prove anything <a class="term" href="../unit01-quant-landscape/session03-research-lifecycle.html#g-out-of-sample" data-term="out-of-sample">out-of-sample</a> — it is <strong>in-sample</strong> now, whatever you privately call it. §6.1.3 makes that precise; <span class="xref soon" data-xref="6.6" data-auto="" title="Coming soon">Session 6.6 — Validation: Walk-Forward, Purged K-Fold &amp; CPCV</span> onward builds the machinery (holdouts, purging, the deflated Sharpe) that lets you tune a rule without lying to yourself about what the result still proves.</p>
+
+<table>
+<thead><tr><th>Where the backtest-to-live gap comes from</th><th>What this session makes explicit</th><th>Fully treated in</th></tr></thead>
+<tbody>
+<tr><td>Fill timing and price</td><td>the fill assumption, stated as a parameter</td><td>this session</td></tr>
+<tr><td>Look-ahead and survivorship in the data</td><td>flagged, not fixed</td><td><span class="term soon" data-term="look-ahead bias" title="Defined in Session 4.2 (coming soon)">look-ahead bias</span>, <span class="xref soon" data-xref="4.2" data-style="short" data-auto="" title="Coming soon">Session 4.2</span></td></tr>
+<tr><td>Costs, slippage, capacity</td><td>set to zero and named as an assumption</td><td><span class="term soon" data-term="transaction cost" title="Defined in Session 6.5 (coming soon)">transaction cost</span>, <span class="xref soon" data-xref="6.5" data-style="short" data-auto="" title="Coming soon">Session 6.5</span></td></tr>
+<tr><td>Too many trials, luck dressed as skill</td><td>out of scope here</td><td><span class="xref soon" data-xref="6.6" data-style="short" data-auto="" title="Coming soon">Session 6.6</span>–<span class="xref soon" data-xref="6.8" data-style="short" data-auto="" title="Coming soon">Session 6.8</span></td></tr>
+<tr><td>Regime change and edge decay over time</td><td>out of scope here</td><td><a class="term" href="../unit01-quant-landscape/session04-engineers-edge-and-odds.html#g-backtest-to-live-decay" data-term="backtest-to-live decay">backtest-to-live decay</a>, <a class="xref" href="../unit01-quant-landscape/session04-engineers-edge-and-odds.html" data-xref="1.4" data-style="short" data-auto="">Session 1.4</a></td></tr>
+</tbody>
+</table>
+
+<div class="co tip"><span class="co-t">💡 Looking ahead</span>
+<p>Step 2 above — replay history, day by day — is written as a plain loop in this lab because that is what a backtest fundamentally does, with nothing hidden by clever code. <span class="xref soon" data-xref="6.2" data-auto="" title="Coming soon">Session 6.2 — Build a Vectorized Backtester</span> turns the identical specification into <span class="term soon" data-term="vectorized backtest" title="Defined in Session 6.2 (coming soon)">vectorised array operations</span> that run in milliseconds instead of seconds; <span class="xref soon" data-xref="6.3" data-auto="" title="Coming soon">Session 6.3 — Build an Event-Driven Backtester</span> turns it into an <span class="term soon" data-term="event-driven backtest" title="Defined in Session 6.3 (coming soon)">event-driven engine</span> with real order and fill objects that can plug into paper or live trading unchanged. Same "if"; faster or more realistic machinery for running it.</p>
+</div>
+</section>
+
+<section id="s3">
+<h2><span class="no">6.1.3</span> Simulating history, honestly</h2>
+<p class="lede">The formula is almost embarrassingly short. The discipline is entirely in what it refuses to let a position depend on.</p>
+
+<p>Write the wealth a strategy would have produced over <math><semantics><mi>T</mi><annotation encoding="application/x-tex">T</annotation></semantics></math> periods, starting from <math><semantics><msub><mi>W</mi><mn>0</mn></msub><annotation encoding="application/x-tex">W_0</annotation></semantics></math>, as compounding one period at a time:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><msub><mover><mi>W</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><mi>T</mi></msub><mo>=</mo><msub><mi>W</mi><mn>0</mn></msub><mrow><munderover><mo movablelimits="false">∏</mo><mrow><mi>t</mi><mo>=</mo><mn>1</mn></mrow><mi>T</mi></munderover></mrow><mo fence="false" symmetric="true" minsize="1.2em" maxsize="1.2em">(</mo><mn>1</mn><mo>+</mo><msub><mi>P</mi><mrow><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub><msub><mi>R</mi><mi>t</mi></msub><mo fence="false" symmetric="true" minsize="1.2em" maxsize="1.2em">)</mo></mrow><annotation encoding="application/x-tex">\hat{W}_T = W_0 \prod_{t=1}^{T} \big(1 + P_{t-1} R_t\big)</annotation></semantics></math></div>
+<p>Here <math><semantics><msub><mi>R</mi><mi>t</mi></msub><annotation encoding="application/x-tex">R_t</annotation></semantics></math> is the asset's realised <a class="term" href="../unit02-markets-instruments/session03-returns-pnl-leverage.html#g-simple-return" data-term="simple return">simple return</a> over period <math><semantics><mi>t</mi><annotation encoding="application/x-tex">t</annotation></semantics></math>, and <math><semantics><msub><mi>P</mi><mrow><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub><annotation encoding="application/x-tex">P_{t-1}</annotation></semantics></math> is the position size — here 0 or 1 — decided using only information available through period <math><semantics><mrow><mi>t</mi><mo>−</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">t-1</annotation></semantics></math>. That subscript is the entire discipline of a <strong>historical simulation</strong> in one place: the position is dated <em>before</em> the return it earns. Let <math><semantics><msub><mi>P</mi><mi>t</mi></msub><annotation encoding="application/x-tex">P_t</annotation></semantics></math> multiply <math><semantics><msub><mi>R</mi><mi>t</mi></msub><annotation encoding="application/x-tex">R_t</annotation></semantics></math> instead, and the "simulation" is quietly assuming a trader can see period <math><semantics><mi>t</mi><annotation encoding="application/x-tex">t</annotation></semantics></math>'s return before period <math><semantics><mi>t</mi><annotation encoding="application/x-tex">t</annotation></semantics></math> has happened — not a subtle statistical bias, an internally inconsistent replay of a past that could not have occurred that way. §6.1.5 measures exactly how much that one subscript is worth.</p>
+
+<p>The product form matters too, and for a familiar reason: <a class="xref" href="../unit02-markets-instruments/session03-returns-pnl-leverage.html" data-xref="2.3" data-style="short" data-auto="">Session 2.3</a> already established that simple returns compound by multiplication across time, not addition, and summing them instead would silently overstate any strategy that ever recovers from a loss. Walk the formula for two days by hand to see the lag do its job. Say day 1 closes up 2% while the filter has already been on since before day 1, so <math><semantics><mrow><msub><mi>P</mi><mn>0</mn></msub><mo>=</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">P_0 = 1</annotation></semantics></math>: an honest simulation credits that whole move, <math><semantics><mrow><mn>1</mn><mo>+</mo><mn>1</mn><mo>×</mo><mn>0.02</mn><mo>=</mo><mn>1.02</mn></mrow><annotation encoding="application/x-tex">1 + 1 \times 0.02 = 1.02</annotation></semantics></math>. Now say day 1's move is exactly what flips the filter off — the close dips just under its moving average. The rule is flat starting day 2, so day 2 contributes exactly zero, <math><semantics><mrow><mn>1.02</mn><mo>×</mo><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mn>1</mn><mo>+</mo><mn>0</mn><mo>×</mo><msub><mi>R</mi><mn>2</mn></msub><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mo>=</mo><mn>1.02</mn></mrow><annotation encoding="application/x-tex">1.02 \times (1 + 0 \times R_2) = 1.02</annotation></semantics></math>, whatever day 2's return turns out to be. That zero is not a bug; it is the entire content of "flat." A one-line implementation error — using day 2's own close to decide day 2's own position, then applying that position to day 2's own return — would instead let day 2's realised move leak into the decision of whether to hold it. That is exactly the naive fill assumption §6.1.5 measures, not a hypothetical.</p>
+
+<p>The other term this session owns follows from the same idea. A stretch of history is <strong>in-sample</strong> the moment it has influenced any decision about the rule — which parameter, which window length, or even the decision to test this rule instead of another. That has nothing to do with a calendar date and everything to do with what you have looked at. It is the mirror image of <a class="term" href="../unit01-quant-landscape/session03-research-lifecycle.html#g-out-of-sample" data-term="out-of-sample">out-of-sample</a>, which <a class="xref" href="../unit01-quant-landscape/session03-research-lifecycle.html" data-xref="1.3" data-style="short" data-auto="">Session 1.3</a> already treats as a resource you spend once: what this session adds is that a specification is what turns a stretch of raw prices into "in-sample" data in the first place — no specification has been tested against it yet, or it has, and now the clock has started.</p>
+
+<div class="co note"><span class="co-t">🧭 Margin note — periods, not years</span>
+<p><math><semantics><mi>T</mi><annotation encoding="application/x-tex">T</annotation></semantics></math> above counts periods — trading days in this lab. When a chart needs continuous elapsed time instead, this course calls it <math><semantics><mi>τ</mi><annotation encoding="application/x-tex">\tau</annotation></semantics></math>, in years, never a calendar date. Every simulated-history chart on this page is indexed that way (year 1, year 2, …) specifically so nobody mistakes a synthetic path for a real historical one.</p>
+</div>
+</section>
+
+<section id="s4">
+<h2><span class="no">6.1.4</span> A toy strategy, precisely specified</h2>
+<p class="lede">Here is §6.1.2's checklist as code — nothing about the rule is hidden in a cell above this one.</p>
+
+<p>The whole rule is four lines. <code>signal</code> is a plain boolean-to-float cast of one comparison; <code>honest</code> shifts that decision forward one full row before multiplying it by the return it is allowed to earn; <code>naive</code> skips the shift. Nothing about the universe, position sizing or the risk-free rate needs to appear in this snippet, because §6.1.2 already fixed all three at simple, stated values — the only thing left for this code to get right is the timing.</p>
+
+<pre><span class="c"># the whole specification: one filter, two fill assumptions, nothing else</span>
+ma = prices.rolling(window).mean()
+signal = (prices > ma).astype(<span class="k">float</span>)      <span class="c"># 1 = trend up, using info through THIS close</span>
+ret = prices.pct_change()
+
+honest = signal.shift(<span class="p">1</span>) * ret               <span class="c"># P_(t-1): filled at the NEXT close</span>
+naive  = signal * ret                        <span class="c"># P_t applied to R_t: the same-close bug</span></pre>
+
+<p>On one simulated <span data-lab="years_path" data-fmt="d">8</span>-year history of a single synthetic asset (<span data-lab="mu" data-fmt=".0%">7%</span> annual drift, <span data-lab="sigma" data-fmt=".0%">18%</span> annual volatility, no real trend beyond that drift), the filter is long <span data-lab="frac_invested" data-fmt=".0%">47%</span> of the time and changes position <span data-lab="n_trades" data-fmt="d">101</span> times. Both fill assumptions replay the identical signal — only the timing differs:</p>
+
+<figure class="diagram chart">
+<!-- chart:equity -->
+<svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Growth of $1, one simulated 8-year history, by fill assumption">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">GROWTH OF $1, ONE SIMULATED 8-YEAR HISTORY, BY FILL ASSUMPTION</text>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#4A5A68" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">Buy &amp; hold</text>
+  <line x1="134.0" y1="32" x2="150.0" y2="32" stroke="#3A56C5" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="156.0" y="36" font-size="11" fill="#4A5A68">Honest fill (1-day lag)</text>
+  <line x1="325.20000000000005" y1="32" x2="341.20000000000005" y2="32" stroke="#D64B2A" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="347.20000000000005" y="36" font-size="11" fill="#4A5A68">Naive fill (0-day lag)</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="268" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$0.00</text>
+  <line x1="64" y1="221.6" x2="602" y2="221.6" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="225.6" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$1.00</text>
+  <line x1="64" y1="179.2" x2="602" y2="179.2" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="183.2" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$2.00</text>
+  <line x1="64" y1="136.8" x2="602" y2="136.8" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="140.8" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$3.00</text>
+  <line x1="64" y1="94.4" x2="602" y2="94.4" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="98.4" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$4.00</text>
+  <line x1="64" y1="52" x2="602" y2="52" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="56" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$5.00</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#C9CFC6" stroke-width="1"/>
+  <line x1="63.7" y1="264" x2="63.7" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="63.7" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">0</text>
+  <line x1="205.2" y1="264" x2="205.2" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="205.2" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">2</text>
+  <line x1="346.8" y1="264" x2="346.8" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="346.8" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">4</text>
+  <line x1="488.3" y1="264" x2="488.3" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="488.3" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">6</text>
+  <line x1="64" y1="221.6" x2="602" y2="221.6" stroke="#4A5A68" stroke-width="1"/>
+  <polyline points="64,222.5 64.6,222.8 65.7,220.9 67.1,222.5 69.3,220.3 70.5,219.6 71.3,221.3 72.7,221.9 74.4,220.8 76.1,220.6 77.5,221.9 78.3,222.2 79.4,220.8 81.1,223.7 82.3,223.4 83.4,221.4 84.5,220.8 85.9,223.6 87,224 89,222 90.4,222.5 91.5,220.9 93.2,219.8 93.8,219.2 95.7,219.2 96.6,220.9 98.3,220.7 100.2,218.6 101.3,220.4 102.2,218.6 103.3,219.6 105.3,217.6 107,218.4 107.2,217.7 109.5,215.6 110.9,217.2 112,216.1 113.7,218.6 114.8,217 115.9,218 117.4,215.6 119,217.3 119.9,215.1 121.3,214.7 123,215.2 124.1,217.2 125.2,216.9 126.9,215.5 128,215.3 128.9,217.1 130.5,217.3 131.7,215.8 133.1,216.2 134.8,219.3 136.2,218.5 137.6,219.7 138.7,218.2 140.7,217.5 141.8,218.6 142.6,217.2 143.7,219.4 145.1,219.1 147.1,222.9 148.8,223 149.9,221.4 151.6,221.9 153,220.1 153.9,219.7 155.8,221.5 156.1,220.6 157.8,218.9 159.8,218.1 160.9,219.9 162.6,218.9 164,220.8 164.5,220 166.2,220.6 167.1,222.2 169,222.8 169.6,221.6 171,220.3 172.9,220.2 174.4,221.1 175.8,224.3 177.4,224.1 178,225.6 180,223.5 181.4,224.8 182.5,223.3 183.3,225.4 184.5,224.3 186.7,226.7 187.5,225.9 188.4,227.1 189.8,226.4 192,228.1 193.4,226.2 194.8,227.3 195.7,226.2 197.7,226.2 198.2,225.3 199.6,224.2 200.7,223.9 202.2,224.8 203.3,223.6 205,223.5 206.1,225.2 208.3,226.6 209.7,226.7 210.6,224.3 212.5,223.1 213.1,224.5 214.2,223.9 215.9,223.2 217,224.2 218.2,224.1 219.8,224.5 221.2,226.1 222.4,226 224.1,227.9 225.2,227.7 226.9,227.1 228,225.3 229.7,225.6 230.5,224.4 231.9,224.6 233.6,222.4 234.7,223.8 236.1,223.1 237.2,225.4 238.4,224.3 239.8,224.6 241.7,223 243.4,222.7 244.6,220.7 245.1,222 246.8,222.3 249,218.6 249.9,219.1 251,221.7 253,219 253.5,220 255.2,220 256.6,217.8 258.3,218.3 259.7,221 260,220.5 262.2,222.9 263.9,224.5 264.8,224 265.6,224.7 267,223.1 269.3,222.6 270.4,221.2 271.5,221 272.9,223.7 273.5,223.3 275.4,226.3 276.8,225.9 278,226 279.1,228.3 280.5,228.9 282.5,227.9 283.6,229.2 284.7,227.9 286.7,228.2 287.5,227.2 289.2,226.3 290.6,227.6 292.3,226.4 293.1,226.9 294.5,226.1 295.7,227.3 296.8,226.7 298.2,227.9 299.9,224.7 300.7,225.5 302.7,228.3 304.1,227.3 304.9,226.6 306.6,226.9 307.4,225.4 309.7,223.6 310.5,224.9 312.5,226 313.9,225.8 314.5,224.6 316.2,223.9 317.6,225.3 318.4,224.8 320.4,224.3 321.2,225 323.2,225.4 324.6,223.7 325.7,224 326.5,224.3 328.2,223.3 329.1,223.5 331.3,222.3 332.4,223.5 333.8,223.4 335.2,222.2 336.1,223 337.2,222.4 338.3,222.9 339.7,226.1 341.7,227.6 343.4,227.4 343.7,226.4 346.2,225.5 347,226.3 348.2,225.2 350.1,224.9 351.3,223.4 352.4,220.6 353.8,220 354.9,221.2 356.9,221.3 357.7,220.4 358.6,221.2 360,219.3 362.2,220.3 363.9,220.6 364.4,219 366.4,220.3 367,218.8 368.9,218.1 370.3,216.3 371.7,217.4 372.3,216.4 373.4,218.3 375.1,216 377.1,216.6 378.8,220.3 379.3,221.1 381,218.6 381.9,220.2 383.5,221.4 384.7,222.2 385.8,220.1 387.2,222.8 389.4,221.6 390.6,221.5 391.1,221.6 392.5,222.6 394.8,223.4 395.3,225.2 396.7,224.5 399,225.2 400.1,224.8 400.7,226.4 402.1,225.3 404.3,225.2 405.2,224 406.6,225 407.4,225.1 409.1,223.1 410.5,225.1 412.2,223.4 413,224.4 414.4,222.3 415.8,222.2 416.7,222.6 418.4,222.4 420.3,224.8 422,224.5 422.3,223.6 423.7,223 425.7,225 426.8,225.2 427.9,226.6 429.3,225.6 430.2,227.7 432.7,224.6 433,224.9 435.5,222.8 436.1,224.2 437.7,226.1 438.6,225 440.5,226.8 441.9,226.6 443.4,227.6 444.5,227.1 445.9,229.6 447,231.4 449,231.7 450.4,233.6 451.5,234.2 452.9,233.2 453.5,233.5 454.6,233.6 456.3,232.4 457.7,231.9 459.6,232.6 459.9,231.7 461.3,232.7 463.3,233.4 464.4,232.4 466.4,233.8 467.2,234 468.6,232.3 469.5,233.3 470.9,233.8 473.1,232.7 474,233.4 475.6,233.3 477,233.3 478.7,234.9 479.3,234.8 480.4,233.5 482.4,234.9 482.9,235.2 485.2,235.3 486.6,233.9 488,234.8 488.3,234 490,234.6 492.2,233.6 493.6,234.3 494.7,235.5 495.6,235.9 497.5,234.7 498.9,235.2 500.1,233.8 500.6,234.9 502.6,234.3 504,235.7 504.6,234.5 506,234.7 507.4,232.7 509.6,233.3 510.7,232.9 511.9,231.4 513.8,230.6 515,232 516.4,231.3 517.2,231.6 519.2,229.8 519.7,230.4 521.1,230.8 522.8,229.7 523.7,230.5 525.1,230.1 527,231.8 528.2,232.2 529,230.9 530.7,230.3 532.1,231 533.8,230.4 534.9,229.2 536,229.7 538,228.3 539.1,228.2 540.5,229.8 542.2,230.2 543.3,231.4 544.4,231.8 545.3,230.9 547.5,229 548.1,228.4 549.2,229.9 550.9,230.1 552.9,227.6 554,226.8 554.8,228.1 556.2,226.7 558.2,227.4 559,227.3 560.4,224.5 561.6,223.4 563,225.4 564.9,224.3 566.1,225.6 567.2,224.8 568.9,225.6 569.7,224 571.7,223 572.8,223 573.9,224.4 575,222.9 577,225 577.6,225.4 579,224.8 580.7,222.1 581.5,222.1 583.5,225.1 585.2,226.1 586.3,225.1 587.7,224.6 588.8,226 589.6,224.7 591.6,226.1 592.7,225.1 594.1,226.4 595.8,227 597.2,225.9 598.6,227.5 599.8,226 601.4,224.6 602,225" fill="none" stroke="#4A5A68" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><title>Buy &amp; hold</title></polyline>
+  <circle cx="602" cy="225" r="4" fill="#4A5A68" stroke="#FBFBF8" stroke-width="2"><title>Buy &amp; hold: $0.92</title></circle>
+  <polyline points="64,221.6 64.3,221.6 65.4,221.6 66.8,221.6 69.3,221.6 70.5,221.4 71,222.4 73.3,222.4 74.4,222.4 75.2,222.9 76.4,223.5 78.6,223.5 79.7,223.7 81.4,223.7 82.8,223.7 84.2,223.7 84.8,224.8 85.6,224.8 87,224.8 88.4,224.8 91,224.8 91.2,224.8 93.2,223.4 93.8,222.9 95.7,222.9 96.6,224.5 98.3,224.3 100.2,222.3 101.3,224 102.2,222.3 103.3,223.2 105.3,221.4 107,222.2 107.2,221.6 109.5,219.6 110.9,221.1 112,220 113.7,222.3 114.8,220.9 115.9,221.8 117.4,219.6 119,221.2 119.9,219.1 121.3,218.8 123,219.3 124.1,221.1 125.2,220.8 126.9,219.5 128,219.4 128.9,220.9 130.5,221.9 131.7,221.2 133.4,222.2 134.5,222.2 135.9,222.2 137,222.2 138.4,222.2 139.8,222.2 141.2,222.2 142.6,222.2 143.7,222.2 145.1,222.2 146.6,222.2 148,222.2 149.4,222.2 150.5,222.2 151.9,222.2 153.3,222.2 154.7,222.2 156.9,222.2 158.1,222.5 159.8,221.4 160.9,223.1 162.6,222.3 163.4,222.3 164.2,224.1 165.4,224.1 166.8,224.1 168.2,224.1 170.7,224.1 171,224.1 173.2,226 174.6,226 176,226 176.3,226 178.6,226 180,226 181.4,226 182.8,226 184.2,226 184.5,226 186.7,226 188.1,226 189.5,226 190.9,226 191.2,226 193.4,226 194.8,226 196.3,226 197.7,226 199.1,226 199.6,225.4 200.7,225.1 202.2,225.9 203.3,224.8 205,224.7 206.1,226.4 207.5,226.8 209.7,226.8 210.3,226.8 212,224.4 213.1,225.7 214.2,225.1 215.9,224.4 217,225.4 218.2,225.3 220.1,226.4 221,226.4 222.1,226.4 223.5,226.4 224.9,226.4 226.3,226.4 228.8,226.4 229.9,226.8 231.4,225.8 231.9,226.4 233.6,224.3 234.7,225.6 236.1,224.9 237.2,227.1 239.2,227.3 240.9,226.8 241.7,225.8 243.4,225.6 244.6,223.7 245.1,224.9 246.8,225.2 249,221.8 249.9,222.2 251,224.6 253,222.2 253.5,223 255.2,223.1 256.6,221 258.3,221.5 259.7,224 260,223.5 261.4,224.5 262.8,224.5 265,224.5 266.5,224.5 267.9,224.5 269.3,224.5 270.4,224.5 271.8,226 272.1,226 273.5,226 274.9,226 276.3,226 277.7,226 279.1,226 280.2,226 281.6,226 283,226 284.4,226 285.8,226 286.9,226 288.4,226 289.8,226 291.2,226 292.6,226 293.7,226 295.1,226 296.5,226 299,226 300.1,224.2 301.6,226.3 301.8,226.9 304.1,226.9 304.9,226.2 306.6,226.5 307.4,224.9 309.7,223.1 310.5,224.4 312.5,225.5 313.9,225.3 314.5,224.2 316.2,223.4 317.6,224.8 318.4,224.4 320.4,223.8 321.2,224.5 323.2,224.9 324.6,223.3 325.7,223.6 326.5,223.8 328.2,222.8 329.1,223 331.3,221.8 332.4,223.1 333.8,222.9 335.2,221.7 336.1,222.6 337.2,221.9 338.9,224.2 340.9,224.2 341.1,224.2 343.4,224.2 344.8,224.2 346.2,224.2 347.6,224.2 349,224.2 349.8,224.7 351.3,224.4 352.4,221.6 353.8,221.1 354.9,222.3 356.9,222.4 357.7,221.5 358.6,222.2 360,220.4 362.2,221.4 363.9,221.7 364.4,220.1 366.4,221.4 367,220 368.9,219.3 370.3,217.5 371.7,218.5 372.3,217.6 373.4,219.4 375.1,217.2 377.1,217.8 378.8,221.4 379.9,221.4 381,221.4 381.6,222.3 384.1,222.3 384.4,222.3 386.6,222.3 388,222.3 389.4,222.3 390.8,222.3 392.2,222.3 392.5,222.3 394.8,222.3 396.2,222.3 397.6,222.3 399,222.3 399.3,222.3 401.5,222.3 402.9,222.3 404.3,222.3 405.7,222.3 406,222.3 408.3,222.3 409.1,222.2 409.9,223.2 411.6,223.2 413.3,224.1 414.4,222.8 415.8,222.7 416.7,223.1 418.4,222.8 420,224.9 422,224.9 422.9,225.5 423.7,224.3 425.1,225.6 426.2,225.6 427.6,225.6 429,225.6 430.2,225.6 432.7,225.6 433.5,225.6 435.5,224.2 436.1,225.6 436.9,225.6 438.3,225.6 439.7,225.6 441.1,225.6 442.5,225.6 443.9,225.6 445,225.6 446.4,225.6 447.8,225.6 449.2,225.6 450.7,225.6 451.8,225.6 453.2,225.6 454.6,225.6 456,225.6 457.4,225.6 458.5,225.6 459.9,225.6 461.3,225.6 462.7,225.6 464.1,225.6 465.5,225.6 466.7,225.6 468.1,225.6 469.5,225.6 470.9,225.6 473.1,225.6 473.7,226.1 475.9,226.1 477.3,226.1 477.6,226.1 479.9,226.1 481.3,226.1 482.7,226.1 484.1,226.1 485.5,226.1 485.8,226.1 488,226.1 489.4,226.1 490.8,226.1 492.2,226.1 492.8,226.5 493.9,226.5 495,226.5 496.4,226.5 498.9,226.5 500.1,226.5 500.6,227.9 501.8,227.9 503.2,228.6 504.6,228.6 506.5,229.4 507.4,227.7 509.6,228.5 510.7,228 511.9,226.2 513.8,225.3 515,226.9 516.4,226.1 517.2,226.4 519.2,224.3 519.7,225.1 521.1,225.5 522.8,224.2 523.7,225.2 525.1,224.8 527,226.7 527.6,226.3 529,227 530.7,226.3 532.1,227.1 533.8,226.5 534.9,225.1 536,225.7 538,224.2 539.1,224.1 539.9,225.2 541.1,226.4 542.5,227.3 543.9,227.3 546.1,227.3 546.7,227.3 548.1,225.4 549.2,227.1 551.2,227.4 552.9,225 554,224.1 554.8,225.5 556.2,224 558.2,224.8 559,224.6 560.4,221.7 561.6,220.5 563,222.6 564.9,221.4 566.1,222.8 567.2,222 568.9,222.9 569.7,221.1 571.7,220 572.8,220.1 573.9,221.5 575,220 577,222.2 577.6,222.6 579,221.9 580.7,219 581.5,219.1 583.5,222.3 584.3,222.3 585.7,222.3 587.1,222.3 588.2,222.3 589.6,222.3 591,222.3 592.5,222.3 593.9,222.3 595,222.3 596.4,222.3 597.8,222.3 600.3,222.3 601.4,222.3 602,222.7" fill="none" stroke="#3A56C5" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>Honest fill (1-day lag)</title></polyline>
+  <circle cx="602" cy="222.7" r="4" fill="#3A56C5" stroke="#FBFBF8" stroke-width="2"><title>Honest fill (1-day lag): $0.97</title></circle>
+  <polyline points="64,221.6 64.3,221.6 65.4,221.6 67.9,221.6 69.1,221.6 70.5,219.9 71,220.3 73.3,220.3 74.1,220.3 75,219.6 76.4,219.3 78.6,219.3 79.4,219.2 80.3,219.2 81.7,219.2 84.2,219.2 84.5,218.5 85.6,218.5 87,218.5 88.4,218.5 91,218.5 91.5,217.1 93.2,215.9 93.8,215.3 95.7,215.3 96.6,217.1 98.3,216.8 100.2,214.5 101.3,216.6 102.2,214.6 103.3,215.6 105.3,213.5 107,214.4 107.2,213.6 109.5,211.3 110.9,213 112,211.8 113.7,214.6 114.8,212.8 115.9,214 117.4,211.3 119,213.2 119.9,210.7 121.3,210.3 123,210.9 124.1,213.1 125.2,212.7 126.9,211.2 128.6,212.4 129.1,211.8 131.4,210.7 132.2,211.2 133.1,210.5 134.5,210.5 135.9,210.5 137,210.5 138.4,210.5 139.8,210.5 141.2,210.5 142.6,210.5 143.7,210.5 145.1,210.5 146.6,210.5 148,210.5 149.4,210.5 150.5,210.5 151.9,210.5 153.3,210.5 154.7,210.5 156.9,210.5 158.3,209.9 159.8,208 160.3,209.7 162.6,208 162.8,208.6 164.2,208.8 165.4,208.8 166.8,208.8 168.2,208.8 170.7,208.8 171.5,207.3 172.1,207.8 173.5,206.6 174.9,206.6 176.3,206.6 177.7,206.6 178.8,206.6 180.2,206.6 181.7,206.6 183.1,206.6 184.5,206.6 185.9,206.6 187,206.6 188.4,206.6 189.8,206.6 191.2,206.6 192.6,206.6 193.7,206.6 195.1,206.6 197.7,206.6 198.8,206.6 199.6,204.9 200.7,204.5 202.2,205.7 203.3,204 205,203.9 206.1,206.4 207.5,206.2 209.7,206.2 210.6,203.6 212.5,201.7 213.1,203.9 214.2,202.9 215.9,201.9 217,203.4 219.3,204.5 219.8,203.8 221,203.8 222.1,203.8 223.5,203.8 224.9,203.8 226.3,203.8 228.8,203.8 229.1,202.8 231.4,200.7 231.9,201.6 233.6,198.1 234.7,200.2 236.1,199.2 237,201.8 238.7,200.3 239.8,201 241.7,198.4 243.4,198 244.6,194.7 245.1,196.8 246.8,197.4 249,191.4 249.9,192.2 251,196.3 253,192.1 253.5,193.6 255.2,193.6 256.6,190.1 258.3,191 259.7,195.3 260,194.4 261.4,195.4 262.8,195.4 264.2,195.4 265.3,195.4 266.7,195.4 269.3,195.4 270.1,195.4 271.2,193.6 272.1,193.5 274.6,193.5 276,193.5 277.4,193.5 277.7,193.5 279.9,193.5 281.3,193.5 282.7,193.5 284.1,193.5 284.4,193.5 286.7,193.5 288.1,193.5 289.5,193.5 290.9,193.5 291.2,193.5 293.4,193.5 294.8,193.5 296.2,193.5 297.6,193.5 299,193.5 299.9,189.1 301.6,193 303,193 303.8,193 304.9,191.3 306.6,191.9 307.4,188.8 309.7,185.4 310.5,187.9 312.5,190 313.9,189.6 314.5,187.4 316.2,185.9 317.6,188.7 318.4,187.8 320.4,186.7 321.2,188.1 323.2,188.8 324.6,185.7 325.7,186.2 326.5,186.7 328.2,184.8 329.1,185.1 331.3,182.8 332.4,185.2 333.8,184.9 335.2,182.6 336.1,184.3 337.2,183.1 338.6,186.1 339.7,186.1 341.1,186.1 342.5,186.1 343.7,186.1 345.1,186.1 346.5,186.1 349,186.1 350.4,184.9 350.7,183.1 352.7,176.2 354.3,177.6 355.5,175.5 356.9,178.3 357.7,176.5 358.6,178 360,174.3 362.2,176.3 363.9,176.9 364.4,173.7 366.4,176.3 367,173.3 368.9,171.9 370.3,168.2 371.7,170.4 372.3,168.4 373.4,172.2 375.1,167.7 377.1,168.8 378.2,173.7 379.9,173.9 381,171.3 381.6,171.3 383,171.3 384.4,171.3 385.8,171.3 386.9,171.3 388.3,171.3 389.7,171.3 391.1,171.3 392.5,171.3 393.9,171.3 395.1,171.3 396.5,171.3 397.9,171.3 399.3,171.3 400.7,171.3 401.8,171.3 403.2,171.3 404.6,171.3 406,171.3 408.3,171.3 408.8,168 411.1,167.7 411.9,166.6 413.6,159.3 415.3,161.5 415.8,159.7 416.7,160.8 418.4,160.1 419.5,162.9 422,162.9 422.3,160.5 423.7,159 424.8,161.3 426.2,161.3 427.6,161.3 429,161.3 430.2,161.3 432.7,161.3 433.2,161.3 435.5,156.9 435.8,156.8 436.9,156.8 438.3,156.8 439.7,156.8 441.1,156.8 442.5,156.8 443.9,156.8 445,156.8 446.4,156.8 447.8,156.8 449.2,156.8 450.7,156.8 451.8,156.8 453.2,156.8 454.6,156.8 456,156.8 457.4,156.8 458.5,156.8 459.9,156.8 461.3,156.8 462.7,156.8 464.1,156.8 465.5,156.8 466.7,156.8 468.1,156.8 469.5,156.8 472,156.8 472.8,156.8 473.4,154.1 474.8,154.1 476.2,154.1 477.6,154.1 479,154.1 480.1,154.1 481.5,154.1 482.9,154.1 484.3,154.1 485.8,154.1 487.2,154.1 488.3,154.1 490.8,154.1 492.2,153 492.5,153.2 493.9,153.2 495,153.2 496.4,153.2 498.9,153.2 500.1,150.6 500.6,152.4 502.6,150.8 504.3,150.8 504.6,148.7 506,147 507.4,138.8 509.6,141.3 510.7,139.7 511.9,133.6 513.8,130.5 515,136 516.4,133.2 517.2,134.3 519.2,127.1 519.7,129.7 521.1,131.3 522.8,126.7 523.7,130.2 525.1,128.6 527,135.2 528.2,135.3 529,129.9 530.7,127.5 532.1,130.4 533.8,128.1 534.9,123.1 536,125.2 538,119.6 539.1,119.3 540.5,125.5 541.1,127.7 542.5,127.2 543.9,127.2 546.1,127.2 547.5,122.3 548.1,119.4 549.2,125.7 550.9,126.2 552.9,116 554,112.7 554.8,117.8 556.2,112.2 558.2,115.3 559,114.7 560.4,103.4 561.6,98.9 563,106.9 564.9,102.6 566.1,107.8 567.2,104.6 568.9,107.9 569.7,101.4 571.7,97 572.8,97.3 573.9,102.9 575,97 577,105.3 577.6,107.1 579,104.4 580.7,93.4 581.5,93.7 583.2,103.3 585.4,103.3 585.7,103.3 588,103.3 589.4,103.3 590.8,103.3 592.2,103.3 592.5,103.3 594.7,103.3 596.1,103.3 597.5,103.3 598.9,103.3 600.3,103.3 601.4,100.5 602,102.3" fill="none" stroke="#D64B2A" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>Naive fill (0-day lag)</title></polyline>
+  <circle cx="602" cy="102.3" r="4" fill="#D64B2A" stroke="#FBFBF8" stroke-width="2"><title>Naive fill (0-day lag): $3.81</title></circle>
+  <text x="614" y="106.3" font-size="11" fill="#1F2C38">Naive: $3.81</text>
+  <text x="614" y="226.7" font-size="11" fill="#1F2C38">Honest: $0.97</text>
+  <line x1="607" y1="225" x2="614" y2="232.7" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="614" y="240.7" font-size="11" fill="#1F2C38">Buy&amp;hold: $0.92</text>
+</svg>
+<!-- /chart:equity -->
+<figcaption>fig 6.1.3 — growth of $1, one simulated 8-year history, by fill assumption</figcaption>
+</figure>
+
+<table>
+<thead><tr><th>Fill assumption</th><th>CAGR</th><th>Sharpe</th><th>Max drawdown</th></tr></thead>
+<tbody>
+<tr><td>Buy &amp; hold (benchmark)</td><td><span data-lab="buyhold_cagr" data-fmt=".1%">−1.1%</span></td><td><span data-lab="buyhold_sharpe" data-fmt=".2f">0.03</span></td><td><span data-lab="buyhold_maxdd" data-fmt=".1%">−43.1%</span></td></tr>
+<tr><td>Honest — next close, 1-day lag</td><td><span data-lab="honest_cagr" data-fmt=".1%">−0.4%</span></td><td><span data-lab="honest_sharpe" data-fmt=".2f">0.03</span></td><td><span data-lab="honest_maxdd" data-fmt=".1%">−26.5%</span></td></tr>
+<tr><td>Naive — same close, 0-day lag</td><td><span data-lab="naive_cagr" data-fmt=".1%">19.2%</span></td><td><span data-lab="naive_sharpe" data-fmt=".2f">1.49</span></td><td><span data-lab="naive_maxdd" data-fmt=".1%">−7.4%</span></td></tr>
+</tbody>
+</table>
+
+<p>On this one simulated history, the naive fill turns a strategy with no real edge into what would look, in a pitch deck, like an exceptional live track record: a <span data-lab="naive_sharpe" data-fmt=".2f">1.49</span> Sharpe and a shallow <span data-lab="naive_maxdd" data-fmt=".1%">−7.4%</span> drawdown, against an honest <span data-lab="honest_sharpe" data-fmt=".2f">0.03</span> and a real <span data-lab="honest_maxdd" data-fmt=".1%">−26.5%</span>. But one path is one draw — exactly the kind of anecdote §6.1.1 warned against treating as proof of anything. §6.1.5 repeats this same experiment on 400 independent synthetic histories to see whether the gap is systematic or just this path's luck.</p>
+
+<p>The drawdown column is the most seductive part of the naive row. A <span data-lab="naive_maxdd" data-fmt=".1%">−7.4%</span> maximum drawdown, next to an honest <span data-lab="honest_maxdd" data-fmt=".1%">−26.5%</span>, looks like a genuinely better-engineered strategy — smoother, calmer, easier to hold through a real drawdown. It isn't. The naive fill's position for a day is chosen using that same day's own close, so on days the price is about to fall relative to its average the rule disproportionately finds itself already flat, and on days it is about to rise, already long. It is not avoiding bad days by skill; the simulation is deciding after the fact and presenting it as before.</p>
+</section>
+
+<section id="s5">
+<h2><span class="no">6.1.5</span> The fill assumption that quietly changes the answer</h2>
+<p class="lede">Change one clause of the specification — how many periods pass between deciding and trading — and the identical rule tells two different stories.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 220" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">SAME SIGNAL, TWO FILL ASSUMPTIONS</text>
+  <rect x="26" y="32" width="326" height="176" rx="9" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="189" y="54" font-size="11" font-weight="700" text-anchor="middle" fill="#D64B2A">THE NAIVE FILL ASSUMPTION</text>
+  <rect x="46" y="66" width="286" height="24" rx="5" fill="#fff" stroke="#F2CDBF"/>
+  <text x="58" y="82" font-size="9.5" fill="#1F2C38">trade at the SAME close used to build the signal</text>
+  <rect x="46" y="96" width="286" height="24" rx="5" fill="#fff" stroke="#F2CDBF"/>
+  <text x="58" y="112" font-size="9.5" fill="#1F2C38">→ effectively "sees" the return before it happens</text>
+  <text x="189" y="148" font-size="9.5" text-anchor="middle" fill="#D64B2A" font-weight="600">Manufactures Sharpe from nothing, not skill.</text>
+  <text x="189" y="166" font-size="9" text-anchor="middle" fill="#4A5A68">No error, no warning — the code just runs.</text>
+  <rect x="368" y="32" width="326" height="176" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="531" y="54" font-size="11" font-weight="700" text-anchor="middle" fill="#1F7A55">THE HONEST FILL ASSUMPTION</text>
+  <rect x="388" y="66" width="286" height="24" rx="5" fill="#fff" stroke="#BFE0CF"/>
+  <text x="400" y="82" font-size="9.5" fill="#1F2C38">1 · decide using information through day t only</text>
+  <rect x="388" y="96" width="286" height="24" rx="5" fill="#fff" stroke="#BFE0CF"/>
+  <text x="400" y="112" font-size="9.5" fill="#1F2C38">2 · trade at day t+1's close — one full day later</text>
+  <text x="531" y="148" font-size="9.5" text-anchor="middle" fill="#1F7A55" font-weight="600">Matches what a live order could actually do.</text>
+  <text x="531" y="166" font-size="9" text-anchor="middle" fill="#4A5A68">Sometimes worse-looking. That's the point.</text>
+</svg>
+<figcaption>fig 6.1.4 — the same rule, two fill assumptions: one a broker could fill, one it couldn't</figcaption>
+</figure>
+
+<p>The asset in this lab is pure geometric Brownian motion: a drift plus noise, with no genuine trend for a moving-average filter to find. That makes it a clean instrument for isolating the fill assumption, because any reliable, repeatable gap between the two variants cannot be real momentum — there isn't any — so it can only be the fill assumption itself. Repeating §6.1.4's experiment on <span data-lab="mc_paths" data-fmt="d">400</span> independent <span data-lab="mc_years" data-fmt="d">4</span>-year synthetic histories confirms it is not one path's luck:</p>
+
+<figure class="diagram chart">
+<!-- chart:sharpe_gap -->
+<svg viewBox="0 0 720 260" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Average annualised Sharpe across 400 simulated worlds, by fill assumption">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">AVERAGE ANNUALISED SHARPE ACROSS 400 SIMULATED WORLDS, BY FILL ASSUMPTION</text>
+  <line x1="64" y1="216" x2="690" y2="216" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="220" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.00</text>
+  <line x1="64" y1="173" x2="690" y2="173" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="177" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.50</text>
+  <line x1="64" y1="130" x2="690" y2="130" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="134" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">1.00</text>
+  <line x1="64" y1="87" x2="690" y2="87" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="91" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">1.50</text>
+  <line x1="64" y1="44" x2="690" y2="44" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="48" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">2.00</text>
+  <line x1="64" y1="216" x2="690" y2="216" stroke="#C9CFC6" stroke-width="1"/>
+  <path d="M156.3,216 V185 Q156.3,181 160.3,181 H176.3 Q180.3,181 180.3,185 V216 Z" fill="#4A5A68"><title>Buy &amp; hold: 0.41</title></path>
+  <text x="168.3" y="174" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.41</text>
+  <text x="168.3" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">Buy &amp; hold</text>
+  <path d="M365,216 V193.3 Q365,189.3 369,189.3 H385 Q389,189.3 389,193.3 V216 Z" fill="#3A56C5"><title>Honest fill: 0.31</title></path>
+  <text x="377" y="182.3" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.31</text>
+  <text x="377" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">Honest fill</text>
+  <path d="M573.7,216 V71 Q573.7,67 577.7,67 H593.7 Q597.7,67 597.7,71 V216 Z" fill="#D64B2A"><title>Naive fill: 1.73</title></path>
+  <text x="585.7" y="60" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">1.73</text>
+  <text x="585.7" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">Naive fill</text>
+</svg>
+<!-- /chart:sharpe_gap -->
+<figcaption>fig 6.1.5 — average annualised Sharpe across 400 simulated worlds, by fill assumption</figcaption>
+</figure>
+
+<p>Averaged over all 400 worlds, the naive fill beats the honest fill by <span data-lab="mean_gap" data-fmt=".2f">1.42</span> Sharpe (<span data-lab="mean_sr_naive" data-fmt=".2f">1.73</span> vs. <span data-lab="mean_sr_honest" data-fmt=".2f">0.31</span>) — a gap <span data-lab="gap_se_multiple" data-fmt=".0f">64</span> standard errors from zero, nowhere near a coincidence of sampling. This lab asserts that gap at 4 standard errors, never a property of a single lucky path, and 64 clears that bar by a wide margin. A one-line bug — forgetting to lag a signal by even one period — manufactures more apparent "edge" than most real trading ideas ever produce.</p>
+
+<p>The honest-fill number carries its own lesson. Averaged the same way, it trails simply buying and holding the asset (<span data-lab="mean_sr_buyhold" data-fmt=".2f">0.41</span> vs. <span data-lab="mean_sr_honest" data-fmt=".2f">0.31</span>, <span data-lab="honest_vs_buyhold_se_multiple" data-fmt=".1f">5.1</span> standard errors apart) — not because the simulation is broken, but because a filter with nothing real to filter for still pays for its whipsaw at every crossing while sometimes sitting out the market's drift. That matches real evidence, not just synthetic data: reconstructing a monthly 10-month moving-average filter on the S&amp;P 500 back to 1900, Faber (2007) found it nearly matched buy-and-hold's return — 11.72% a year versus 11.66% — while cutting volatility and drawdown sharply, not beating the index outright. An honestly simulated rule with no real edge doesn't have to look bad to be honest; it just has to stop pretending to beat a coin flip it happened to tie.</p>
+
+<p>The mechanism behind that <span data-lab="honest_vs_buyhold_se_multiple" data-fmt=".1f">5.1</span>-standard-error shortfall is ordinary, not mysterious. Every time the price crosses its moving average, the honest rule needs one full day after the cross to react, and on a pure random walk that crossing carries no information about what comes next — so the filter pays a small, real cost in whipsaw at every crossing (<span data-lab="n_trades" data-fmt="d">101</span> of them, in the single path of §6.1.4) while collecting none of the upside a genuine trend-following mechanism would need to exist in order to earn back. A specification can be perfectly honest and still lose to the simplest possible benchmark; that is a fact about the rule, not a flaw in the simulation.</p>
+
+<p>None of the naive-fill result requires exotic code. A one-line expression like <code>position * returns</code>, with <code>position</code> built from the same price column as <code>returns</code> and no <code>.shift()</code> in sight, reproduces the naive case exactly — by default, the first time someone writes a backtest before learning to ask "filled when, at what price?" It requires no malice and no obviously broken code; it requires only that the fill assumption was never written down as its own parameter, the way §6.1.2 insists it must be.</p>
+
+<div class="co warn"><span class="co-t">⚠️ Pitfall — "it ran without errors, so the fill must be fine"</span>
+<p>The naive version above also ran without a single error, warning, or type mismatch — it produced a spurious <span data-lab="mean_sr_naive" data-fmt=".2f">1.73</span> Sharpe as cleanly as the honest version produced <span data-lab="mean_sr_honest" data-fmt=".2f">0.31</span>. A backtest engine has no way to know whether the price it just used to fill a trade was actually available when the trade was decided; only the person writing the fill assumption down, and checking it against what a real order could achieve, catches this. This is the mildest member of a much larger family — using a close that was later restated, an index membership you only know in hindsight, a price nobody could actually have traded at — that <span class="xref soon" data-xref="6.4" data-auto="" title="Coming soon">Session 6.4 — The Bias Hall of Fame</span> catalogues in full.</p>
+</div>
+</section>
+
+<section id="s6">
+<h2><span class="no">6.1.6</span> Try it</h2>
+<p class="lede">Fifteen minutes with the companion lab open, changing exactly one thing at a time.</p>
+
+<p>The two edits below isolate the same two dimensions this session spent its numbers on: how much history the filter looks back over, and how many periods separate a decision from its fill. Predicting first, then running, is <a class="xref" href="../unit01-quant-landscape/session03-research-lifecycle.html" data-xref="1.3" data-style="short" data-auto="">Session 1.3</a>'s <a class="term" href="../unit01-quant-landscape/session03-research-lifecycle.html#g-pre-registration" data-term="pre-registration">pre-registration</a> idea in miniature — decide what you expect before the machine tells you what happened.</p>
+
+<div class="co lab"><span class="co-t">🔧 Try it (15 min, in the lab)</span>
+<p>1. Before running anything, predict what happens to <code>n_trades</code> and <code>frac_invested</code> if you change <code>WINDOW</code> from 100 to 20 days. Write your prediction down, then run it and check.<br>
+2. Add a third fill assumption: <code>signal.shift(2) * ret</code> — a two-day lag instead of one. Predict whether its Sharpe should sit above or below the honest (1-day) version, using §6.1.3's formula to justify your answer, then run it.<br>
+3. Success looks like this: your two-day-lag prediction and the lab's number agree in direction, and you can say in one sentence why an <em>extra</em> day of delay should not help a rule that has no real edge to begin with.</p>
+</div>
+</section>
+
+<hr>
+
+<section id="s7">
+<h2><span class="no">6.1.7</span> Glossary · Check yourself · Go deeper</h2>
+<div class="gloss" id="glossary">
+<div id="g-strategy-specification"><b>Strategy specification</b> — everything needed for two independent runs of the same rule on the same data to produce identical trades: universe, signal, entry/exit, sizing, fill assumption, costs and the risk-free rate.</div>
+<div id="g-historical-simulation"><b>Historical simulation</b> — the mechanical replay, one period at a time, of a fully specified rule against price history it played no part in shaping.</div>
+<div id="g-fill-assumption"><b>Fill assumption</b> — the explicit choice of what price, and after what delay, a simulated trade is assumed to execute at.</div>
+<div id="g-in-sample"><b>In-sample</b> — any stretch of history that has influenced a decision about a rule — its parameters, its form, or the choice to test it at all.</div>
+</div>
+
+<h3>Check yourself</h3>
+<details class="q"><summary>1. A colleague says "my backtest shows a 1.8 Sharpe, so the strategy works." What's wrong with that sentence?</summary><div>It treats a historical simulation as proof of a live edge. Per §6.1.1, a backtest is a conditional claim about the past under stated assumptions — not a prediction, not proof of skill, not a live track record. Before being impressed, ask for the strategy specification (especially the fill assumption and costs) and whether the result is even out of sample.</div></details>
+<details class="q"><summary>2. In §6.1.5, the identical signal earns a Sharpe of about 1.73 under one fill assumption and about 0.31 under another, on data with no real trend at all. What single change caused that, and why does it matter for any backtest you're handed?</summary><div>Removing the one-period lag, so the position for period t uses the same close that produces period t's own return (P_t applied to R_t instead of P_{t-1}). It matters because this is a one-line bug that runs cleanly — no crash, no warning — and manufactures more apparent edge than most real strategies ever show; you cannot tell it happened without checking the specification.</div></details>
+<details class="q"><summary>3. A researcher tunes the moving-average window from 100 days to 40 after seeing that 40 improves the honest-fill Sharpe, then reports the improved number as "the" result. What has happened to that stretch of history?</summary><div>It is now in-sample: the choice of window was made using information from that period, so its Sharpe no longer measures performance on data the rule hasn't seen. Reporting it as if it were a fresh test is exactly the mistake a written kill criterion and a fresh holdout (Sessions 6.6–6.8) exist to prevent.</div></details>
+<details class="q"><summary>4. In the wealth formula of §6.1.3, why must the position at period t, P_(t-1), be decided using only information through period t-1 rather than period t?</summary><div>Because letting the position depend on period t's own information while also earning period t's return (P_t · R_t) requires knowing that return before it occurs — something no live trader can do. It isn't a minor statistical bias; it silently turns an honest simulation into a replay of a past that couldn't have happened that way, exactly the naive fill assumption in §6.1.5.</div></details>
+<details class="q"><summary>5. Two people backtest "the same" moving-average rule and get different equity curves. Per §6.1.2, what's the first thing to check?</summary><div>Whether their strategy specifications actually match — universe, signal, sizing, and above all the fill assumption and costs. If any of those differ, the two runs are honest answers to two different questions, not evidence that one person's code is better than the other's.</div></details>
+
+<div class="co lab"><span class="co-t">🔧 Homework (~1 h before Session 6.2)</span>
+<p>1. In the lab, set <code>WINDOW</code> to 20 and then 250. Record how <code>frac_invested</code>, <code>n_trades</code> and the honest Sharpe change, predicting each before you run it.<br>
+2. Add the two-day-lag fill assumption from §6.1.6 properly: record its Sharpe next to the 0-day (naive) and 1-day (honest) versions, and write two sentences on what the trend across all three tells you about fill assumptions in general.<br>
+3. Read the first five pages of Harvey &amp; Liu (2015), below, and write down, in their words, what a backtest formally is not.</p>
+</div>
+
+<h3>📚 Go deeper</h3>
+<ol class="refs">
+<li>López de Prado, M. (2018). <em>Advances in Financial Machine Learning</em>, ch. 11 "The Dangers of Backtesting". Wiley. <span class="rid">ISBN 978-1-119-48208-6</span></li>
+<li>Harvey, C. R. &amp; Liu, Y. (2015). "Backtesting." <em>The Journal of Portfolio Management</em> 42(1), 13–28. <span class="rid">doi:10.3905/jpm.2015.42.1.013</span></li>
+<li>Perold, A. F. (1988). "The Implementation Shortfall: Paper Versus Reality." <em>The Journal of Portfolio Management</em> 14(3), 4–9. <span class="rid">doi:10.3905/jpm.1988.409150</span></li>
+</ol>
+
+<h3>Sources for the numbers</h3>
+<ol class="refs">
+<li>Faber, M. T. (2007). "A Quantitative Approach to Tactical Asset Allocation." <em>The Journal of Wealth Management</em>, Spring 2007. <span class="rid">SSRN 962461</span></li>
+</ol>
+</section>
+
+<!-- nav:foot -->
+<div class="foot">
+<span class="soon" title="Coming soon">← Prev: 5.7 · Kalman &amp; Regimes</span>
+<span class="soon" title="Coming soon">Next: 6.2 · Vectorized Backtest →</span>
+</div>
+<p class="legal">Educational material only — not investment, legal or tax advice. Backtests and simulations are hypothetical. <a href="../start-here.html#disclaimer">Disclaimer</a> · Text CC BY 4.0 · Code MIT.</p>
+<!-- /nav:foot -->
+</main>
+</div></body></html>

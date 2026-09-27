@@ -1,0 +1,25 @@
+{
+  "results": {
+    "illustrative_final_protected": 0.9146041720566477,
+    "illustrative_final_unprotected": 0.6308156751170136,
+    "mc_horizon_days": 60,
+    "mc_miss_rate": 0.05205949656750572,
+    "mc_n_pairs": 3314,
+    "mc_n_triggered": 3496,
+    "mc_paths": 6000,
+    "mc_stop_pct": 0.08,
+    "mc_trigger_rate": 0.5826666666666667,
+    "mean_overshoot_coarse_bps": 111.57447406054484,
+    "mean_overshoot_fine_bps": 31.443626226698516,
+    "mean_overshoot_gap_bps": 80.13084783384633,
+    "overshoot_gap_se_bps": 1.673265065256288,
+    "overshoot_gap_se_multiple": 47.88891461232592,
+    "parity_final_equity_event": 0.8335458038791016,
+    "parity_final_equity_vectorized": 0.8335458038790983,
+    "parity_max_abs_diff": 3.774758283725532e-15,
+    "parity_positions_match": true,
+    "risk_free_rate": 0.0
+  },
+  "seed": 20260926,
+  "session": "6.3"
+}

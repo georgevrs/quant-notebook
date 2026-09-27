@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- nav:head -->
+<title>6.3 · Build an Event-Driven Backtester</title>
+<meta name="description" content="An event loop with orders, fills and portfolio state — slower, but realistic, and the same shape as a live trading system.">
+<link rel="canonical" href="https://georgevrs.github.io/quant-notebook/unit06-backtesting-discipline/session03-event-driven-backtester.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Quant Notebook">
+<meta property="og:title" content="6.3 · Build an Event-Driven Backtester">
+<meta property="og:description" content="An event loop with orders, fills and portfolio state — slower, but realistic, and the same shape as a live trading system.">
+<meta property="og:url" content="https://georgevrs.github.io/quant-notebook/unit06-backtesting-discipline/session03-event-driven-backtester.html">
+<meta name="twitter:card" content="summary">
+<link rel="stylesheet" href="../assets/brand.css">
+<link rel="stylesheet" href="../assets/temml.css">
+<!-- /nav:head -->
+</head>
+<body><div class="page" id="top">
+<!-- nav:tabs -->
+<nav class="tabs">
+<a href="../index.html">⌂ Course home</a>
+<span class="soon" title="Coming soon">6.1 · What a Backtest Is</span>
+<span class="soon" title="Coming soon">6.2 · Vectorized Backtest</span>
+<a class="active" href="session03-event-driven-backtester.html">6.3 · Event-Driven</a>
+<span class="soon" title="Coming soon">6.4 · Bias Hall of Fame</span>
+<span class="soon" title="Coming soon">6.5 · Costs &amp; Capacity</span>
+<span class="soon" title="Coming soon">6.6 · Validation</span>
+<span class="soon" title="Coming soon">6.7 · Overfitting Stats</span>
+<span class="soon" title="Coming soon">6.8 · Lab: Protocol</span>
+<a href="../roadmap.html">🗺 Roadmap</a>
+</nav>
+<!-- /nav:tabs -->
+
+<header class="cover">
+<!-- nav:heading -->
+<p class="eyebrow">Unit 6 · Backtesting &amp; Research Discipline — Session 03 of 08</p>
+<h1>Build an Event-Driven Backtester</h1>
+<!-- /nav:heading -->
+<p class="subtitle"><span class="xref soon" data-xref="6.2" data-auto="" title="Coming soon">Session 6.2 — Build a Vectorized Backtester</span> builds a backtester out of arrays; this one builds it out of a queue — market data arrives, the strategy decides, an order goes out, a fill comes back, and the portfolio's state updates, one tick at a time. On the simple case the two must agree to the last cent. <mark>The payoff isn't speed — it's that this loop is the same shape a live trading system uses.</mark></p>
+<div class="meta">
+<span>DURATION <b>1.5 h + lab</b></span>
+<span>LEVEL <b>Intermediate</b></span>
+<span>TRACKS <b>QR · QT · QD · IND</b></span>
+<span>HANDS-ON <b>A stop order the vectorized approach can't express, tested on 6,000 simulated paths</b></span>
+</div>
+<!-- nav:labstrip -->
+<div class="labstrip"><b>📓 Companion lab</b>
+<a href="https://colab.research.google.com/github/georgevrs/quant-notebook/blob/main/labs/u06/s03_event_driven_backtester.ipynb">Open in Colab</a>
+<a href="https://github.com/georgevrs/quant-notebook/blob/main/labs/u06/s03_event_driven_backtester.ipynb">Notebook on GitHub</a>
+<a href="https://github.com/georgevrs/quant-notebook/blob/main/labs/u06/s03_event_driven_backtester.py">Source (.py)</a>
+</div>
+<!-- /nav:labstrip -->
+<div class="toc">
+<b>On this page</b>
+<ol>
+<li><a href="#s1">Two ways to replay history</a></li>
+<li><a href="#s2">The event loop, tick by tick</a></li>
+<li><a href="#s3">Orders, fills and portfolio state</a></li>
+<li><a href="#s4">In code — and does it agree?</a></li>
+<li><a href="#s5">What a vectorized backtest can't see</a></li>
+<li><a href="#s6">The pitfall: a queue that still peeks</a></li>
+<li><a href="#s7">Backtest&ndash;live parity: why the shape matters</a></li>
+<li><a href="#s8">Try it</a></li>
+<li><a href="#s9">Glossary · Check yourself · Go deeper</a></li>
+</ol>
+</div>
+</header>
+
+<main>
+
+<section id="s1">
+<h2><span class="no">6.3.1</span> Two ways to replay history</h2>
+<p class="lede">A backtest replays history to see what a strategy would have done. <span class="xref soon" data-xref="6.2" data-auto="" title="Coming soon">Session 6.2 — Build a Vectorized Backtester</span> replays it as one big array computation; this session replays it one event at a time. Both are correct — they answer different questions.</p>
+
+<p><span class="xref soon" data-xref="6.1" data-auto="" title="Coming soon">Session 6.1 — What a Backtest Is (and Isn&#x27;t)</span> defined a <span class="term soon" data-term="historical simulation" title="Defined in Session 6.1 (coming soon)">historical simulation</span> as mechanical: two people coding the same <span class="term soon" data-term="strategy specification" title="Defined in Session 6.1 (coming soon)">strategy specification</span> should get identical trades. <span class="xref soon" data-xref="6.2" data-auto="" title="Coming soon">Session 6.2 — Build a Vectorized Backtester</span> made that mechanical replay <em>fast</em> — a <span class="term soon" data-term="vectorized backtest" title="Defined in Session 6.2 (coming soon)">vectorized backtest</span> holds the whole price history as one array and computes <span class="term soon" data-term="position" title="Defined in Session 6.2 (coming soon)">position</span>, return and <span class="term soon" data-term="equity curve" title="Defined in Session 6.2 (coming soon)">equity curve</span> in a handful of array operations, which is exactly why it can sweep thousands of parameter combinations overnight. This session makes the same replay <strong>realistic</strong>: an <strong>event-driven backtest</strong> processes history as a stream of discrete events — a new price, a decision, an order, a fill — through the same object shapes a live trading system uses. Nothing here says vectorized backtesting is wrong; it is the right tool for search. Event-driven backtesting is the right tool for anything whose behaviour depends on what happens <em>between</em> two data points, and for anything you eventually want to run live.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 214" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">TWO WAYS TO REPLAY THE SAME HISTORY</text>
+  <rect x="26" y="34" width="326" height="146" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="189" y="58" font-size="12.5" font-weight="700" text-anchor="middle" fill="#3A56C5">VECTORIZED</text>
+  <rect x="46" y="70" width="286" height="24" rx="5" fill="#fff" stroke="#C9D2F1"/>
+  <text x="58" y="86" font-size="9.5" fill="#1F2C38">the whole history is one array</text>
+  <rect x="46" y="100" width="286" height="24" rx="5" fill="#fff" stroke="#C9D2F1"/>
+  <text x="58" y="116" font-size="9.5" fill="#1F2C38">shift, multiply, cumulate &#8212; no loop</text>
+  <text x="189" y="150" font-size="9.5" text-anchor="middle" fill="#3A56C5" font-weight="600">fast &#8212; built for sweeping parameters</text>
+  <text x="189" y="166" font-size="9" text-anchor="middle" fill="#4A5A68">sweeps thousands of these in seconds</text>
+
+  <rect x="368" y="34" width="326" height="146" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="531" y="58" font-size="12.5" font-weight="700" text-anchor="middle" fill="#1F7A55">EVENT-DRIVEN &#183; THIS SESSION</text>
+  <rect x="388" y="70" width="286" height="24" rx="5" fill="#fff" stroke="#BFE0CF"/>
+  <text x="400" y="86" font-size="9.5" fill="#1F2C38">history arrives one tick at a time</text>
+  <rect x="388" y="100" width="286" height="24" rx="5" fill="#fff" stroke="#BFE0CF"/>
+  <text x="400" y="116" font-size="9.5" fill="#1F2C38">an order, a fill, a state update</text>
+  <text x="531" y="150" font-size="9.5" text-anchor="middle" fill="#1F7A55" font-weight="600">slower &#8212; but this loop can run live</text>
+  <text x="531" y="166" font-size="9" text-anchor="middle" fill="#4A5A68">&#167;6.3.7 swaps the data feed, not the code</text>
+
+  <text x="360" y="200" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">On a simple long/flat rule the two must agree exactly &#8212; &#167;6.3.4 proves it.</text>
+</svg>
+<figcaption>fig 6.3.1 &#8212; two legitimate ways to replay the same history, built for different jobs</figcaption>
+</figure>
+
+<p>Neither architecture is a defence against bad data or a badly specified rule. <span class="xref soon" data-xref="6.4" data-style="short" data-auto="" title="Coming soon">Session 6.4</span>'s look-ahead, survivorship and stale-price bugs infect a vectorized backtest and an event-driven one equally, because they live in the data and the specification, not in the loop shape. Architecture buys you exactly two things: the ability to express path-dependent orders cleanly (§6.3.5), and a strategy you can eventually run for real without rewriting it (§6.3.7). Expect the event loop to make an honest backtester easier to build, not to make a dishonest one impossible.</p>
+
+<div class="co key"><span class="co-t">📌 Key idea — the payoff is shape, not speed</span>
+<p>An event-driven backtest is deliberately built out of the same pieces a live system needs: an <strong>order</strong>, a <strong>fill</strong>, and <strong>portfolio state</strong> that only ever changes in response to one of those. Moving from backtest to live becomes a matter of swapping where events come from, not rewriting the strategy. That property is <strong>backtest&ndash;live parity</strong>, and it is the reason Unit 15 builds directly on this session's vocabulary.</p>
+</div>
+</section>
+
+<section id="s2">
+<h2><span class="no">6.3.2</span> The event loop, tick by tick</h2>
+<p class="lede">Strip away the trading vocabulary and an <strong>event loop</strong> is a generic pattern: a queue of typed messages, and a loop that pops the oldest one and hands it to whatever reacts to that type.</p>
+
+<p>The pattern is old and general — it is how GUIs, network servers and message brokers are built, and Hohpe &amp; Woolf's <em>Enterprise Integration Patterns</em> catalogues it in full for distributed systems. A backtester needs only four pieces of it: a market event announcing a new price, the strategy's decision, an <strong>order</strong> recording what it wants to trade, and a <strong>fill</strong> recording what actually happened. Everything the loop does is one of: react to a new price, decide, submit an order, or apply a fill.</p>
+
+<p>A GUI's loop reacts to <code>MouseClick</code> and <code>KeyPress</code> and produces screen updates; a web server's reacts to <code>Request</code> and produces <code>Response</code>; this backtester's reacts to <code>MarketEvent</code> and produces <code>OrderEvent</code>. Swapping the event type is the entire difference between the three — the loop, the queue, and the discipline of handling one message before asking for the next are identical. That is what makes the pattern worth learning once and reusing, rather than reinventing per project.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 204" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">THE EVENT LOOP &#8212; the same four steps, every tick</text>
+  <rect x="20" y="48" width="124" height="64" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="82" y="74" font-size="10.5" text-anchor="middle" fill="#3A56C5" font-weight="600">1 &#183; MARKET</text>
+  <text x="82" y="92" font-size="9" text-anchor="middle" fill="#4A5A68">a new price arrives</text>
+  <rect x="158" y="48" width="124" height="64" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="220" y="74" font-size="10.5" text-anchor="middle" fill="#3A56C5" font-weight="600">2 &#183; STRATEGY</text>
+  <text x="220" y="92" font-size="9" text-anchor="middle" fill="#4A5A68">long, flat, or hold?</text>
+  <rect x="296" y="48" width="124" height="64" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="358" y="74" font-size="10.5" text-anchor="middle" fill="#3A56C5" font-weight="600">3 &#183; ORDER</text>
+  <text x="358" y="92" font-size="9" text-anchor="middle" fill="#4A5A68">creates an order</text>
+  <rect x="434" y="48" width="124" height="64" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="496" y="74" font-size="10.5" text-anchor="middle" fill="#3A56C5" font-weight="600">4 &#183; FILL</text>
+  <text x="496" y="92" font-size="9" text-anchor="middle" fill="#4A5A68">the trade executes</text>
+  <rect x="572" y="48" width="124" height="64" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="634" y="74" font-size="10.5" text-anchor="middle" fill="#1F7A55" font-weight="600">5 &#183; PORTFOLIO</text>
+  <text x="634" y="92" font-size="9" text-anchor="middle" fill="#4A5A68">cash, shares, equity</text>
+  <path d="M144 80 H155" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2fwd)"/>
+  <path d="M282 80 H293" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2fwd)"/>
+  <path d="M420 80 H431" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2fwd)"/>
+  <path d="M558 80 H569" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2fwd)"/>
+  <path d="M634 112 V150 H82 V115" stroke="#4A5A68" stroke-width="1.5" fill="none" marker-end="url(#s2loop)"/>
+  <text x="358" y="164" font-size="9.5" text-anchor="middle" fill="#4A5A68" font-weight="600">next tick</text>
+  <text x="360" y="188" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">The loop never looks past the event it is holding &#8212; that discipline is what rules out look-ahead.</text>
+  <defs>
+    <marker id="s2fwd" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F2C38"/></marker>
+    <marker id="s2loop" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#4A5A68"/></marker>
+  </defs>
+</svg>
+<figcaption>fig 6.3.2 &#8212; the event loop: market event &#8594; strategy decides &#8594; order &#8594; fill &#8594; portfolio state, then the next tick</figcaption>
+</figure>
+
+<table>
+<thead><tr><th>Event</th><th>Who raises it</th><th>Who reacts</th><th>Produces</th></tr></thead>
+<tbody>
+<tr><td><code>MarketEvent</code></td><td>the data feed (history, or a live socket)</td><td>the strategy, and any resting stop</td><td>an <code>OrderEvent</code>, or nothing</td></tr>
+<tr><td><code>OrderEvent</code></td><td>the strategy's decision</td><td>the execution handler</td><td>a <code>FillEvent</code></td></tr>
+<tr><td><code>FillEvent</code></td><td>the execution handler</td><td>the portfolio</td><td>updated cash and shares</td></tr>
+<tr><td>portfolio state</td><td>&#8212; created once, not an event</td><td>read by the strategy, written by fills</td><td>this tick's equity number</td></tr>
+</tbody>
+</table>
+
+<p>In this lab the queue is, quite literally, the market feed: <code>run_event_loop</code> pops the next <code>MarketEvent</code> from a plain <code>deque</code>, and everything that one tick causes — a stop check, a decision, an <code>OrderEvent</code>, its <code>FillEvent</code> — is settled with ordinary function calls before the loop asks the feed for the next tick. A larger engine would push those follow-on events back onto one shared queue so several instruments or several strategies could interleave; for one strategy watching one instrument, that generality buys nothing but a new way to get the ordering wrong, so this lab keeps it direct. NautilusTrader's actual event bus implements the general version, in Rust, for exactly the case where the generality earns its keep.</p>
+
+<div class="co tip"><span class="co-t">💡 Tip — the queue can hold anything</span>
+<p>Nothing about this loop knows it is fed by history. Swap the queue's source for a live broker socket and the strategy, order and fill code do not change — the mechanism behind §6.3.7's <strong>backtest&ndash;live parity</strong>.</p>
+</div>
+</section>
+
+<section id="s3">
+<h2><span class="no">6.3.3</span> Orders, fills and portfolio state</h2>
+<p class="lede">Three small objects carry all the state. Get their fields right and the rest of the engine is bookkeeping.</p>
+
+<p>An <strong>order</strong> is a request, not yet a trade: it records a side (buy or sell), a type (fill now, or fill only if a condition is met), and, for a conditional order, the trigger price. A <strong>fill</strong> is the fact that a trade happened: a price, a quantity, and a commission — nothing about intent survives into a fill, only what occurred. <strong>Portfolio state</strong> is the running account: cash, shares held, and the equity curve that a <code>MarketEvent</code> re-prices and a <code>FillEvent</code> changes. This is the same separation a real order management system keeps, and for the same reason — an order can be rejected or sit unfilled, so the portfolio must never move until a fill says it can. An OMS is a state machine: it only transitions on an event, never on a wish. This lab's <code>OrderEvent</code> only ever reaches two end states — filled, or still resting — but a production order lives through more of them (submitted, partially filled, rejected, cancelled), and every one of those is still just a named transition triggered by an event nobody was allowed to skip.</p>
+
+<table>
+<thead><tr><th>Object</th><th>What it holds</th><th>In this lab</th></tr></thead>
+<tbody>
+<tr><td><code>OrderEvent</code></td><td>side, order type, and a stop price if conditional</td><td><code>OrderEvent(day, "BUY")</code></td></tr>
+<tr><td><code>FillEvent</code></td><td>the executed price, the quantity, a <span class="term soon" data-term="commission" title="Defined in Session 6.5 (coming soon)">commission</span></td><td>returned by <code>ExecutionHandler.submit(...)</code></td></tr>
+<tr><td><code>Portfolio</code></td><td>cash, shares, and the equity curve so far</td><td><code>cash -= quantity * price</code></td></tr>
+</tbody>
+</table>
+
+<p>Marking the portfolio to market is one identity: wealth is cash plus the value of what you hold at today's price. Writing shares held as <math><semantics><msub><mi>n</mi><mi>t</mi></msub><annotation encoding="application/x-tex">n_t</annotation></semantics></math> and cash as <math><semantics><msub><mi>C</mi><mi>t</mi></msub><annotation encoding="application/x-tex">C_t</annotation></semantics></math>:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><msub><mi>W</mi><mi>t</mi></msub><mo>=</mo><msub><mi>C</mi><mi>t</mi></msub><mo>+</mo><msub><mi>n</mi><mi>t</mi></msub><msub><mi>P</mi><mi>t</mi></msub></mrow><annotation encoding="application/x-tex">W_t = C_t + n_t P_t</annotation></semantics></math></div>
+<p>Every <code>MarketEvent</code> recomputes this once, using whatever <code>n_t</code> the last fill left behind — which is exactly why a fill must be applied before the next price is marked, not after (§6.3.4 shows what breaks if you get the order wrong).</p>
+
+<p>The <code>order_type</code> field is deliberately open-ended. This lab implements only <code>MARKET</code> (fill now) and <code>STOP</code> (fill once price crosses a trigger), but a <a class="term" href="../unit02-markets-instruments/session01-market-anatomy.html#g-limit-order" data-term="limit order">limit order</a> — rest until a <em>better</em> price is on offer, not a worse one — is the same object with one different comparison inside <code>ExecutionHandler</code>, not a different architecture. Whichever order types <a class="xref" href="../unit02-markets-instruments/session01-market-anatomy.html" data-xref="2.1" data-style="short" data-auto="">Session 2.1</a> introduced as market mechanics, this engine can hold as data.</p>
+
+<div class="co note"><span class="co-t">🧭 Margin note — the fill assumption, made explicit</span>
+<p><span class="xref soon" data-xref="6.1" data-auto="" title="Coming soon">Session 6.1 — What a Backtest Is (and Isn&#x27;t)</span> named the <span class="term soon" data-term="fill assumption" title="Defined in Session 6.1 (coming soon)">fill assumption</span>: at what price, and after what delay, a trade is assumed to execute. This lab fills every <code>MARKET</code> order at the current event's price and sets <span class="term soon" data-term="commission" title="Defined in Session 6.5 (coming soon)">commission</span> to zero throughout — the simplest honest assumption, priced properly in <span class="xref soon" data-xref="6.5" data-auto="" title="Coming soon">Session 6.5 — Transaction Costs &amp; Capacity</span>. The risk-free rate is <span data-lab="risk_free_rate" data-fmt=".0%">0%</span>: cash earns nothing while flat.</p>
+</div>
+</section>
+
+<section id="s4">
+<h2><span class="no">6.3.4</span> In code — and does it agree?</h2>
+<p class="lede">Four classes and one loop are enough. Run them on the same data and the same rule <span class="xref soon" data-xref="6.2" data-style="short" data-auto="" title="Coming soon">Session 6.2</span> uses, and there is only one honest answer.</p>
+
+<pre><span class="c"># the four types: a market event, an order, a fill, and the portfolio it updates</span>
+<span class="k">class</span> Portfolio:
+    <span class="k">def</span> on_fill(self, fill):
+        <span class="k">if</span> fill.side == <span class="s">"BUY"</span>:
+            self.shares += fill.quantity
+            self.cash -= fill.quantity * fill.price + fill.commission
+        <span class="k">else</span>:
+            self.shares -= fill.quantity
+            self.cash += fill.quantity * fill.price - fill.commission
+
+    <span class="k">def</span> mark_to_market(self, price):
+        equity = self.cash + self.shares * price
+        self.equity_curve.append(equity)
+        <span class="k">return</span> equity</pre>
+
+<p>The loop itself is a <code>deque</code> of <code>MarketEvent</code>s. Popping one marks the portfolio, checks any resting stop, and — using only data known before this tick — decides whether to submit an <code>OrderEvent</code>, whose fill is applied before the loop asks for the next tick:</p>
+
+<pre><span class="c"># market_events is the queue; everything one tick causes is settled before the next tick is popped</span>
+<span class="k">while</span> market_events:
+    ev = market_events.popleft()
+    portfolio.mark_to_market(ev.price)
+    stop_fill = execution.check_resting_stop(ev.day, ev.price, portfolio)
+    <span class="k">if</span> stop_fill: portfolio.on_fill(stop_fill)
+    <span class="k">if</span> target_position[ev.day + 1] != portfolio.invested:
+        fill = execution.submit(order, ev.price, portfolio)
+        portfolio.on_fill(fill)</pre>
+
+<p>The rule under test is <span class="xref soon" data-xref="6.2" data-style="short" data-auto="" title="Coming soon">Session 6.2</span>'s own construction, narrowed to one instrument so the loop only needs one order book to read: the least volatile of its eight fair-game (zero-drift) assets, and its own 60-day <span class="term soon" data-term="signal lag" title="Defined in Session 6.2 (coming soon)">lookback signal</span>, long only. The <span class="term soon" data-term="vectorized backtest" title="Defined in Session 6.2 (coming soon)">vectorized backtest</span> shifts that signal by one day and multiplies; the event loop above reaches the same <code>OrderEvent</code> decisions from the same data, one tick later in wall-clock terms but not one bit later in information. Run 1,500 simulated days through both:</p>
+
+<figure class="diagram chart">
+<!-- chart:equity_agree -->
+<svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Same data, same strategy — two engines, one answer">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">SAME DATA, SAME STRATEGY — TWO ENGINES, ONE ANSWER</text>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#E8850C" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">vectorized (6.2)</text>
+  <line x1="172.4" y1="32" x2="188.4" y2="32" stroke="#3A56C5" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="194.4" y="36" font-size="11" fill="#4A5A68">event-driven (6.3)</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="268" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$0.80</text>
+  <line x1="64" y1="221.6" x2="602" y2="221.6" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="225.6" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$0.85</text>
+  <line x1="64" y1="179.2" x2="602" y2="179.2" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="183.2" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$0.90</text>
+  <line x1="64" y1="136.8" x2="602" y2="136.8" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="140.8" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$0.95</text>
+  <line x1="64" y1="94.4" x2="602" y2="94.4" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="98.4" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$1.00</text>
+  <line x1="64" y1="52" x2="602" y2="52" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="56" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$1.05</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#C9CFC6" stroke-width="1"/>
+  <line x1="63.6" y1="264" x2="63.6" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="63.6" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">0</text>
+  <line x1="154" y1="264" x2="154" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="154" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">1</text>
+  <line x1="244.4" y1="264" x2="244.4" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="244.4" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">2</text>
+  <line x1="334.8" y1="264" x2="334.8" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="334.8" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">3</text>
+  <line x1="425.2" y1="264" x2="425.2" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="425.2" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">4</text>
+  <line x1="515.6" y1="264" x2="515.6" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="515.6" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">5</text>
+  <line x1="64" y1="94.4" x2="602" y2="94.4" stroke="#4A5A68" stroke-width="1"/>
+  <polyline points="64,94.4 64.4,94.4 65.4,94.4 66.9,94.4 68.3,94.4 69.7,94.4 70.8,94.4 72.2,94.4 73.7,94.4 75.1,94.4 76.2,94.4 77.6,94.4 79.1,94.4 80.5,94.4 81.6,94.4 83,94.4 84.4,94.4 85.9,94.4 87.3,94.4 88.4,94.4 89.8,94.4 91.3,94.4 92.7,94.4 93.8,94.4 95.2,94.4 96.6,94.4 98.1,94.4 99.1,94.4 100.6,94.4 102,94.4 104.2,94.4 104.5,89.4 107,91.3 107.4,98.6 108.8,97.1 110.3,97.1 111.3,97.1 112.8,97.1 114.2,97.1 115.6,97.1 116.7,97.1 118.2,97.1 119.6,97.1 121,97.1 122.1,97.1 124.6,97.1 126,99.2 126.4,115.2 127.8,115.2 128.9,115.2 130.4,115.2 131.8,115.2 133.2,115.2 134.3,115.2 136.8,115.2 137.9,108.4 138.6,120.5 140.4,109.7 141.1,124.6 143.6,134.7 144.3,114 146.1,109.5 147.6,133 148.6,124.1 150.1,136.3 150.8,134 152.6,114 153.7,123.5 154.7,124.7 156.2,106.9 158,92.4 159.8,111.9 161.2,99.4 162.3,109.7 163.4,129.9 164.8,111.3 166.2,124.3 167.7,98.1 169.1,109.4 170.2,117.3 171.2,91.3 173,87.9 173.8,100 175.2,95.2 176.6,119 177.7,119 179.8,119 181.3,113.5 182,123.8 184.2,123.8 184.9,128.5 186.3,112.6 188.1,117.8 188.8,136.9 189.9,136.9 191.3,136.9 192.4,136.9 193.8,136.9 195.3,136.9 196.7,136.9 197.8,136.9 199.2,136.9 200.7,136.9 202.1,136.9 203.2,136.9 204.6,136.9 206,136.9 207.5,136.9 208.5,136.9 210,136.9 211.4,136.9 212.8,136.9 214.3,136.9 215.4,136.9 216.8,136.9 218.2,136.9 219.7,136.9 220.7,136.9 222.2,136.9 223.6,136.9 225.8,136.9 226.8,137 227.6,160.8 229.3,153.3 230.8,167 231.9,167 232.9,167 234.4,167 235.8,167 238,167 239,160.3 239.7,160.3 241.2,160.3 242.6,160.3 243.7,160.3 245.1,160.3 246.6,160.3 248,160.3 249.1,160.3 250.5,160.3 251.9,160.3 253.4,160.3 254.8,160.3 255.9,160.3 257.3,160.3 258.8,160.3 260.2,160.3 261.3,160.3 262.7,160.3 264.1,160.3 265.6,160.3 266.6,160.3 268.1,160.3 269.5,160.3 271,160.3 273.1,160.3 274.5,152.3 275.3,157.7 276.7,159.6 277.8,145.3 279.9,144.9 280.6,162.1 282.4,164 283.5,180.3 284.9,174.5 286.4,183.1 287.1,161.3 288.9,146.5 290.3,164.7 291,154.5 292.8,158.5 293.9,148.9 295.3,162.2 296.4,162.2 297.9,162.2 299.3,162.2 300.7,162.2 301.8,162.2 303.2,162.2 304.7,162.2 306.8,162.2 307.9,177.3 308.6,177.3 310,177.3 311.5,177.3 312.9,177.3 315.1,177.3 316.5,173.8 317.9,191.3 319,184.8 320.4,204.8 321.9,204.8 323,203.6 324.4,209 325.8,202.3 326.9,189.9 328.3,189.9 329.8,172.3 330.5,163.6 331.6,177.4 333.4,184.6 334.8,158.9 336.2,141.2 338,155.1 338.7,178.5 340.5,153.6 341.2,148.4 343,158.9 344.1,160.3 345.9,135.3 347,151.5 348.1,142.7 349.9,175 350.6,172.1 352,181.9 353.1,181.9 354.5,181.9 356,181.9 357.4,181.9 358.8,181.9 359.9,181.9 361.3,181.9 362.8,181.9 364.2,181.9 365.3,181.9 366.7,181.9 368.1,181.9 369.6,181.9 370.7,181.9 372.1,181.9 373.5,181.9 375,181.9 376.4,181.9 377.5,181.9 378.9,181.9 380.3,181.9 381.8,181.9 382.9,181.9 384.3,181.9 385.7,181.9 387.2,181.9 388.2,181.9 389.7,181.9 391.1,181.9 393.3,181.9 394.7,187.9 396.1,182.2 397.2,180.5 398.3,197.4 399.7,195.8 401.1,158.4 401.9,161.5 404,199.5 404.7,199.5 405.8,199.5 407.2,199.5 408.7,199.5 410.8,199.5 412.3,198.5 413.7,177.9 414.8,194.6 415.9,203.7 417.3,212.7 419.1,210.9 419.8,196.6 421.9,187.8 422.7,200.9 424.5,200.9 425.2,202.6 427.3,191.9 428.4,201.5 429.5,193.8 430.9,207 432.7,187.2 433.4,187.5 434.1,191.4 436.3,192.7 437.4,184.9 439.5,182 440.2,192.2 441.7,171.9 442.8,189.6 444.5,189.1 445.3,178.1 447.4,186.3 448.8,179.3 449.6,192.6 450.6,198.8 451.7,198.8 453.2,198.8 454.6,198.8 457.1,198.8 457.5,198.8 458.5,198.8 460,198.8 462.5,198.8 462.8,198.8 463.9,198.8 465.3,198.8 467.9,198.8 468.9,202.1 470,193.3 471.4,207.7 472.2,193.1 474,209.3 475,199.5 476.1,208.5 477.9,188.3 479,199 480.8,200.7 481.5,190.9 482.9,204.6 484.4,189.1 486.2,202.4 486.9,185.9 489,174.3 490.8,174.1 491.2,159.2 493,171.8 493.7,161.5 495.1,182.6 496.6,162.4 498.3,156.9 499.8,165.7 501.2,193.3 501.9,194.2 504.1,194.2 504.8,180.2 505.9,191.1 507.3,191.1 508.7,191.1 509.8,191.1 511.3,191.1 512.7,191.1 514.1,191.1 515.2,191.1 516.6,191.1 518.1,191.1 519.5,191.1 520.9,191.1 522,191.1 523.5,191.1 524.9,191.1 526.3,191.1 527.4,191.1 528.8,191.1 530.3,191.1 531.7,191.1 532.8,191.1 534.2,191.1 535.6,191.1 537.1,191.1 538.2,191.1 539.6,191.1 541,191.1 542.5,191.1 544.6,191.1 545.7,204.7 546.4,175.6 548.6,187.3 549.3,179 550.4,184.4 552.5,181.9 554.3,196.3 555,213.2 555.7,213.2 557.5,216.9 559.3,219.6 560,233.4 561.5,235.6 562.5,235.6 564,235.6 565.4,235.6 566.9,235.6 567.9,235.6 569.4,235.6 570.8,235.6 572.2,235.6 573.3,235.6 574.7,235.6 576.2,235.6 577.6,235.6 578.7,235.6 580.1,235.6 581.6,235.6 583,235.6 584.4,235.6 585.5,235.6 586.9,235.6 588.4,235.6 589.8,235.6 590.9,235.6 592.3,235.6 593.8,235.6 595.2,235.6 596.3,235.6 597.7,235.6 599.1,235.6 600.6,235.6 602,235.6" fill="none" stroke="#E8850C" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>vectorized (6.2)</title></polyline>
+  <circle cx="602" cy="235.6" r="4" fill="#E8850C" stroke="#FBFBF8" stroke-width="2"><title>vectorized (6.2): $0.83</title></circle>
+  <polyline points="64,94.4 64.4,94.4 65.4,94.4 66.9,94.4 68.3,94.4 69.7,94.4 70.8,94.4 72.2,94.4 73.7,94.4 75.1,94.4 76.2,94.4 77.6,94.4 79.1,94.4 80.5,94.4 81.6,94.4 83,94.4 84.4,94.4 85.9,94.4 87.3,94.4 88.4,94.4 89.8,94.4 91.3,94.4 92.7,94.4 93.8,94.4 95.2,94.4 96.6,94.4 98.1,94.4 99.1,94.4 100.6,94.4 102,94.4 104.2,94.4 104.5,89.4 107,91.3 107.4,98.6 108.8,97.1 110.3,97.1 111.3,97.1 112.8,97.1 114.2,97.1 115.6,97.1 116.7,97.1 118.2,97.1 119.6,97.1 121,97.1 122.1,97.1 124.6,97.1 126,99.2 126.4,115.2 127.8,115.2 128.9,115.2 130.4,115.2 131.8,115.2 133.2,115.2 134.3,115.2 136.8,115.2 137.9,108.4 138.6,120.5 140.4,109.7 141.1,124.6 143.6,134.7 144.3,114 146.1,109.5 147.6,133 148.6,124.1 150.1,136.3 150.8,134 152.6,114 153.7,123.5 154.7,124.7 156.2,106.9 158,92.4 159.8,111.9 161.2,99.4 162.3,109.7 163.4,129.9 164.8,111.3 166.2,124.3 167.7,98.1 169.1,109.4 170.2,117.3 171.2,91.3 173,87.9 173.8,100 175.2,95.2 176.6,119 177.7,119 179.8,119 181.3,113.5 182,123.8 184.2,123.8 184.9,128.5 186.3,112.6 188.1,117.8 188.8,136.9 189.9,136.9 191.3,136.9 192.4,136.9 193.8,136.9 195.3,136.9 196.7,136.9 197.8,136.9 199.2,136.9 200.7,136.9 202.1,136.9 203.2,136.9 204.6,136.9 206,136.9 207.5,136.9 208.5,136.9 210,136.9 211.4,136.9 212.8,136.9 214.3,136.9 215.4,136.9 216.8,136.9 218.2,136.9 219.7,136.9 220.7,136.9 222.2,136.9 223.6,136.9 225.8,136.9 226.8,137 227.6,160.8 229.3,153.3 230.8,167 231.9,167 232.9,167 234.4,167 235.8,167 238,167 239,160.3 239.7,160.3 241.2,160.3 242.6,160.3 243.7,160.3 245.1,160.3 246.6,160.3 248,160.3 249.1,160.3 250.5,160.3 251.9,160.3 253.4,160.3 254.8,160.3 255.9,160.3 257.3,160.3 258.8,160.3 260.2,160.3 261.3,160.3 262.7,160.3 264.1,160.3 265.6,160.3 266.6,160.3 268.1,160.3 269.5,160.3 271,160.3 273.1,160.3 274.5,152.3 275.3,157.7 276.7,159.6 277.8,145.3 279.9,144.9 280.6,162.1 282.4,164 283.5,180.3 284.9,174.5 286.4,183.1 287.1,161.3 288.9,146.5 290.3,164.7 291,154.5 292.8,158.5 293.9,148.9 295.3,162.2 296.4,162.2 297.9,162.2 299.3,162.2 300.7,162.2 301.8,162.2 303.2,162.2 304.7,162.2 306.8,162.2 307.9,177.3 308.6,177.3 310,177.3 311.5,177.3 312.9,177.3 315.1,177.3 316.5,173.8 317.9,191.3 319,184.8 320.4,204.8 321.9,204.8 323,203.6 324.4,209 325.8,202.3 326.9,189.9 328.3,189.9 329.8,172.3 330.5,163.6 331.6,177.4 333.4,184.6 334.8,158.9 336.2,141.2 338,155.1 338.7,178.5 340.5,153.6 341.2,148.4 343,158.9 344.1,160.3 345.9,135.3 347,151.5 348.1,142.7 349.9,175 350.6,172.1 352,181.9 353.1,181.9 354.5,181.9 356,181.9 357.4,181.9 358.8,181.9 359.9,181.9 361.3,181.9 362.8,181.9 364.2,181.9 365.3,181.9 366.7,181.9 368.1,181.9 369.6,181.9 370.7,181.9 372.1,181.9 373.5,181.9 375,181.9 376.4,181.9 377.5,181.9 378.9,181.9 380.3,181.9 381.8,181.9 382.9,181.9 384.3,181.9 385.7,181.9 387.2,181.9 388.2,181.9 389.7,181.9 391.1,181.9 393.3,181.9 394.7,187.9 396.1,182.2 397.2,180.5 398.3,197.4 399.7,195.8 401.1,158.4 401.9,161.5 404,199.5 404.7,199.5 405.8,199.5 407.2,199.5 408.7,199.5 410.8,199.5 412.3,198.5 413.7,177.9 414.8,194.6 415.9,203.7 417.3,212.7 419.1,210.9 419.8,196.6 421.9,187.8 422.7,200.9 424.5,200.9 425.2,202.6 427.3,191.9 428.4,201.5 429.5,193.8 430.9,207 432.7,187.2 433.4,187.5 434.1,191.4 436.3,192.7 437.4,184.9 439.5,182 440.2,192.2 441.7,171.9 442.8,189.6 444.5,189.1 445.3,178.1 447.4,186.3 448.8,179.3 449.6,192.6 450.6,198.8 451.7,198.8 453.2,198.8 454.6,198.8 456,198.8 457.5,198.8 458.5,198.8 460,198.8 461.4,198.8 462.8,198.8 463.9,198.8 465.3,198.8 467.9,198.8 468.9,202.1 470,193.3 471.4,207.7 472.2,193.1 474,209.3 475,199.5 476.1,208.5 477.9,188.3 479,199 480.8,200.7 481.5,190.9 482.9,204.6 484.4,189.1 486.2,202.4 486.9,185.9 489,174.3 490.8,174.1 491.2,159.2 493,171.8 493.7,161.5 495.1,182.6 496.6,162.4 498.3,156.9 499.8,165.7 501.2,193.3 501.9,194.2 504.1,194.2 504.8,180.2 505.9,191.1 508.4,191.1 508.7,191.1 509.8,191.1 511.3,191.1 513.8,191.1 514.1,191.1 515.2,191.1 516.6,191.1 518.1,191.1 520.6,191.1 520.9,191.1 522,191.1 523.5,191.1 526,191.1 526.3,191.1 527.4,191.1 528.8,191.1 531.3,191.1 531.7,191.1 532.8,191.1 534.2,191.1 536.7,191.1 537.1,191.1 538.2,191.1 539.6,191.1 541,191.1 543.5,191.1 544.6,191.1 545.7,204.7 546.4,175.6 548.6,187.3 549.3,179 550.4,184.4 552.5,181.9 554.3,196.3 555,213.2 555.7,213.2 557.5,216.9 559.3,219.6 560,233.4 561.5,235.6 562.5,235.6 564,235.6 565.4,235.6 566.9,235.6 567.9,235.6 569.4,235.6 570.8,235.6 572.2,235.6 573.3,235.6 574.7,235.6 576.2,235.6 577.6,235.6 578.7,235.6 580.1,235.6 581.6,235.6 583,235.6 584.4,235.6 585.5,235.6 586.9,235.6 588.4,235.6 589.8,235.6 590.9,235.6 592.3,235.6 593.8,235.6 595.2,235.6 596.3,235.6 597.7,235.6 599.1,235.6 600.6,235.6 602,235.6" fill="none" stroke="#3A56C5" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>event-driven (6.3)</title></polyline>
+  <circle cx="602" cy="235.6" r="4" fill="#3A56C5" stroke="#FBFBF8" stroke-width="2"><title>event-driven (6.3): $0.83</title></circle>
+  <text x="614" y="239.6" font-size="11" fill="#1F2C38">event-driven: $0.83</text>
+  <line x1="607" y1="235.6" x2="614" y2="245.6" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="614" y="253.6" font-size="11" fill="#1F2C38">vectorized: $0.83</text>
+</svg>
+<!-- /chart:equity_agree -->
+<figcaption>fig 6.3.3 &#8212; the vectorized and event-driven equity curves, drawn on top of each other</figcaption>
+</figure>
+
+<p>The vectorized engine ends at <span data-lab="parity_final_equity_vectorized" data-fmt="$.4f">$0.8335</span> per dollar invested; the event loop ends at <span data-lab="parity_final_equity_event" data-fmt="$.4f">$0.8335</span>. The largest gap between the two equity curves, on any day, is <span data-lab="parity_max_abs_diff" data-fmt=".2e">3.77e-15</span> — floating-point noise, not a discrepancy. This is not a Monte Carlo result to be trusted within some tolerance: both engines do the same arithmetic on the same numbers, so they either match to machine precision or one of them has a bug.</p>
+
+<p>That is a general technique, not a backtesting trick. Whenever two implementations claim to compute the same thing, feeding both identical input and demanding bit-for-bit agreement is a far stronger check than reading either one's output and deciding it looks plausible. A vectorized backtest and an event loop are about as independent as two implementations of one specification get — one is array algebra, the other is a small state machine — which is exactly why their agreement here is worth something.</p>
+
+<table>
+<thead><tr><th>Situation</th><th>Reach for</th><th>Why</th></tr></thead>
+<tbody>
+<tr><td>Sweeping thousands of parameter combinations</td><td><strong>vectorized</strong> (<span class="xref soon" data-xref="6.2" data-style="short" data-auto="" title="Coming soon">Session 6.2</span>)</td><td>array operations, no per-tick Python loop</td></tr>
+<tr><td>A quick check that a simple long/flat rule is coded right</td><td>either</td><td>§6.3.4 shows they must agree exactly</td></tr>
+<tr><td>An order type that depends on the path (a stop, a trailing stop)</td><td><strong>event-driven</strong></td><td>needs state carried tick to tick — see §6.3.5</td></tr>
+<tr><td>The backtest and the live system should share code</td><td><strong>event-driven</strong></td><td>same order/fill/portfolio objects, different feed</td></tr>
+</tbody>
+</table>
+
+<div class="co tip"><span class="co-t">💡 Looking ahead</span>
+<p>This whole engine — <code>MarketEvent</code>, <code>OrderEvent</code>, <code>FillEvent</code>, <code>Portfolio</code> — is a shrunk-down version of what a real order management system does. <span class="xref soon" data-xref="15.1" data-auto="" title="Coming soon">Session 15.1 — Architecture of a Live Trading System</span> names the parts properly (OMS, EMS, a state machine per order); this lab is the first time you have built one, even a small one, yourself.</p>
+</div>
+</section>
+
+<section id="s5">
+<h2><span class="no">6.3.5</span> What a vectorized backtest can't see</h2>
+<p class="lede">A resting order is the case where the two architectures stop being interchangeable.</p>
+
+<p>A <a class="xref" href="../unit02-markets-instruments/session01-market-anatomy.html" data-xref="2.1" data-style="short" data-auto="">Session 2.1</a>-style <a class="term" href="../unit02-markets-instruments/session01-market-anatomy.html#g-stop-order" data-term="stop order">stop order</a> is a standing instruction: sell if the price ever trades at or below a level, whenever that happens. It only means something if <em>something</em> is watching continuously after the order is placed — it is <em>path-dependent</em>, not a function of the day's return alone. A vectorized backtest has no "continuously": it has one row per bar. The best it can do is compare a bar's close to the stop level once per bar, which makes it blind to whatever the price did between two closes. The event loop needs no new machinery for this — <code>ExecutionHandler.check_resting_stop</code> already runs on every <code>MarketEvent</code> in §6.3.4 — so extending it means feeding it a <em>finer</em> stream of the same event type, not writing new code.</p>
+
+<p>One simulated path makes the mechanism concrete: a position held through a rough patch, with a stop resting <span data-lab="mc_stop_pct" data-fmt=".0%">8%</span> below the entry price, checked on every one of twelve sub-daily ticks instead of once at the close.</p>
+
+<figure class="diagram chart">
+<!-- chart:stop_value -->
+<svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="One simulated path — what a resting stop order changes">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">ONE SIMULATED PATH — WHAT A RESTING STOP ORDER CHANGES</text>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#D64B2A" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">no stop order</text>
+  <line x1="153.2" y1="32" x2="169.2" y2="32" stroke="#3A56C5" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="175.2" y="36" font-size="11" fill="#4A5A68">stop at −8%</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="268" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$0.60</text>
+  <line x1="64" y1="221.6" x2="602" y2="221.6" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="225.6" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$0.70</text>
+  <line x1="64" y1="179.2" x2="602" y2="179.2" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="183.2" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$0.80</text>
+  <line x1="64" y1="136.8" x2="602" y2="136.8" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="140.8" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$0.90</text>
+  <line x1="64" y1="94.4" x2="602" y2="94.4" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="98.4" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$1.00</text>
+  <line x1="64" y1="52" x2="602" y2="52" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="56" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$1.10</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#C9CFC6" stroke-width="1"/>
+  <line x1="63.3" y1="264" x2="63.3" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="63.3" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">0</text>
+  <line x1="174.5" y1="264" x2="174.5" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="174.5" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">0.05</text>
+  <line x1="285.8" y1="264" x2="285.8" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="285.8" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">0.1</text>
+  <line x1="397.1" y1="264" x2="397.1" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="397.1" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">0.15</text>
+  <line x1="508.4" y1="264" x2="508.4" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="508.4" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">0.2</text>
+  <line x1="64" y1="94.4" x2="602" y2="94.4" stroke="#4A5A68" stroke-width="1"/>
+  <polyline points="72.1,94.4 80.9,105 89.8,108.9 98.6,100.7 107.4,98.4 116.3,107.9 125.1,110.5 133.9,100.3 142.7,101.3 151.6,100.9 160.4,103 169.2,115 178.1,112 186.9,109.7 195.7,97.9 204.6,93.1 213.4,92.4 222.2,116.8 231.1,117.7 239.9,108.2 248.7,118.7 257.6,121.6 266.4,124.6 275.2,143.6 284.1,151.3 292.9,157.3 301.7,147.8 310.6,157.7 319.4,152.9 328.2,149.7 337,154.2 345.9,165.7 354.7,157.7 363.5,158.8 372.4,161 381.2,164 390,166.6 398.9,174.1 407.7,159.7 416.5,168 425.4,171.6 434.2,185 443,180.2 451.9,191.9 460.7,199.7 469.5,206.6 478.4,213.7 487.2,219.7 496,228.9 504.9,228.1 513.7,227.6 522.5,221.3 531.3,221.4 540.2,222.7 549,233.7 557.8,245.6 566.7,252.1 575.5,254.4 584.3,249.2 593.2,245.8 602,250.9" fill="none" stroke="#D64B2A" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>no stop order</title></polyline>
+  <circle cx="602" cy="250.9" r="4" fill="#D64B2A" stroke="#FBFBF8" stroke-width="2"><title>no stop order: $0.63</title></circle>
+  <polyline points="64,94.4 64.7,98.2 66.2,99.5 66.9,103.1 69.2,102.7 70.6,101.3 71.4,99.2 72.1,102.9 74.3,110.5 75.8,109 77.2,111.1 78,113 79.5,111.9 80.2,113.3 81.7,108.9 83.1,111.1 84.6,108.7 86.1,105.3 87.6,99.9 88.3,102.1 90.5,100.7 91.2,102 92,99.9 93.4,100.2 94.9,100.2 96.4,104.2 97.9,102.7 99.3,98.4 100.8,102.4 101.5,100.7 103,100.5 104.5,106.6 106,104.9 107.4,104.2 108.9,108.4 110.4,104 111.1,109.1 112.6,109.1 114,112.5 115.5,108.8 116.3,111 117.7,108.1 119.2,109.7 120.7,102.9 121.4,102.5 123.6,102.1 124.4,103.6 125.8,100.3 127.3,103.7 128.8,101.3 129.5,105.6 131.7,105.6 132.4,103.6 133.2,106.3 135.4,98.8 136.1,100.4 137.6,98.1 139.1,100.6 139.8,99.3 141.3,101.6 143.5,100.9 144.2,96.9 146.4,104.2 147.2,103.1 148.6,99.1 150.1,103.5 150.8,101.2 152.3,103 153.8,109.5 155.3,114 156.7,108.7 157.5,108.3 159.7,107.9 160.4,112.4 161.9,118.1 163.4,111.2 164.1,110.7 165.6,114.7 167,117.2 168.5,120.5 170,112 171.5,111.3 172.9,111.7 173.7,110.7 174.4,108.1 175.9,108.4 177.3,112.1 179.5,106.7 180.3,105.9 181.8,104.5 182.5,99.4 184.7,93.1 185.4,92.9 187.6,97.9 188.4,93 189.1,95.8 190.6,87.7 192.1,89.5 193.5,89.1 195,91.6 195.7,93.6 197.2,97.1 199.4,88.5 200.2,92.1 201.6,89.9 203.1,91 203.8,94.9 205.3,92.4 207.5,100.7 208.3,99.8 209,103.8 210.5,108.7 211.9,107.8 214.1,116.8 214.9,116.6 215.6,118 217.1,119.4 218.6,117.3 220,118.5 221.5,116.7 222.2,119 224.4,112.8 225.2,110.2 226.7,114.3 228.9,107.7 229.6,111.8 231.1,108.8 232.5,115.8 233.3,114.3 234.7,122 236.2,123 237.7,121.9 239.2,115.8 239.9,119.1 242.1,121.6 242.8,120.8 243.6,121.8 245.1,117.3 247.3,123.1 248,125.1 249.5,121.6 250.2,120.7 252.4,125.8 253.1,125.7 254.6,121.4 256.1,121.6 257.6,127.7 258.3,124.6 259.8,130.6 261.2,130.6 262.7,130.6 263.5,130.6 264.9,130.6 266.4,130.6 267.9,130.6 269.3,130.6 270.8,130.6 271.5,130.6 273,130.6 274.5,130.6 276,130.6 277.4,130.6 278.2,130.6 279.6,130.6 281.1,130.6 282.6,130.6 284.1,130.6 284.8,130.6 286.3,130.6 287.7,130.6 289.2,130.6 290.7,130.6 291.4,130.6 292.9,130.6 294.4,130.6 295.8,130.6 297.3,130.6 298,130.6 299.5,130.6 301,130.6 302.5,130.6 303.9,130.6 304.7,130.6 306.1,130.6 307.6,130.6 309.1,130.6 310.6,130.6 312,130.6 312.8,130.6 314.2,130.6 315.7,130.6 317.2,130.6 318.6,130.6 319.4,130.6 320.9,130.6 322.3,130.6 323.8,130.6 325.3,130.6 326,130.6 327.5,130.6 329,130.6 330.4,130.6 331.9,130.6 332.6,130.6 334.1,130.6 335.6,130.6 337,130.6 338.5,130.6 339.3,130.6 340.7,130.6 342.2,130.6 343.7,130.6 345.1,130.6 345.9,130.6 347.4,130.6 348.8,130.6 350.3,130.6 351.8,130.6 353.2,130.6 354,130.6 355.4,130.6 356.9,130.6 358.4,130.6 359.9,130.6 360.6,130.6 362.1,130.6 363.5,130.6 365,130.6 366.5,130.6 367.2,130.6 368.7,130.6 370.2,130.6 371.6,130.6 373.1,130.6 373.8,130.6 375.3,130.6 376.8,130.6 378.3,130.6 379.7,130.6 380.5,130.6 381.9,130.6 383.4,130.6 384.9,130.6 386.4,130.6 387.1,130.6 388.6,130.6 390,130.6 391.5,130.6 393,130.6 394.5,130.6 395.2,130.6 396.7,130.6 398.1,130.6 399.6,130.6 401.1,130.6 401.8,130.6 403.3,130.6 404.8,130.6 406.2,130.6 407.7,130.6 408.4,130.6 409.9,130.6 411.4,130.6 412.9,130.6 414.3,130.6 415.1,130.6 416.5,130.6 418,130.6 419.5,130.6 420.9,130.6 421.7,130.6 423.2,130.6 424.6,130.6 426.1,130.6 427.6,130.6 428.3,130.6 429.8,130.6 431.3,130.6 432.7,130.6 434.2,130.6 435.7,130.6 436.4,130.6 437.9,130.6 439.3,130.6 440.8,130.6 442.3,130.6 443,130.6 444.5,130.6 446,130.6 447.4,130.6 448.9,130.6 449.7,130.6 451.1,130.6 452.6,130.6 454.1,130.6 455.5,130.6 456.3,130.6 457.7,130.6 459.2,130.6 460.7,130.6 462.2,130.6 462.9,130.6 464.4,130.6 465.8,130.6 467.3,130.6 468.8,130.6 469.5,130.6 471,130.6 472.5,130.6 473.9,130.6 475.4,130.6 476.9,130.6 477.6,130.6 479.1,130.6 480.6,130.6 482,130.6 483.5,130.6 484.2,130.6 485.7,130.6 487.2,130.6 488.7,130.6 490.1,130.6 490.9,130.6 492.3,130.6 493.8,130.6 495.3,130.6 496.8,130.6 497.5,130.6 499,130.6 500.4,130.6 501.9,130.6 503.4,130.6 504.1,130.6 505.6,130.6 507.1,130.6 508.5,130.6 510,130.6 510.7,130.6 512.2,130.6 513.7,130.6 515.2,130.6 516.6,130.6 518.1,130.6 518.8,130.6 520.3,130.6 521.8,130.6 523.3,130.6 524.7,130.6 525.5,130.6 526.9,130.6 528.4,130.6 529.9,130.6 531.3,130.6 532.1,130.6 533.6,130.6 535,130.6 536.5,130.6 538,130.6 538.7,130.6 540.2,130.6 541.6,130.6 543.1,130.6 544.6,130.6 545.3,130.6 546.8,130.6 548.3,130.6 549.7,130.6 551.2,130.6 552,130.6 553.4,130.6 554.9,130.6 556.4,130.6 557.8,130.6 559.3,130.6 560,130.6 561.5,130.6 563,130.6 564.5,130.6 565.9,130.6 566.7,130.6 568.1,130.6 569.6,130.6 571.1,130.6 572.6,130.6 573.3,130.6 574.8,130.6 576.2,130.6 577.7,130.6 579.2,130.6 579.9,130.6 581.4,130.6 582.9,130.6 584.3,130.6 585.8,130.6 586.5,130.6 588,130.6 589.5,130.6 591,130.6 592.4,130.6 593.9,130.6" fill="none" stroke="#3A56C5" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>stop at −8%</title></polyline>
+  <circle cx="593.9" cy="130.6" r="4" fill="#3A56C5" stroke="#FBFBF8" stroke-width="2"><title>stop at −8%: $0.91</title></circle>
+  <text x="605.9" y="134.6" font-size="11" fill="#1F2C38">stop at −8%: $0.91</text>
+  <text x="614" y="254.9" font-size="11" fill="#1F2C38">no stop order: $0.63</text>
+</svg>
+<!-- /chart:stop_value -->
+<figcaption>fig 6.3.4 &#8212; one simulated path: unprotected vs. a resting stop, checked every tick</figcaption>
+</figure>
+
+<p>On this path the unprotected position ends at <span data-lab="illustrative_final_unprotected" data-fmt="$.2f">$0.63</span> per dollar invested; the stopped-out version ends at <span data-lab="illustrative_final_protected" data-fmt="$.2f">$0.91</span>. One path is an anecdote, not evidence — the real question is how much a stop's execution quality degrades if it can only be checked once a day, the way a vectorized backtest would have to check it. Across <span data-lab="mc_paths" data-fmt=",.0f">6,000</span> simulated paths over a <span data-lab="mc_horizon_days" data-fmt=".0f">60</span>-day holding window, <span data-lab="mc_n_triggered" data-fmt=",.0f">3,496</span> paths breach the stop at some point. Checking only at the close <strong>misses the breach entirely</strong> on <span data-lab="mc_miss_rate" data-fmt=".1%">5.2%</span> of them — the price dips below the stop intraday and recovers by the close, so a close-only check never even knows to react. On the <span data-lab="mc_n_pairs" data-fmt=",.0f">3,314</span> paths where both methods do trigger, checking only at the close executes, on average, <span data-lab="mean_overshoot_gap_bps" data-fmt=".1f">80.1</span> basis points further past the intended stop level than checking every tick (<span data-lab="mean_overshoot_fine_bps" data-fmt=".1f">31.4</span> bps of overshoot checking every tick, vs. <span data-lab="mean_overshoot_coarse_bps" data-fmt=".1f">111.6</span> bps checking once a day) — a gap of <span data-lab="overshoot_gap_se_multiple" data-fmt=".1f">47.9</span> standard errors from zero, not a coincidence of one draw.</p>
+
+<figure class="diagram chart">
+<!-- chart:overshoot_comparison -->
+<svg viewBox="0 0 720 260" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Average overshoot past the stop level">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">AVERAGE OVERSHOOT PAST THE STOP LEVEL</text>
+  <line x1="64" y1="216" x2="690" y2="216" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="220" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.0 bps</text>
+  <line x1="64" y1="158.7" x2="690" y2="158.7" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="162.7" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">50.0 bps</text>
+  <line x1="64" y1="101.3" x2="690" y2="101.3" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="105.3" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">100.0 bps</text>
+  <line x1="64" y1="44" x2="690" y2="44" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="48" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">150.0 bps</text>
+  <line x1="64" y1="216" x2="690" y2="216" stroke="#C9CFC6" stroke-width="1"/>
+  <path d="M208.5,216 V183.9 Q208.5,179.9 212.5,179.9 H228.5 Q232.5,179.9 232.5,183.9 V216 Z" fill="#3A56C5"><title>checks every tick: 31.4 bps</title></path>
+  <text x="220.5" y="172.9" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">31.4 bps</text>
+  <text x="220.5" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">checks every tick</text>
+  <path d="M521.5,216 V92.1 Q521.5,88.1 525.5,88.1 H541.5 Q545.5,88.1 545.5,92.1 V216 Z" fill="#D64B2A"><title>checks at the close: 111.6 bps</title></path>
+  <text x="533.5" y="81.1" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">111.6 bps</text>
+  <text x="533.5" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">checks at the close</text>
+</svg>
+<!-- /chart:overshoot_comparison -->
+<figcaption>fig 6.3.5 &#8212; how much worse a stop's execution gets when it is only checked once a day</figcaption>
+</figure>
+
+<p>Nothing stops someone from bolting a "stop" onto a vectorized backtest by comparing each day's close to a level. But that is a materially different, worse-executing order than the one a live broker actually offers, and the vectorized code has no natural place to remember "already stopped out, stay flat" without reaching for a loop — at which point it is not vectorized any more. The event loop expresses the path-dependent order directly, because it was already built to look at one event at a time.</p>
+
+<div class="co key"><span class="co-t">📌 Key idea</span>
+<p>A resting order is a claim about what happens <em>between</em> observations. A vectorized backtest has no "between" — only rows. An event-driven backtest's unit of time is whatever granularity you feed it, which is why it extends to path-dependent orders and a vectorized backtest, however cleverly written, does not.</p>
+</div>
+</section>
+
+<section id="s6">
+<h2><span class="no">6.3.6</span> The pitfall: a queue that still peeks</h2>
+<p class="lede">An event loop looks disciplined by construction. It is only as disciplined as the objects passed through it.</p>
+
+<p>The whole promise of §6.3.1 — that this architecture cannot look ahead — depends on one thing: the strategy must receive nothing but the current event. It is easy to write an event-driven-looking backtester that quietly fails this. If a <code>Strategy</code> object is constructed with the entire price array (<code>Strategy(prices)</code>) and only <em>also</em> reacts to <code>MarketEvent</code>s, nothing forces it to use <code>event.price</code> instead of <code>prices[t + 5]</code>. The loop still pops events in order, the code still looks like an event loop, and the equity curve can still look completely plausible — the bug does not announce itself in the output, because a look-ahead bug generally makes results <em>better</em>, not obviously broken.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 220" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">SAME LOOP, TWO STRATEGY INTERFACES</text>
+  <rect x="26" y="32" width="326" height="176" rx="9" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="189" y="54" font-size="11" font-weight="700" text-anchor="middle" fill="#D64B2A">THE LEAK</text>
+  <rect x="46" y="66" width="286" height="24" rx="5" fill="#fff" stroke="#F2CDBF"/>
+  <text x="58" y="82" font-size="9.5" fill="#1F2C38" font-family="IBM Plex Mono,monospace">Strategy(prices: array)</text>
+  <rect x="46" y="96" width="286" height="24" rx="5" fill="#fff" stroke="#F2CDBF"/>
+  <text x="58" y="112" font-size="9.5" fill="#1F2C38">can read prices[t + 5] early</text>
+  <text x="189" y="148" font-size="9.5" text-anchor="middle" fill="#D64B2A" font-weight="600">the equity curve still looks fine</text>
+  <text x="189" y="166" font-size="9" text-anchor="middle" fill="#4A5A68">the interface allowed the peek</text>
+  <rect x="368" y="32" width="326" height="176" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="531" y="54" font-size="11" font-weight="700" text-anchor="middle" fill="#1F7A55">DISCIPLINED</text>
+  <rect x="388" y="66" width="286" height="24" rx="5" fill="#fff" stroke="#BFE0CF"/>
+  <text x="400" y="82" font-size="9.5" fill="#1F2C38" font-family="IBM Plex Mono,monospace">on_market(event: MarketEvent)</text>
+  <rect x="388" y="96" width="286" height="24" rx="5" fill="#fff" stroke="#BFE0CF"/>
+  <text x="400" y="112" font-size="9.5" fill="#1F2C38">only ever sees event.price</text>
+  <text x="531" y="148" font-size="9.5" text-anchor="middle" fill="#1F7A55" font-weight="600">cannot look ahead, by construction</text>
+  <text x="531" y="166" font-size="9" text-anchor="middle" fill="#4A5A68">the interface enforces it, not memory</text>
+  <text x="360" y="198" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">Check the strategy's interface in review &#8212; a leak rarely shows up in the numbers.</text>
+</svg>
+<figcaption>fig 6.3.6 &#8212; the same event loop, with and without a way to cheat</figcaption>
+</figure>
+
+<p>This is a specific, code-shaped instance of a disease with its own name: <span class="xref soon" data-xref="4.2" data-style="short" data-auto="" title="Coming soon">Session 4.2</span> calls it <span class="term soon" data-term="look-ahead bias" title="Defined in Session 4.2 (coming soon)">look-ahead bias</span>, and shows it quietly inflating performance in backtests that have no event loop anywhere in sight. The event loop does not cure the disease — it just relocates where the bug has to hide, from an unlagged array shift to a constructor argument.</p>
+
+<div class="co warn"><span class="co-t">⚠️ Pitfall — "an event loop can't look ahead"</span>
+<p>An event loop makes look-ahead <em>awkward</em>, not impossible. The guarantee only holds if every object the strategy can reach was constructed from data available at or before the current event — no stored reference to the future rows, no global holding the full history. In code review, read the constructor arguments of the strategy class before you trust the loop around it.</p>
+</div>
+</section>
+
+<section id="s7">
+<h2><span class="no">6.3.7</span> Backtest&ndash;live parity: why the shape matters</h2>
+<p class="lede">The reason to pay for a slower architecture is what it lets you reuse later.</p>
+
+<p>A vectorized backtest's core operation — multiply a whole column by another whole column — has no live equivalent: a live system never has "the whole column," only the next tick. So going from a vectorized research backtest to a live strategy means a rewrite, and a rewrite is where new bugs live. An event loop's core operation — react to one event, maybe emit another — is already what a live system does, message by message. <strong>Backtest&ndash;live parity</strong> is the practice of keeping the strategy, order, fill and portfolio code identical between the two, and swapping only the two pieces that touch the outside world: where <code>MarketEvent</code>s come from, and how <code>OrderEvent</code>s get turned into <code>FillEvent</code>s.</p>
+
+<p>A team that validates a signal in a vectorized research notebook and then asks an engineer to "productionise it" has, whether anyone says so out loud, just created a second, unaudited specification of the strategy — the two now agree only as well as the two people who wrote them happened to agree. Backtest&ndash;live parity's real saving is not runtime speed; it is deleting that second specification, and the translation bugs that come with it, entirely.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 230" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="16" font-size="11" font-weight="600" fill="#1F2C38">ONLY THE TOP CHANGES</text>
+  <rect x="40" y="26" width="290" height="66" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="185" y="50" font-size="11" font-weight="700" text-anchor="middle" fill="#3A56C5">BACKTEST</text>
+  <text x="185" y="68" font-size="9.5" text-anchor="middle" fill="#4A5A68">historical prices, a simulated fill</text>
+  <rect x="390" y="26" width="290" height="66" rx="9" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="535" y="50" font-size="11" font-weight="700" text-anchor="middle" fill="#8A6D00">LIVE</text>
+  <text x="535" y="68" font-size="9.5" text-anchor="middle" fill="#4A5A68">a broker feed, a real fill</text>
+  <path d="M185 92 V126" stroke="#4A5A68" stroke-width="1.7" marker-end="url(#s7a)"/>
+  <path d="M535 92 V126" stroke="#4A5A68" stroke-width="1.7" marker-end="url(#s7a)"/>
+  <rect x="110" y="130" width="500" height="66" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="360" y="156" font-size="11.5" font-weight="700" text-anchor="middle" fill="#1F7A55">STRATEGY + PORTFOLIO &#8212; UNCHANGED CODE</text>
+  <text x="360" y="176" font-size="9.5" text-anchor="middle" fill="#4A5A68">MarketEvent &#8594; OrderEvent &#8594; FillEvent, the same three classes</text>
+  <text x="360" y="216" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">Only the box on top changes; the loop underneath never finds out.</text>
+  <defs><marker id="s7a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#4A5A68"/></marker></defs>
+</svg>
+<figcaption>fig 6.3.7 &#8212; the same strategy and portfolio code, two different worlds above it</figcaption>
+</figure>
+
+<p>This is not a hypothetical benefit. NautilusTrader — the open-source engine <span class="xref soon" data-xref="15.2" data-auto="" title="Coming soon">Session 15.2 — Backtest-to-Live with NautilusTrader</span> is built around — states its core design goal in exactly these terms: the same strategy and execution-algorithm code runs across backtest and live systems, which is what removes the translation step (and the bugs it introduces) between "it worked in research" and "it works with real orders." <span class="xref soon" data-xref="15.1" data-auto="" title="Coming soon">Session 15.1 — Architecture of a Live Trading System</span> gives the production version of this diagram a proper name — order management system, execution management system — but the shape is the one you just built.</p>
+
+<div class="co tip"><span class="co-t">💡 Looking ahead</span>
+<p><span class="xref soon" data-xref="15.1" data-auto="" title="Coming soon">Session 15.1 — Architecture of a Live Trading System</span> names every part of this loop properly and adds the pieces a production system needs beyond a backtest (reconciliation, retries, a kill switch). <span class="xref soon" data-xref="15.2" data-auto="" title="Coming soon">Session 15.2 — Backtest-to-Live with NautilusTrader</span> then takes this exact idea — one strategy class, two worlds — and runs it for real, against a paper account, in NautilusTrader.</p>
+</div>
+</section>
+
+<section id="s8">
+<h2><span class="no">6.3.8</span> Try it</h2>
+<p class="lede">Watch the two engines agree, then make them disagree on purpose — breaking something correctly on purpose is one of the fastest ways to trust that it was doing anything at all.</p>
+
+<p>Reading a passing assertion tells you the code ran; it does not tell you the assertion was testing what you think it was testing. The two exercises below are the same check run in both directions: first confirm the agreement is as exact as claimed, then remove the one line responsible for the stop's protection and watch the specific number it protects collapse. If a change to a single, named line doesn't move the one number it should move, the line was not doing what the comments said.</p>
+
+<div class="co lab"><span class="co-t">🔧 Try it (12 min, in the lab)</span>
+<p>Open <code>labs/u06/<wbr>s03_event_driven_<wbr>backtester.py</code> and run Part 2. Confirm for yourself that <code>parity_max_abs_diff</code> is on the order of 1e-15, not 1e-3 — that is the difference between "these agree" and "these are close." Then, in <code>run_event_loop</code>, comment out the line that checks the resting stop before deciding a new order (<code>stop_fill = execution.check_resting_stop(...)</code>) and re-run Part 3. Watch <code>illustrative_final_protected</code> collapse toward <code>illustrative_final_unprotected</code> — you have just turned the stop into a decoration that never fires, by breaking the one line that makes it real. Put the line back before you move on.</p>
+</div>
+</section>
+
+<hr>
+
+<section id="s9">
+<h2><span class="no">6.3.9</span> Glossary · Check yourself · Go deeper</h2>
+<div class="gloss" id="glossary">
+<div id="g-event-driven-backtest"><b>event-driven backtest</b> — a historical simulation that replays market data one event at a time through the same strategy, order, fill and portfolio code a live system uses, instead of computing the whole history as arrays at once.</div>
+<div id="g-event-loop"><b>event loop</b> — the loop that pops the next event off a queue, hands it to whatever reacts to that type, and keeps going until the queue is empty.</div>
+<div id="g-order"><b>order</b> — an object recording what the strategy wants to trade: a side, a type, and any trigger price. A request, not yet a trade.</div>
+<div id="g-fill"><b>fill</b> — an object recording that an order actually executed: the price, the quantity, and any commission.</div>
+<div id="g-portfolio-state"><b>portfolio state</b> — the running record of cash, shares held and mark-to-market equity, changed only by a fill and re-priced by every market event.</div>
+<div id="g-backtest-live-parity"><b>backtest&ndash;live parity</b> — using the same strategy, order, fill and portfolio code in backtest and in live trading, so only the data source and the execution handler change.</div>
+</div>
+
+<h3>Check yourself</h3>
+<details class="q"><summary>1. You have swept 5,000 parameter combinations overnight with <span class="xref soon" data-xref="6.2" data-style="short" data-auto="" title="Coming soon">Session 6.2</span>'s vectorized backtester. A colleague asks you to also test each position carrying a 5% trailing stop. Should you bolt the stop onto the vectorized sweep, or reach for the event loop?</summary><div>The event loop. A trailing stop needs to remember the running extreme price and whether it has already fired — state carried from tick to tick — which an array of shifted columns has nowhere to hold. Keep the plain sweep (no stop) vectorized; add the event loop only for the run that needs path-dependent state.</div></details>
+<details class="q"><summary>2. In §6.3.2's loop, why must the fill from a decision made while processing day t&minus;1's tick be applied before day t's market event marks the portfolio? What would §6.3.4's parity check show if you got this backwards?</summary><div>Day t's return belongs to whatever position was decided using data through day t&minus;1 — that position must already be in place before day t's price is marked, or the wrong day earns the wrong return. Get the order backwards and <code>parity_max_abs_diff</code> stops being floating-point noise (~1e&#8722;15) and becomes a real, visible mismatch against the vectorized answer — exactly the kind of bug an exact-agreement test exists to catch.</div></details>
+<details class="q"><summary>3. Your strategy emits an OrderEvent to buy, and the process crashes before a FillEvent is produced. What does the portfolio's state show, and why does that matter operationally?</summary><div>Cash and shares are exactly what they were before &#8212; the portfolio only changes on a FillEvent, never on an order alone, because an order is a request that can be rejected, partially filled, or lost. That separation is why a real order management system tracks working orders separately from the position: it must never assume a trade happened until a fill confirms it.</div></details>
+<details class="q"><summary>4. Two students each write an event loop. Student A's Strategy class takes the full price array in its constructor; Student B's only receives <code>event.price</code> inside a market-event handler. Whose design can silently reintroduce look-ahead bias, and how would you catch it in review?</summary><div>Student A's. Holding the whole array lets the strategy index ahead of the current tick, and the resulting equity curve can still look completely plausible &#8212; a look-ahead bug usually makes results look better, not obviously wrong. You catch it by reading the constructor signature in review, not by trusting the numbers.</div></details>
+<details class="q"><summary>5. <span class="xref soon" data-xref="15.2" data-style="short" data-auto="" title="Coming soon">Session 15.2</span> will point a live broker feed at classes built in this lab. Which pieces stay untouched, and which must be swapped?</summary><div>The <code>MarketEvent</code>/<code>OrderEvent</code>/<code>FillEvent</code> types and the strategy and portfolio logic stay exactly as written. What changes is where <code>MarketEvent</code>s come from (a stored price array vs. a live socket) and what turns an <code>OrderEvent</code> into a <code>FillEvent</code> (a simulator vs. a real broker API) &#8212; that swap, and nothing else, is backtest&ndash;live parity.</div></details>
+
+<div class="co lab"><span class="co-t">🔧 Homework (~1 h before Session 6.4)</span>
+<p>1. In the lab, change <code>STOP_PCT</code> from 0.08 to 0.04 and re-run Parts 3&ndash;4. Report the new trigger rate, miss rate and overshoot gap — does a tighter stop make the close-only miss problem better or worse, and can you explain why in one sentence?<br>
+2. Change <code>FINE_PER_DAY</code> from 12 to 4 (a coarser intraday grid) and re-run Part 4. Does the gap between checking every tick and checking at the close grow or shrink — and why does the fine engine's own precision matter to that answer?<br>
+3. Read <span class="xref soon" data-xref="6.4" data-auto="" title="Coming soon">Session 6.4 — The Bias Hall of Fame</span>'s goal in the roadmap before class: the biases it demonstrates apply equally whether the backtester underneath is vectorized or event-driven — the architecture in this session does not, by itself, protect you from any of them.</p>
+</div>
+
+<h3>📚 Go deeper</h3>
+<ol class="refs">
+<li>Hohpe, G. &amp; Woolf, B. (2003). <em>Enterprise Integration Patterns: Designing, Building, and Deploying Messaging Solutions.</em> Addison-Wesley. <span class="rid">ISBN 0-321-20068-3</span></li>
+<li>QuantStart. "Event-Driven Backtesting with Python" (series). <span class="rid">https://www.quantstart.com/articles/Event-Driven-Backtesting-with-Python-Part-I/</span></li>
+<li>NautilusTrader documentation. <span class="rid">https://nautilustrader.io/docs/</span></li>
+</ol>
+
+<h3>Sources for the numbers</h3>
+<ol class="refs">
+<li>NautilusTrader. GitHub repository README, accessed September 2026 &#8212; source for the quoted design claim in &#167;6.3.7 that the same strategy and execution-algorithm code runs across backtest and live systems. <span class="rid">https://github.com/nautechsystems/nautilus_trader</span></li>
+</ol>
+</section>
+
+<!-- nav:foot -->
+<div class="foot">
+<span class="soon" title="Coming soon">← Prev: 6.2 · Vectorized Backtest</span>
+<span class="soon" title="Coming soon">Next: 6.4 · Bias Hall of Fame →</span>
+</div>
+<p class="legal">Educational material only — not investment, legal or tax advice. Backtests and simulations are hypothetical. <a href="../start-here.html#disclaimer">Disclaimer</a> · Text CC BY 4.0 · Code MIT.</p>
+<!-- /nav:foot -->
+</main>
+</div></body></html>

@@ -1,0 +1,38 @@
+<svg viewBox="0 0 720 280" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Estimated vs true half-life, four settings, 5 years of daily data">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">ESTIMATED VS TRUE HALF-LIFE, FOUR SETTINGS, 5 YEARS OF DAILY DATA</text>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#4A5A68" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">true half-life</text>
+  <line x1="159.60000000000002" y1="32" x2="175.60000000000002" y2="32" stroke="#3A56C5" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="181.60000000000002" y="36" font-size="11" fill="#4A5A68">estimated (mean of 400 fits)</text>
+  <line x1="64" y1="236" x2="690" y2="236" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="240" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0 d</text>
+  <line x1="64" y1="191" x2="690" y2="191" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="195" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">20 d</text>
+  <line x1="64" y1="146" x2="690" y2="146" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="150" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">40 d</text>
+  <line x1="64" y1="101" x2="690" y2="101" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="105" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">60 d</text>
+  <line x1="64" y1="56" x2="690" y2="56" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="60" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">80 d</text>
+  <line x1="64" y1="236" x2="690" y2="236" stroke="#C9CFC6" stroke-width="1"/>
+  <path d="M117.2,236 V228.8 Q117.2,224.8 121.2,224.8 H137.2 Q141.2,224.8 141.2,228.8 V236 Z" fill="#4A5A68"><title>5 d · true half-life: 5 d</title></path>
+  <text x="129.2" y="218.8" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">5 d</text>
+  <path d="M143.2,236 V228.9 Q143.2,224.9 147.2,224.9 H163.2 Q167.2,224.9 167.2,228.9 V236 Z" fill="#3A56C5"><title>5 d · estimated (mean of 400 fits): 5 d</title></path>
+  <text x="155.2" y="218.9" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">5 d</text>
+  <text x="142.2" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">5 d</text>
+  <path d="M273.8,236 V217.5 Q273.8,213.5 277.8,213.5 H293.8 Q297.8,213.5 297.8,217.5 V236 Z" fill="#4A5A68"><title>10 d · true half-life: 10 d</title></path>
+  <text x="285.8" y="207.5" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">10 d</text>
+  <path d="M299.8,236 V218.1 Q299.8,214.1 303.8,214.1 H319.8 Q323.8,214.1 323.8,218.1 V236 Z" fill="#3A56C5"><title>10 d · estimated (mean of 400 fits): 10 d</title></path>
+  <text x="311.8" y="208.1" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">10 d</text>
+  <text x="298.8" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">10 d</text>
+  <path d="M430.2,236 V195 Q430.2,191 434.2,191 H450.2 Q454.2,191 454.2,195 V236 Z" fill="#4A5A68"><title>20 d · true half-life: 20 d</title></path>
+  <text x="442.2" y="185" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">20 d</text>
+  <path d="M456.2,236 V197.5 Q456.2,193.5 460.2,193.5 H476.2 Q480.2,193.5 480.2,197.5 V236 Z" fill="#3A56C5"><title>20 d · estimated (mean of 400 fits): 19 d</title></path>
+  <text x="468.2" y="187.5" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">19 d</text>
+  <text x="455.2" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">20 d</text>
+  <path d="M586.8,236 V105 Q586.8,101 590.8,101 H606.8 Q610.8,101 610.8,105 V236 Z" fill="#4A5A68"><title>60 d · true half-life: 60 d</title></path>
+  <text x="598.8" y="95" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">60 d</text>
+  <path d="M612.8,236 V122.3 Q612.8,118.3 616.8,118.3 H632.8 Q636.8,118.3 636.8,122.3 V236 Z" fill="#3A56C5"><title>60 d · estimated (mean of 400 fits): 52 d</title></path>
+  <text x="624.8" y="112.3" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">52 d</text>
+  <text x="611.8" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">60 d</text>
+</svg>

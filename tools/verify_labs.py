@@ -32,7 +32,26 @@ REL_TOL, ABS_TOL = 1e-6, 1e-9
 # excluded from the committed-value check entirely. The lab's own live assert on the same
 # quantity (dvol_bp < 0.1, max_dw < 1e-2) still runs on every verify and is what actually guards
 # against a real regression.
-NONDETERMINISTIC_KEYS = ("_scs_dvol_bp", "_scs_dw", "_scs_minw")
+NONDETERMINISTIC_KEYS = (
+    "_scs_dvol_bp", "_scs_dw", "_scs_minw",
+    # Session 4.5's three write-timing keys (seconds, no "_ms" suffix): see the note below.
+    "t_write_csv", "t_write_mono_parquet", "t_write_partitioned_parquet",
+)
+
+# Wall-clock timing benchmarks (Session 4.5's storage-stack comparison: naive CSV vs Parquet vs
+# DuckDB vs polars) vary with disk cache state and machine load, especially on a shared CI runner —
+# by design, not by bug. Match only the deliberate "_ms" duration suffix and the "speedup_"/
+# "slowdown_" ratio prefix (checked against every other lab's keys — some legitimately use a bare
+# "t_" prefix for the Student-t distribution or a period count, which must stay strictly checked).
+# The lab's own directional asserts (e.g. `t_duckdb < t_naive_csv / 5`) still run on every verify.
+NONDETERMINISTIC_SUFFIXES = ("_ms",)
+NONDETERMINISTIC_PREFIXES = ("speedup_", "slowdown_")
+
+
+def is_nondeterministic(key: str) -> bool:
+    return (any(s in key for s in NONDETERMINISTIC_KEYS)
+            or key.endswith(NONDETERMINISTIC_SUFFIXES)
+            or key.startswith(NONDETERMINISTIC_PREFIXES))
 
 
 def changed_sessions(course: Course) -> set[str]:
@@ -55,7 +74,7 @@ def compare(old: dict, new: dict) -> list[str]:
             problems.append(f"{key}: missing after re-run")
         elif key not in old:
             problems.append(f"{key}: new result not committed")
-        elif any(s in key for s in NONDETERMINISTIC_KEYS):
+        elif is_nondeterministic(key):
             pass  # present on both sides; value is allowed to vary run to run (see above)
         else:
             a, b = old[key], new[key]

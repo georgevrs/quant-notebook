@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- nav:head -->
+<title>6.7 · Overfitting Statistics: PSR, DSR, MinTRL &amp; PBO</title>
+<meta name="description" content="The probabilistic and deflated Sharpe ratios, minimum track record length, and the probability of backtest overfitting — how to price in the number of things you tried.">
+<link rel="canonical" href="https://georgevrs.github.io/quant-notebook/unit06-backtesting-discipline/session07-overfitting-statistics.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Quant Notebook">
+<meta property="og:title" content="6.7 · Overfitting Statistics: PSR, DSR, MinTRL &amp; PBO">
+<meta property="og:description" content="The probabilistic and deflated Sharpe ratios, minimum track record length, and the probability of backtest overfitting — how to price in the number of things you tried.">
+<meta property="og:url" content="https://georgevrs.github.io/quant-notebook/unit06-backtesting-discipline/session07-overfitting-statistics.html">
+<meta name="twitter:card" content="summary">
+<link rel="stylesheet" href="../assets/brand.css">
+<link rel="stylesheet" href="../assets/temml.css">
+<!-- /nav:head -->
+</head>
+<body><div class="page" id="top">
+<!-- nav:tabs -->
+<nav class="tabs">
+<a href="../index.html">⌂ Course home</a>
+<span class="soon" title="Coming soon">6.1 · What a Backtest Is</span>
+<span class="soon" title="Coming soon">6.2 · Vectorized Backtest</span>
+<span class="soon" title="Coming soon">6.3 · Event-Driven</span>
+<span class="soon" title="Coming soon">6.4 · Bias Hall of Fame</span>
+<span class="soon" title="Coming soon">6.5 · Costs &amp; Capacity</span>
+<span class="soon" title="Coming soon">6.6 · Validation</span>
+<a class="active" href="session07-overfitting-statistics.html">6.7 · Overfitting Stats</a>
+<span class="soon" title="Coming soon">6.8 · Lab: Protocol</span>
+<a href="../roadmap.html">🗺 Roadmap</a>
+</nav>
+<!-- /nav:tabs -->
+
+<header class="cover">
+<!-- nav:heading -->
+<p class="eyebrow">Unit 6 · Backtesting &amp; Research Discipline — Session 07 of 08</p>
+<h1>Overfitting Statistics: PSR, DSR, MinTRL &amp; PBO</h1>
+<!-- /nav:heading -->
+<p class="subtitle">A backtest's Sharpe ratio is a lucky guess until you price in how many you tried, how long you watched, and how it was chosen. This session builds four numbers that do exactly that pricing — the probabilistic Sharpe ratio, the minimum track record length, the deflated Sharpe ratio and the probability of backtest overfitting — and proves each one from its published formula. <mark>The core move: a Sharpe ratio without its trial count is not a number, it is a claim.</mark></p>
+<div class="meta">
+<span>DURATION <b>1.5 h + lab</b></span>
+<span>LEVEL <b>Intermediate</b></span>
+<span>TRACKS <b>QR · QT · QD · IND</b></span>
+<span>HANDS-ON <b>Deflate a lucky best-of-1,000 Sharpe ratio back toward the truth</b></span>
+</div>
+<!-- nav:labstrip -->
+<div class="labstrip"><b>📓 Companion lab</b>
+<a href="https://colab.research.google.com/github/georgevrs/quant-notebook/blob/main/labs/u06/s07_overfitting_statistics.ipynb">Open in Colab</a>
+<a href="https://github.com/georgevrs/quant-notebook/blob/main/labs/u06/s07_overfitting_statistics.ipynb">Notebook on GitHub</a>
+<a href="https://github.com/georgevrs/quant-notebook/blob/main/labs/u06/s07_overfitting_statistics.py">Source (.py)</a>
+</div>
+<!-- /nav:labstrip -->
+<div class="toc">
+<b>On this page</b>
+<ol>
+<li><a href="#s1">A Sharpe ratio is an estimate, not a fact</a></li>
+<li><a href="#s2">How it works: pricing in the checks — and how long is long enough</a></li>
+<li><a href="#s3">Deflating for the number of trials</a></li>
+<li><a href="#s4">When you don't know N: PBO and CSCV</a></li>
+<li><a href="#s5">Where people go wrong</a></li>
+<li><a href="#s6">Try it</a></li>
+<li><a href="#s7">Glossary · Check yourself · Go deeper</a></li>
+</ol>
+</div>
+</header>
+
+<main>
+
+<section id="s1">
+<h2><span class="no">6.7.1</span> A Sharpe ratio is an estimate, not a fact</h2>
+<p class="lede">Every reported <a class="term" href="../unit02-markets-instruments/session03-returns-pnl-leverage.html#g-sharpe-ratio" data-term="Sharpe ratio">Sharpe ratio</a> is one noisy draw. This section turns that draw into a probability, using the shape of the returns themselves — not just their average.</p>
+
+<p><span class="xref soon" data-xref="5.2" data-auto="" title="Coming soon">Session 5.2 — Regression &amp; Inference That Doesn&#x27;t Lie</span> already gave you the <span class="term soon" data-term="standard error of the Sharpe ratio" title="Defined in Session 5.2 (coming soon)">standard error of the Sharpe ratio</span>: under Lo's (2002) assumptions (returns close to normal, independent across time), an annualised Sharpe ratio estimated from <span data-lab="years_single" data-fmt="d">5</span> years of daily data carries real sampling noise. The <strong>probabilistic Sharpe ratio</strong> (PSR) generalises that one step further: instead of assuming normal returns, it asks the question directly — given exactly what this track record's returns look like, what is the probability that the <em>true</em> Sharpe ratio clears a benchmark <span class="nowrap"><math><semantics><msup><mpadded lspace="0"><mi>SR</mi></mpadded><mo form="prefix" stretchy="false">∗</mo></msup><annotation encoding="application/x-tex">\SR^*</annotation></semantics></math></span> (often 0)? All of this session's returns are synthetic excess returns; the risk-free rate is taken as 0 throughout.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 232" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <rect x="20" y="14" width="680" height="202" rx="12" fill="#fff" stroke="#1F2C38" stroke-width="1.5"/>
+  <text x="40" y="40" font-size="12" fill="#4A5A68" font-family="IBM Plex Mono,monospace">WHAT DETERMINES YOUR CONFIDENCE IN A SHARPE RATIO</text>
+  <rect x="45" y="58" width="140" height="112" rx="8" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="115" y="90" font-size="14" font-weight="600" text-anchor="middle" fill="#3A56C5">T</text>
+  <text x="115" y="112" font-size="10.5" text-anchor="middle" fill="#4A5A68">periods observed —</text>
+  <text x="115" y="126" font-size="10.5" text-anchor="middle" fill="#4A5A68">more data, tighter σ</text>
+  <rect x="210" y="58" width="140" height="112" rx="8" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="280" y="90" font-size="14" font-weight="600" text-anchor="middle" fill="#1F7A55">skew(R)</text>
+  <text x="280" y="112" font-size="10.5" text-anchor="middle" fill="#4A5A68">asymmetry —</text>
+  <text x="280" y="126" font-size="10.5" text-anchor="middle" fill="#4A5A68">crash risk widens σ</text>
+  <rect x="375" y="58" width="140" height="112" rx="8" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="445" y="90" font-size="14" font-weight="600" text-anchor="middle" fill="#8A6D00">kurt(R)</text>
+  <text x="445" y="112" font-size="10.5" text-anchor="middle" fill="#4A5A68">tail weight —</text>
+  <text x="445" y="126" font-size="10.5" text-anchor="middle" fill="#4A5A68">fat tails widen σ</text>
+  <rect x="540" y="58" width="140" height="112" rx="8" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="610" y="90" font-size="14" font-weight="600" text-anchor="middle" fill="#D64B2A">SR*</text>
+  <text x="610" y="112" font-size="10.5" text-anchor="middle" fill="#4A5A68">the bar you must</text>
+  <text x="610" y="126" font-size="10.5" text-anchor="middle" fill="#4A5A68">clear to count as skill</text>
+  <text x="360" y="150" font-size="9.5" text-anchor="middle" fill="#4A5A68">↓ combine into one standard deviation σ(ŜR), then one Z-score ↓</text>
+  <text x="360" y="200" font-size="12" text-anchor="middle" fill="#4A5A68" font-style="italic">PSR is that Z-score run through the normal CDF: a single probability.</text>
+</svg>
+<figcaption>fig 6.7.1 — the four ingredients PSR combines into one probability</figcaption>
+</figure>
+
+<p>Bailey &amp; López de Prado (2012) give the standard deviation of the Sharpe ratio estimator as a function of the sample's own <a class="term" href="../unit03-math-toolkit/session02-distributions-fat-tails.html#g-skewness" data-term="skewness">skewness</a> and <a class="term" href="../unit03-math-toolkit/session02-distributions-fat-tails.html#g-kurtosis" data-term="kurtosis">kurtosis</a> — raw kurtosis, in Session 3.2's convention, so a normal distribution scores 3, not 0. Writing <math><semantics><mover><mpadded lspace="0"><mi>SR</mi></mpadded><mo stretchy="true" class="tml-hat-3" style="math-depth:0;">ˆ</mo></mover><annotation encoding="application/x-tex">\widehat{\SR}</annotation></semantics></math> for the estimated <strong>per-period</strong> Sharpe ratio and <math><semantics><mi>T</mi><annotation encoding="application/x-tex">T</annotation></semantics></math> for the number of periods:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><mover><mrow><mi>P</mi><mi>S</mi><mi>R</mi></mrow><mo stretchy="true" class="tml-hat-4" style="math-depth:0;">ˆ</mo></mover><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><msup><mpadded lspace="0"><mi>SR</mi></mpadded><mo form="prefix" stretchy="false">∗</mo></msup><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mo>=</mo><mrow><mi mathvariant="normal">Φ</mi><mspace></mspace></mrow><mrow style="margin-left:-0.1667em;"></mrow><mrow><mo fence="true" form="prefix" stretchy="true">(</mo><mfrac><mrow><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mover><mpadded lspace="0"><mi>SR</mi></mpadded><mo stretchy="true" class="tml-hat-3" style="math-depth:0;">ˆ</mo></mover><mo>−</mo><msup><mpadded lspace="0"><mi>SR</mi></mpadded><mo form="prefix" stretchy="false">∗</mo></msup><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><msqrt><mi>T</mi></msqrt></mrow><msqrt><mrow><mn>1</mn><mo>−</mo><mtext>skew</mtext><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>R</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mspace width="0.1667em"></mspace><mover><mpadded lspace="0"><mi>SR</mi></mpadded><mo stretchy="true" class="tml-hat-3" style="math-depth:0;">ˆ</mo></mover><mo>+</mo><mfrac><mrow><mtext>kurt</mtext><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>R</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mo>−</mo><mn>1</mn></mrow><mn>4</mn></mfrac><msup><mover><mpadded lspace="0"><mi>SR</mi></mpadded><mo stretchy="true" class="tml-hat-3" style="math-depth:0;">ˆ</mo></mover><mn>2</mn></msup></mrow></msqrt></mfrac><mo fence="true" form="postfix" stretchy="true">)</mo></mrow></mrow><annotation encoding="application/x-tex">\widehat{PSR}(\SR^*) = \Phi\!\left(\frac{(\widehat{\SR}-\SR^*)\sqrt{T}}{\sqrt{1 - \text{skew}(R)\,\widehat{\SR} + \frac{\text{kurt}(R)-1}{4}\widehat{\SR}^2}}\right)</annotation></semantics></math></div>
+<p>where <math><semantics><mrow><mi mathvariant="normal">Φ</mi><mspace></mspace></mrow><annotation encoding="application/x-tex">\Phi</annotation></semantics></math> is the standard normal CDF. Set <math><semantics><mrow><mtext>skew</mtext><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>R</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mo>=</mo><mn>0</mn></mrow><annotation encoding="application/x-tex">\text{skew}(R)=0</annotation></semantics></math> and <math><semantics><mrow><mtext>kurt</mtext><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>R</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mo>=</mo><mn>3</mn></mrow><annotation encoding="application/x-tex">\text{kurt}(R)=3</annotation></semantics></math> (a normal distribution) and the denominator becomes <math><semantics><msqrt><mrow><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mn>1</mn><mo>+</mo><msup><mover><mpadded lspace="0"><mi>SR</mi></mpadded><mo stretchy="true" class="tml-hat-3" style="math-depth:0;">ˆ</mo></mover><mn>2</mn></msup><mi>/</mi><mn>2</mn><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mi>/</mi><mi>T</mi></mrow></msqrt><annotation encoding="application/x-tex">\sqrt{(1+\widehat{\SR}^2/2)/T}</annotation></semantics></math> — exactly Session 5.2's Lo (2002) formula. The lab checks this line by line: Lo's formula gives a per-period standard error of <span data-lab="sigma_lo_se" data-fmt=".4f">0.0257</span>, and PSR's own formula at <math><semantics><mrow><mtext>skew</mtext><mo>=</mo><mn>0</mn><mo separator="true">,</mo><mtext> </mtext><mtext>kurt</mtext><mo>=</mo><mn>3</mn></mrow><annotation encoding="application/x-tex">\text{skew}=0,\ \text{kurt}=3</annotation></semantics></math> gives <span data-lab="sigma_psr_normal" data-fmt=".4f">0.0257</span> — identical, because it is the same formula wearing a more general coat. <strong>Probabilistic Sharpe ratio</strong> is the name for that coat: a Z-score run through the normal CDF, using the sample's own skewness and kurtosis instead of assuming them away.</p>
+
+<p>PSR reads like a Bayesian statement — "the probability the true Sharpe ratio exceeds zero" — but the calculation behind it is entirely frequentist: it treats the estimator <math><semantics><mover><mpadded lspace="0"><mi>SR</mi></mpadded><mo stretchy="true" class="tml-hat-3" style="math-depth:0;">ˆ</mo></mover><annotation encoding="application/x-tex">\widehat{\SR}</annotation></semantics></math> as approximately normal around the unknown true Sharpe ratio, with the standard deviation the formula above computes, and asks how much of that normal curve sits above <math><semantics><msup><mpadded lspace="0"><mi>SR</mi></mpadded><mo form="prefix" stretchy="false">∗</mo></msup><annotation encoding="application/x-tex">\SR^*</annotation></semantics></math>. It is the same plug-in logic as any Z-test; the honest reading is "a track record this good would arise this often under the null," dressed in more useful language. PSR is not a substitute for asking whether the strategy's story makes sense in the first place — <a class="xref" href="../unit01-quant-landscape/session03-research-lifecycle.html#s2" data-xref="1.3#s2" data-style="short" data-auto="">Session 1.3</a>'s three questions (who pays you, why, and why does it persist) come first, and no amount of statistical confidence repairs a strategy with no answer to them.</p>
+
+<p>One honestly-reported track record makes this concrete: <span data-lab="years_single" data-fmt="d">5</span> years of daily returns from <code>quantnb.synth.jump_diffusion_returns</code> (Session 3.2's compensated-crash generator — rare down-jumps, drift adjusted so the expected growth rate is unaffected), calibrated to a true annual Sharpe of 0.6. The sample shows an annualised Sharpe of <span data-lab="sr_annual_hat" data-fmt=".2f">0.12</span> (five years is not a lot of data — §6.7.2 below quantifies exactly how little), skewness <span data-lab="skew_hat" data-fmt=".2f">−0.85</span> and kurtosis <span data-lab="kurt_hat" data-fmt=".2f">6.09</span> — visibly negative and visibly fat, the shape a strategy with occasional bad days actually has. Its own PSR(0) is <span data-lab="psr_actual" data-fmt=".2%">60.29%</span>; assuming (wrongly) that its returns were normal would have reported <span data-lab="psr_if_normal" data-fmt=".2%">60.32%</span> instead — barely different, because at <strong>daily</strong> frequency <math><semantics><mover><mpadded lspace="0"><mi>SR</mi></mpadded><mo stretchy="true" class="tml-hat-3" style="math-depth:0;">ˆ</mo></mover><annotation encoding="application/x-tex">\widehat{\SR}</annotation></semantics></math> (the per-period figure) is tiny, and both the skewness and the <math><semantics><msup><mover><mpadded lspace="0"><mi>SR</mi></mpadded><mo stretchy="true" class="tml-hat-3" style="math-depth:0;">ˆ</mo></mover><mn>2</mn></msup><annotation encoding="application/x-tex">\widehat{\SR}^2</annotation></semantics></math> term it multiplies are small next to the "1" in the square root.</p>
+
+<table>
+<thead><tr><th>Reporting frequency</th><th>Periods (T)</th><th>PSR, this shape</th><th>PSR, if normal</th><th>Gap</th></tr></thead>
+<tbody>
+<tr><td>Daily</td><td>1,260</td><td><span data-lab="freq_psr_actual_daily" data-fmt=".1%">98.5%</span></td><td><span data-lab="freq_psr_normal_daily" data-fmt=".1%">98.7%</span></td><td><span data-lab="freq_gap_daily" data-fmt=".1%">0.2%</span></td></tr>
+<tr><td>Monthly</td><td>60</td><td><span data-lab="freq_psr_actual_monthly" data-fmt=".1%">97.3%</span></td><td><span data-lab="freq_psr_normal_monthly" data-fmt=".1%">98.6%</span></td><td><span data-lab="freq_gap_monthly" data-fmt=".1%">1.3%</span></td></tr>
+<tr><td>Annual</td><td>5</td><td><span data-lab="freq_psr_actual_annual" data-fmt=".1%">89.7%</span></td><td><span data-lab="freq_psr_normal_annual" data-fmt=".1%">96.6%</span></td><td><span data-lab="freq_gap_annual" data-fmt=".1%">6.9%</span></td></tr>
+</tbody>
+</table>
+
+<p>That table holds this strategy's measured shape fixed and asks only how the correction's bite changes if the same 5-year span were instead rated from monthly or annual observations (fewer, coarser periods, same shape) — an illustration of the formula's own sensitivity, not a claim about how real returns actually aggregate. At daily frequency the correction rounds to nothing; at annual frequency, confidence drops from a comfortable <span data-lab="freq_psr_normal_annual" data-fmt=".0%">97%</span> under the (wrong) normal assumption to a shakier <span data-lab="freq_psr_actual_annual" data-fmt=".0%">90%</span> once the real shape counts. This is exactly why Bailey &amp; López de Prado recommend rating a track record at the highest frequency the data allows: it makes the normal approximation nearly exact.</p>
+
+<p>This creates a perverse incentive, because coarser reporting is also the industry norm — chosen for readability, not statistics. A fund that only ever shows monthly or annual numbers needs a much larger true edge before the same PSR is honest, precisely because it has denied itself the frequency that would make the normal approximation safe. When you can choose your own reporting frequency, use the highest one your data supports; when you can't — an annual letter is all a manager will show you — treat the confidence on offer as optimistic until you see the number recomputed at a finer grain.</p>
+
+<div class="co key"><span class="co-t">📌 Key idea — PSR is a probability, not a p-value trick</span>
+<p>PSR(0) is literally "P(true Sharpe ratio &gt; 0), given this track record." It is not a hypothesis-test p-value in disguise, and it is not corrected for anything you tried beside this one track record — that correction is §6.7.3's job. <mark>PSR alone answers "is this one number believable"; it cannot answer "how many numbers did you look at before choosing this one."</mark></p>
+</div>
+</section>
+
+<section id="s2">
+<h2><span class="no">6.7.2</span> How it works: pricing in the checks — and how long is long enough</h2>
+<p class="lede">Four statistics, four different questions. Before the formulas, the map of which one you reach for and why.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 260" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="20" y="20" font-size="11" font-weight="600" fill="#1F2C38">PRICING IN WHAT YOU TRIED — one track record, five checks</text>
+  <rect x="20" y="40" width="124" height="66" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="82" y="66" font-size="10.5" text-anchor="middle" fill="#3A56C5" font-weight="600">1 · RAW SHARPE</text>
+  <text x="82" y="83" font-size="9" text-anchor="middle" fill="#4A5A68">one estimate,</text>
+  <text x="82" y="95" font-size="9" text-anchor="middle" fill="#4A5A68">T periods</text>
+  <rect x="160" y="40" width="124" height="66" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="222" y="66" font-size="10.5" text-anchor="middle" fill="#3A56C5" font-weight="600">2 · PSR §6.7.1</text>
+  <text x="222" y="83" font-size="9" text-anchor="middle" fill="#4A5A68">P(true SR</text>
+  <text x="222" y="95" font-size="9" text-anchor="middle" fill="#4A5A68">&gt; benchmark)</text>
+  <rect x="300" y="40" width="124" height="66" rx="9" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="362" y="66" font-size="10.5" text-anchor="middle" fill="#8A6D00" font-weight="600">3 · MinTRL</text>
+  <text x="362" y="83" font-size="9" text-anchor="middle" fill="#4A5A68">was T even</text>
+  <text x="362" y="95" font-size="9" text-anchor="middle" fill="#4A5A68">enough? · GATE</text>
+  <rect x="440" y="40" width="124" height="66" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="502" y="66" font-size="10.5" text-anchor="middle" fill="#3A56C5" font-weight="600">4 · DSR §6.7.3</text>
+  <text x="502" y="83" font-size="9" text-anchor="middle" fill="#4A5A68">priced for</text>
+  <text x="502" y="95" font-size="9" text-anchor="middle" fill="#4A5A68">N trials</text>
+  <rect x="580" y="40" width="120" height="66" rx="9" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="640" y="66" font-size="10.5" text-anchor="middle" fill="#8A6D00" font-weight="600">5 · GO/NO-GO</text>
+  <text x="640" y="83" font-size="9" text-anchor="middle" fill="#4A5A68">the memo,</text>
+  <text x="640" y="95" font-size="9" text-anchor="middle" fill="#4A5A68">§6.8</text>
+  <rect x="378" y="190" width="166" height="60" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="461" y="212" font-size="10.5" text-anchor="middle" fill="#1F7A55" font-weight="600">PBO via CSCV §6.7.4</text>
+  <text x="461" y="229" font-size="9" text-anchor="middle" fill="#4A5A68">one dataset, many parameter</text>
+  <text x="461" y="241" font-size="9" text-anchor="middle" fill="#4A5A68">fits — no independent N</text>
+  <path d="M144 73 H157" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M284 73 H297" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M424 73 H437" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M564 73 H577" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M82 106 V150 H461 V187" stroke="#3A56C5" stroke-width="1.5" stroke-dasharray="5 4" fill="none" marker-end="url(#s2b)"/>
+  <text x="180" y="147" font-size="9" fill="#3A56C5" font-style="italic">…or a parameter sweep instead of N independent trials</text>
+  <path d="M544 218 H700 V106" stroke="#1F7A55" stroke-width="1.7" fill="none" marker-end="url(#s2c)"/>
+  <defs>
+    <marker id="s2a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F2C38"/></marker>
+    <marker id="s2b" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#3A56C5"/></marker>
+    <marker id="s2c" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F7A55"/></marker>
+  </defs>
+</svg>
+<figcaption>fig 6.7.2 — the same track record, priced two ways: N independent trials (top) or one dataset fit many times (bottom)</figcaption>
+</figure>
+
+<table>
+<thead><tr><th>Statistic</th><th>Needs</th><th>Answers</th></tr></thead>
+<tbody>
+<tr><td>PSR</td><td>one track record (T, skewness, kurtosis)</td><td>is the true Sharpe ratio above a benchmark?</td></tr>
+<tr><td>MinTRL</td><td>a target Sharpe ratio and a confidence level</td><td>how long a track record would it take to prove it?</td></tr>
+<tr><td>DSR</td><td>PSR's inputs, plus N independent trials</td><td>…once you price in how many things you tried?</td></tr>
+<tr><td>PBO (via CSCV)</td><td>many parameterisations of one rule on one dataset</td><td>would the in-sample winner have looked average out of sample?</td></tr>
+</tbody>
+</table>
+
+<p>Read that table against <a class="xref" href="../unit01-quant-landscape/session03-research-lifecycle.html#s1" data-xref="1.3#s1" data-style="short" data-auto="">Session 1.3</a>'s research lifecycle. PSR and MinTRL are checks you can run on a single, pre-registered idea before it has competed with anything else — they belong at the validation gate even for N=1. DSR and PBO only make sense once a search has actually happened, which in practice is nearly always: a lookback window tuned, a threshold nudged, a universe narrowed. "Which one do I compute" usually reduces to "was there a search, and can I count it (DSR) or only resample it (PBO)?"</p>
+
+<p>Start with <strong>minimum track record length</strong> (MinTRL): the length of history, in periods, that a claimed Sharpe ratio <math><semantics><mover><mpadded lspace="0"><mi>SR</mi></mpadded><mo stretchy="true" class="tml-hat-3" style="math-depth:0;">ˆ</mo></mover><annotation encoding="application/x-tex">\widehat{\SR}</annotation></semantics></math> would need before <math><semantics><mrow><mover><mrow><mi>P</mi><mi>S</mi><mi>R</mi></mrow><mo stretchy="true" class="tml-hat-4" style="math-depth:0;">ˆ</mo></mover><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><msup><mpadded lspace="0"><mi>SR</mi></mpadded><mo form="prefix" stretchy="false">∗</mo></msup><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">\widehat{PSR}(\SR^*)</annotation></semantics></math> reaches a chosen confidence <math><semantics><mrow><mn>1</mn><mo>−</mo><mi>α</mi></mrow><annotation encoding="application/x-tex">1-\alpha</annotation></semantics></math>. It is PSR's own formula, solved for <math><semantics><mi>T</mi><annotation encoding="application/x-tex">T</annotation></semantics></math> instead of for a probability:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><mover><mrow><mi>M</mi><mi>i</mi><mi>n</mi><mi>T</mi><mi>R</mi><mi>L</mi></mrow><mo stretchy="true" class="tml-hat-4" style="math-depth:0;">ˆ</mo></mover><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><msup><mpadded lspace="0"><mi>SR</mi></mpadded><mo form="prefix" stretchy="false">∗</mo></msup><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mo>=</mo><mrow><mo fence="true" form="prefix" stretchy="true">(</mo><mn>1</mn><mo>−</mo><mtext>skew</mtext><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>R</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mspace width="0.1667em"></mspace><mover><mpadded lspace="0"><mi>SR</mi></mpadded><mo stretchy="true" class="tml-hat-3" style="math-depth:0;">ˆ</mo></mover><mo>+</mo><mfrac><mrow><mtext>kurt</mtext><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>R</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mo>−</mo><mn>1</mn></mrow><mn>4</mn></mfrac><msup><mover><mpadded lspace="0"><mi>SR</mi></mpadded><mo stretchy="true" class="tml-hat-3" style="math-depth:0;">ˆ</mo></mover><mn>2</mn></msup><mo fence="true" form="postfix" stretchy="true">)</mo></mrow><msup><mrow><mo fence="true" form="prefix" stretchy="true">(</mo><mfrac><msub><mi>z</mi><mrow><mn>1</mn><mo>−</mo><mi>α</mi></mrow></msub><mrow><mover><mpadded lspace="0"><mi>SR</mi></mpadded><mo stretchy="true" class="tml-hat-3" style="math-depth:0;">ˆ</mo></mover><mo>−</mo><msup><mpadded lspace="0"><mi>SR</mi></mpadded><mo form="prefix" stretchy="false">∗</mo></msup></mrow></mfrac><mo fence="true" form="postfix" stretchy="true">)</mo></mrow><mn>2</mn></msup></mrow><annotation encoding="application/x-tex">\widehat{MinTRL}(\SR^*) = \left(1 - \text{skew}(R)\,\widehat{\SR} + \frac{\text{kurt}(R)-1}{4}\widehat{\SR}^2\right)\left(\frac{z_{1-\alpha}}{\widehat{\SR}-\SR^*}\right)^2</annotation></semantics></math></div>
+<p>At <math><semantics><mrow><mtext>skew</mtext><mo>=</mo><mn>0</mn><mo separator="true">,</mo><mtext> </mtext><mtext>kurt</mtext><mo>=</mo><mn>3</mn></mrow><annotation encoding="application/x-tex">\text{skew}=0,\ \text{kurt}=3</annotation></semantics></math> this is exactly Session 5.2's <code>years_needed</code> — the lab checks it to eleven decimal places (<span data-lab="years_needed_check" data-fmt=".4f">10.8275</span> years against <span data-lab="mintrl_years_check" data-fmt=".4f">10.8275</span> years). Fed this session's measured negative skew and fat tails instead, the same target Sharpe needs visibly more patience:</p>
+
+<table>
+<thead><tr><th>Target Sharpe (<math><semantics><mrow><msup><mpadded lspace="0"><mi>SR</mi></mpadded><mo form="prefix" stretchy="false">∗</mo></msup><mo>=</mo><mn>0</mn></mrow><annotation encoding="application/x-tex">\SR^*=0</annotation></semantics></math>, 95% confidence)</th><th>Years needed, normal returns</th><th>Years needed, this session's fat-tailed shape</th></tr></thead>
+<tbody>
+<tr><td>0.5</td><td><span data-lab="mintrl_years_normal_0.5" data-fmt=".1f">10.8</span></td><td><span data-lab="mintrl_years_fat_0.5" data-fmt=".1f">11.1</span></td></tr>
+<tr><td>1.0</td><td><span data-lab="mintrl_years_normal_1.0" data-fmt=".1f">2.7</span></td><td><span data-lab="mintrl_years_fat_1.0" data-fmt=".1f">2.9</span></td></tr>
+</tbody>
+</table>
+
+<p>MinTRL is a critical value, not a promise: it is built so a track record of exactly that length turns <math><semantics><mrow><mover><mrow><mi>P</mi><mi>S</mi><mi>R</mi></mrow><mo stretchy="true" class="tml-hat-4" style="math-depth:0;">ˆ</mo></mover><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mn>0</mn><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mo>=</mo><mn>1</mn><mo>−</mo><mi>α</mi></mrow><annotation encoding="application/x-tex">\widehat{PSR}(0) = 1-\alpha</annotation></semantics></math> <em>if</em> the observed Sharpe ratio lands right on the target. Equivalently, a skill-less manager (true Sharpe 0) measured for <math><semantics><mrow><mtext>MinTRL</mtext><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><msup><mpadded lspace="0"><mi>SR</mi></mpadded><mo form="prefix" stretchy="false">∗</mo></msup><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">\text{MinTRL}(\SR^*)</annotation></semantics></math> periods should show an estimate at or above <math><semantics><msup><mpadded lspace="0"><mi>SR</mi></mpadded><mo form="prefix" stretchy="false">∗</mo></msup><annotation encoding="application/x-tex">\SR^*</annotation></semantics></math> only <math><semantics><mi>α</mi><annotation encoding="application/x-tex">\alpha</annotation></semantics></math> of the time — the lab's Monte Carlo check confirms it: <span data-lab="mintrl_mc_fpr" data-fmt=".1%">5.0%</span> of 20,000 skill-less five-year-plus tracks cleared the bar, against a target of <span data-lab="mintrl_mc_alpha" data-fmt=".0%">5%</span>. This is the same logic as the size of any hypothesis test: MinTRL is chosen so a manager with no real skill is wrongly declared skilled no more than <math><semantics><mi>α</mi><annotation encoding="application/x-tex">\alpha</annotation></semantics></math> of the time, whatever their true (unknown) Sharpe ratio actually is.</p>
+
+<div class="co tip"><span class="co-t">💡 Tip — use MinTRL before you start, not after</span>
+<p>Run MinTRL at the design stage: "if this strategy really has a Sharpe of 0.5, I need about <span data-lab="mintrl_years_normal_0.5" data-fmt=".0f">11</span> years to know it." If you do not have that much history and cannot get it (a new exchange, a new instrument), you have learned something important before spending months on the idea — this is the same discipline as <a class="xref" href="../unit01-quant-landscape/session03-research-lifecycle.html#s5" data-xref="1.3#s5" data-style="short" data-auto="">Session 1.3</a>'s pre-registration, applied to sample-size planning.</p>
+</div>
+</section>
+
+<section id="s3">
+<h2><span class="no">6.7.3</span> Deflating for the number of trials</h2>
+<p class="lede">PSR trusts the one track record in front of it. DSR asks the harder question: what if this is the best of many?</p>
+
+<p><a class="xref" href="../unit01-quant-landscape/session03-research-lifecycle.html#s4" data-xref="1.3#s4" data-style="short" data-auto="">Session 1.3</a> proved this by simulation: try enough skill-less strategies and keep the best, and the winner's in-sample Sharpe ratio grows with N even though nothing was ever there. The exact result behind that demo is the <strong>False Strategy Theorem</strong> (López de Prado &amp; Bailey, 2021): the expected value of the best Sharpe ratio among <math><semantics><mi>N</mi><annotation encoding="application/x-tex">N</annotation></semantics></math> skill-less trials, each estimated with per-trial standard deviation <math><semantics><msub><mover><mi>σ</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><mi>N</mi></msub><annotation encoding="application/x-tex">\hat\sigma_N</annotation></semantics></math>, is approximately</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><msub><mpadded lspace="0"><mi>SR</mi></mpadded><mn>0</mn></msub><mspace width="0.2778em"></mspace><mo>=</mo><mspace width="0.2778em"></mspace><msub><mover><mi>σ</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><mi>N</mi></msub><mrow><mo fence="true" form="prefix" stretchy="true">[</mo><mo form="prefix" stretchy="false">(</mo><mn>1</mn><mo>−</mo><mi>γ</mi><mo form="postfix" stretchy="false">)</mo><mspace width="0.1667em"></mspace><msup><mrow><mi mathvariant="normal">Φ</mi><mspace></mspace></mrow><mrow><mo form="prefix" stretchy="false" lspace="0em" rspace="0em">−</mo><mn>1</mn></mrow></msup><mrow style="margin-left:-0.1667em;"></mrow><mo fence="false" symmetric="true" minsize="1.8em" maxsize="1.8em">(</mo><mn>1</mn><mo>−</mo><mstyle displaystyle="false" scriptlevel="0"><mfrac><mn>1</mn><mi>N</mi></mfrac></mstyle><mo fence="false" symmetric="true" minsize="1.8em" maxsize="1.8em">)</mo><mo>+</mo><mi>γ</mi><mspace width="0.1667em"></mspace><msup><mrow><mi mathvariant="normal">Φ</mi><mspace></mspace></mrow><mrow><mo form="prefix" stretchy="false" lspace="0em" rspace="0em">−</mo><mn>1</mn></mrow></msup><mrow style="margin-left:-0.1667em;"></mrow><mo fence="false" symmetric="true" minsize="1.8em" maxsize="1.8em">(</mo><mn>1</mn><mo>−</mo><mstyle displaystyle="false" scriptlevel="0"><mfrac><mn>1</mn><mrow><mi>N</mi><mi>e</mi></mrow></mfrac></mstyle><mo fence="false" symmetric="true" minsize="1.8em" maxsize="1.8em">)</mo><mo fence="true" form="postfix" stretchy="true">]</mo></mrow></mrow><annotation encoding="application/x-tex">\SR_0 \;=\; \hat\sigma_N\left[(1-\gamma)\,\Phi^{-1}\!\Big(1-\tfrac1N\Big) + \gamma\,\Phi^{-1}\!\Big(1-\tfrac1{Ne}\Big)\right]</annotation></semantics></math></div>
+<p>with <math><semantics><mrow><mi>γ</mi><mo>≈</mo><mn>0.577</mn></mrow><annotation encoding="application/x-tex">\gamma \approx 0.577</annotation></semantics></math> the Euler–Mascheroni constant (unrelated to skewness or kurtosis — a coincidence of Greek letters, not a shared meaning). <math><semantics><msub><mpadded lspace="0"><mi>SR</mi></mpadded><mn>0</mn></msub><annotation encoding="application/x-tex">\SR_0</annotation></semantics></math> is not a guess about any one trial; it is what the <em>best of N honestly skill-less trials</em> would show, on average. Intuitively, <math><semantics><msub><mpadded lspace="0"><mi>SR</mi></mpadded><mn>0</mn></msub><annotation encoding="application/x-tex">\SR_0</annotation></semantics></math> grows the way the maximum of N draws from any roughly bell-shaped distribution grows: slowly, on the order of <math><semantics><msqrt><mrow><mn>2</mn><mrow><mspace width="0.1667em"></mspace><mi>ln</mi><mo>⁡</mo><mspace width="0.1667em"></mspace></mrow><mi>N</mi></mrow></msqrt><annotation encoding="application/x-tex">\sqrt{2\ln N}</annotation></semantics></math>, because pushing the sample maximum further into the tail gets exponentially harder the further out it already is. That slow growth does real work in the table below: going from 1 trial to 10 moves the deflation benchmark by nearly half of the entire range between 1 and 1,000 trials, while quadrupling 50 to 200 barely moves it at all. The <strong>deflated Sharpe ratio</strong> (DSR) is simply PSR evaluated at that benchmark instead of at <math><semantics><mrow><msup><mpadded lspace="0"><mi>SR</mi></mpadded><mo form="prefix" stretchy="false">∗</mo></msup><mo>=</mo><mn>0</mn></mrow><annotation encoding="application/x-tex">\SR^*=0</annotation></semantics></math>:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><mover><mrow><mi>D</mi><mi>S</mi><mi>R</mi></mrow><mo stretchy="true" class="tml-hat-4" style="math-depth:0;">ˆ</mo></mover><mspace width="0.2778em"></mspace><mo>=</mo><mspace width="0.2778em"></mspace><mover><mrow><mi>P</mi><mi>S</mi><mi>R</mi></mrow><mo stretchy="true" class="tml-hat-4" style="math-depth:0;">ˆ</mo></mover><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><msub><mpadded lspace="0"><mi>SR</mi></mpadded><mn>0</mn></msub><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">\widehat{DSR} \;=\; \widehat{PSR}(\SR_0)</annotation></semantics></math></div>
+<p>Bailey &amp; López de Prado (2014) built DSR exactly to answer the question a raw Sharpe ratio cannot: is this the best of N because it is skilled, or because N was large? The one number DSR needs beyond a normal PSR calculation is the <strong>number of trials</strong> — how many genuinely independent things were tried before this one was reported. A grid search over 50 lookback windows for one signal is not 50 independent trials in DSR's sense: consecutive lookbacks produce highly correlated Sharpe ratios, so the effective count could be closer to 5 or 10. This is <a class="xref" href="../unit03-math-toolkit/session03-linear-algebra-portfolios.html" data-xref="3.3" data-style="short" data-auto="">Session 3.3</a>'s effective number of independent bets, applied to trials instead of assets — correlation shrinks how much independent evidence N numbers actually carry, and undercounting it in the optimistic direction is the easiest way to make DSR claim more confidence than the search earned. Estimating that "effective N" honestly, and logging it as you go, is <span class="xref soon" data-xref="6.8" data-auto="" title="Coming soon">Session 6.8 — Lab: The Research Protocol</span>'s job.</p>
+
+<figure class="diagram chart">
+<!-- chart:psr_vs_dsr -->
+<svg viewBox="0 0 720 280" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Naive PSR is fooled by N; DSR is not (5 years, 200 repeats)">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">NAIVE PSR IS FOOLED BY N; DSR IS NOT (5 YEARS, 200 REPEATS)</text>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#D64B2A" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">naive PSR (ignores N)</text>
+  <line x1="204.4" y1="32" x2="220.4" y2="32" stroke="#3A56C5" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="226.4" y="36" font-size="11" fill="#4A5A68">deflated Sharpe ratio</text>
+  <line x1="64" y1="236" x2="690" y2="236" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="240" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.00</text>
+  <line x1="64" y1="200" x2="690" y2="200" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="204" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.25</text>
+  <line x1="64" y1="164" x2="690" y2="164" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="168" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.50</text>
+  <line x1="64" y1="128" x2="690" y2="128" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="132" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.75</text>
+  <line x1="64" y1="92" x2="690" y2="92" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="96" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">1.00</text>
+  <line x1="64" y1="56" x2="690" y2="56" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="60" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">1.25</text>
+  <line x1="64" y1="236" x2="690" y2="236" stroke="#C9CFC6" stroke-width="1"/>
+  <path d="M101.6,236 V165.1 Q101.6,161.1 105.6,161.1 H121.6 Q125.6,161.1 125.6,165.1 V236 Z" fill="#D64B2A"><title>N = 1 · naive PSR (ignores N): 0.52</title></path>
+  <text x="113.6" y="155.1" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.52</text>
+  <path d="M127.6,236 V165.1 Q127.6,161.1 131.6,161.1 H147.6 Q151.6,161.1 151.6,165.1 V236 Z" fill="#3A56C5"><title>N = 1 · deflated Sharpe ratio: 0.52</title></path>
+  <text x="139.6" y="155.1" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.52</text>
+  <text x="126.6" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">N = 1</text>
+  <path d="M226.8,236 V109.9 Q226.8,105.9 230.8,105.9 H246.8 Q250.8,105.9 250.8,109.9 V236 Z" fill="#D64B2A"><title>N = 10 · naive PSR (ignores N): 0.90</title></path>
+  <text x="238.8" y="99.9" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.90</text>
+  <path d="M252.8,236 V169 Q252.8,165 256.8,165 H272.8 Q276.8,165 276.8,169 V236 Z" fill="#3A56C5"><title>N = 10 · deflated Sharpe ratio: 0.49</title></path>
+  <text x="264.8" y="159" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.49</text>
+  <text x="251.8" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">N = 10</text>
+  <path d="M352,236 V98.8 Q352,94.8 356,94.8 H372 Q376,94.8 376,98.8 V236 Z" fill="#D64B2A"><title>N = 50 · naive PSR (ignores N): 0.98</title></path>
+  <text x="364" y="88.8" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.98</text>
+  <path d="M378,236 V168.9 Q378,164.9 382,164.9 H398 Q402,164.9 402,168.9 V236 Z" fill="#3A56C5"><title>N = 50 · deflated Sharpe ratio: 0.49</title></path>
+  <text x="390" y="158.9" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.49</text>
+  <text x="377" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">N = 50</text>
+  <path d="M477.2,236 V96.6 Q477.2,92.6 481.2,92.6 H497.2 Q501.2,92.6 501.2,96.6 V236 Z" fill="#D64B2A"><title>N = 200 · naive PSR (ignores N): 1.00</title></path>
+  <text x="489.2" y="86.6" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">1.00</text>
+  <path d="M503.2,236 V166.7 Q503.2,162.7 507.2,162.7 H523.2 Q527.2,162.7 527.2,166.7 V236 Z" fill="#3A56C5"><title>N = 200 · deflated Sharpe ratio: 0.51</title></path>
+  <text x="515.2" y="156.7" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.51</text>
+  <text x="502.2" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">N = 200</text>
+  <path d="M602.4,236 V96.1 Q602.4,92.1 606.4,92.1 H622.4 Q626.4,92.1 626.4,96.1 V236 Z" fill="#D64B2A"><title>N = 1,000 · naive PSR (ignores N): 1.00</title></path>
+  <text x="614.4" y="86.1" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">1.00</text>
+  <path d="M628.4,236 V168.2 Q628.4,164.2 632.4,164.2 H648.4 Q652.4,164.2 652.4,168.2 V236 Z" fill="#3A56C5"><title>N = 1,000 · deflated Sharpe ratio: 0.50</title></path>
+  <text x="640.4" y="158.2" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.50</text>
+  <text x="627.4" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">N = 1,000</text>
+</svg>
+<!-- /chart:psr_vs_dsr -->
+<figcaption>fig 6.7.3 — naive PSR (no correction for N) versus DSR, on the best of N skill-less strategies</figcaption>
+</figure>
+
+<p>The lab reruns <a class="xref" href="../unit01-quant-landscape/session03-research-lifecycle.html#s4" data-xref="1.3#s4" data-style="short" data-auto="">Session 1.3</a>'s experiment — N skill-less strategies, 5 years, 200 repeats, keep the best in-sample Sharpe — but this time computes both statistics on the winner. A rater who only sees the raw number, or even PSR alone, is fooled exactly as N grows; DSR is not:</p>
+
+<table>
+<thead><tr><th>Trials (N)</th><th>Best in-sample Sharpe</th><th>Naive PSR</th><th>Deflation benchmark SR0</th><th>Deflated Sharpe ratio</th></tr></thead>
+<tbody>
+<tr><td>1</td><td><span data-lab="best_is_annual_1" data-fmt=".2f">0.04</span></td><td><span data-lab="psr_naive_1" data-fmt=".0%">52%</span></td><td><span data-lab="sr0_annual_1" data-fmt=".2f">0.00</span></td><td><span data-lab="dsr_1" data-fmt=".0%">52%</span></td></tr>
+<tr><td>10</td><td><span data-lab="best_is_annual_10" data-fmt=".2f">0.68</span></td><td><span data-lab="psr_naive_10" data-fmt=".0%">90%</span></td><td><span data-lab="sr0_annual_10" data-fmt=".2f">0.69</span></td><td><span data-lab="dsr_10" data-fmt=".0%">49%</span></td></tr>
+<tr><td>50</td><td><span data-lab="best_is_annual_50" data-fmt=".2f">1.01</span></td><td><span data-lab="psr_naive_50" data-fmt=".0%">98%</span></td><td><span data-lab="sr0_annual_50" data-fmt=".2f">1.01</span></td><td><span data-lab="dsr_50" data-fmt=".0%">49%</span></td></tr>
+<tr><td>200</td><td><span data-lab="best_is_annual_200" data-fmt=".2f">1.25</span></td><td><span data-lab="psr_naive_200" data-fmt=".0%">100%</span></td><td><span data-lab="sr0_annual_200" data-fmt=".2f">1.24</span></td><td><span data-lab="dsr_200" data-fmt=".0%">51%</span></td></tr>
+<tr><td>1,000</td><td><span data-lab="best_is_annual_1000" data-fmt=".2f">1.46</span></td><td><span data-lab="psr_naive_1000" data-fmt=".0%">100%</span></td><td><span data-lab="sr0_annual_1000" data-fmt=".2f">1.46</span></td><td><span data-lab="dsr_1000" data-fmt=".0%">50%</span></td></tr>
+</tbody>
+</table>
+
+<p>Naive PSR climbs from an unremarkable <span data-lab="psr_naive_1" data-fmt=".0%">52%</span> at N=1 to a seemingly airtight <span data-lab="psr_naive_1000" data-fmt=".0%">100%</span> at N=1,000. DSR barely moves — it sits within a couple of points of <span data-lab="dsr_1" data-fmt=".0%">52%</span> at every N in the table, because <math><semantics><msub><mpadded lspace="0"><mi>SR</mi></mpadded><mn>0</mn></msub><annotation encoding="application/x-tex">\SR_0</annotation></semantics></math> grows to absorb exactly the inflation that a larger search manufactures. A best-of-1,000 Sharpe ratio of <span data-lab="best_is_annual_1000" data-fmt=".2f">1.46</span> is, once deflated, statistically indistinguishable from a coin flip.</p>
+
+<p>DSR is not a blanket penalty on ambition, though — it is a penalty on <em>unreported</em> trials. The same measured track record can score very differently depending on what actually happened before it:</p>
+
+<figure class="diagram chart">
+<!-- chart:real_vs_fake_dsr -->
+<svg viewBox="0 0 720 260" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Same SR 0.9 track record, different trial count: DSR (300 repeats)">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">SAME SR 0.9 TRACK RECORD, DIFFERENT TRIAL COUNT: DSR (300 REPEATS)</text>
+  <line x1="64" y1="216" x2="690" y2="216" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="220" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.00</text>
+  <line x1="64" y1="181.6" x2="690" y2="181.6" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="185.6" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.20</text>
+  <line x1="64" y1="147.2" x2="690" y2="147.2" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="151.2" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.40</text>
+  <line x1="64" y1="112.8" x2="690" y2="112.8" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="116.8" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.60</text>
+  <line x1="64" y1="78.4" x2="690" y2="78.4" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="82.4" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.80</text>
+  <line x1="64" y1="44" x2="690" y2="44" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="48" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">1.00</text>
+  <line x1="64" y1="216" x2="690" y2="216" stroke="#C9CFC6" stroke-width="1"/>
+  <path d="M156.3,216 V99.2 Q156.3,95.2 160.3,95.2 H176.3 Q180.3,95.2 180.3,99.2 V216 Z" fill="#3A56C5"><title>real edge, 5 trials: 0.70</title></path>
+  <text x="168.3" y="88.2" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.70</text>
+  <text x="168.3" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">real edge, 5 trials</text>
+  <path d="M365,216 V187.1 Q365,183.1 369,183.1 H385 Q389,183.1 389,187.1 V216 Z" fill="#D64B2A"><title>real edge, as best-of-1,000: 0.19</title></path>
+  <text x="377" y="176.1" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.19</text>
+  <text x="377" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">real edge, as best-of-1,000</text>
+  <path d="M573.7,216 V134.2 Q573.7,130.2 577.7,130.2 H593.7 Q597.7,130.2 597.7,134.2 V216 Z" fill="#4A5A68"><title>no edge, best-of-1,000: 0.50</title></path>
+  <text x="585.7" y="123.2" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.50</text>
+  <text x="585.7" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">no edge, best-of-1,000</text>
+</svg>
+<!-- /chart:real_vs_fake_dsr -->
+<figcaption>fig 6.7.4 — a genuine SR 0.9 edge, tested five times, mostly survives deflation; the identical track record claimed as the best of 1,000 does not</figcaption>
+</figure>
+
+<p>A strategy with a real annual Sharpe ratio of <span data-lab="real_sr_annual" data-fmt=".1f">0.9</span>, tested honestly among <span data-lab="n_honest" data-fmt="d">5</span> pre-declared variants, keeps a DSR of <span data-lab="dsr_honest_mean" data-fmt=".0%">70%</span> on average. Report the identical track record as the best of <span data-lab="n_dishonest" data-fmt=",d">1,000</span> trials — a lie of omission, not a different strategy — and the same numbers deflate to <span data-lab="dsr_dishonest_mean" data-fmt=".0%">19%</span>. Nothing about the strategy changed. Only the honesty of the reported search did.</p>
+
+<p>Notice what did not change between the honest and dishonest reports: the same 1,260 days of returns, the same skewness, the same kurtosis, the same measured Sharpe ratio. The only input that differed was N — a number that lives entirely in the researcher's notebook, not in the data. That is exactly why a trial log is not paperwork: it is the one piece of evidence that makes DSR computable at all, and the one thing a raw Sharpe ratio can never disclose on its own.</p>
+
+<div class="co note"><span class="co-t">🧭 Margin note — DSR needs a number N; PBO does not</span>
+<p>DSR's <math><semantics><msub><mpadded lspace="0"><mi>SR</mi></mpadded><mn>0</mn></msub><annotation encoding="application/x-tex">\SR_0</annotation></semantics></math> comes from extreme-value theory applied to N <em>independent</em> Sharpe ratio estimates. A grid of moving-average lookbacks fit to one price series is not that: the same days are reused by every parameterisation, so there is no clean N to plug in. §6.7.4 covers exactly that case.</p>
+</div>
+</section>
+
+<section id="s4">
+<h2><span class="no">6.7.4</span> When you don't know N: PBO and CSCV</h2>
+<p class="lede">A parameter sweep on one dataset is the most common research pattern of all — and DSR cannot score it.</p>
+
+<p>Bailey, Borwein, López de Prado &amp; Zhu (2016) built <strong>combinatorially symmetric cross-validation</strong> (<strong>CSCV</strong>) for exactly this case: many parameterisations of one rule, fit and judged on the same finite sample. Split the sample into <math><semantics><mi>S</mi><annotation encoding="application/x-tex">S</annotation></semantics></math> contiguous blocks (even <math><semantics><mi>S</mi><annotation encoding="application/x-tex">S</annotation></semantics></math>), and form every way of splitting those blocks into two equal halves — <math><semantics><mrow><mo fence="true">(</mo><mfrac linethickness="0px"><mi>S</mi><mrow><mi>S</mi><mi>/</mi><mn>2</mn></mrow></mfrac><mo fence="true">)</mo></mrow><annotation encoding="application/x-tex">\binom{S}{S/2}</annotation></semantics></math> combinations in all. In each combination, one half is in-sample, the other out-of-sample.</p>
+
+<p>Why not just hold out one block, the way <span class="xref soon" data-xref="6.6" data-style="short" data-auto="" title="Coming soon">Session 6.6</span>'s walk-forward analysis does? Because with a single split, which half happened to be called "out-of-sample" is itself an arbitrary choice, and a rule that looks lucky on one split can look unlucky on another purely by chance. CSCV's combinatorial symmetry removes that arbitrariness: every block plays both roles across the full set of combinations, so PBO reflects the selection procedure itself rather than one lucky or unlucky slice of the calendar.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 210" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="20" y="20" font-size="11" font-weight="600" fill="#1F2C38">CSCV, ONE COMBINATION OF MANY</text>
+  <rect x="20" y="38" width="150" height="60" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="95" y="62" font-size="10.5" text-anchor="middle" fill="#3A56C5" font-weight="600">S blocks of time</text>
+  <text x="95" y="80" font-size="9" text-anchor="middle" fill="#4A5A68">split into halves</text>
+  <rect x="200" y="38" width="150" height="60" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="275" y="62" font-size="10.5" text-anchor="middle" fill="#3A56C5" font-weight="600">pick IS winner</text>
+  <text x="275" y="80" font-size="9" text-anchor="middle" fill="#4A5A68">best Sharpe, in-sample half</text>
+  <rect x="380" y="38" width="150" height="60" rx="9" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="455" y="62" font-size="10.5" text-anchor="middle" fill="#8A6D00" font-weight="600">rank it OOS</text>
+  <text x="455" y="80" font-size="9" text-anchor="middle" fill="#4A5A68">among all N rules</text>
+  <rect x="560" y="38" width="140" height="60" rx="9" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="630" y="62" font-size="10.5" text-anchor="middle" fill="#D64B2A" font-weight="600">logit λ</text>
+  <text x="630" y="80" font-size="9" text-anchor="middle" fill="#4A5A68">≤0 means "below median"</text>
+  <path d="M170 68 H197" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s4a)"/>
+  <path d="M350 68 H377" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s4a)"/>
+  <path d="M530 68 H557" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s4a)"/>
+  <text x="360" y="130" font-size="10" text-anchor="middle" fill="#4A5A68">repeat for every one of the S-choose-S/2 splits →</text>
+  <rect x="230" y="150" width="260" height="46" rx="8" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="360" y="178" font-size="11" text-anchor="middle" fill="#1F7A55" font-weight="600">PBO = fraction with λ ≤ 0</text>
+  <path d="M455 100 V147" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s4a)"/>
+  <defs><marker id="s4a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F2C38"/></marker></defs>
+</svg>
+<figcaption>fig 6.7.5 — CSCV in one pass: split, pick the in-sample winner, see where it ranks out of sample, repeat</figcaption>
+</figure>
+
+<p>For each combination <math><semantics><mi>c</mi><annotation encoding="application/x-tex">c</annotation></semantics></math>, the rule with the best in-sample Sharpe ratio is found, then its rank among all <math><semantics><mi>N</mi><annotation encoding="application/x-tex">N</annotation></semantics></math> rules' <em>out-of-sample</em> Sharpe ratios is converted to a relative rank and a logit:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><msub><mi>ω</mi><mi>c</mi></msub><mo>=</mo><mfrac><msub><mtext>rank</mtext><mi>c</mi></msub><mrow><mi>N</mi><mo>+</mo><mn>1</mn></mrow></mfrac><mo separator="true">,</mo><mspace width="2em"></mspace><msub><mi>λ</mi><mi>c</mi></msub><mo>=</mo><mrow><mi>ln</mi><mo>⁡</mo><mspace width="0.1667em"></mspace></mrow><mrow style="margin-left:-0.1667em;"></mrow><mfrac><msub><mi>ω</mi><mi>c</mi></msub><mrow><mn>1</mn><mo>−</mo><msub><mi>ω</mi><mi>c</mi></msub></mrow></mfrac></mrow><annotation encoding="application/x-tex">\omega_c = \frac{\text{rank}_c}{N+1}, \qquad \lambda_c = \ln\!\frac{\omega_c}{1-\omega_c}</annotation></semantics></math></div>
+<p><math><semantics><mrow><msub><mi>λ</mi><mi>c</mi></msub><mo>≤</mo><mn>0</mn></mrow><annotation encoding="application/x-tex">\lambda_c \le 0</annotation></semantics></math> means the in-sample winner did no better than the out-of-sample median — as bad an outcome as picking a rule at random. The <strong>probability of backtest overfitting</strong> (PBO) is the fraction of combinations where that happens:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><mover><mrow><mi>P</mi><mi>B</mi><mi>O</mi></mrow><mo stretchy="true" class="tml-hat-4" style="math-depth:0;">ˆ</mo></mover><mo>=</mo><mfrac><mn>1</mn><mrow><mi>|</mi><mi>C</mi><mi>|</mi></mrow></mfrac><mrow><munder><mo movablelimits="false">∑</mo><mrow><mi>c</mi><mo>∈</mo><mi>C</mi></mrow></munder></mrow><mn>𝟙</mn><mrow><mo fence="true" form="prefix" stretchy="false">[</mo><msub><mi>λ</mi><mi>c</mi></msub><mo>≤</mo><mn>0</mn><mo fence="true" form="postfix" stretchy="false">]</mo></mrow></mrow><annotation encoding="application/x-tex">\widehat{PBO} = \frac{1}{|C|}\sum_{c \in C} \mathbb{1}[\lambda_c \le 0]</annotation></semantics></math></div>
+
+<p>The lab runs this on a genuine parameter sweep: <span data-lab="n_rules_pbo" data-fmt="d">25</span> moving-average crossover rules (five fast lookbacks × five slow lookbacks), all trading the same simulated <strong>zero-drift</strong> price series — no true edge exists anywhere in this universe. Split into <span data-lab="s_blocks_pbo" data-fmt="d">10</span> blocks gives <span data-lab="n_combos_pbo" data-fmt=",d">252</span> combinations. Choosing <math><semantics><mi>S</mi><annotation encoding="application/x-tex">S</annotation></semantics></math> trades two errors against each other: too few blocks and each in-sample or out-of-sample half is too short to estimate a Sharpe ratio reliably; too many and the number of combinations explodes for no statistical benefit — ten blocks of roughly a year each is a standard middle ground, not a magic number. The in-sample winner turned out to be no better than an out-of-sample coin flip in <span data-lab="pbo" data-fmt=".0%">82%</span> of them — a high PBO, and the right answer: with a real mechanism (a crossover rule that can fit noise-specific wiggles in a specific block) tuned against the same finite sample over and over, most of the apparent skill is exactly that fitting, not signal.</p>
+
+<figure class="diagram chart">
+<!-- chart:pbo_logits -->
+<svg viewBox="0 0 720 280" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="CSCV logits across 252 in-sample/out-of-sample splits">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">CSCV LOGITS ACROSS 252 IN-SAMPLE/OUT-OF-SAMPLE SPLITS</text>
+  <line x1="64" y1="197.7" x2="680" y2="197.7" stroke="#E4E8EC" stroke-width="1"/>
+  <line x1="64" y1="151.4" x2="680" y2="151.4" stroke="#E4E8EC" stroke-width="1"/>
+  <line x1="64" y1="105.1" x2="680" y2="105.1" stroke="#E4E8EC" stroke-width="1"/>
+  <line x1="64" y1="58.8" x2="680" y2="58.8" stroke="#E4E8EC" stroke-width="1"/>
+  <line x1="64" y1="244" x2="680" y2="244" stroke="#C9CFC6" stroke-width="1"/>
+  <line x1="93" y1="244" x2="93" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="93" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">−3.0</text>
+  <line x1="225.3" y1="244" x2="225.3" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="225.3" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">−2.0</text>
+  <line x1="357.7" y1="244" x2="357.7" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="357.7" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">−1.0</text>
+  <line x1="490.1" y1="244" x2="490.1" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="490.1" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">0.0</text>
+  <line x1="622.4" y1="244" x2="622.4" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="622.4" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">1.0</text>
+  <rect x="64.5" y="129.4" width="19.5" height="114.6" fill="#D64B2A" fill-opacity="0.55"><title>−3.2 to −3.1</title></rect>
+  <rect x="146.6" y="58.8" width="19.5" height="185.2" fill="#D64B2A" fill-opacity="0.55"><title>−2.6 to −2.4</title></rect>
+  <rect x="208.2" y="76.5" width="19.5" height="167.5" fill="#D64B2A" fill-opacity="0.55"><title>−2.1 to −2.0</title></rect>
+  <rect x="249.3" y="94.1" width="19.5" height="149.9" fill="#D64B2A" fill-opacity="0.55"><title>−1.8 to −1.7</title></rect>
+  <rect x="290.4" y="67.6" width="19.5" height="176.4" fill="#D64B2A" fill-opacity="0.55"><title>−1.5 to −1.4</title></rect>
+  <rect x="310.9" y="129.4" width="19.5" height="114.6" fill="#D64B2A" fill-opacity="0.55"><title>−1.4 to −1.2</title></rect>
+  <rect x="352" y="58.8" width="19.5" height="185.2" fill="#D64B2A" fill-opacity="0.55"><title>−1.0 to −0.9</title></rect>
+  <rect x="372.5" y="120.5" width="19.5" height="123.5" fill="#D64B2A" fill-opacity="0.55"><title>−0.9 to −0.7</title></rect>
+  <rect x="393" y="138.2" width="19.5" height="105.8" fill="#D64B2A" fill-opacity="0.55"><title>−0.7 to −0.6</title></rect>
+  <rect x="413.6" y="102.9" width="19.5" height="141.1" fill="#D64B2A" fill-opacity="0.55"><title>−0.6 to −0.4</title></rect>
+  <rect x="434.1" y="120.5" width="19.5" height="123.5" fill="#D64B2A" fill-opacity="0.55"><title>−0.4 to −0.3</title></rect>
+  <rect x="454.6" y="120.5" width="19.5" height="123.5" fill="#D64B2A" fill-opacity="0.55"><title>−0.3 to −0.1</title></rect>
+  <rect x="475.2" y="138.2" width="19.5" height="105.8" fill="#3A56C5" fill-opacity="0.55"><title>−0.1 to 0.0</title></rect>
+  <rect x="495.7" y="94.1" width="19.5" height="149.9" fill="#3A56C5" fill-opacity="0.55"><title>0.0 to 0.2</title></rect>
+  <rect x="516.2" y="138.2" width="19.5" height="105.8" fill="#3A56C5" fill-opacity="0.55"><title>0.2 to 0.3</title></rect>
+  <rect x="536.8" y="182.3" width="19.5" height="61.7" fill="#3A56C5" fill-opacity="0.55"><title>0.3 to 0.5</title></rect>
+  <rect x="557.3" y="199.9" width="19.5" height="44.1" fill="#3A56C5" fill-opacity="0.55"><title>0.5 to 0.7</title></rect>
+  <rect x="577.8" y="235.2" width="19.5" height="8.8" fill="#3A56C5" fill-opacity="0.55"><title>0.7 to 0.8</title></rect>
+  <rect x="618.9" y="226.4" width="19.5" height="17.6" fill="#3A56C5" fill-opacity="0.55"><title>1.0 to 1.1</title></rect>
+  <rect x="639.4" y="235.2" width="19.5" height="8.8" fill="#3A56C5" fill-opacity="0.55"><title>1.1 to 1.3</title></rect>
+  <rect x="660" y="235.2" width="19.5" height="8.8" fill="#3A56C5" fill-opacity="0.55"><title>1.3 to 1.4</title></rect>
+  <line x1="490.1" y1="42" x2="490.1" y2="244" stroke="#4A5A68" stroke-width="1"/>
+  <text x="485.1" y="38" font-size="10.5" text-anchor="end" fill="#1F2C38">IS winner ≤ OOS median ←</text>
+</svg>
+<!-- /chart:pbo_logits -->
+<figcaption>fig 6.7.6 — the logit λ across all 252 CSCV splits; the coral tail (λ ≤ 0) is where PBO comes from</figcaption>
+</figure>
+
+<div class="co note"><span class="co-t">🧭 Margin note — CSCV is not <span class="xref soon" data-xref="6.6" data-style="short" data-auto="" title="Coming soon">Session 6.6</span>'s CPCV</span>
+<p>The names collide but the jobs don't. <span class="xref soon" data-xref="6.6" data-style="short" data-auto="" title="Coming soon">Session 6.6</span>'s <span class="term soon" data-term="combinatorial purged cross-validation" title="Defined in Session 6.6 (coming soon)">combinatorial purged cross-validation</span> (CPCV) builds many realistic, leakage-free <a class="term" href="../unit01-quant-landscape/session03-research-lifecycle.html#g-backtest" data-term="backtest">backtest</a> <em>paths</em> from one dataset, respecting <span class="term soon" data-term="purging" title="Defined in Session 6.6 (coming soon)">purging</span> and <span class="term soon" data-term="embargo" title="Defined in Session 6.6 (coming soon)">embargo</span>, so you get an honest distribution of a single strategy's performance. CSCV asks a narrower, different question: given that you picked a winner in-sample, would it have looked like a winner out-of-sample? One builds paths; the other scores a selection decision. The parameter sweep above ignored transaction costs entirely, to keep the statistics visible — <span class="xref soon" data-xref="6.5" data-style="short" data-auto="" title="Coming soon">Session 6.5</span> is what you add before trusting any of these numbers on a live book.</p>
+</div>
+</section>
+
+<section id="s5">
+<h2><span class="no">6.7.5</span> Where people go wrong</h2>
+<p class="lede">Two failure modes account for nearly every misused deflated Sharpe ratio: silence about N, and a formula fed the wrong number.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 220" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">REPORTING A BACKTEST'S SHARPE RATIO</text>
+  <rect x="26" y="32" width="326" height="176" rx="9" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="189" y="54" font-size="11" font-weight="700" text-anchor="middle" fill="#D64B2A">THE NAIVE WAY</text>
+  <rect x="46" y="66" width="286" height="24" rx="5" fill="#fff" stroke="#F2CDBF"/>
+  <text x="58" y="82" font-size="9.5" fill="#1F2C38">quote the raw Sharpe ratio alone</text>
+  <rect x="46" y="96" width="286" height="24" rx="5" fill="#fff" stroke="#F2CDBF"/>
+  <text x="58" y="112" font-size="9.5" fill="#1F2C38">never say how many variants were tried</text>
+  <text x="189" y="148" font-size="9.5" text-anchor="middle" fill="#D64B2A" font-weight="600">Looks airtight; is a coin flip.</text>
+  <text x="189" y="166" font-size="9" text-anchor="middle" fill="#4A5A68">Best-of-1,000 noise scored 100% naive PSR.</text>
+  <rect x="368" y="32" width="326" height="176" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="531" y="54" font-size="11" font-weight="700" text-anchor="middle" fill="#1F7A55">THE DISCIPLINED WAY</text>
+  <rect x="388" y="66" width="286" height="24" rx="5" fill="#fff" stroke="#BFE0CF"/>
+  <text x="400" y="82" font-size="9.5" fill="#1F2C38">1 · log every trial as you run it</text>
+  <rect x="388" y="96" width="286" height="24" rx="5" fill="#fff" stroke="#BFE0CF"/>
+  <text x="400" y="112" font-size="9.5" fill="#1F2C38">2 · report PSR, MinTRL, DSR or PBO together</text>
+  <text x="531" y="148" font-size="9.5" text-anchor="middle" fill="#1F7A55" font-weight="600">Looks less impressive; is real.</text>
+  <text x="531" y="166" font-size="9" text-anchor="middle" fill="#4A5A68">The same edge survives at N=5, honestly told.</text>
+</svg>
+<figcaption>fig 6.7.7 — the entire session in one contrast: what you disclose changes what the number means</figcaption>
+</figure>
+
+<div class="co warn"><span class="co-t">⚠️ Pitfall — "kurtosis is kurtosis, whichever function computes it"</span>
+<p>PSR's formula wants <strong>raw</strong> kurtosis (3 for a normal, per Session 3.2's convention), but <code>scipy.stats.kurtosis</code> and pandas' <code>.kurt()</code> return <strong>excess</strong> kurtosis (0 for a normal) by default. Feed the wrong one in and the <math><semantics><mrow><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mtext>kurt</mtext><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>R</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mo>−</mo><mn>1</mn><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mi>/</mi><mn>4</mn></mrow><annotation encoding="application/x-tex">(\text{kurt}(R)-1)/4</annotation></semantics></math> term is off by a factor that scales with how fat the tails really are — quietly <em>overstating</em> every PSR and DSR the code reports, in exactly the direction that makes a bad backtest look better. This is not a hypothetical mix-up: production trading-strategy code, including at least one widely used open-source backtesting library, has shipped this exact bug. Whichever library you use, check its convention before you trust its number — this lab's own <code>psr()</code> takes raw kurtosis and says so in its docstring.</p>
+</div>
+
+<p>A newer instrument makes the opposite mistake harder to excuse. The <strong>MinervaScore</strong> (Santoni, Jouanne &amp; Scullin, 2026) bundles DSR, PBO, a superior-predictive-ability test and MinTRL into one 0–100 robustness grade — and its own authors report that on real markets it barely predicts anything forward-looking (a Spearman correlation of just 0.013 with future performance), despite separating genuine skill from noise almost perfectly on synthetic data where the truth is known (AUROC 0.989). That gap is not a flaw unique to their score; it is this whole session's warning, restated: these four statistics tell you whether a backtest's <em>Sharpe ratio</em> earned its confidence. None of them, alone or combined, tell you the strategy will keep working. <span class="xref soon" data-xref="6.6" data-style="short" data-auto="" title="Coming soon">Session 6.6</span>'s validation splits and <span class="xref soon" data-xref="6.8" data-auto="" title="Coming soon">Session 6.8 — Lab: The Research Protocol</span>'s paper-trading gate are what carry that further burden.</p>
+
+<p>Treat every statistic in this session as a filter that removes bad ideas, never as a certificate that promotes a good one. A high DSR or a low PBO is necessary before risking capital on a backtest; neither is sufficient, and no combination of them replaces an untouched holdout or time spent trading on paper.</p>
+</section>
+
+<section id="s6">
+<h2><span class="no">6.7.6</span> Try it</h2>
+<p class="lede">Open the companion lab and watch DSR see through a search you construct yourself.</p>
+<div class="co lab"><span class="co-t">🔧 Try it (15 min, in the lab)</span>
+<p>1. In §4 of the lab, change <code>REAL_SR_ANNUAL</code> to 0.5 and rerun. Predict, before running, whether <code>dsr_honest_mean</code> at N=5 will still clear 50% — a true Sharpe of 0.5 is a much smaller edge to detect in 5 years.<br>
+2. Change <code>N_HONEST</code> from 5 to 30 with <code>REAL_SR_ANNUAL</code> back at 0.9. Does the honestly-reported DSR fall by as much as going from 5 honest trials to 1,000 dishonest ones did?<br>
+3. Success looks like this: you can explain, in one sentence, why the SAME measured track record produces a different DSR each time — and it is never because the underlying strategy changed.</p>
+</div>
+</section>
+
+<hr>
+
+<section id="s7">
+<h2><span class="no">6.7.7</span> Glossary · Check yourself · Go deeper</h2>
+<div class="gloss" id="glossary">
+<div id="g-probabilistic-sharpe-ratio"><b>Probabilistic Sharpe ratio</b> — the probability that a strategy's true Sharpe ratio exceeds a benchmark, computed from the track record's own length, skewness and kurtosis (Bailey &amp; López de Prado, 2012).</div>
+<div id="g-minimum-track-record-length"><b>Minimum track record length</b> — the number of periods a claimed Sharpe ratio needs before its PSR against a benchmark reaches a chosen confidence level.</div>
+<div id="g-deflated-sharpe-ratio"><b>Deflated Sharpe ratio</b> — PSR evaluated against the expected best Sharpe ratio of N independent skill-less trials, instead of against zero; a Sharpe ratio corrected for how many things were tried (Bailey &amp; López de Prado, 2014).</div>
+<div id="g-false-strategy-theorem"><b>False strategy theorem</b> — the result that the expected best Sharpe ratio among N skill-less trials grows with N and shrinks with more data, following an extreme-value-theory formula (López de Prado &amp; Bailey, 2021).</div>
+<div id="g-number-of-trials"><b>Number of trials</b> — how many genuinely independent strategies, parameters or variants were tried before the one being reported; near-duplicate trials count as less than one independent trial each.</div>
+<div id="g-probability-of-backtest-overfitting"><b>Probability of backtest overfitting</b> — the fraction of in-sample/out-of-sample splits (via CSCV) in which the in-sample winner performs at or below the out-of-sample median (Bailey, Borwein, López de Prado &amp; Zhu, 2016).</div>
+<div id="g-cscv"><b>CSCV</b> — combinatorially symmetric cross-validation: splitting a sample into S blocks and evaluating every equal-sized in-sample/out-of-sample combination of them, to score a selection decision rather than a single backtest.</div>
+</div>
+
+<h3>Check yourself</h3>
+<details class="q"><summary>1. Two managers report the identical annualised Sharpe ratio of 1.2 from five years of monthly returns. Manager A's returns are close to normal; Manager B's show negative skew and heavy tails. Whose PSR is higher, and why?</summary><div>Manager A's. In the PSR formula, negative skewness and kurtosis above 3 both increase the standard deviation of the Sharpe ratio estimator (for a positive Sharpe ratio), which lowers the resulting probability. The gap widens exactly as sampling frequency coarsens — see the frequency table in §6.7.1.</div></details>
+<details class="q"><summary>2. A vendor pitches a strategy with a 3-year track record and a reported annualised Sharpe ratio of 1.0. Reassuring?</summary><div>Barely. This session's own MinTRL table shows that even under the generous assumption of normal returns, a Sharpe ratio of 1.0 needs about 2.7 years to clear a zero benchmark at 95% confidence — 3 years clears it, but only just, and under any real fat-tailed shape the requirement is longer. Before being reassured, ask how many other variants were tried; that is a DSR question, not a MinTRL one.</div></details>
+<details class="q"><summary>3. A colleague swept 1,000 parameter combinations and reports the best Sharpe ratio, 1.46, without correction. What does this session's evidence say?</summary><div>That number is close to meaningless on its own. This session's own N=1,000 experiment shows the best of 1,000 skill-less strategies averages exactly that Sharpe ratio in-sample, while its deflated Sharpe ratio sits at about 50% — statistically indistinguishable from no skill at all. Ask for the deflated number, or the trial count needed to compute it.</div></details>
+<details class="q"><summary>4. Why can't you just run DSR on a 25-combination moving-average sweep over one price history instead of CSCV/PBO?</summary><div>DSR's deflation benchmark SR0 is built from the expected maximum of N genuinely independent Sharpe ratio estimates. The 25 moving-average variants are not independent: every one of them trades the same days, so their Sharpe ratios are highly correlated and there is no clean N to plug into the False Strategy Theorem's formula. CSCV sidesteps the question of N entirely by directly testing whether an in-sample selection decision would have held up out of sample, resampled many ways from the one dataset you have.</div></details>
+<details class="q"><summary>5. A junior researcher's DSR implementation passes <code>scipy.stats.kurtosis(returns)</code> (excess kurtosis, default) straight into a textbook PSR formula written for raw kurtosis. Which direction does the error push every reported DSR, and why does that make it dangerous?</summary><div>It silently overstates DSR (and PSR): the formula computes <code>(kurt - 1)/4 * SR^2</code> expecting <code>kurt≈3</code> for near-normal returns, but receives <code>kurt≈0</code> instead, understating the true standard deviation of the Sharpe ratio estimator and so overstating the resulting probability. It is dangerous precisely because it fails silently, in the direction that makes a mediocre backtest look better — the same code will pass unremarked-on until someone checks the convention.</div></details>
+
+<div class="co lab"><span class="co-t">🔧 Homework (~1 h before Session 6.8)</span>
+<p>1. In the lab, set <code>TRIALS</code> to include 5,000 and 20,000. Does DSR still hold near 50%, or does the normal approximation behind <math><semantics><msub><mpadded lspace="0"><mi>SR</mi></mpadded><mn>0</mn></msub><annotation encoding="application/x-tex">\SR_0</annotation></semantics></math> start to show its age at extreme N?<br>
+2. Read Bailey &amp; López de Prado (2014), below, focusing on their worked hedge-fund example.<br>
+3. Start a trial log for your own next research idea — every variant, dated, before you look at a single result. <span class="xref soon" data-xref="6.8" data-auto="" title="Coming soon">Session 6.8 — Lab: The Research Protocol</span> collects it.</p>
+</div>
+
+<h3>📚 Go deeper</h3>
+<ol class="refs">
+<li>Bailey, D. H. &amp; López de Prado, M. (2012). "The Sharpe Ratio Efficient Frontier." <em>Journal of Risk</em> 15(2), 3–44. <span class="rid">doi:10.21314/JOR.2012.255</span></li>
+<li>Bailey, D. H. &amp; López de Prado, M. (2014). "The Deflated Sharpe Ratio: Correcting for Selection Bias, Backtest Overfitting and Non-Normality." <em>Journal of Portfolio Management</em> 40(5), 94–107. <span class="rid">doi:10.2139/ssrn.2460551</span></li>
+<li>Bailey, D. H., Borwein, J. M., López de Prado, M. &amp; Zhu, Q. J. (2016). "The Probability of Backtest Overfitting." <em>Journal of Computational Finance</em> 20(4), 39–69. <span class="rid">doi:10.21314/JCF.2016.322</span></li>
+<li>López de Prado, M. &amp; Bailey, D. H. (2021). "The False Strategy Theorem: A Financial Application of Experimental Mathematics." <em>American Mathematical Monthly</em> 128(9), 825–831. <span class="rid">doi:10.1080/00029890.2021.1965068</span></li>
+<li>López de Prado, M. (2018). <em>Advances in Financial Machine Learning</em>, ch. 11 &amp; 13–14. Wiley. <span class="rid">ISBN 978-1-119-48208-6</span></li>
+</ol>
+
+<h3>Sources for the numbers</h3>
+<ol class="refs">
+<li>Santoni, M. L., Jouanne, V. &amp; Scullin, M. L. (2026). "Equity Strategy Backtesting: Luck or Edge? The MinervaScore as a Statistical Robustness Grade." <span class="rid">arXiv:2608.23808</span></li>
+<li>Pav, S. E. (2026). "Post-Selection Estimation of Sharpe Ratios." <span class="rid">arXiv:2606.01650</span></li>
+<li>Choufani, J.-M. E. (2026). "Minimum Track Record Length Under Fat Tails: How Long Must Performance History Be Before Skill Is Declared?" <span class="rid">SSRN 7024958</span></li>
+</ol>
+</section>
+
+<!-- nav:foot -->
+<div class="foot">
+<span class="soon" title="Coming soon">← Prev: 6.6 · Validation</span>
+<span class="soon" title="Coming soon">Next: 6.8 · Lab: Protocol →</span>
+</div>
+<p class="legal">Educational material only — not investment, legal or tax advice. Backtests and simulations are hypothetical. <a href="../start-here.html#disclaimer">Disclaimer</a> · Text CC BY 4.0 · Code MIT.</p>
+<!-- /nav:foot -->
+</main>
+</div></body></html>

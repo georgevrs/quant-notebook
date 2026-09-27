@@ -239,7 +239,7 @@ units:
         prereqs: ["2.1"]
         owns: [OHLCV bar, tick data, quote data, level 1 data, level 2 data, fundamental data, data vendor, data licence, redistribution]
         deps: [core]
-        status: planned
+        status: doing
       - id: "4.2"
         slug: point-in-time-biases
         title: Point-in-Time Data & Data Biases
@@ -248,7 +248,7 @@ units:
         prereqs: ["4.1"]
         owns: [point-in-time data, look-ahead bias, survivorship bias, restatement, data vintage, delisting return, backfill bias]
         deps: [core]
-        status: planned
+        status: doing
       - id: "4.3"
         slug: corporate-actions-security-master
         title: Corporate Actions, Security Master & Continuous Futures
@@ -257,7 +257,7 @@ units:
         prereqs: ["4.2", "2.4"]
         owns: [adjustment factor, adjusted price, total-return index, security master, security identifier, continuous futures, back-adjustment, ratio adjustment, roll schedule]
         deps: [core]
-        status: planned
+        status: doing
       - id: "4.4"
         slug: time-calendars-bars
         title: Time, Calendars, As-of Joins & Bars
@@ -266,7 +266,7 @@ units:
         prereqs: ["4.2"]
         owns: [timestamp, time zone, exchange calendar, as-of join, time bars, volume bars, dollar bars, imbalance bars]
         deps: [core]
-        status: planned
+        status: doing
       - id: "4.5"
         slug: research-storage-stack
         title: The Research Storage Stack
@@ -275,7 +275,7 @@ units:
         prereqs: ["4.4"]
         owns: [Parquet, Apache Arrow, DuckDB, polars, lazy evaluation, partitioning, columnar storage, kdb+]
         deps: [core]
-        status: planned
+        status: doing
       - id: "4.6"
         slug: lab-research-data-lake
         title: "Lab: Build Your Research Data Lake"
@@ -284,7 +284,7 @@ units:
         prereqs: ["4.3", "4.5"]
         owns: [data quality check, data lineage, idempotent pipeline, data contract]
         deps: [core]
-        status: planned
+        status: doing
 
   - id: 5
     slug: statistics-time-series
@@ -301,7 +301,7 @@ units:
         prereqs: ["3.2", "4.6"]
         owns: [stylized facts, volatility clustering, leverage effect, autocorrelation, aggregational Gaussianity]
         deps: [core]
-        status: planned
+        status: doing
       - id: "5.2"
         slug: regression-inference
         title: Regression & Inference That Doesn't Lie
@@ -310,7 +310,7 @@ units:
         prereqs: ["5.1"]
         owns: [ordinary least squares, t-statistic, p-value, HAC standard errors, Newey-West estimator, overlapping observations, standard error of the Sharpe ratio, multiple testing, family-wise error rate, false discovery rate, SPA test, model confidence set]
         deps: [core]
-        status: planned
+        status: doing
       - id: "5.3"
         slug: bayesian-thinking
         title: "Bayesian Thinking: Priors, Shrinkage & Updating"
@@ -319,7 +319,7 @@ units:
         prereqs: ["5.2"]
         owns: [prior, posterior, likelihood, conjugate prior, shrinkage, credible interval, empirical Bayes]
         deps: [core]
-        status: planned
+        status: doing
       - id: "5.4"
         slug: stationarity-arma
         title: Stationarity & ARMA Models
@@ -328,7 +328,7 @@ units:
         prereqs: ["5.2"]
         owns: [stationarity, unit root, ADF test, KPSS test, autoregressive model, moving-average model, ARMA model, ACF, PACF]
         deps: [core]
-        status: planned
+        status: doing
       - id: "5.5"
         slug: volatility-modeling
         title: Modeling Volatility
@@ -337,7 +337,7 @@ units:
         prereqs: ["5.4"]
         owns: [realized volatility, Parkinson estimator, Garman-Klass estimator, Yang-Zhang estimator, EWMA volatility, GARCH model, GJR-GARCH model, volatility forecast]
         deps: [core]
-        status: planned
+        status: doing
       - id: "5.6"
         slug: cointegration-mean-reversion
         title: Cointegration & Mean Reversion
@@ -346,7 +346,7 @@ units:
         prereqs: ["5.4"]
         owns: [cointegration, Engle-Granger test, Johansen test, hedge ratio, spread, Ornstein-Uhlenbeck process, half-life of mean reversion]
         deps: [core]
-        status: planned
+        status: doing
       - id: "5.7"
         slug: kalman-regimes
         title: Kalman Filters & Regime Models
@@ -355,7 +355,7 @@ units:
         prereqs: ["5.3", "5.6"]
         owns: [state-space model, Kalman filter, dynamic hedge ratio, hidden Markov model, market regime, structural break]
         deps: [core]
-        status: planned
+        status: doing
 
   - id: 6
     slug: backtesting-discipline
@@ -372,7 +372,7 @@ units:
         prereqs: ["1.3", "5.2"]
         owns: [strategy specification, historical simulation, fill assumption, in-sample]
         deps: [core]
-        status: planned
+        status: doing
       - id: "6.2"
         slug: vectorized-backtester
         title: Build a Vectorized Backtester
@@ -381,7 +381,7 @@ units:
         prereqs: ["6.1"]
         owns: [vectorized backtest, position, turnover, signal lag, equity curve]
         deps: [core]
-        status: planned
+        status: doing
       - id: "6.3"
         slug: event-driven-backtester
         title: Build an Event-Driven Backtester
@@ -390,7 +390,7 @@ units:
         prereqs: ["6.2"]
         owns: [event-driven backtest, event loop, order, fill, portfolio state, backtest–live parity]
         deps: [core]
-        status: planned
+        status: doing
       - id: "6.4"
         slug: bias-hall-of-fame
         title: The Bias Hall of Fame
@@ -399,7 +399,7 @@ units:
         prereqs: ["6.2", "4.2"]
         owns: [data snooping, selection bias, untradable price, stale price, publication bias]
         deps: [core]
-        status: planned
+        status: doing
       - id: "6.5"
         slug: costs-capacity
         title: Transaction Costs & Capacity
@@ -408,7 +408,7 @@ units:
         prereqs: ["6.2", "2.1"]
         owns: [transaction cost, commission, slippage, market impact, borrow cost, capacity, break-even cost]
         deps: [core]
-        status: planned
+        status: doing
       - id: "6.6"
         slug: validation-schemes
         title: "Validation: Walk-Forward, Purged K-Fold & CPCV"
@@ -417,7 +417,7 @@ units:
         prereqs: ["6.4"]
         owns: [walk-forward analysis, purging, embargo, purged k-fold cross-validation, combinatorial purged cross-validation, leakage]
         deps: [core, portfolio]
-        status: planned
+        status: doing
       - id: "6.7"
         slug: overfitting-statistics
         title: "Overfitting Statistics: PSR, DSR, MinTRL & PBO"
@@ -426,7 +426,7 @@ units:
         prereqs: ["6.6", "5.2"]
         owns: [probabilistic Sharpe ratio, deflated Sharpe ratio, minimum track record length, probability of backtest overfitting, CSCV, false strategy theorem, number of trials]
         deps: [core]
-        status: planned
+        status: doing
       - id: "6.8"
         slug: lab-research-protocol
         title: "Lab: The Research Protocol"
@@ -435,7 +435,7 @@ units:
         prereqs: ["6.7"]
         owns: [trial log, parameter sweep, experiment tracking, go/no-go memo]
         deps: [core, backtest, tracking]
-        status: planned
+        status: doing
 
   - id: 7
     slug: factor-investing
@@ -488,7 +488,7 @@ units:
         prereqs: ["7.4"]
         owns: [causal graph, confounder, collider, specification error, factor mirage]
         deps: [core]
-        status: planned
+        status: doing
 
   - id: 8
     slug: strategy-families
@@ -505,7 +505,7 @@ units:
         prereqs: ["6.8", "2.4", "5.5"]
         owns: [time-series momentum, trend following, EWMA crossover, volatility scaling, forecast]
         deps: [core]
-        status: planned
+        status: doing
       - id: "8.2"
         slug: cross-sectional-momentum
         title: Cross-Sectional Momentum & Reversal

@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- nav:head -->
+<title>5.3 · Bayesian Thinking: Priors, Shrinkage &amp; Updating</title>
+<meta name="description" content="Priors, posteriors and shrinkage — the machinery behind Ledoit-Wolf, Black-Litterman and Kalman filters, and the honest answer to &quot;is my Sharpe real?&quot;">
+<link rel="canonical" href="https://georgevrs.github.io/quant-notebook/unit05-statistics-time-series/session03-bayesian-thinking.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Quant Notebook">
+<meta property="og:title" content="5.3 · Bayesian Thinking: Priors, Shrinkage &amp; Updating">
+<meta property="og:description" content="Priors, posteriors and shrinkage — the machinery behind Ledoit-Wolf, Black-Litterman and Kalman filters, and the honest answer to &quot;is my Sharpe real?&quot;">
+<meta property="og:url" content="https://georgevrs.github.io/quant-notebook/unit05-statistics-time-series/session03-bayesian-thinking.html">
+<meta name="twitter:card" content="summary">
+<link rel="stylesheet" href="../assets/brand.css">
+<link rel="stylesheet" href="../assets/temml.css">
+<!-- /nav:head -->
+</head>
+<body><div class="page" id="top">
+<!-- Session 5.3 — priors, posteriors, conjugate priors, credible intervals, empirical Bayes and
+     shrinkage, applied to estimating a Sharpe ratio. See AUTHORING.md. -->
+<!-- nav:tabs -->
+<nav class="tabs">
+<a href="../index.html">⌂ Course home</a>
+<span class="soon" title="Coming soon">5.1 · Stylized Facts</span>
+<span class="soon" title="Coming soon">5.2 · Honest Inference</span>
+<a class="active" href="session03-bayesian-thinking.html">5.3 · Bayesian Thinking</a>
+<span class="soon" title="Coming soon">5.4 · Stationarity &amp; ARMA</span>
+<span class="soon" title="Coming soon">5.5 · Volatility</span>
+<span class="soon" title="Coming soon">5.6 · Cointegration</span>
+<span class="soon" title="Coming soon">5.7 · Kalman &amp; Regimes</span>
+<a href="../roadmap.html">🗺 Roadmap</a>
+</nav>
+<!-- /nav:tabs -->
+
+<header class="cover">
+<!-- nav:heading -->
+<p class="eyebrow">Unit 5 · Statistics &amp; Time Series of Returns — Session 03 of 07</p>
+<h1>Bayesian Thinking: Priors, Shrinkage &amp; Updating</h1>
+<!-- /nav:heading -->
+<p class="subtitle">You will never know a fund's true Sharpe ratio — only a noisy guess built from a few years of history, and the shorter the history the noisier the guess. Bayesian thinking is a disciplined way to combine that guess with what you already know about the shelf of funds it came from. <mark>The core move: don't trust a noisy number at face value — shrink it toward what similar numbers usually turn out to be, by exactly as much as its own uncertainty deserves.</mark></p>
+<div class="meta">
+<span>DURATION <b>1.5 h + lab</b></span>
+<span>LEVEL <b>Intermediate</b></span>
+<span>TRACKS <b>QR · QT · IND</b></span>
+<span>HANDS-ON <b>200 synthetic funds, shrunk and scored against the truth and the future</b></span>
+</div>
+<!-- nav:labstrip -->
+<div class="labstrip"><b>📓 Companion lab</b>
+<a href="https://colab.research.google.com/github/georgevrs/quant-notebook/blob/main/labs/u05/s03_bayesian_thinking.ipynb">Open in Colab</a>
+<a href="https://github.com/georgevrs/quant-notebook/blob/main/labs/u05/s03_bayesian_thinking.ipynb">Notebook on GitHub</a>
+<a href="https://github.com/georgevrs/quant-notebook/blob/main/labs/u05/s03_bayesian_thinking.py">Source (.py)</a>
+</div>
+<!-- /nav:labstrip -->
+<div class="toc">
+<b>On this page</b>
+<ol>
+<li><a href="#s1">One estimate is never the whole story</a></li>
+<li><a href="#s2">How Bayesian updating works</a></li>
+<li><a href="#s3">Credible intervals vs confidence intervals</a></li>
+<li><a href="#s4">Shrinkage across a shelf of funds: empirical Bayes</a></li>
+<li><a href="#s5">In code</a></li>
+<li><a href="#s6">Where people go wrong: the leaderboard illusion</a></li>
+<li><a href="#s7">Try it</a></li>
+<li><a href="#s8">Glossary · Check yourself · Go deeper</a></li>
+</ol>
+</div>
+</header>
+
+<main>
+
+<section id="s1">
+<h2><span class="no">5.3.1</span> One estimate is never the whole story</h2>
+<p class="lede">A Sharpe ratio computed from a few years of daily returns carries a lot of sampling noise — and you already have information about what Sharpe ratios usually look like, before you ever see this one.</p>
+
+<p>In <a class="xref" href="../unit03-math-toolkit/session01-probability-expected-value.html" data-xref="3.1" data-auto="">Session 3.1 — Probability &amp; Expected Value</a> you met <a class="term" href="../unit03-math-toolkit/session01-probability-expected-value.html#g-bayes-rule" data-term="Bayes&#x27; rule">Bayes' rule</a> as a way to turn "how likely is the data, given a hypothesis" into "how likely is the hypothesis, given the data." This session applies exactly that idea to a number every quant eventually has to answer for: is a strategy's <a class="term" href="../unit02-markets-instruments/session03-returns-pnl-leverage.html#g-sharpe-ratio" data-term="Sharpe ratio">Sharpe ratio</a> real, or mostly luck? The machinery for doing this honestly has three pieces. The <strong>prior</strong> is what you believed about a quantity before seeing this particular piece of data — for a fund's true skill, a sensible prior is "most funds on this shelf cluster around a modest number, with only a few genuine standouts," the same instinct behind the <a class="term" href="../unit01-quant-landscape/session04-engineers-edge-and-odds.html#g-base-rate" data-term="base rate">base rate</a> reasoning from <a class="xref" href="../unit01-quant-landscape/session04-engineers-edge-and-odds.html" data-xref="1.4" data-auto="">Session 1.4 — The Engineer&#x27;s Edge, Blind Spots &amp; Honest Odds</a>, made quantitative. The <strong>likelihood</strong> is how probable the observed data is for each possible value of the unknown quantity — here, how likely a given noisy Sharpe estimate is if the fund's true skill were some particular number. The <strong>posterior</strong> is the updated belief once you combine the two: literally prior × likelihood, rescaled to sum to one, which is Bayes' rule again, just applied to a whole distribution of possible skill levels instead of a single yes/no hypothesis.</p>
+
+<p>Concretely: suppose the shelf of strategies you run has true annual Sharpe ratios that look Normal with mean <span data-lab="mu0" data-fmt=".2f">0.20</span> and standard deviation <span data-lab="tau0" data-fmt=".2f">0.30</span> — call these <math><semantics><msub><mi>μ</mi><mn>0</mn></msub><annotation encoding="application/x-tex">\mu_0</annotation></semantics></math> and <math><semantics><msub><mi>σ</mi><mn>0</mn></msub><annotation encoding="application/x-tex">\sigma_0</annotation></semantics></math> (reusing this course's letters for "a mean" and "a standard deviation," just applied to a cross-section of Sharpe ratios rather than to a return series). A particular fund reports an annualised Sharpe of <math><semantics><mi>y</mi><annotation encoding="application/x-tex">y</annotation></semantics></math>, estimated from <math><semantics><mi>Y</mi><annotation encoding="application/x-tex">Y</annotation></semantics></math> years of daily excess returns, with <a class="term" href="../unit03-math-toolkit/session01-probability-expected-value.html#g-standard-error" data-term="standard error">standard error</a> <math><semantics><mi>s</mi><annotation encoding="application/x-tex">s</annotation></semantics></math> (the <span class="term soon" data-term="standard error of the Sharpe ratio" title="Defined in Session 5.2 (coming soon)">standard error of the Sharpe ratio</span> is derived in <span class="xref soon" data-xref="5.2" data-auto="" title="Coming soon">Session 5.2 — Regression &amp; Inference That Doesn&#x27;t Lie</span>; here we only need the number it produces). One particular simulated fund, with <span data-lab="ex_years" data-fmt=".0f">3</span> years of history and — unknown to any analyst — a true Sharpe of <span data-lab="ex_true_theta" data-fmt=".2f">0.55</span>, happens to report <math><semantics><mrow><mi>y</mi><mo>=</mo></mrow><annotation encoding="application/x-tex">y =</annotation></semantics></math> <span data-lab="ex_sr_hat" data-fmt="+.2f">+0.15</span>, with standard error <math><semantics><mrow><mi>s</mi><mo>=</mo></mrow><annotation encoding="application/x-tex">s =</annotation></semantics></math> <span data-lab="ex_se" data-fmt=".2f">0.58</span>. That standard error is enormous next to the estimate itself — three years of daily data barely constrains an annual Sharpe ratio at all.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 230" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">TWO SOURCES OF INFORMATION, ONE BELIEF</text>
+  <rect x="55" y="34" width="230" height="82" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="170" y="60" font-size="12.5" font-weight="700" text-anchor="middle" fill="#3A56C5">PRIOR</text>
+  <text x="170" y="79" font-size="9.5" text-anchor="middle" fill="#4A5A68">what the shelf of funds</text>
+  <text x="170" y="93" font-size="9.5" text-anchor="middle" fill="#4A5A68">usually looks like</text>
+  <text x="170" y="107" font-size="9" text-anchor="middle" fill="#4A5A68" font-family="IBM Plex Mono,monospace">precision 1/&#963;&#8320;&#178;</text>
+  <rect x="435" y="34" width="230" height="82" rx="9" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="550" y="60" font-size="12.5" font-weight="700" text-anchor="middle" fill="#8A6D00">LIKELIHOOD</text>
+  <text x="550" y="79" font-size="9.5" text-anchor="middle" fill="#4A5A68">this fund's own noisy</text>
+  <text x="550" y="93" font-size="9.5" text-anchor="middle" fill="#4A5A68">estimate, y &#177; s</text>
+  <text x="550" y="107" font-size="9" text-anchor="middle" fill="#4A5A68" font-family="IBM Plex Mono,monospace">precision 1/s&#178;</text>
+  <path d="M195 118 L275 168" stroke="#3A56C5" stroke-width="2" marker-end="url(#s1a)"/>
+  <path d="M525 118 L445 168" stroke="#B99B22" stroke-width="2" marker-end="url(#s1a)"/>
+  <rect x="270" y="168" width="180" height="52" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="360" y="190" font-size="12.5" font-weight="700" text-anchor="middle" fill="#1F7A55">POSTERIOR</text>
+  <text x="360" y="207" font-size="9.5" text-anchor="middle" fill="#4A5A68">precision-weighted blend</text>
+  <text x="360" y="18" font-size="1" fill="none"> </text>
+  <defs><marker id="s1a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F2C38"/></marker></defs>
+</svg>
+<figcaption>fig 5.3.1 — the posterior leans toward whichever source is more precise: a tight prior or a long, calm track record</figcaption>
+</figure>
+
+<div class="co key"><span class="co-t">📌 Key idea — precision, not vote-counting</span>
+<p>Combining a prior and a likelihood is not "average the two numbers." It is a <strong>precision</strong>-weighted average: whichever source has the smaller variance (the tighter, more confident distribution) pulls the answer further toward itself. A fund with only a few years of data has a wide, imprecise likelihood, so the prior dominates; a fund with a long, calm history has a narrow likelihood and keeps most of its own signal.</p>
+</div>
+</section>
+
+<section id="s2">
+<h2><span class="no">5.3.2</span> How Bayesian updating works</h2>
+<p class="lede">The same five-step recipe handles every conjugate-prior problem in this session, whether the unknown is a Sharpe ratio or a win rate.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 150" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <rect x="18" y="40" width="128" height="62" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="82" y="64" font-size="10.5" text-anchor="middle" fill="#3A56C5" font-weight="600">1 &#183; STATE</text>
+  <text x="82" y="78" font-size="9.5" text-anchor="middle" fill="#4A5A68">a prior</text>
+  <text x="82" y="91" font-size="9.5" text-anchor="middle" fill="#4A5A68">&#956;&#8320;, &#963;&#8320; (or a0, b0)</text>
+  <rect x="166" y="40" width="128" height="62" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="230" y="64" font-size="10.5" text-anchor="middle" fill="#3A56C5" font-weight="600">2 &#183; COLLECT</text>
+  <text x="230" y="78" font-size="9.5" text-anchor="middle" fill="#4A5A68">the data</text>
+  <text x="230" y="91" font-size="9.5" text-anchor="middle" fill="#4A5A68">y and its noise s</text>
+  <rect x="314" y="40" width="128" height="62" rx="9" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="378" y="64" font-size="10.5" text-anchor="middle" fill="#8A6D00" font-weight="600">3 &#183; WEIGH</text>
+  <text x="378" y="78" font-size="9.5" text-anchor="middle" fill="#4A5A68">by precision</text>
+  <text x="378" y="91" font-size="9.5" text-anchor="middle" fill="#4A5A68">1/&#963;&#8320;&#178; vs 1/s&#178;</text>
+  <rect x="462" y="40" width="128" height="62" rx="9" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="526" y="64" font-size="10.5" text-anchor="middle" fill="#8A6D00" font-weight="600">4 &#183; COMBINE</text>
+  <text x="526" y="78" font-size="9.5" text-anchor="middle" fill="#4A5A68">conjugate update</text>
+  <text x="526" y="91" font-size="9.5" text-anchor="middle" fill="#4A5A68">closed form, no fitting</text>
+  <rect x="610" y="40" width="96" height="62" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="658" y="64" font-size="10.5" text-anchor="middle" fill="#1F7A55" font-weight="600">5 &#183; REPORT</text>
+  <text x="658" y="78" font-size="9.5" text-anchor="middle" fill="#4A5A68">posterior +</text>
+  <text x="658" y="91" font-size="9.5" text-anchor="middle" fill="#4A5A68">credible interval</text>
+  <path d="M148 71 H164" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M296 71 H312" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M444 71 H460" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M592 71 H608" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <text x="360" y="130" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">A conjugate prior makes step 4 algebra instead of numerical integration.</text>
+  <defs><marker id="s2a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F2C38"/></marker></defs>
+</svg>
+<figcaption>fig 5.3.2 — the update loop this whole session runs, for any conjugate pair</figcaption>
+</figure>
+
+<p>A <strong>conjugate prior</strong> is a prior family chosen so that, once combined with a particular likelihood, the posterior lands back in the same family — a Normal prior updated by Normal noise gives a Normal posterior; a Beta prior updated by Bernoulli trials gives a Beta posterior. That is the whole appeal: step 4 in fig 5.3.2 is arithmetic, not a numerical integration or an MCMC run. The table below covers the two conjugate pairs this session uses, plus a third you will recognise later.</p>
+
+<table>
+<thead><tr><th>Data look like…</th><th>Prior</th><th>Posterior after the data</th><th>A quant example</th></tr></thead>
+<tbody>
+<tr><td>Normal, known variance <math><semantics><msup><mi>s</mi><mn class="tml-sml-pad">2</mn></msup><annotation encoding="application/x-tex">s^2</annotation></semantics></math></td><td>Normal(<math><semantics><msub><mi>μ</mi><mn>0</mn></msub><annotation encoding="application/x-tex">\mu_0</annotation></semantics></math>, <math><semantics><msubsup><mi>σ</mi><mn>0</mn><mn>2</mn></msubsup><annotation encoding="application/x-tex">\sigma_0^2</annotation></semantics></math>)</td><td>Normal, precision-weighted mean and combined precision</td><td>Shrinking a Sharpe ratio or an alpha estimate (§5.3.4; <span class="xref soon" data-xref="9.2" data-auto="" title="Coming soon">Session 9.2 — Covariance Estimation</span>, <span class="xref soon" data-xref="9.6" data-auto="" title="Coming soon">Session 9.6 — Optimization with Constraints &amp; Costs</span>)</td></tr>
+<tr><td>Bernoulli/Binomial, <math><semantics><mi>n</mi><annotation encoding="application/x-tex">n</annotation></semantics></math> trials</td><td>Beta(<math><semantics><msub><mi>a</mi><mn>0</mn></msub><annotation encoding="application/x-tex">a_0</annotation></semantics></math>, <math><semantics><msub><mi>b</mi><mn>0</mn></msub><annotation encoding="application/x-tex">b_0</annotation></semantics></math>)</td><td>Beta(<math><semantics><mrow><msub><mi>a</mi><mn>0</mn></msub><mo>+</mo><mi>x</mi></mrow><annotation encoding="application/x-tex">a_0+x</annotation></semantics></math>, <math><semantics><mrow><msub><mi>b</mi><mn>0</mn></msub><mo>+</mo><mi>n</mi><mo>−</mo><mi>x</mi></mrow><annotation encoding="application/x-tex">b_0+n-x</annotation></semantics></math>)</td><td>A strategy's win rate after its first <math><semantics><mi>n</mi><annotation encoding="application/x-tex">n</annotation></semantics></math> trades (§5.3.2)</td></tr>
+<tr><td>Poisson counts per interval</td><td>Gamma(<math><semantics><msub><mi>α</mi><mn>0</mn></msub><annotation encoding="application/x-tex">\alpha_0</annotation></semantics></math>, <math><semantics><msub><mi>β</mi><mn>0</mn></msub><annotation encoding="application/x-tex">\beta_0</annotation></semantics></math>)</td><td>Gamma(<math><semantics><mrow><msub><mi>α</mi><mn>0</mn></msub><mo>+</mo><mrow><mi mathvariant="normal">Σ</mi><mspace></mspace></mrow><msub><mi>x</mi><mi>i</mi></msub></mrow><annotation encoding="application/x-tex">\alpha_0+\Sigma x_i</annotation></semantics></math>, <math><semantics><mrow><msub><mi>β</mi><mn>0</mn></msub><mo>+</mo><mi>n</mi></mrow><annotation encoding="application/x-tex">\beta_0+n</annotation></semantics></math>)</td><td>Fills, corporate actions or order arrivals per day</td></tr>
+</tbody>
+</table>
+
+<p>The Beta-Binomial pair is worth one worked pass because it is the conjugate update you will reach for most often outside of means: any time the unknown is a probability. Suppose a new strategy's true (unobservable) win rate is <span data-lab="beta_p_true" data-fmt=".0%">55%</span>, and before seeing a single trade you hold a weakly informative prior Beta(<span data-lab="beta_a0" data-fmt=".0f">4</span>, <span data-lab="beta_b0" data-fmt=".0f">4</span>) — centred at a coin flip, worth about <span data-lab="beta_a0" data-fmt=".0f">4</span> + <span data-lab="beta_b0" data-fmt=".0f">4</span> = 8 pseudo-trades of conviction. After <span data-lab="beta_n_trades" data-fmt=".0f">20</span> real trades with <span data-lab="beta_k_example" data-fmt=".0f">14</span> wins, the raw hit rate is <span data-lab="beta_mle" data-fmt=".1%">70.0%</span>, but the posterior mean — literally (<math><semantics><mrow><msub><mi>a</mi><mn>0</mn></msub><mo>+</mo><mi>x</mi></mrow><annotation encoding="application/x-tex">a_0+x</annotation></semantics></math>)/(<math><semantics><mrow><msub><mi>a</mi><mn>0</mn></msub><mo>+</mo><msub><mi>b</mi><mn>0</mn></msub><mo>+</mo><mi>n</mi></mrow><annotation encoding="application/x-tex">a_0+b_0+n</annotation></semantics></math>) — is only <span data-lab="beta_post_mean" data-fmt=".1%">64.3%</span>: the prior's 8 pseudo-trades still count for a third of the total evidence at <math><semantics><mrow><mi>n</mi><mo>=</mo><mn>20</mn></mrow><annotation encoding="application/x-tex">n=20</annotation></semantics></math>. Run the same strategy for <span data-lab="beta_n_trades_large" data-fmt=",.0f">2,000</span> trades instead, and the prior's 8 pseudo-trades barely register.</p>
+
+<div class="co tip"><span class="co-t">💡 Looking ahead</span>
+<p>Every later use of shrinkage in this course is this same conjugate Normal-Normal update wearing a different hat: Ledoit-Wolf covariance shrinkage in <span class="xref soon" data-xref="9.2" data-auto="" title="Coming soon">Session 9.2 — Covariance Estimation</span> blends a noisy sample covariance matrix with a well-behaved target the same way you are about to blend a noisy Sharpe estimate with a shelf-wide average; Black-Litterman in <span class="xref soon" data-xref="9.6" data-auto="" title="Coming soon">Session 9.6 — Optimization with Constraints &amp; Costs</span> blends an investor's views with the market's implied returns; a <span class="xref soon" data-xref="5.7" data-auto="" title="Coming soon">Session 5.7 — Kalman Filters &amp; Regime Models</span> Kalman filter runs this exact update every single time step, on a hedge ratio instead of a Sharpe ratio.</p>
+</div>
+</section>
+
+<section id="s3">
+<h2><span class="no">5.3.3</span> Credible intervals vs confidence intervals</h2>
+<p class="lede">Two intervals from the same data, at the same 95% label, answer two different questions — and mixing them up is one of the most common statistics mistakes in finance.</p>
+
+<p>The posterior from §5.3.1 is itself Normal, with mean and variance given by combining precisions:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><msub><mi>μ</mi><mtext>post</mtext></msub><mo>=</mo><mfrac><mrow><mstyle displaystyle="true" scriptlevel="0"><mfrac><msub><mi>μ</mi><mn>0</mn></msub><msubsup><mi>σ</mi><mn>0</mn><mn>2</mn></msubsup></mfrac></mstyle><mo>+</mo><mstyle displaystyle="true" scriptlevel="0"><mfrac><mi>y</mi><msup><mi>s</mi><mn class="tml-sml-pad">2</mn></msup></mfrac></mstyle></mrow><mrow><mstyle displaystyle="true" scriptlevel="0"><mfrac><mn>1</mn><msubsup><mi>σ</mi><mn>0</mn><mn>2</mn></msubsup></mfrac></mstyle><mo>+</mo><mstyle displaystyle="true" scriptlevel="0"><mfrac><mn>1</mn><msup><mi>s</mi><mn class="tml-sml-pad">2</mn></msup></mfrac></mstyle></mrow></mfrac><mo separator="true">,</mo><mspace width="2em"></mspace><mfrac><mn>1</mn><msubsup><mi>σ</mi><mtext>post</mtext><mn>2</mn></msubsup></mfrac><mo>=</mo><mfrac><mn>1</mn><msubsup><mi>σ</mi><mn>0</mn><mn>2</mn></msubsup></mfrac><mo>+</mo><mfrac><mn>1</mn><msup><mi>s</mi><mn class="tml-sml-pad">2</mn></msup></mfrac></mrow><annotation encoding="application/x-tex">\mu_{\text{post}} = \frac{\dfrac{\mu_0}{\sigma_0^2} + \dfrac{y}{s^2}}{\dfrac{1}{\sigma_0^2} + \dfrac{1}{s^2}}, \qquad \frac{1}{\sigma_{\text{post}}^2} = \frac{1}{\sigma_0^2} + \frac{1}{s^2}</annotation></semantics></math></div>
+<p>which rearranges into the shrinkage form this whole session is built on — a weight <math><semantics><mrow><mi>k</mi><mo>=</mo><msubsup><mi>σ</mi><mn>0</mn><mn>2</mn></msubsup><mi>/</mi><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><msubsup><mi>σ</mi><mn>0</mn><mn>2</mn></msubsup><mo>+</mo><msup><mi>s</mi><mn class="tml-sml-pad">2</mn></msup><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">k = \sigma_0^2/(\sigma_0^2+s^2)</annotation></semantics></math>, between 0 and 1, that the data keeps:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><msub><mi>μ</mi><mtext>post</mtext></msub><mo>=</mo><msub><mi>μ</mi><mn>0</mn></msub><mo>+</mo><mi>k</mi><mspace width="0.1667em"></mspace><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>y</mi><mo>−</mo><msub><mi>μ</mi><mn>0</mn></msub><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">\mu_{\text{post}} = \mu_0 + k\,(y - \mu_0)</annotation></semantics></math></div>
+<p>For the fund in §5.3.1, <math><semantics><mrow><mi>k</mi><mo>=</mo></mrow><annotation encoding="application/x-tex">k =</annotation></semantics></math> <span data-lab="ex_w" data-fmt=".1%">21.3%</span>: only about a fifth of the raw estimate's deviation from the shelf average survives, so the posterior mean is <span data-lab="ex_post_mean" data-fmt="+.2f">+0.19</span> — pulled <span data-lab="ex_shrink_pct" data-fmt=".0%">79%</span> of the way back to the prior. A <strong>credible interval</strong> is then the posterior's own central range: <span data-lab="ex_post_mean" data-fmt="+.3f">+0.189</span> <math><semantics><mo form="prefix" stretchy="false" lspace="0em" rspace="0em">±</mo><annotation encoding="application/x-tex">\pm</annotation></semantics></math> 1.96 <math><semantics><mo form="prefix" stretchy="false" lspace="0em" rspace="0em">×</mo><annotation encoding="application/x-tex">\times</annotation></semantics></math> <span data-lab="ex_post_sd" data-fmt=".3f">0.266</span> gives <span data-lab="ex_cred_lo" data-fmt="+.2f">−0.33</span> to <span data-lab="ex_cred_hi" data-fmt="+.2f">+0.71</span> — a direct statement that, if the prior is right, there is a 95% chance the fund's true Sharpe lies in that range. The plain 95% confidence interval on the raw estimate, <math><semantics><mrow><mi>y</mi><mo>±</mo><mn>1.96</mn><mi>s</mi></mrow><annotation encoding="application/x-tex">y \pm 1.96s</annotation></semantics></math>, is <span data-lab="ex_ci_lo" data-fmt="+.2f">−0.98</span> to <span data-lab="ex_ci_hi" data-fmt="+.2f">+1.28</span> — <span data-lab="ex_width_ratio" data-fmt=".0%">46%</span> wider, because it borrows no information from the shelf at all.</p>
+
+<table>
+<thead><tr><th>Aspect</th><th>Confidence interval</th><th>Credible interval</th></tr></thead>
+<tbody>
+<tr><td>What varies</td><td>the interval, across repeated samples; the true value is fixed</td><td>your belief about the true value, given this one sample</td></tr>
+<tr><td>"95%" means</td><td>95% of intervals built this way, over many repetitions, would contain the truth</td><td>given the prior and this data, 95% posterior probability the truth is in here</td></tr>
+<tr><td>Needs a prior?</td><td>no</td><td>yes — and a bad prior gives a confidently wrong answer</td></tr>
+<tr><td>Width, small sample</td><td>wide — all the uncertainty is the data's own noise</td><td>narrower — borrows precision from the shelf</td></tr>
+</tbody>
+</table>
+
+<p>The subtlety practitioners trip over: a 95% confidence interval's guarantee is <em>unconditional</em> — averaged over every sample you might have drawn, before you saw which fund you'd be asked about. It says nothing about THIS particular interval once you have already picked this fund out for looking impressive (§5.3.6 makes that concrete with real numbers). A correctly-specified credible interval, conditional on the stated prior, is the number people actually want when they ask "how sure are we" — but it is only as honest as the prior behind it, which is exactly what empirical Bayes (§5.3.4) tries to make defensible: estimate that prior from data instead of asserting it.</p>
+
+<div class="co note"><span class="co-t">🧭 Margin note — a known cost of "empirical" Bayes</span>
+<p>Estimating <math><semantics><msub><mi>μ</mi><mn>0</mn></msub><annotation encoding="application/x-tex">\mu_0</annotation></semantics></math> and <math><semantics><msub><mi>σ</mi><mn>0</mn></msub><annotation encoding="application/x-tex">\sigma_0</annotation></semantics></math> from the same cross-section you are shrinking (§5.3.4) is called <strong>empirical Bayes</strong>, and it works well in practice, but it quietly treats the estimated <math><semantics><msub><mi>σ</mi><mn>0</mn></msub><annotation encoding="application/x-tex">\sigma_0</annotation></semantics></math> as if it were known for certain — understating uncertainty a little. Across the 200-fund experiment in §5.3.4, the resulting credible intervals cover the true Sharpe about <span data-lab="cover_cred_all" data-fmt=".1%">91.5%</span> of the time, not quite the nominal 95%. A fully Bayesian treatment fixes this with a hyperprior on <math><semantics><msub><mi>σ</mi><mn>0</mn></msub><annotation encoding="application/x-tex">\sigma_0</annotation></semantics></math> itself, at the cost of losing the closed form — a refinement this course does not need for what follows, but worth knowing exists (Morey et al., 2016, make the general point that "95%" is easy to overclaim either way).</p>
+</div>
+</section>
+
+<section id="s4">
+<h2><span class="no">5.3.4</span> Shrinkage across a shelf of funds: empirical Bayes</h2>
+<p class="lede">With one fund, you have to guess a prior. With many funds drawn from the same shelf, the shelf itself tells you the prior — and shrinking every estimate by it beats trusting each one at face value.</p>
+
+<p><strong>Shrinkage</strong> is the general move of pulling a noisy estimate part-way toward a more stable target to lower its expected error — and <strong>empirical Bayes</strong> is the specific trick of estimating that target, and how hard to pull, directly from the same batch of noisy estimates, using each one's own known noise level. James and Stein (1961) proved something startling about this: once you are estimating three or more unrelated-looking quantities at once, shrinking every one of them toward their common average — even quantities that have nothing to do with each other, like a batter's average and a bond's default rate — lowers the *total* squared error, even though no individual quantity is helped by data from the others. Efron and Morris's (1977) illustration is now a classic: shrinking 1970 batting averages toward the league mean cut total squared prediction error from 0.086 to 0.027 — about <span data-lab="beta_mse_reduction_small" data-fmt=".0f">0</span>x lower — using nothing but the 18 players' own early-season numbers pulled toward each other. A fund's Sharpe ratio is exactly this kind of quantity: it looks like a fact about one fund, but a shelf of them shares a common, estimable backdrop.</p>
+
+<p>The lab draws <math><semantics><mrow><mi>N</mi><mo>=</mo></mrow><annotation encoding="application/x-tex">N=</annotation></semantics></math> <span data-lab="n_funds" data-fmt=",.0f">200</span> synthetic funds' true annual Sharpe ratios from the same shelf as §5.3.1, Normal(<math><semantics><mrow><msub><mi>μ</mi><mn>0</mn></msub><mo>=</mo></mrow><annotation encoding="application/x-tex">\mu_0=</annotation></semantics></math><span data-lab="mu0" data-fmt=".2f">0.20</span>, <math><semantics><mrow><msub><mi>σ</mi><mn>0</mn></msub><mo>=</mo></mrow><annotation encoding="application/x-tex">\sigma_0=</annotation></semantics></math><span data-lab="tau0" data-fmt=".2f">0.30</span>) — loosely motivated by the finding that most mutual funds show no true skill once luck is priced out (75.4% zero-alpha, versus only 0.6% genuinely skilled, per Barras, Scaillet &amp; Wermers, 2010): a realistic shelf should put most of its mass near a modest number, not assume every fund is equally likely to be a star. Every fund shares the same 15% annual volatility and a risk-free rate of 0, so only track-record length and luck can explain what follows: 50 funds each have 2, 3, 5 and 10 years of daily history. Since we generated the data, we know each fund's true <math><semantics><msub><mi>θ</mi><mi>i</mi></msub><annotation encoding="application/x-tex">\theta_i</annotation></semantics></math> — which lets us score the estimators honestly, something no real analyst ever gets to do.</p>
+
+<p>Instead of assuming <math><semantics><msub><mi>μ</mi><mn>0</mn></msub><annotation encoding="application/x-tex">\mu_0</annotation></semantics></math> and <math><semantics><msub><mi>σ</mi><mn>0</mn></msub><annotation encoding="application/x-tex">\sigma_0</annotation></semantics></math> are known, <strong>empirical Bayes</strong> estimates them from the 200 estimates themselves — the grand mean, and the cross-sectional variance left over once each fund's own sampling noise is subtracted out:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><msub><mover><mi>μ</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><mn>0</mn></msub><mo>=</mo><mfrac><mn>1</mn><mi>N</mi></mfrac><mrow><munder><mo movablelimits="false">∑</mo><mi>i</mi></munder></mrow><msub><mi>y</mi><mi>i</mi></msub><mo separator="true">,</mo><mspace width="2em"></mspace><msubsup><mover><mi>σ</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><mn>0</mn><mn>2</mn></msubsup><mo>=</mo><mrow><mi>max</mi><mo>⁡</mo><mspace width="0.1667em"></mspace></mrow><mrow style="margin-left:-0.1667em;"></mrow><mo fence="false" symmetric="true" minsize="1.8em" maxsize="1.8em">(</mo><mn>0</mn><mo separator="true">,</mo><mtext> </mtext><msubsup><mi>s</mi><mi>y</mi><mn class="tml-sml-pad">2</mn></msubsup><mo>−</mo><mfrac><mn>1</mn><mi>N</mi></mfrac><mrow><munder><mo movablelimits="false">∑</mo><mi>i</mi></munder></mrow><msubsup><mi>s</mi><mi>i</mi><mn class="tml-sml-pad">2</mn></msubsup><mo fence="false" symmetric="true" minsize="1.8em" maxsize="1.8em">)</mo></mrow><annotation encoding="application/x-tex">\hat\mu_0 = \frac{1}{N}\sum_i y_i, \qquad \hat\sigma_0^2 = \max\!\Big(0,\ s_y^2 - \frac{1}{N}\sum_i s_i^2\Big)</annotation></semantics></math></div>
+<p>where <math><semantics><msubsup><mi>s</mi><mi>y</mi><mn class="tml-sml-pad">2</mn></msubsup><annotation encoding="application/x-tex">s_y^2</annotation></semantics></math> is the plain sample variance of the 200 estimates and <math><semantics><msub><mi>s</mi><mi>i</mi></msub><annotation encoding="application/x-tex">s_i</annotation></semantics></math> is fund <math><semantics><mi>i</mi><annotation encoding="application/x-tex">i</annotation></semantics></math>'s own standard error. In this run, <math><semantics><mrow><msub><mover><mi>σ</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><mn>0</mn></msub><mo>=</mo></mrow><annotation encoding="application/x-tex">\hat\sigma_0 =</annotation></semantics></math> <span data-lab="tau0_hat_avg" data-fmt=".3f">0.293</span>, close to the true <span data-lab="tau0" data-fmt=".2f">0.30</span>. Every fund is then shrunk by its own weight <math><semantics><mrow><msub><mi>k</mi><mi>i</mi></msub><mo>=</mo><msubsup><mover><mi>σ</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><mn>0</mn><mn>2</mn></msubsup><mi>/</mi><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><msubsup><mover><mi>σ</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><mn>0</mn><mn>2</mn></msubsup><mo>+</mo><msubsup><mi>s</mi><mi>i</mi><mn class="tml-sml-pad">2</mn></msubsup><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">k_i = \hat\sigma_0^2/(\hat\sigma_0^2+s_i^2)</annotation></semantics></math> — and because <math><semantics><msub><mi>s</mi><mi>i</mi></msub><annotation encoding="application/x-tex">s_i</annotation></semantics></math> shrinks with more years of data, the weight rises with track record:</p>
+
+<table>
+<thead><tr><th>Track record</th><th>Standard error of the Sharpe estimate</th><th>Weight kept on this fund's own data</th></tr></thead>
+<tbody>
+<tr><td>2 years</td><td>large — barely more than noise</td><td><span data-lab="weight_2y" data-fmt=".0%">12%</span></td></tr>
+<tr><td>3 years</td><td>still large</td><td><span data-lab="weight_3y" data-fmt=".0%">17%</span></td></tr>
+<tr><td>5 years</td><td>moderate</td><td><span data-lab="weight_5y" data-fmt=".0%">25%</span></td></tr>
+<tr><td>10 years</td><td>smallest here, but still substantial</td><td><span data-lab="weight_10y" data-fmt=".0%">40%</span></td></tr>
+</tbody>
+</table>
+
+<p>Even a decade of daily returns keeps under half the weight — a blunt reminder of how slowly Sharpe-ratio noise decays (§5.2's <span class="term soon" data-term="standard error of the Sharpe ratio" title="Defined in Session 5.2 (coming soon)">standard error of the Sharpe ratio</span> shows why: it falls only with the square root of years). Scored against the true <math><semantics><msub><mi>θ</mi><mi>i</mi></msub><annotation encoding="application/x-tex">\theta_i</annotation></semantics></math>, the shrunk estimates cut mean squared error from <span data-lab="mse_raw_theta" data-fmt=".3f">0.282</span> to <span data-lab="mse_shrunk_theta" data-fmt=".3f">0.068</span> — <span data-lab="mse_reduction_theta_pct" data-fmt=".0%">76%</span> lower. That comparison needs the (synthetic) truth, which real analysts never have; the realistic version scores each fund's shrunk and raw estimates against its OWN next <span data-lab="t_oos_years" data-fmt=".0f">3</span> years of live performance instead, and shrinkage still wins, cutting mean squared error by <span data-lab="mse_reduction_oos_pct" data-fmt=".0%">35%</span>.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 210" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">HOW MUCH A FUND TRUSTS ITS OWN NUMBER — vs the shelf average</text>
+  <text x="120" y="46" font-size="10.5" font-weight="600" text-anchor="middle" fill="#1F2C38">2-YEAR FUND</text>
+  <rect x="30" y="54" width="180" height="26" rx="4" fill="#F5F6F2" stroke="#C9CFC6"/>
+  <rect x="30" y="54" width="30" height="26" rx="4" fill="#3A56C5"/>
+  <text x="30" y="96" font-size="9" fill="#4A5A68">mostly the shelf average</text>
+  <text x="360" y="46" font-size="10.5" font-weight="600" text-anchor="middle" fill="#1F2C38">5-YEAR FUND</text>
+  <rect x="270" y="54" width="180" height="26" rx="4" fill="#F5F6F2" stroke="#C9CFC6"/>
+  <rect x="270" y="54" width="75" height="26" rx="4" fill="#3A56C5"/>
+  <text x="270" y="96" font-size="9" fill="#4A5A68">a real but modest lean on its own data</text>
+  <text x="610" y="46" font-size="10.5" font-weight="600" text-anchor="middle" fill="#1F2C38">10-YEAR FUND</text>
+  <rect x="510" y="54" width="180" height="26" rx="4" fill="#F5F6F2" stroke="#C9CFC6"/>
+  <rect x="510" y="54" width="115" height="26" rx="4" fill="#3A56C5"/>
+  <text x="510" y="96" font-size="9" fill="#4A5A68">still shrunk — never trust it alone</text>
+  <line x1="30" y1="120" x2="46" y2="120" stroke="#3A56C5" stroke-width="6"/>
+  <text x="52" y="123" font-size="9.5" fill="#4A5A68">this fund's own track record</text>
+  <line x1="230" y1="120" x2="246" y2="120" stroke="#C9CFC6" stroke-width="6"/>
+  <text x="252" y="123" font-size="9.5" fill="#4A5A68">the shelf average (the prior)</text>
+  <text x="360" y="160" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">Longer histories lean more on their own data, but the shelf average never disappears.</text>
+</svg>
+<figcaption>fig 5.3.3 — bar widths are illustrative, not lab numbers; the reference table above has the real weights</figcaption>
+</figure>
+
+<div class="co key"><span class="co-t">📌 Key idea — shrinkage helps on average, not case by case</span>
+<p>Shrinkage lowers <em>total</em> error across the shelf; it is not a promise about any one fund. The fund in §5.3.1 happened to have an unusually high true Sharpe (<span data-lab="ex_true_theta" data-fmt=".2f">0.55</span>), and its shrunk estimate (<span data-lab="ex_post_mean" data-fmt="+.2f">+0.19</span>) undersells it badly — an occasional, unavoidable cost. James-Stein shrinkage is a statement about the whole portfolio of estimates, exactly like a portfolio's risk is a statement about the whole book, not any one position.</p>
+</div>
+</section>
+
+<section id="s5">
+<h2><span class="no">5.3.5</span> In code</h2>
+<p class="lede">The empirical-Bayes step is short enough to hold in your head: two summary statistics from the cross-section, then one line per fund.</p>
+
+<pre><span class="c"># estimate the shelf's mean and spread from the cross-section itself</span>
+mu0_hat = float(sr_hat.mean())
+tau0_hat_sq = max(float(sr_hat.var(ddof=<span class="p">1</span>)) - float(np.mean(se ** <span class="p">2</span>)), <span class="p">0.0</span>)
+
+<span class="c"># shrink every fund by its own precision-weighted amount</span>
+k = tau0_hat_sq / (tau0_hat_sq + se ** <span class="p">2</span>)          <span class="c"># weight kept on this fund's own data</span>
+sr_shrunk = mu0_hat + k * (sr_hat - mu0_hat)
+post_sd = np.sqrt(k * se ** <span class="p">2</span>)                     <span class="c"># for a credible interval per fund</span></pre>
+
+<p>Two details worth naming because they are easy to get backwards. First, <code>se</code> is computed per fund from <span class="term soon" data-term="standard error of the Sharpe ratio" title="Defined in Session 5.2 (coming soon)">standard error of the Sharpe ratio</span> (already implemented; §5.2 derives it), <strong>not</strong> assumed equal across funds — that heterogeneity is exactly what makes the 2-year and 10-year funds shrink by different amounts. Second, the variance floor at <code>0.0</code> matters: with a noisy cross-section, the raw method-of-moments estimate of <math><semantics><msubsup><mover><mi>σ</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><mn>0</mn><mn>2</mn></msubsup><annotation encoding="application/x-tex">\hat\sigma_0^2</annotation></semantics></math> can go slightly negative (the average sampling noise can, by chance, exceed the observed spread of estimates), which is nonsense for a variance — clip it, or every fund's credible interval silently gets a negative width.</p>
+
+<p>The Beta-Binomial update from §5.3.2 is one line shorter, because Beta pseudo-counts add directly (here <math><semantics><mrow><msub><mi>a</mi><mn>0</mn></msub><mo>=</mo><msub><mi>b</mi><mn>0</mn></msub><mo>=</mo><mn>4</mn></mrow><annotation encoding="application/x-tex">a_0=b_0=4</annotation></semantics></math>, 20 trades, <math><semantics><mrow><mi>x</mi><mo>=</mo><mn>14</mn></mrow><annotation encoding="application/x-tex">x=14</annotation></semantics></math> wins, matching §5.3.2's numbers):</p>
+<pre><span class="c"># posterior after observing k_example wins out of N_TRADES trades</span>
+post_a, post_b = A0 + k_example, B0 + (N_TRADES - k_example)
+post_mean_beta = post_a / (post_a + post_b)</pre>
+</section>
+
+<section id="s6">
+<h2><span class="no">5.3.6</span> Where people go wrong: the leaderboard illusion</h2>
+<p class="lede">Ranking funds — or backtested strategies — by their raw trailing Sharpe ratio and trusting the top of the list is one of the most common, and most expensive, mistakes in manager selection.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 220" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">PICKING A FUND FROM A LEADERBOARD, TWO WAYS</text>
+  <rect x="26" y="32" width="326" height="176" rx="9" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="189" y="54" font-size="11" font-weight="700" text-anchor="middle" fill="#D64B2A">RANK BY RAW SHARPE</text>
+  <rect x="46" y="66" width="286" height="24" rx="5" fill="#fff" stroke="#F2CDBF"/>
+  <text x="58" y="82" font-size="9.5" fill="#1F2C38">sort all funds by trailing Sharpe</text>
+  <rect x="46" y="96" width="286" height="24" rx="5" fill="#fff" stroke="#F2CDBF"/>
+  <text x="58" y="112" font-size="9.5" fill="#1F2C38">interview only the top few</text>
+  <text x="189" y="148" font-size="9.5" text-anchor="middle" fill="#D64B2A" font-weight="600">the "best" fund is disproportionately a</text>
+  <text x="189" y="163" font-size="9.5" text-anchor="middle" fill="#D64B2A" font-weight="600">short-history fund that got lucky</text>
+  <text x="189" y="182" font-size="9" text-anchor="middle" fill="#4A5A68">regression to the mean, not skill</text>
+  <rect x="368" y="32" width="326" height="176" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="531" y="54" font-size="11" font-weight="700" text-anchor="middle" fill="#1F7A55">RANK BY SHRUNK SHARPE</text>
+  <rect x="388" y="66" width="286" height="24" rx="5" fill="#fff" stroke="#BFE0CF"/>
+  <text x="400" y="82" font-size="9.5" fill="#1F2C38">1 &#183; shrink every estimate first</text>
+  <rect x="388" y="96" width="286" height="24" rx="5" fill="#fff" stroke="#BFE0CF"/>
+  <text x="400" y="112" font-size="9.5" fill="#1F2C38">2 &#183; then sort, then interview</text>
+  <text x="531" y="148" font-size="9.5" text-anchor="middle" fill="#1F7A55" font-weight="600">survivors skew toward genuinely</text>
+  <text x="531" y="163" font-size="9.5" text-anchor="middle" fill="#1F7A55" font-weight="600">above-average, longer-tenured funds</text>
+  <text x="531" y="182" font-size="9" text-anchor="middle" fill="#4A5A68">a discount for noise, not a guess</text>
+</svg>
+<figcaption>fig 5.3.4 — same 200 funds, two rankings; only one of them is measuring skill</figcaption>
+</figure>
+
+<p>The 200-fund experiment in §5.3.4 makes this concrete. Among the top <span data-lab="top_frac" data-fmt=".0%">10%</span> of funds by raw Sharpe, <span data-lab="frac_shortest_top_raw" data-fmt=".0%">39%</span> are from the shortest (2-year) group — far above the <span data-lab="even_share_pct" data-fmt=".0%">25%</span> you would expect if track-record length made no difference. Shrinking first drops that share to <span data-lab="frac_shortest_top_shrunk" data-fmt=".0%">11%</span>: it specifically un-rewards the estimates most likely to be noise pretending to be skill. The pay-off shows up in the funds actually selected: the raw top-decile's average TRUE skill is only <span data-lab="mean_theta_top_raw" data-fmt=".3f">0.447</span>, versus <span data-lab="mean_theta_top_shrunk" data-fmt=".3f">0.483</span> for the shrunk top-decile — a real, if modest, improvement in what you would have actually picked.</p>
+
+<p>The interval story from §5.3.3 gets worse, not better, once you select on the estimate. Restricted to that same top decile, the plain 95% confidence interval — perfectly valid on average, across all 200 funds — covers the true Sharpe only <span data-lab="cover_ci_top" data-fmt=".0%">81%</span> of the time, versus <span data-lab="cover_ci_all" data-fmt=".0%">95%</span> unconditionally. The 95% credible interval, because it already discounted the noisiest estimates before anyone went looking for winners, holds up better among the same selected funds: <span data-lab="cover_cred_top" data-fmt=".0%">91%</span>.</p>
+
+<table>
+<thead><tr><th>Situation</th><th>Choose</th><th>Why</th></tr></thead>
+<tbody>
+<tr><td>A fund with a decade of calm history</td><td>trust it mostly</td><td>at 10 years it still keeps only <span data-lab="weight_10y" data-fmt=".0%">40%</span> weight on its own number — light shrinkage, not none</td></tr>
+<tr><td>A 2-year fund with a dazzling Sharpe</td><td>shrink hard before acting</td><td>its standard error dwarfs the shelf's spread, so most of "dazzling" is noise</td></tr>
+<tr><td>Ranking many funds or strategies to pick one</td><td>rank by the shrunk estimate</td><td>avoids rewarding exactly the funds most likely to be a lucky draw</td></tr>
+</tbody>
+</table>
+
+<div class="co warn"><span class="co-t">⚠️ Pitfall — "the top of the leaderboard is the best fund"</span>
+<p>Picking the single best-looking track record out of many candidates and taking its number at face value is a close cousin of the search bias <span class="xref soon" data-xref="6.7" data-auto="" title="Coming soon">Session 6.7 — Overfitting Statistics: PSR, DSR, MinTRL &amp; PBO</span> corrects for with the deflated Sharpe ratio when you have tried many BACKTESTS before finding this one. Here the funds already exist — you are not searching, just selecting — but the same regression-to-the-mean arithmetic applies: the estimate that looks best is, on average, the estimate that got the luckiest draw of noise, not the one with the most skill.</p>
+</div>
+</section>
+
+<section id="s7">
+<h2><span class="no">5.3.7</span> Try it</h2>
+<p class="lede">Two five-minute edits to the lab that make the shrinkage weight move, so you can feel what drives it.</p>
+
+<div class="co lab"><span class="co-t">🔧 Try it (10 min, in the lab)</span>
+<p>1 · In §1 of the lab, change <code>TAU0</code> (the shelf's assumed spread <math><semantics><msub><mi>σ</mi><mn>0</mn></msub><annotation encoding="application/x-tex">\sigma_0</annotation></semantics></math>) to <code>0.05</code>, then to <code>1.0</code>, and re-run just that cell. Watch the weight <code>ex_w</code> fall toward 0 (a tight shelf: everyone is basically the same, so your own number adds almost nothing) or rise toward 1 (a wide-open shelf: funds are so different that only your own track record tells you much). Which markets do you think look more like the first case, and which more like the second?<br>
+2 · In §3 of the lab, change <code>YEARS_GROUPS</code> from <code>[2, 3, 5, 10]</code> to <code>[1, 1, 1, 1]</code> (every fund is brand new) and re-run. Confirm the average shrinkage weight collapses close to zero across the board — with one year of daily noise, the empirical-Bayes machine correctly decides almost nothing distinguishes one fund from another yet.</p>
+</div>
+</section>
+
+<hr>
+
+<section id="s8">
+<h2><span class="no">5.3.8</span> Glossary · Check yourself · Go deeper</h2>
+<div class="gloss" id="glossary">
+<div id="g-prior"><b>Prior</b> — what you believe about an unknown quantity before seeing this particular piece of data, expressed as a probability distribution.</div>
+<div id="g-likelihood"><b>Likelihood</b> — how probable the observed data is, for each possible value of the unknown quantity.</div>
+<div id="g-posterior"><b>Posterior</b> — the updated belief after combining the prior and the likelihood: prior &#215; likelihood, rescaled to sum to one.</div>
+<div id="g-conjugate-prior"><b>Conjugate prior</b> — a prior family that, combined with a given likelihood, yields a posterior in the same family, so updating is algebra rather than numerical integration.</div>
+<div id="g-shrinkage"><b>Shrinkage</b> — pulling a noisy estimate part-way toward a more stable target (often a shared average) to lower its expected squared error.</div>
+<div id="g-credible-interval"><b>Credible interval</b> — a range from the posterior distribution that is stated to contain the true value with a given posterior probability, conditional on the prior.</div>
+<div id="g-empirical-bayes"><b>Empirical Bayes</b> — estimating a prior's own parameters from the same batch of data it will be used to update, instead of assuming them.</div>
+</div>
+
+<h3>Check yourself</h3>
+<details class="q"><summary>1. Two analysts each estimate a strategy's Sharpe ratio at 0.9 from three years of daily returns. One works at a firm running 200 similar strategies with a well-documented shelf average around 0.2; the other is evaluating a solo strategy with no comparable peer group. Should they trust the 0.9 equally?</summary><div>No. The first analyst has an estimable prior (the shelf) to shrink toward, and with only 3 years of data the standard error is large enough (§5.3.1: about 0.58 on a comparable fund) that most of "0.9" is likely noise — it should be pulled hard toward 0.2. The second analyst has no comparable shelf to borrow precision from, so the raw estimate — while still noisy — is the best available number; if anything, a weak, generic prior (e.g. "most strategies don't have huge edges") is still wiser than none.</div></details>
+<details class="q"><summary>2. Why does insisting on a conjugate prior make Bayesian updating practical, and what do you give up by insisting on one?</summary><div>A conjugate prior turns "combine a prior and a likelihood" into closed-form algebra (fig 5.3.2, step 4) instead of a numerical integration or a sampling-based method like MCMC — that is the entire reason Beta-Binomial and Normal-Normal updates show up everywhere in quick, practical estimation. What you give up is fidelity: your true belief about a quantity might not have the exact shape of a Beta or a Normal, and forcing it into a convenient family is an approximation. For the mean-estimation problems this course cares about (Sharpe ratios, alphas, hedge ratios), that approximation is usually reasonable.</div></details>
+<details class="q"><summary>3. A colleague shows you a 95% confidence interval and a 95% credible interval for the same fund's Sharpe ratio, and they don't overlap much. Which one would you rather hand to a client deciding whether to allocate, and why?</summary><div>Neither is automatically "more correct" — they answer different questions. The credible interval is the one that directly answers what a client actually wants ("how sure are we the true Sharpe is in this range, given everything we know"), but only if the prior behind it is defensible; a badly-chosen prior gives a confident, precise, wrong answer. An empirical-Bayes prior, estimated from a real shelf of comparable strategies (§5.3.4), is the most defensible version. If no credible shelf exists, the wider confidence interval is the more honest thing to show, precisely because it borrows nothing you cannot justify.</div></details>
+<details class="q"><summary>4. A manager-selection committee ranks 40 funds by trailing 2-year Sharpe ratio and interviews only the top 3. What is wrong with this filter, and what would you do instead?</summary><div>Ranking by the raw trailing Sharpe rewards exactly the funds whose estimates are most likely to be inflated by noise — with only 2 years of data the standard error is large, so the top of any such leaderboard is disproportionately short-history funds that got lucky (§5.3.6: 39% of the top decile here, versus a fair 25%). The fix is to shrink every fund's estimate toward the peer group's average by an amount that reflects its own standard error, THEN rank — which is exactly what cut the true-skill gap and cut the short-history over-representation in the lab.</div></details>
+<details class="q"><summary>5. What does "empirical" mean in empirical Bayes, and where do the prior's numbers come from if you don't just assert them?</summary><div>"Empirical" means the prior's own parameters (here, the shelf's mean and spread of true Sharpe ratios) are estimated from the same data you are about to update with, using a method like the sample mean and a noise-corrected sample variance (§5.3.4), rather than being asserted from outside knowledge or a textbook default. It is a practical compromise: not fully Bayesian (a genuine hyperprior would treat those parameters as uncertain too, §5.3.3's margin note), but far more defensible than guessing.</div></details>
+
+<div class="co lab"><span class="co-t">🔧 Homework (~1 h before Session 5.4)</span>
+<p>1. In the lab, change <code>T_OOS_YEARS</code> from 3 to 8 and re-run §3. Confirm the out-of-sample MSE gap between raw and shrunk estimates (currently 35%) moves — and write one sentence on why a noisier "future" measurement makes any estimator's advantage harder to detect.<br>
+2. Read the two-page Efron &amp; Morris (1977) piece in 📚 Go deeper and find the sentence where they describe shrinkage as solving "unrelated" problems together for their mutual benefit — bring the quote to Session 5.4.<br>
+3. Skim <span class="xref soon" data-xref="5.4" data-auto="" title="Coming soon">Session 5.4 — Stationarity &amp; ARMA Models</span>'s goal statement: it asks whether a return series is stationary, a very different kind of question from "is this number real" — think about why both questions matter before you trust a backtest.</p>
+</div>
+
+<h3>📚 Go deeper</h3>
+<ol class="refs">
+<li>Gelman, A., Carlin, J.B., Stern, H.S., Dunson, D.B., Vehtari, A. &amp; Rubin, D.B. (2013). <em>Bayesian Data Analysis</em> (3rd ed.). CRC Press. <span class="rid">ISBN 978-1-4398-4095-5</span></li>
+<li>Efron, B. &amp; Morris, C. (1977). "Stein's Paradox in Statistics." <em>Scientific American</em>, 236(5), 119–127. <span class="rid">https://www.scientificamerican.com/article/steins-paradox-in-statistics/</span></li>
+<li>Casella, G. (1985). "An Introduction to Empirical Bayes Data Analysis." <em>The American Statistician</em>, 39(2), 83–87. <span class="rid">doi:10.1080/00031305.1985.10479400</span></li>
+</ol>
+
+<h3>Sources for the numbers</h3>
+<ol class="refs">
+<li>James, W. &amp; Stein, C. (1961). "Estimation with Quadratic Loss." <em>Proceedings of the Fourth Berkeley Symposium on Mathematical Statistics and Probability</em>, Vol. 1, 361–379. <span class="rid">https://projecteuclid.org/proceedings/berkeley-symposium-on-mathematical-statistics-and-probability/Proceedings-of-the-Fourth-Berkeley-Symposium-on-Mathematical-Statistics-and/Chapter/Estimation-with-Quadratic-Loss/bsmsp/1200512173</span></li>
+<li>Jorion, P. (1986). "Bayes-Stein Estimation for Portfolio Analysis." <em>Journal of Financial and Quantitative Analysis</em>, 21(3), 279–292. <span class="rid">doi:10.2307/2331042</span></li>
+<li>Barras, L., Scaillet, O. &amp; Wermers, R. (2010). "False Discoveries in Mutual Fund Performance: Measuring Luck in Estimated Alphas." <em>Journal of Finance</em>, 65(1), 179–216. <span class="rid">doi:10.1111/j.1540-6261.2009.01527.x</span></li>
+<li>Morey, R.D., Hoekstra, R., Rouder, J.N., Lee, M.D. &amp; Wagenmakers, E.-J. (2016). "The Fallacy of Placing Confidence in Confidence Intervals." <em>Psychonomic Bulletin &amp; Review</em>, 23(1), 103–123. <span class="rid">doi:10.3758/s13423-015-0947-8</span></li>
+</ol>
+</section>
+
+<!-- nav:foot -->
+<div class="foot">
+<span class="soon" title="Coming soon">← Prev: 5.2 · Honest Inference</span>
+<span class="soon" title="Coming soon">Next: 5.4 · Stationarity &amp; ARMA →</span>
+</div>
+<p class="legal">Educational material only — not investment, legal or tax advice. Backtests and simulations are hypothetical. <a href="../start-here.html#disclaimer">Disclaimer</a> · Text CC BY 4.0 · Code MIT.</p>
+<!-- /nav:foot -->
+</main>
+</div></body></html>

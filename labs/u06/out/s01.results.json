@@ -1,0 +1,32 @@
+{
+  "results": {
+    "buyhold_cagr": -0.010995243321158976,
+    "buyhold_maxdd": -0.4310814087030871,
+    "buyhold_sharpe": 0.02787699158868637,
+    "frac_invested": 0.47104851330203446,
+    "gap_se_multiple": 64.40786169964178,
+    "honest_cagr": -0.003545987638703507,
+    "honest_maxdd": -0.2645956004314568,
+    "honest_sharpe": 0.032951311111250985,
+    "honest_vs_buyhold": -0.09655510431514663,
+    "honest_vs_buyhold_se_multiple": 5.107243319540207,
+    "mc_paths": 400,
+    "mc_years": 4,
+    "mean_gap": 1.4224538332771095,
+    "mean_sr_buyhold": 0.40672819524449916,
+    "mean_sr_honest": 0.3101730909293525,
+    "mean_sr_naive": 1.732626924206462,
+    "mu": 0.07,
+    "n_trades": 101,
+    "naive_cagr": 0.19239477906813862,
+    "naive_maxdd": -0.07364075790073321,
+    "naive_sharpe": 1.4947595799307885,
+    "rf": 0.0,
+    "se_gap": 0.022085096380167837,
+    "sigma": 0.18,
+    "window": 100,
+    "years_path": 8
+  },
+  "seed": 20260926,
+  "session": "6.1"
+}

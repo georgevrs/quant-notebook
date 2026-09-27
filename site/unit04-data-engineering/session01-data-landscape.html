@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- nav:head -->
+<title>4.1 · The Data Landscape, Vendors &amp; Licensing</title>
+<meta name="description" content="Bars, ticks, quotes, books, fundamentals and macro — who sells what, what it costs, and what the licence lets you do with it.">
+<link rel="canonical" href="https://georgevrs.github.io/quant-notebook/unit04-data-engineering/session01-data-landscape.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Quant Notebook">
+<meta property="og:title" content="4.1 · The Data Landscape, Vendors &amp; Licensing">
+<meta property="og:description" content="Bars, ticks, quotes, books, fundamentals and macro — who sells what, what it costs, and what the licence lets you do with it.">
+<meta property="og:url" content="https://georgevrs.github.io/quant-notebook/unit04-data-engineering/session01-data-landscape.html">
+<meta name="twitter:card" content="summary">
+<link rel="stylesheet" href="../assets/brand.css">
+<link rel="stylesheet" href="../assets/temml.css">
+<!-- /nav:head -->
+</head>
+<body><div class="page" id="top">
+<!-- nav:tabs -->
+<nav class="tabs">
+<a href="../index.html">⌂ Course home</a>
+<a class="active" href="session01-data-landscape.html">4.1 · Data Landscape</a>
+<span class="soon" title="Coming soon">4.2 · Point-in-Time</span>
+<span class="soon" title="Coming soon">4.3 · Security Master</span>
+<span class="soon" title="Coming soon">4.4 · Time &amp; Bars</span>
+<span class="soon" title="Coming soon">4.5 · Storage Stack</span>
+<span class="soon" title="Coming soon">4.6 · Lab: Data Lake</span>
+<a href="../roadmap.html">🗺 Roadmap</a>
+</nav>
+<!-- /nav:tabs -->
+
+<header class="cover">
+<!-- nav:heading -->
+<p class="eyebrow">Unit 4 · Financial Data Engineering — Session 01 of 06</p>
+<h1>The Data Landscape, Vendors &amp; Licensing</h1>
+<!-- /nav:heading -->
+<p class="subtitle">A backtest is only as honest as the data underneath it, and "the data" is really three separate decisions bundled into one purchase: a granularity (ticks, quotes, a book, bars, filings), a vendor who packaged and priced it, and a licence that says what you are actually allowed to do with it. This session maps all three, so the rest of the unit — point-in-time bias, adjusted prices, calendars, storage — has something concrete to sit on. <mark>The core move: buy the coarsest granularity that still answers your question, and read the licence before you redistribute anything.</mark></p>
+<div class="meta">
+<span>DURATION <b>1.5 h + lab</b></span>
+<span>LEVEL <b>Foundations</b></span>
+<span>TRACKS <b>QR · QD · IND</b></span>
+<span>HANDS-ON <b>Price a day of ticks, quotes and bars — in bytes</b></span>
+</div>
+<!-- nav:labstrip -->
+<div class="labstrip"><b>📓 Companion lab</b>
+<a href="https://colab.research.google.com/github/georgevrs/quant-notebook/blob/main/labs/u04/s01_data_landscape.ipynb">Open in Colab</a>
+<a href="https://github.com/georgevrs/quant-notebook/blob/main/labs/u04/s01_data_landscape.ipynb">Notebook on GitHub</a>
+<a href="https://github.com/georgevrs/quant-notebook/blob/main/labs/u04/s01_data_landscape.py">Source (.py)</a>
+</div>
+<!-- /nav:labstrip -->
+<div class="toc">
+<b>On this page</b>
+<ol>
+<li><a href="#s1">The shapes data comes in</a></li>
+<li><a href="#s2">How much of the book you can see</a></li>
+<li><a href="#s3">Beyond price: fundamentals and macro</a></li>
+<li><a href="#s4">From the matching engine to your notebook</a></li>
+<li><a href="#s5">What a bar throws away</a></li>
+<li><a href="#s6">In code: pricing granularity</a></li>
+<li><a href="#s7">Reading the licence</a></li>
+<li><a href="#s8">Try it</a></li>
+<li><a href="#s9">Glossary · Check yourself · Go deeper</a></li>
+</ol>
+</div>
+</header>
+
+<main>
+
+<section id="s1">
+<h2><span class="no">4.1.1</span> The shapes data comes in</h2>
+<p class="lede">Every quant data problem starts with the same question: how fast does this actually need to update? The answer sorts the entire market-data industry into a handful of shapes, and each shape has its own price tag.</p>
+
+<p>"Market data" is not one product. At the fast end, <strong>tick data</strong> is a record of every individual trade — a timestamp, a price and a size, one row per trade, exactly as it happened on the tape. Sitting beside it, <strong>quote data</strong> is a record of every change to the best bid and ask: the prices a venue is currently willing to trade at, updated whenever either side moves, whether or not a trade takes place. A quote is a standing offer; a tick is a completed transaction, and mixing the two up is a surprisingly common bug in a first data pipeline.</p>
+
+<p>At the slow end sits the shape most of finance actually uses: the <strong>OHLCV bar</strong>. A bar compresses everything that happened in a fixed interval — a minute, an hour, a day — into one row: the Open, High, Low and Close price, plus the Volume traded. It throws away the order in which things happened inside that interval (§4.1.5), and it does that on purpose: most research questions don't need tick-by-tick detail, and a bar is orders of magnitude cheaper to buy, store and query.</p>
+
+<p>The same market event usually produces all three shapes at once: a trade prints a tick, it may move the best bid or ask into a new quote, and it gets folded into whichever bar interval happens to be open. They are not competing products so much as different lenses on one reality. A vendor selling "1-minute bars" is selling you the tick stream's shadow, already summarised — and, as §4.1.5 shows precisely, no amount of clever code recovers the ticks from the shadow alone.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 230" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <rect x="20" y="14" width="680" height="200" rx="12" fill="#fff" stroke="#1F2C38" stroke-width="1.5"/>
+  <text x="40" y="40" font-size="12" fill="#4A5A68" font-family="IBM Plex Mono,monospace">THE SHAPES DATA COMES IN — one market, four cadences</text>
+  <rect x="45" y="58" width="140" height="110" rx="8" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="115" y="92" font-size="14.5" font-weight="600" text-anchor="middle" fill="#3A56C5">TRADES &amp; TICKS</text>
+  <text x="115" y="114" font-size="11.5" text-anchor="middle" fill="#4A5A68">every executed</text>
+  <text x="115" y="130" font-size="11.5" text-anchor="middle" fill="#4A5A68">print, one row each</text>
+  <rect x="210" y="58" width="140" height="110" rx="8" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="280" y="92" font-size="14.5" font-weight="600" text-anchor="middle" fill="#1F7A55">QUOTES &amp; BOOKS</text>
+  <text x="280" y="114" font-size="11.5" text-anchor="middle" fill="#4A5A68">bid/ask &amp; depth —</text>
+  <text x="280" y="130" font-size="11.5" text-anchor="middle" fill="#4A5A68">level 1 &amp; 2 (§4.1.2)</text>
+  <rect x="375" y="58" width="140" height="110" rx="8" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="445" y="92" font-size="14.5" font-weight="600" text-anchor="middle" fill="#8A6D00">BARS</text>
+  <text x="445" y="114" font-size="11.5" text-anchor="middle" fill="#4A5A68">OHLCV, one row</text>
+  <text x="445" y="130" font-size="11.5" text-anchor="middle" fill="#4A5A68">per minute or day</text>
+  <rect x="540" y="58" width="140" height="110" rx="8" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="610" y="92" font-size="14.5" font-weight="600" text-anchor="middle" fill="#D64B2A">FUNDAMENTALS</text>
+  <text x="610" y="114" font-size="11.5" text-anchor="middle" fill="#4A5A68">filings &amp; ratios,</text>
+  <text x="610" y="130" font-size="11.5" text-anchor="middle" fill="#4A5A68">plus macro data</text>
+  <text x="360" y="198" font-size="12" text-anchor="middle" fill="#4A5A68" font-style="italic">Faster cadence → more rows, more bytes, tighter licence terms.</text>
+</svg>
+<figcaption>fig 4.1.1 — the four cadences a market's data comes in; §4.1.2–§4.1.3 unpack the middle two</figcaption>
+</figure>
+
+<div class="co key"><span class="co-t">📌 Key idea — granularity is a cost, not just a resolution</span>
+<p>Every step down in cadence — tick → quote → bar → fundamental — multiplies the row count and, with it, the price, the storage bill and the questions a licence has to answer. The right granularity is the coarsest one that still answers your research question, not the finest one you can afford.</p>
+</div>
+</section>
+
+<section id="s2">
+<h2><span class="no">4.1.2</span> How much of the book you can see</h2>
+<p class="lede">A quote is really the top of a much bigger structure. Every venue maintains a full ladder of resting orders at every price, and how much of that ladder you can see is a separate purchase from the quote itself.</p>
+
+<p><strong>Level 1 data</strong> is the best bid and best ask only — one price and one size on each side, the number shown on almost every free stock-chart site and ticker tape. <strong>Level 2 data</strong>, also called market depth or the order book, shows multiple price levels on each side: not just the best price, but who else is waiting behind it and how much size sits at each rung of the ladder.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 250" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">LEVEL 1 VS LEVEL 2 — SAME BOOK, DIFFERENT VISIBILITY</text>
+  <rect x="26" y="32" width="326" height="196" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="189" y="54" font-size="11" font-weight="700" text-anchor="middle" fill="#3A56C5">LEVEL 1 — TOP OF BOOK</text>
+  <rect x="46" y="68" width="286" height="26" rx="5" fill="#fff" stroke="#C7D0F0"/>
+  <text x="58" y="85" font-size="9.5" fill="#1F2C38">bid  $100.02 × 400 shares</text>
+  <rect x="46" y="100" width="286" height="26" rx="5" fill="#fff" stroke="#C7D0F0"/>
+  <text x="58" y="117" font-size="9.5" fill="#1F2C38">ask  $100.05 × 250 shares</text>
+  <text x="189" y="155" font-size="9.5" text-anchor="middle" fill="#3A56C5" font-weight="600">one number each side</text>
+  <text x="189" y="173" font-size="9" text-anchor="middle" fill="#4A5A68">free or cheap; enough for most research</text>
+  <text x="189" y="191" font-size="9" text-anchor="middle" fill="#4A5A68">updates whenever the best price changes</text>
+  <rect x="368" y="32" width="326" height="196" rx="9" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="531" y="54" font-size="11" font-weight="700" text-anchor="middle" fill="#8A6D00">LEVEL 2 — MARKET DEPTH</text>
+  <rect x="388" y="68" width="286" height="26" rx="5" fill="#fff" stroke="#EBDDA6"/>
+  <text x="400" y="85" font-size="9.5" fill="#1F2C38">$100.05 × 250   (best ask)</text>
+  <rect x="388" y="100" width="286" height="26" rx="5" fill="#fff" stroke="#EBDDA6"/>
+  <text x="400" y="117" font-size="9.5" fill="#1F2C38">$100.06 × 800   (2nd level)</text>
+  <rect x="388" y="132" width="286" height="26" rx="5" fill="#fff" stroke="#EBDDA6"/>
+  <text x="400" y="149" font-size="9.5" fill="#1F2C38">$100.07 × 1,240 (3rd level)</text>
+  <text x="531" y="180" font-size="9.5" text-anchor="middle" fill="#8A6D00" font-weight="600">a ladder on each side</text>
+  <text x="531" y="198" font-size="9" text-anchor="middle" fill="#4A5A68">needs a direct or vendor feed, priced higher</text>
+</svg>
+<figcaption>fig 4.1.2 — level 1 shows the best price each side; level 2 shows the queue of orders behind it</figcaption>
+</figure>
+
+<p>The two shapes serve different jobs. A market maker deciding where to post a resting order needs to know how much size sits ahead of it at every nearby price — that is a level 2 question. A strategy that rebalances once a month at the closing auction never looks at the book at all; it needs bars, and level 1 at most, to confirm a fill. Level 2 is also the more expensive habit: it usually requires a direct or vendor feed rather than the free consolidated tape (§4.1.4), because depth is exactly the information a venue can charge the most for.</p>
+
+<div class="co note"><span class="co-t">🧭 Margin note — an engineer's analogy</span>
+<p>Level 1 is a cache holding just the latest value. Level 2 is the whole underlying data structure, ordered by priority. You pay for level 2 the way you pay to query a primary database instead of reading a memoised replica: more infrastructure sits behind it, so it costs more and demands more of your own systems to consume in real time.</p>
+</div>
+
+<p>In practice, almost nobody outside execution and market-making desks consumes level 2 directly: a signal that only needs a fair price once a day has no use for a ladder that reshuffles thousands of times a second. Some venues expose a level deeper still — <strong>level 3</strong>, showing every individual resting order with its own identifier rather than aggregated size at each price — but that is normally reserved for the exchange's own systems and co-located participants, not something a vendor resells broadly.</p>
+</section>
+
+<section id="s3">
+<h2><span class="no">4.1.3</span> Beyond price: fundamentals and macro</h2>
+<p class="lede">Not every dataset moves tick by tick. A company's balance sheet updates four times a year; a country's GDP estimate updates monthly and keeps being revised for a decade afterwards. Slow data is still data, and it drives some of the most durable strategies in the book.</p>
+
+<p><strong>Fundamental data</strong> is information about a company's business rather than its stock price: revenue, earnings, assets, debt and margins — the numbers in a 10-K or 10-Q filing in the US (a 20-F or 6-K equivalent elsewhere), released quarterly and audited. It changes slowly and it changes discretely: a figure is whatever the filing said, until the next filing, or until it is restated. Restatement is exactly the trap it sounds like — using a number as it looks <em>today</em> as if you had known it on the date it was first reported is a look-ahead bias, and <span class="xref soon" data-xref="4.2" data-auto="" title="Coming soon">Session 4.2 — Point-in-Time Data &amp; Data Biases</span> builds the discipline that keeps it out of a backtest.</p>
+
+<p>Fundamental ratios stated per share — earnings per share, book value per share — also break silently across a stock split or a buyback unless the share count and the price move together. <span class="xref soon" data-xref="4.3" data-auto="" title="Coming soon">Session 4.3 — Corporate Actions, Security Master &amp; Continuous Futures</span> is where that adjustment machinery, and the stable security identifiers it depends on, get built properly; here it is enough to know that a "fundamental" number is only as point-in-time-honest as the price and share count it is divided by.</p>
+
+<p>Macroeconomic data — inflation, employment, policy rates — comes from statistical agencies and central banks on a similarly slow, heavily revised cadence, and the same point-in-time discipline applies to it. <span class="xref soon" data-xref="11.5" data-auto="" title="Coming soon">Session 11.5 — FX &amp; Macro Regimes</span> picks macro data back up as a trading signal in its own right, once the point-in-time machinery exists to use it honestly.</p>
+
+<table>
+<thead><tr><th>Data shape</th><th>Typical cadence</th><th>What it answers</th><th>Rough footprint</th></tr></thead>
+<tbody>
+<tr><td>Tick (trade) data</td><td>every execution</td><td>what actually traded, at what size</td><td><span data-lab="bytes_per_tick" data-fmt=".1f">20.3</span> B/record, Parquet</td></tr>
+<tr><td>Quote data</td><td>every bid/ask change</td><td>where the market is willing to trade now</td><td><span data-lab="bytes_per_quote" data-fmt=".1f">29.2</span> B/record, Parquet</td></tr>
+<tr><td>Level 1</td><td>= quote data, top only</td><td>the single price of "now"</td><td>a slice of quote data</td></tr>
+<tr><td>Level 2</td><td>every book change</td><td>who else is waiting, and how much</td><td>several× level-1 volume</td></tr>
+<tr><td>OHLCV bar</td><td>fixed interval (1 min, 1 day)</td><td>a compressed summary of the interval</td><td><span data-lab="bytes_per_bar" data-fmt=".1f">59.9</span> B/record, far fewer rows</td></tr>
+<tr><td>Fundamental data</td><td>quarterly / annual</td><td>is the business healthy, cheap, growing</td><td>one small row per filing</td></tr>
+</tbody>
+</table>
+
+<div class="co tip"><span class="co-t">💡 Looking ahead</span>
+<p>These six shapes are the classic core of a research data lake; they are not the whole universe. Text, satellite imagery, credit-card panels and web-scraped "data exhaust" are a different category again — <span class="xref soon" data-xref="13.1" data-auto="" title="Coming soon">Session 13.1 — Alternative Data</span> covers how to evaluate and legally source alternative data once you are past the basics here.</p>
+</div>
+</section>
+
+<section id="s4">
+<h2><span class="no">4.1.4</span> From the matching engine to your notebook</h2>
+<p class="lede">A single trade produces data at several points before it reaches your notebook, and a different party can be paid at each hop. Knowing the chain tells you where the cost and the latency actually come from.</p>
+
+<p>A <strong>data vendor</strong> buys the right to redistribute one or more venues' raw feeds, adds value — normalising formats across venues, building deep history, offering an API or a terminal instead of a raw multicast socket — and resells access to you. Almost nobody trades or researches on a raw exchange feed directly; nearly everyone goes through at least one vendor, and most of what you pay funds that middle layer, not the exchange itself.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 180" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="22" y="20" font-size="11" font-weight="600" fill="#1F2C38">FROM THE MATCHING ENGINE TO YOUR NOTEBOOK — five hops, three ways to pay</text>
+  <rect x="22" y="38" width="122" height="66" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="83" y="64" font-size="11" text-anchor="middle" fill="#3A56C5" font-weight="600">1 · EXCHANGE</text>
+  <text x="83" y="81" font-size="9.5" text-anchor="middle" fill="#4A5A68">the trade or</text>
+  <text x="83" y="94" font-size="9.5" text-anchor="middle" fill="#4A5A68">quote is born</text>
+  <rect x="164" y="38" width="122" height="66" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="225" y="64" font-size="11" text-anchor="middle" fill="#3A56C5" font-weight="600">2 · FEED</text>
+  <text x="225" y="81" font-size="9.5" text-anchor="middle" fill="#4A5A68">direct (fast, $$$)</text>
+  <text x="225" y="94" font-size="9.5" text-anchor="middle" fill="#4A5A68">or SIP (slower)</text>
+  <rect x="306" y="38" width="122" height="66" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="367" y="64" font-size="11" text-anchor="middle" fill="#3A56C5" font-weight="600">3 · VENDOR</text>
+  <text x="367" y="81" font-size="9.5" text-anchor="middle" fill="#4A5A68">Bloomberg, Databento,</text>
+  <text x="367" y="94" font-size="9.5" text-anchor="middle" fill="#4A5A68">Massive &amp; others</text>
+  <rect x="448" y="38" width="122" height="66" rx="9" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="509" y="64" font-size="11" text-anchor="middle" fill="#8A6D00" font-weight="600">4 · LICENCE</text>
+  <text x="509" y="81" font-size="9.5" text-anchor="middle" fill="#4A5A68">display vs</text>
+  <text x="509" y="94" font-size="9.5" text-anchor="middle" fill="#4A5A68">non-display?</text>
+  <rect x="590" y="38" width="108" height="66" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="644" y="64" font-size="11" text-anchor="middle" fill="#1F7A55" font-weight="600">5 · YOUR APP</text>
+  <text x="644" y="81" font-size="9.5" text-anchor="middle" fill="#4A5A68">notebook,</text>
+  <text x="644" y="94" font-size="9.5" text-anchor="middle" fill="#4A5A68">algo, product</text>
+  <path d="M144 71 H160" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s4a)"/>
+  <path d="M286 71 H302" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s4a)"/>
+  <path d="M428 71 H444" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s4a)"/>
+  <path d="M570 71 H586" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s4a)"/>
+  <text x="225" y="126" font-size="9" text-anchor="middle" fill="#D64B2A">trap: SIP lags</text>
+  <text x="225" y="138" font-size="9" text-anchor="middle" fill="#D64B2A">direct feeds</text>
+  <text x="509" y="126" font-size="9" text-anchor="middle" fill="#D64B2A">trap: redistributing</text>
+  <text x="509" y="138" font-size="9" text-anchor="middle" fill="#D64B2A">without a licence</text>
+  <text x="360" y="164" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">Every hop can add latency, cost or a licence term you didn't budget for.</text>
+  <defs><marker id="s4a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F2C38"/></marker></defs>
+</svg>
+<figcaption>fig 4.1.3 — from the exchange's matching engine to your notebook: three hops, three different ways to pay</figcaption>
+</figure>
+
+<p>At the feed stage, two competing routes exist for the same US equity quote. A venue's <strong>direct</strong> (proprietary) feed delivers its own trades and quotes with the least possible latency, priced per exchange. The <strong>consolidated tape</strong> — the SIP, run under the CTA/UTP plans that Regulation NMS mandates — aggregates every venue's best bid and offer into one official feed, available to everyone, but measurably slower: Ding, Hanna &amp; Hendershott (2014) clocked direct-feed recipients seeing a quote change tens of microseconds after it happens, against roughly 1,128 microseconds for SIP recipients — more than fifty times slower. The SEC's 2020 Market Data Infrastructure rule set out to let competing, non-exchange consolidators sell a faster public alternative; as of 2025 the exchanges and the SEC are still negotiating the fees that would make that real, so the gap endures (see Sources, below).</p>
+
+<table>
+<thead><tr><th>Tier</th><th>Examples</th><th>What you get</th><th>Roughly what it costs (2026)</th></tr></thead>
+<tbody>
+<tr><td>Exchange direct feed</td><td>CME Globex, Nasdaq TotalView</td><td>lowest latency, full depth, one venue</td><td>per-feed licence + a separate non-display fee</td></tr>
+<tr><td>Consolidated tape (SIP)</td><td>CTA/UTP plans (US equities)</td><td>the official NBBO, mandated availability</td><td>modest subscriber fee; slower than direct</td></tr>
+<tr><td>Full-service vendor</td><td>Bloomberg Terminal, LSEG Workspace</td><td>cross-asset, terminal + APIs, news, analytics</td><td>≈$32,000/seat/year for Bloomberg in 2026</td></tr>
+<tr><td>API-first vendor</td><td>Databento, Massive (formerly Polygon.io)</td><td>pay-as-you-go or tiered plans; some redistribution-ready</td><td>free tier up to a few hundred $/month</td></tr>
+<tr><td>Academic</td><td>CRSP, Compustat, WRDS</td><td>survivorship-free histories, cleaned identifiers</td><td>institutional site licence, not sold to individuals</td></tr>
+<tr><td>Free / public</td><td>FRED, SEC EDGAR, Binance public data</td><td>macro series, filings, crypto bars</td><td>free, rate-limited, redistribution rules vary</td></tr>
+</tbody>
+</table>
+
+<p>Vendor relationships are not permanent, either: IEX Group announced in May 2024 that it would retire its entire IEX Cloud product line, and shut it down on 31 August 2024 — three months' notice for every application built on it. Treat a vendor's SDK as a thin, swappable adapter over your own schema, not as the schema itself.</p>
+
+<div class="co tip"><span class="co-t">💡 Looking ahead</span>
+<p>Once a vendor's file lands on disk, the question becomes how to store years of it and still query it in seconds — that engine, not the vendor relationship, is what <span class="xref soon" data-xref="4.5" data-auto="" title="Coming soon">Session 4.5 — The Research Storage Stack</span> is about.</p>
+</div>
+</section>
+
+<section id="s5">
+<h2><span class="no">4.1.5</span> What a bar throws away</h2>
+<p class="lede">A bar is convenient because it is small. It is also throwing away almost everything that happened inside its interval, and — because this is a simulation with a known truth — exactly how much it throws away can be measured.</p>
+
+<p>Treat a day's true (log) return as built from many small, independent pieces — the same <a class="xref" href="../unit03-math-toolkit/session05-simulation-monte-carlo.html" data-xref="3.5">geometric Brownian motion</a> used throughout the course. A close-to-close bar gives you exactly <em>one</em> noisy observation of that day's variance: square the day's return, and you have an unbiased but wildly imprecise estimate. Split the same day into <math><semantics><mi>M</mi><annotation encoding="application/x-tex">M</annotation></semantics></math> intraday sub-returns and sum their squares instead — the realized-variance idea <span class="xref soon" data-xref="5.5" data-auto="" title="Coming soon">Session 5.5 — Modeling Volatility</span> turns into full volatility estimators — and the estimate gets dramatically more precise, for a reason that has nothing to do with volatility modelling and everything to do with counting observations:</p>
+
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><mi>Var</mi><mo>⁡</mo><mspace width="0.1667em"></mspace><mrow style="margin-left:-0.1667em;"></mrow><mrow><mo fence="true" form="prefix" stretchy="true">(</mo><msubsup><mover><mi>σ</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><mtext>bar</mtext><mn>2</mn></msubsup><mo fence="true" form="postfix" stretchy="true">)</mo></mrow><mo>=</mo><mn>2</mn><msubsup><mi>σ</mi><mtext>day</mtext><mn>4</mn></msubsup><mo separator="true">,</mo><mspace width="2em"></mspace><mi>Var</mi><mo>⁡</mo><mspace width="0.1667em"></mspace><mrow style="margin-left:-0.1667em;"></mrow><mrow><mo fence="true" form="prefix" stretchy="true">(</mo><msubsup><mover><mi>σ</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><mtext>RV</mtext><mn>2</mn></msubsup><mo fence="true" form="postfix" stretchy="true">)</mo></mrow><mo>=</mo><mfrac><mrow><mn>2</mn><msubsup><mi>σ</mi><mtext>day</mtext><mn>4</mn></msubsup></mrow><mi>M</mi></mfrac></mrow><annotation encoding="application/x-tex">\Var\!\left(\hat\sigma^2_{\text{bar}}\right) = 2\sigma_{\text{day}}^4, \qquad \Var\!\left(\hat\sigma^2_{\text{RV}}\right) = \frac{2\sigma_{\text{day}}^4}{M}</annotation></semantics></math></div>
+
+<p>Both are exact for i.i.d. Gaussian returns, not approximations. The lab simulates <span data-lab="m_subintervals" data-fmt="d">78</span> five-minute sub-returns per session and confirms both formulas by <a class="xref" href="../unit03-math-toolkit/session05-simulation-monte-carlo.html" data-xref="3.5" data-style="short">Monte Carlo</a> at 4 <a class="xref" href="../unit03-math-toolkit/session01-probability-expected-value.html" data-xref="3.1" data-style="short">standard errors</a>: the measured ratio of the two sampling variances comes out at <span data-lab="var_ratio_emp" data-fmt=".0f">75</span>, against a theoretical value of exactly <span data-lab="m_subintervals" data-fmt="d">78</span>. Put in standard-error terms, the bar-based estimate is <span data-lab="sd_ratio" data-fmt=".1f">8.8</span>× noisier than the realized-variance estimate — which is simply <math><semantics><msqrt><mi>M</mi></msqrt><annotation encoding="application/x-tex">\sqrt{M}</annotation></semantics></math>, the same square-root-of-n scaling behind every standard error in this course. <mark>A bar is not a smaller version of the tick data it came from — it is a single, expensive-to-improve-on measurement, where the ticks underneath it were dozens of cheap ones.</mark></p>
+
+<div class="co note"><span class="co-t">🧭 Margin note — an engineer's analogy</span>
+<p>An OHLCV bar is a log-rotation summary: request count and error rate per minute, not each request. Fine for a dashboard; useless for debugging the one request that paged you at 3 a.m. — for that you need the unrotated log, which is exactly what the ticks underneath a bar are.</p>
+</div>
+
+<p>This is also why alternative ways of drawing the interval boundary exist. Sampling bars by a fixed volume or dollar amount traded, instead of a fixed clock interval, changes what the "one observation per bar" actually measures — <span class="xref soon" data-xref="4.4" data-auto="" title="Coming soon">Session 4.4 — Time, Calendars, As-of Joins &amp; Bars</span> builds those information-driven bars once timestamps, calendars and as-of joins are in place.</p>
+</section>
+
+<section id="s6">
+<h2><span class="no">4.1.6</span> In code: pricing granularity</h2>
+<p class="lede">The numbers above came from three tools this unit leans on hard: pandas or polars to build the data, Parquet to store it, and DuckDB to query it without loading everything into memory.</p>
+
+<p>The lab writes one synthetic session's ticks, quotes and 1-minute bars to Parquet and measures the files on disk. Compressed columnar storage beats a plain CSV of the same ticks by <span data-lab="compression_ratio" data-fmt=".2f">2.61</span>×, and the raw tick-and-quote feed for the day is <span data-lab="raw_to_bar_ratio" data-fmt=".0f">167</span>× the size of the 1-minute bars built from it — the gap that makes "just buy the ticks, you can always aggregate later" an expensive habit at scale, and "buy the bars, you can never get the ticks back" a one-way door.</p>
+
+<figure class="diagram chart">
+<!-- chart:bytes_per_record -->
+<svg viewBox="0 0 720 260" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Parquet bytes per record, by data type (one synthetic session)">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">PARQUET BYTES PER RECORD, BY DATA TYPE (ONE SYNTHETIC SESSION)</text>
+  <line x1="64" y1="216" x2="690" y2="216" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="220" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0 B</text>
+  <line x1="64" y1="173" x2="690" y2="173" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="177" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">20 B</text>
+  <line x1="64" y1="130" x2="690" y2="130" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="134" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">40 B</text>
+  <line x1="64" y1="87" x2="690" y2="87" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="91" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">60 B</text>
+  <line x1="64" y1="44" x2="690" y2="44" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="48" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">80 B</text>
+  <line x1="64" y1="216" x2="690" y2="216" stroke="#C9CFC6" stroke-width="1"/>
+  <path d="M156.3,216 V91.2 Q156.3,87.2 160.3,87.2 H176.3 Q180.3,87.2 180.3,91.2 V216 Z" fill="#3A56C5"><title>OHLCV bar: 60 B</title></path>
+  <text x="168.3" y="80.2" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">60 B</text>
+  <text x="168.3" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">OHLCV bar</text>
+  <path d="M365,216 V176.3 Q365,172.3 369,172.3 H385 Q389,172.3 389,176.3 V216 Z" fill="#E8850C"><title>Trade tick: 20 B</title></path>
+  <text x="377" y="165.3" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">20 B</text>
+  <text x="377" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">Trade tick</text>
+  <path d="M573.7,216 V157.3 Q573.7,153.3 577.7,153.3 H593.7 Q597.7,153.3 597.7,157.3 V216 Z" fill="#3F8E5A"><title>Quote: 29 B</title></path>
+  <text x="585.7" y="146.3" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">29 B</text>
+  <text x="585.7" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">Quote</text>
+</svg>
+<!-- /chart:bytes_per_record -->
+<figcaption>fig 4.1.4 — Parquet bytes per record, measured on one synthetic session, by data type</figcaption>
+</figure>
+
+<p>Bars are also not a separate feed at all — they are a query result. DuckDB computes the same 1-minute OHLCV bars directly from the tick Parquet file with plain SQL, and polars reads only the one column it needs (lazily, without materialising the rest of the file):</p>
+
+<pre><span class="c"># the same tick file, queried two ways — both must agree with pandas' resample()</span>
+bars_sql = duckdb.sql(<span class="s">"""
+    SELECT time_bucket(INTERVAL '1 minutes', ts) AS ts,
+           first(price ORDER BY ts) AS open, max(price) AS high,
+           min(price) AS low, last(price ORDER BY ts) AS close,
+           sum(size) AS volume
+    FROM read_parquet('ticks.parquet') GROUP BY 1 ORDER BY 1
+"""</span>).df()
+
+mean_price = (pl.scan_parquet(<span class="s">"ticks.parquet"</span>)
+              .select(pl.col(<span class="s">"price"</span>).mean())
+              .collect().item())  <span class="c"># reads one column, not the whole file</span></pre>
+
+<p>Parquet beats CSV here for a structural reason, not a clever trick: it stores each column contiguously and dictionary- or run-length-encodes repeated values, so a column of mostly-similar prices or repeated symbols compresses far better than a text file that spells out every value, in full, on every row. DuckDB reads that same columnar layout directly off disk — no separate load step, no intermediate database to populate — which is why the query above can run against a file that pandas would still be parsing if it were a CSV of the same size.</p>
+
+<p>Both engines match the pandas <code>resample().ohlc()</code> computed from the same ticks exactly, open, high, low, close and volume. Scaled up, this one illustrative symbol's measured footprint projects to roughly <span data-lab="annual_gb_one_symbol" data-fmt=".2f">0.98</span> GB a year of raw ticks and quotes — and to about <span data-lab="annual_gb_universe" data-fmt=".0f">492</span> GB a year across an illustrative <span data-lab="universe_size" data-fmt="d">500</span>-name universe, before a single options or futures feed is added. Nobody is redistributing that volume of raw history casually, which is exactly why the licence question in §4.1.7 matters at scale, not just in principle.</p>
+
+<div class="co key"><span class="co-t">📌 Key idea — a bar is a query, not a product</span>
+<p>Anyone holding the raw ticks can derive bars, at any interval, after the fact. Anyone who only bought bars can never get the ticks back. When your budget and your licence allow it, buy the finest granularity you can and derive everything coarser from it — never the other way round.</p>
+</div>
+</section>
+
+<section id="s7">
+<h2><span class="no">4.1.7</span> Reading the licence</h2>
+<p class="lede">The invoice you pay for market data is not the only thing the agreement controls. It also says who may look at it, how a machine may act on it unattended, and whether you may ever pass it to someone else — and getting any of the three wrong is a compliance problem, not a bug.</p>
+
+<p>A <strong>data licence</strong> is the contract that says what you may do with a feed, separately from what you paid to receive it: which users may see it, whether software may act on it without a human watching, how long you may retain it, and whether you may pass it on. <strong>Redistribution</strong> is exactly that last right — making the data, or a derivative of it such as a delayed feed or a computed summary, available to a third party. It is almost always sold separately from the right to use the data yourself, and priced far higher, because the exchange is now being asked to price every one of your downstream users, not just you.</p>
+
+<p>Two distinctions do most of the work in a real agreement. <strong>Display</strong> use means a human looks at the data on a screen; <strong>non-display</strong> use means a program consumes it — to price a model, drive an algorithm or power an application — and exchanges such as CME Group licence non-display use as a separate, usually pricier, category with its own sub-rules for automated trading. Separately, most US exchanges split subscribers into <strong>professional</strong> (anyone using the data for a business purpose) and <strong>non-professional</strong> (an individual trading their own account), with NYSE's non-professional policy setting out the narrow conditions under which the cheaper retail rate applies.</p>
+
+<table>
+<thead><tr><th>Question the licence answers</th><th>Category</th><th>What changes</th></tr></thead>
+<tbody>
+<tr><td>Who is the user?</td><td>Professional vs non-professional subscriber</td><td>professionals sit on a different, higher fee schedule</td></tr>
+<tr><td>How is it consumed?</td><td>Display vs non-display use</td><td>an unattended model or algorithm needs the non-display rider</td></tr>
+<tr><td>Can you pass it on?</td><td>Internal use vs redistribution</td><td>redistribution needs its own agreement, priced per downstream user</td></tr>
+<tr><td>Can you keep it?</td><td>Real-time vs retained/archival rights</td><td>some agreements cap how long ticks may be stored at all</td></tr>
+</tbody>
+</table>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 220" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">SAME FEED, TWO WAYS TO HANDLE THE LICENCE</text>
+  <rect x="26" y="32" width="326" height="176" rx="9" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="189" y="54" font-size="11" font-weight="700" text-anchor="middle" fill="#D64B2A">THE NAIVE WAY</text>
+  <rect x="46" y="66" width="286" height="24" rx="5" fill="#fff" stroke="#F2CDBF"/>
+  <text x="58" y="82" font-size="9.5" fill="#1F2C38">ship a cheap API's feed straight to users</text>
+  <rect x="46" y="96" width="286" height="24" rx="5" fill="#fff" stroke="#F2CDBF"/>
+  <text x="58" y="112" font-size="9.5" fill="#1F2C38">assume paying for it means you can resell it</text>
+  <text x="189" y="148" font-size="9.5" text-anchor="middle" fill="#D64B2A" font-weight="600">an audit finds undeclared redistribution</text>
+  <text x="189" y="166" font-size="9" text-anchor="middle" fill="#4A5A68">back-billed at the enterprise rate, or cut off</text>
+  <rect x="368" y="32" width="326" height="176" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="531" y="54" font-size="11" font-weight="700" text-anchor="middle" fill="#1F7A55">THE DISCIPLINED WAY</text>
+  <rect x="388" y="66" width="286" height="24" rx="5" fill="#fff" stroke="#BFE0CF"/>
+  <text x="400" y="82" font-size="9.5" fill="#1F2C38">1 · check the display / non-display clause</text>
+  <rect x="388" y="96" width="286" height="24" rx="5" fill="#fff" stroke="#BFE0CF"/>
+  <text x="400" y="112" font-size="9.5" fill="#1F2C38">2 · buy the redistribution right before shipping</text>
+  <text x="531" y="148" font-size="9.5" text-anchor="middle" fill="#1F7A55" font-weight="600">priced correctly from day one</text>
+  <text x="531" y="166" font-size="9" text-anchor="middle" fill="#4A5A68">survives an audit; nothing gets cut off mid-launch</text>
+</svg>
+<figcaption>fig 4.1.5 — the same feed, two licensing choices: one is a line item, the other is a legal exposure</figcaption>
+</figure>
+
+<div class="co warn"><span class="co-t">⚠️ Pitfall — "I'm already paying for this feed, so I can put it wherever I want"</span>
+<p>Viewing and redistributing are licensed separately, and exchanges enforce it: distributor agreements typically require reporting subscriber counts and are subject to audit. Piping a paid feed's prices into a public dashboard, a chatbot other companies can query, or a client-facing product is redistribution however small the audience — and every one of those downstream users needs to be accounted for in the agreement, not discovered in an audit.</p>
+</div>
+</section>
+
+<section id="s8">
+<h2><span class="no">4.1.8</span> Try it</h2>
+<p class="lede">Open the companion lab and change one assumption at a time — predict the direction of the change before you run it.</p>
+
+<div class="co lab"><span class="co-t">🔧 Try it (15 min, in the lab)</span>
+<p>1. In §1–2, raise <code>QUOTE_MULTIPLIER</code> from 6 to 20 (many venues quote far more than they trade) and rerun. Predict first: does <code>bytes_per_quote</code> move, or only the total quote file size?<br>
+2. In §4, change the sub-interval count so a session is split into 30-minute pieces instead of 5-minute ones. Predict the new theoretical variance ratio before rerunning — it is exactly the new number of sub-intervals.<br>
+3. Success looks like this: your predicted ratio matches <code>m_subintervals</code> exactly, and you can say in one sentence why the match is exact rather than approximate here.</p>
+</div>
+</section>
+
+<hr>
+
+<section id="s9">
+<h2><span class="no">4.1.9</span> Glossary · Check yourself · Go deeper</h2>
+<div class="gloss" id="glossary">
+<div id="g-ohlcv-bar"><b>OHLCV bar</b> — a fixed-interval summary of trading: open, high, low, close and volume, one row per interval.</div>
+<div id="g-tick-data"><b>Tick data</b> — a record of every individual trade: timestamp, price and size, one row per trade.</div>
+<div id="g-quote-data"><b>Quote data</b> — a record of every change to the best bid and ask, whether or not a trade happens.</div>
+<div id="g-level-1-data"><b>Level 1 data</b> — the best bid and ask only: one price and size on each side.</div>
+<div id="g-level-2-data"><b>Level 2 data</b> — full order-book depth: multiple price levels and sizes on each side.</div>
+<div id="g-fundamental-data"><b>Fundamental data</b> — information about a company's business (revenue, earnings, debt) rather than its price.</div>
+<div id="g-data-vendor"><b>Data vendor</b> — a firm that licenses a venue's raw feed, adds value, and resells access to it.</div>
+<div id="g-data-licence"><b>Data licence</b> — the contract governing who may use a feed, how, and for how long, separate from its price.</div>
+<div id="g-redistribution"><b>Redistribution</b> — passing licensed data, or a derivative of it, on to a third party; almost always priced and contracted separately.</div>
+</div>
+
+<h3>Check yourself</h3>
+<details class="q"><summary>1. A vendor offers a feed of "every NBBO update" for a stock. Is that tick data, and which level of the book does it represent?</summary><div>It is quote data, not tick data — an NBBO update happens whenever the best bid or ask changes, whether or not a trade occurs. It is level 1: the National Best Bid and Offer is, by definition, only the single best price on each side, not the depth behind it.</div></details>
+<details class="q"><summary>2. A market maker needs to know how many shares are waiting one cent behind the best offer before it posts its own order. Which data shape gives it that, and why won't a bar do?</summary><div>Level 2 (market depth): it is the only shape that shows size at prices beyond the best bid/ask. A bar only reports the open, high, low, close and total volume of an interval — it carries no information at all about the order book's structure at any instant inside it.</div></details>
+<details class="q"><summary>3. Your firm's Bloomberg-licensed closing prices get piped into a public dashboard that anyone can load, no login required. What licence question did nobody ask?</summary><div>Redistribution — and, underneath it, display vs non-display use. A licence covering the firm's own authorised, logged-in users does not automatically cover an anonymous public audience; that is a separate right, usually priced per downstream viewer.</div></details>
+<details class="q"><summary>4. A free API publishes no rate limit in its documentation. Can you scrape it as fast as you like and resell what you collect?</summary><div>No. SEC EDGAR looks "open" but still enforces a fair-access policy (a declared User-Agent, about 10 requests/second) behind the scenes — the absence of a published limit is not a redistribution grant, and reselling collected data is a separate licensing question regardless of how the data was fetched.</div></details>
+<details class="q"><summary>5. Why does one close-to-close return make such a noisy estimate of a day's volatility, compared with summing many intraday squared returns?</summary><div>A single bar's squared return is one draw from a distribution with sampling variance 2σ⁴_day. Splitting the day into M independent intraday pieces and summing their squares divides that sampling variance by M — the same square-root-of-n logic behind every standard error in the course, applied to volatility instead of a mean.</div></details>
+
+<div class="co lab"><span class="co-t">🔧 Homework (~1 h before Session 4.2)</span>
+<p>1. In the lab, raise <code>QUOTE_MULTIPLIER</code> from 6 to 20 and rerun §1–2. Which byte-per-record numbers move, and which stay put? Write one sentence explaining why.<br>
+2. Read CME Group's non-display licensing FAQ (below) and find the single sentence that would apply to an unattended research notebook that recomputes signals every night with no human watching the screen.<br>
+3. Set up whichever of FRED or SEC EDGAR you expect to use later in this unit: request an API key or set the <code>SEC_USER_AGENT</code> environment variable to your own name and email, per its fair-access policy, before <span class="xref soon" data-xref="4.2" data-auto="" title="Coming soon">Session 4.2 — Point-in-Time Data &amp; Data Biases</span> asks you to fetch anything for real.</p>
+</div>
+
+<h3>📚 Go deeper</h3>
+<ol class="refs">
+<li>O'Hara, M. (2015). "High Frequency Market Microstructure." <em>Journal of Financial Economics</em> 116(2), 257–270. <span class="rid">doi:10.1016/j.jfineco.2015.01.003</span></li>
+<li>Ding, S., Hanna, J. &amp; Hendershott, T. (2014). "How Slow Is the NBBO? A Comparison with Direct Exchange Feeds." <em>Financial Review</em> 49(2), 313–332. <span class="rid">doi:10.1111/fire.12037</span></li>
+<li>Harris, L. (2003). <em>Trading and Exchanges: Market Microstructure for Practitioners</em>, esp. the chapters on quotation dissemination and market data. Oxford University Press. <span class="rid">ISBN 978-0-19-514470-3</span></li>
+</ol>
+
+<h3>Sources for the numbers on this page</h3>
+<ol class="refs">
+<li>U.S. Securities and Exchange Commission (2021, 9 April). "Market Data Infrastructure," Release No. 34-90610 (adopted 9 December 2020); Federal Register 86 FR 18596 (US; competing-consolidator fees still under negotiation as of 2025). <span class="rid"><a href="https://www.federalregister.gov/documents/2021/04/09/2020-28370/market-data-infrastructure">https://www.federalregister.gov/documents/2021/04/09/2020-28370/market-data-infrastructure</a></span></li>
+<li>CME Group. "Data Licensing Policy Guidelines and Non-Display Licensing FAQ" (PDF; accessed September 2026, US). <span class="rid"><a href="https://www.cmegroup.com/market-data/distributor/files/cme-group-data-licensing-policy-guidelines-and-non-display-licensing-faq.pdf">https://www.cmegroup.com/market-data/distributor/files/cme-group-data-licensing-policy-guidelines-and-non-display-licensing-faq.pdf</a></span></li>
+<li>NYSE. "Nonprofessional Subscriber Policy" (PDF; accessed September 2026, US). <span class="rid"><a href="https://www.nyse.com/publicdocs/nyse/data/Policy-Non-ProfessionalSubscribers_PDP.pdf">https://www.nyse.com/publicdocs/nyse/data/Policy-Non-ProfessionalSubscribers_PDP.pdf</a></span></li>
+<li>Massive (2024). "IEX Cloud retirement: migrate your apps from IEX Cloud to Massive" (IEX Group announced retirement 31 May 2024; service retired 31 August 2024, US; accessed September 2026). <span class="rid"><a href="https://massive.com/blog/iex-cloud-migration-guide">https://massive.com/blog/iex-cloud-migration-guide</a></span></li>
+<li>Databento (2026). "Part 1: Introduction to Market Data Licensing." Databento Blog (accessed September 2026, US). <span class="rid"><a href="https://databento.com/blog/introduction-market-data-licensing">https://databento.com/blog/introduction-market-data-licensing</a></span></li>
+<li>Massive, formerly Polygon.io (2025, 30 October rebrand; pricing accessed September 2026, US). <span class="rid"><a href="https://massive.com/pricing">https://massive.com/pricing</a></span></li>
+<li>U.S. Securities and Exchange Commission. "Developer Resources" — EDGAR fair-access policy (accessed September 2026, US). <span class="rid"><a href="https://www.sec.gov/about/developer-resources">https://www.sec.gov/about/developer-resources</a></span></li>
+<li>NeuGroup (2024). "Bloomberg Terminals: How Much More You'll Pay Next Year" (industry-reported pricing; Bloomberg does not publish a public price list, US; accessed September 2026). <span class="rid"><a href="https://www.neugroup.com/bloomberg-terminals-how-much-more-youll-pay-next-year/">https://www.neugroup.com/bloomberg-terminals-how-much-more-youll-pay-next-year/</a></span></li>
+</ol>
+</section>
+
+<!-- nav:foot -->
+<div class="foot">
+<a href="../unit03-math-toolkit/session06-kelly-bet-sizing.html">← Prev: 3.6 · Kelly &amp; Ruin</a>
+<span class="soon" title="Coming soon">Next: 4.2 · Point-in-Time →</span>
+</div>
+<p class="legal">Educational material only — not investment, legal or tax advice. Backtests and simulations are hypothetical. <a href="../start-here.html#disclaimer">Disclaimer</a> · Text CC BY 4.0 · Code MIT.</p>
+<!-- /nav:foot -->
+</main>
+</div></body></html>

@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- nav:head -->
+<title>6.2 · Build a Vectorized Backtester</title>
+<meta name="description" content="Signals to positions to returns in a few lines of pandas/polars — and the shift discipline that keeps the future out.">
+<link rel="canonical" href="https://georgevrs.github.io/quant-notebook/unit06-backtesting-discipline/session02-vectorized-backtester.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Quant Notebook">
+<meta property="og:title" content="6.2 · Build a Vectorized Backtester">
+<meta property="og:description" content="Signals to positions to returns in a few lines of pandas/polars — and the shift discipline that keeps the future out.">
+<meta property="og:url" content="https://georgevrs.github.io/quant-notebook/unit06-backtesting-discipline/session02-vectorized-backtester.html">
+<meta name="twitter:card" content="summary">
+<link rel="stylesheet" href="../assets/brand.css">
+<link rel="stylesheet" href="../assets/temml.css">
+<!-- /nav:head -->
+</head>
+<body><div class="page" id="top">
+<!-- Session 6.2 — the course's backtesting spine: vectorized_backtest(), position, turnover and the
+     signal-lag discipline, generalising 6.1's single-asset P_t to a multi-asset weight vector. -->
+<!-- nav:tabs -->
+<nav class="tabs">
+<a href="../index.html">⌂ Course home</a>
+<span class="soon" title="Coming soon">6.1 · What a Backtest Is</span>
+<a class="active" href="session02-vectorized-backtester.html">6.2 · Vectorized Backtest</a>
+<span class="soon" title="Coming soon">6.3 · Event-Driven</span>
+<span class="soon" title="Coming soon">6.4 · Bias Hall of Fame</span>
+<span class="soon" title="Coming soon">6.5 · Costs &amp; Capacity</span>
+<span class="soon" title="Coming soon">6.6 · Validation</span>
+<span class="soon" title="Coming soon">6.7 · Overfitting Stats</span>
+<span class="soon" title="Coming soon">6.8 · Lab: Protocol</span>
+<a href="../roadmap.html">🗺 Roadmap</a>
+</nav>
+<!-- /nav:tabs -->
+
+<header class="cover">
+<!-- nav:heading -->
+<p class="eyebrow">Unit 6 · Backtesting &amp; Research Discipline — Session 02 of 08</p>
+<h1>Build a Vectorized Backtester</h1>
+<!-- /nav:heading -->
+<p class="subtitle">Every strategy this course builds from here on gets judged the same way: turn a signal into a position, multiply by what the market actually did, and compound the result — for every asset and every day at once. Get one detail wrong, and the backtest stops grading a strategy and starts grading itself. <mark>The core move: a position may only depend on information that is already one full step old, and you prove it with a check that has nothing to do with which random seed you got lucky with.</mark></p>
+<div class="meta">
+<span>DURATION <b>1.5 h + lab</b></span>
+<span>LEVEL <b>Intermediate</b></span>
+<span>TRACKS <b>QR · QT · QD · IND</b></span>
+<span>HANDS-ON <b>Turn one shift into a Sharpe ratio of 56 that should not exist</b></span>
+</div>
+<!-- nav:labstrip -->
+<div class="labstrip"><b>📓 Companion lab</b>
+<a href="https://colab.research.google.com/github/georgevrs/quant-notebook/blob/main/labs/u06/s02_vectorized_backtester.ipynb">Open in Colab</a>
+<a href="https://github.com/georgevrs/quant-notebook/blob/main/labs/u06/s02_vectorized_backtester.ipynb">Notebook on GitHub</a>
+<a href="https://github.com/georgevrs/quant-notebook/blob/main/labs/u06/s02_vectorized_backtester.py">Source (.py)</a>
+</div>
+<!-- /nav:labstrip -->
+<div class="toc">
+<b>On this page</b>
+<ol>
+<li><a href="#s1">What "vectorized" means</a></li>
+<li><a href="#s2">Signal to equity, in five steps</a></li>
+<li><a href="#s3">The math: weights, turnover, equity</a></li>
+<li><a href="#s4">In code: a backtester in ten lines</a></li>
+<li><a href="#s5">The one-line bug that fakes a 56 Sharpe</a></li>
+<li><a href="#s6">Does a longer lookback save you?</a></li>
+<li><a href="#s7">Try it</a></li>
+<li><a href="#s8">Glossary · Check yourself · Go deeper</a></li>
+</ol>
+</div>
+</header>
+
+<main>
+
+<section id="s1">
+<h2><span class="no">6.2.1</span> What "vectorized" means</h2>
+<p class="lede">A backtester is a machine for turning a rule into a number. This session builds the version that runs in milliseconds instead of seconds, on more than one asset at a time.</p>
+
+<p><span class="xref soon" data-xref="6.1" data-auto="" title="Coming soon">Session 6.1 — What a Backtest Is (and Isn&#x27;t)</span> proved the discipline on the smallest possible case: one synthetic asset, a moving-average filter, and a plain Python loop that replayed history one day at a time. That loop is honest and easy to audit, but it does not scale — a universe of 500 assets and 20 years of daily bars is ten million loop iterations, and every one of them re-derives logic that never changes. A <strong>vectorized backtest</strong> computes the same replay as whole-array operations over the full history at once: one <code>DataFrame</code> of signals, one shift, one multiply, one running product — for every asset and every day in a single call. It is not a different backtest from <span class="xref soon" data-xref="6.1" data-auto="" title="Coming soon">Session 6.1 — What a Backtest Is (and Isn&#x27;t)</span>'s loop; it is the identical <span class="term soon" data-term="historical simulation" title="Defined in Session 6.1 (coming soon)">historical simulation</span>, expressed so pandas and numpy can do the arithmetic instead of the Python interpreter.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 230" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <rect x="20" y="14" width="680" height="200" rx="12" fill="#fff" stroke="#1F2C38" stroke-width="1.5"/>
+  <text x="40" y="40" font-size="12" fill="#4A5A68" font-family="IBM Plex Mono,monospace">A VECTORIZED BACKTEST — four DataFrames, every day computed at once</text>
+  <rect x="45" y="58" width="140" height="110" rx="8" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="115" y="92" font-size="14" font-weight="600" text-anchor="middle" fill="#3A56C5">SIGNAL</text>
+  <text x="115" y="115" font-size="10.5" text-anchor="middle" fill="#4A5A68">from data known</text>
+  <text x="115" y="130" font-size="10.5" text-anchor="middle" fill="#4A5A68">up to day t</text>
+  <rect x="210" y="58" width="140" height="110" rx="8" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="280" y="92" font-size="14" font-weight="600" text-anchor="middle" fill="#8A6D00">POSITION</text>
+  <text x="280" y="115" font-size="10.5" text-anchor="middle" fill="#4A5A68">the signal, held</text>
+  <text x="280" y="130" font-size="10.5" text-anchor="middle" fill="#4A5A68">back one full step</text>
+  <rect x="375" y="58" width="140" height="110" rx="8" fill="#F5F6F2" stroke="#4A5A68" stroke-width="1.5"/>
+  <text x="445" y="92" font-size="14" font-weight="600" text-anchor="middle" fill="#1F2C38">RETURN</text>
+  <text x="445" y="115" font-size="10.5" text-anchor="middle" fill="#4A5A68">what the market</text>
+  <text x="445" y="130" font-size="10.5" text-anchor="middle" fill="#4A5A68">did — not a choice</text>
+  <rect x="540" y="58" width="140" height="110" rx="8" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="610" y="92" font-size="14" font-weight="600" text-anchor="middle" fill="#1F7A55">EQUITY</text>
+  <text x="610" y="115" font-size="10.5" text-anchor="middle" fill="#4A5A68">compounded</text>
+  <text x="610" y="130" font-size="10.5" text-anchor="middle" fill="#4A5A68">strategy return</text>
+  <text x="360" y="198" font-size="12" text-anchor="middle" fill="#4A5A68" font-style="italic">Four DataFrames, one multiply, one running product — that is all "vectorized" buys you.</text>
+</svg>
+<figcaption>fig 6.2.1 — the four objects a vectorized backtest computes for every asset and every day at once</figcaption>
+</figure>
+
+<p>The speed is not the point — it is a side effect. The real reason this course builds the vectorized version first is that a whole-array computation forces every timing decision into the open: there is nowhere to hide an accidental use of tomorrow's data inside a loop variable that quietly carries state across iterations. <span class="xref soon" data-xref="6.3" data-auto="" title="Coming soon">Session 6.3 — Build an Event-Driven Backtester</span> rebuilds the identical <span class="term soon" data-term="strategy specification" title="Defined in Session 6.1 (coming soon)">strategy specification</span> as an <span class="term soon" data-term="event loop" title="Defined in Session 6.3 (coming soon)">event loop</span> that processes one bar at a time — slower, but closer to how a live system actually runs. Both machines must produce the same verdict on the same rule; this session is the one you will use for research, because you will run it thousands of times before you ever run the other once.</p>
+
+<p>The gain compounds with scale. This session's whole experiment — two full backtests over an eight-asset universe, a 20-year statistical check, and a sweep across four lookback windows — finishes before you finish reading this paragraph. The identical arithmetic written as nested loops, one over assets and one over days inside it, would take noticeably longer even at this toy size, and at a real universe of a few thousand names it is the difference between testing an idea twenty times before lunch and testing it once a day. Speed is what makes fast, disciplined iteration possible — which is exactly why a bug that fakes a good result is so dangerous here: a vectorized backtester lets you run the wrong experiment just as quickly as the right one.</p>
+
+<div class="co key"><span class="co-t">📌 Key idea — vectorized is a computation strategy, not a different rule</span>
+<p>Nothing about "vectorized" changes what a strategy is allowed to know. The <span class="term soon" data-term="fill assumption" title="Defined in Session 6.1 (coming soon)">fill assumption</span> is exactly as strict here as in a day-by-day loop — a signal computed from day <em>t</em>'s closing price still cannot be traded against day <em>t</em>'s own return. Vectorizing only changes how fast you can find out whether you broke that rule.</p>
+</div>
+</section>
+
+<section id="s2">
+<h2><span class="no">6.2.2</span> Signal to equity, in five steps</h2>
+<p class="lede">Every vectorized backtest, however elaborate, is the same five pandas calls in the same order. Memorize the order, not the code.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 176" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">SIGNAL TO EQUITY — the same five steps, whatever the strategy</text>
+  <rect x="22" y="38" width="120" height="70" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="82" y="64" font-size="11" text-anchor="middle" fill="#3A56C5" font-weight="600">1 · SIGNAL</text>
+  <text x="82" y="81" font-size="9.5" text-anchor="middle" fill="#4A5A68">+1 / 0 / -1</text>
+  <text x="82" y="94" font-size="9.5" text-anchor="middle" fill="#4A5A68">per asset, per day</text>
+  <rect x="164" y="38" width="120" height="70" rx="9" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="224" y="64" font-size="11" text-anchor="middle" fill="#8A6D00" font-weight="600">2 · SHIFT</text>
+  <text x="224" y="81" font-size="9.5" text-anchor="middle" fill="#4A5A68">delay by the</text>
+  <text x="224" y="94" font-size="9.5" text-anchor="middle" fill="#4A5A68">signal lag</text>
+  <rect x="306" y="38" width="120" height="70" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="366" y="64" font-size="11" text-anchor="middle" fill="#3A56C5" font-weight="600">3 · POSITION</text>
+  <text x="366" y="81" font-size="9.5" text-anchor="middle" fill="#4A5A68">the weight</text>
+  <text x="366" y="94" font-size="9.5" text-anchor="middle" fill="#4A5A68">actually held</text>
+  <rect x="448" y="38" width="120" height="70" rx="9" fill="#F5F6F2" stroke="#4A5A68" stroke-width="1.5"/>
+  <text x="508" y="64" font-size="11" text-anchor="middle" fill="#1F2C38" font-weight="600">4 · RETURN</text>
+  <text x="508" y="81" font-size="9.5" text-anchor="middle" fill="#4A5A68">multiply, sum</text>
+  <text x="508" y="94" font-size="9.5" text-anchor="middle" fill="#4A5A68">across assets</text>
+  <rect x="590" y="38" width="108" height="70" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="644" y="64" font-size="11" text-anchor="middle" fill="#1F7A55" font-weight="600">5 · EQUITY</text>
+  <text x="644" y="81" font-size="9.5" text-anchor="middle" fill="#4A5A68">running</text>
+  <text x="644" y="94" font-size="9.5" text-anchor="middle" fill="#4A5A68">product</text>
+  <path d="M145 73 H161" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M287 73 H303" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M429 73 H445" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M571 73 H587" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <text x="224" y="128" font-size="9" text-anchor="middle" fill="#D64B2A">skip this step and</text>
+  <text x="224" y="140" font-size="9" text-anchor="middle" fill="#D64B2A">see §6.2.5</text>
+  <text x="360" y="164" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">Every stage here is one pandas call — the shift is the only one that can quietly lie to you.</text>
+  <defs><marker id="s2a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F2C38"/></marker></defs>
+</svg>
+<figcaption>fig 6.2.2 — signal to equity: the five calls every vectorized backtest makes, in order</figcaption>
+</figure>
+
+<table>
+<thead><tr><th>Step</th><th>Typical pandas call</th><th>What could go wrong here</th></tr></thead>
+<tbody>
+<tr><td>1 · Signal</td><td><code>np.sign(returns.rolling(k).sum())</code></td><td>using a price column that itself was built with a look-ahead join</td></tr>
+<tr><td>2 · Shift</td><td><code>signal.shift(lag)</code></td><td><strong>this session's bug</strong>: <code>lag=0</code> or a missing <code>.shift()</code> entirely</td></tr>
+<tr><td>3 · Position</td><td><code>signal.div(gross, axis=0)</code></td><td>gross exposure computed before the shift, so it uses future information too</td></tr>
+<tr><td>4 · Return</td><td><code>(position * returns).sum(axis=1)</code></td><td>positions and returns misaligned on date or asset columns</td></tr>
+<tr><td>5 · Equity</td><td><code>(1 + strategy_returns).cumprod()</code></td><td>summing instead of compounding returns across time</td></tr>
+</tbody>
+</table>
+
+<p>Step 2 deserves a closer look, because it is the one line this whole session is about. <code>signal.shift(lag)</code> moves every value down by <code>lag</code> rows: the value that used to sit on day <em>t</em> now sits on day <em>t</em> + lag, and the first <code>lag</code> rows of the result are empty. Filling those empty rows with zero — flat, no position — is a deliberate choice: a strategy with no history yet has no basis for a position, so it holds nothing rather than guessing. Everything downstream — the multiply, the sum across assets, the running product — treats that shifted <code>DataFrame</code> exactly like any other; none of those calls can tell the difference between a signal that was honestly delayed and one that was never delayed at all. That is precisely why the bug in §6.2.5 is so easy to introduce and so hard to spot by reading the code around it.</p>
+
+<div class="co tip"><span class="co-t">💡 Looking ahead</span>
+<p><span class="xref soon" data-xref="6.1" data-auto="" title="Coming soon">Session 6.1 — What a Backtest Is (and Isn&#x27;t)</span> already derived the single-asset wealth recursion behind step 5 (§6.1.3); §6.2.3 below only generalises its scalar position into a weight per asset. <span class="xref soon" data-xref="6.3" data-auto="" title="Coming soon">Session 6.3 — Build an Event-Driven Backtester</span> keeps every one of these five ideas but replaces the whole-array computation with an event loop that can also model partial fills and order queues.</p>
+</div>
+</section>
+
+<section id="s3">
+<h2><span class="no">6.2.3</span> The math: weights, turnover, equity</h2>
+<p class="lede">Four short formulas carry the whole session. Read each one as "what do I know, and when do I know it."</p>
+
+<p><span class="xref soon" data-xref="6.1" data-auto="" title="Coming soon">Session 6.1 — What a Backtest Is (and Isn&#x27;t)</span> wrote the wealth of a one-asset, all-in-or-flat strategy as <math><semantics><mrow><msub><mover><mi>W</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><mi>T</mi></msub><mo>=</mo><msub><mi>W</mi><mn>0</mn></msub><msubsup><mo movablelimits="false">∏</mo><mrow><mi>t</mi><mo>=</mo><mn>1</mn></mrow><mi>T</mi></msubsup><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mn>1</mn><mo>+</mo><msub><mi>P</mi><mrow><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub><msub><mi>R</mi><mi>t</mi></msub><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">\hat{W}_T = W_0 \prod_{t=1}^{T} (1 + P_{t-1} R_t)</annotation></semantics></math>, where <math><semantics><msub><mi>P</mi><mi>t</mi></msub><annotation encoding="application/x-tex">P_t</annotation></semantics></math> was 0 or 1. This session's only real change is turning that scalar position into a <strong>position</strong> per asset: a weight <math><semantics><msub><mi>w</mi><mrow><mi>i</mi><mo separator="true">,</mo><mi>t</mi></mrow></msub><annotation encoding="application/x-tex">w_{i,t}</annotation></semantics></math> that says how much of the portfolio's capital sits in asset <math><semantics><mi>i</mi><annotation encoding="application/x-tex">i</annotation></semantics></math> at time <math><semantics><mi>t</mi><annotation encoding="application/x-tex">t</annotation></semantics></math>, long or short. Sizing a <math><semantics><mrow><mo form="prefix" stretchy="false">±</mo><mn>1</mn><mi>/</mi><mn>0</mn></mrow><annotation encoding="application/x-tex">\pm 1/0</annotation></semantics></math> signal into a fully-invested, equally-weighted target is one line:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><msub><mi>w</mi><mrow><mi>i</mi><mo separator="true">,</mo><mi>t</mi></mrow></msub><mo>=</mo><mfrac><msub><mi>s</mi><mrow><mi>i</mi><mo separator="true">,</mo><mi>t</mi></mrow></msub><mrow><msub><mo movablelimits="false">∑</mo><mi>j</mi></msub><mi>|</mi><msub><mi>s</mi><mrow><mi>j</mi><mo separator="true">,</mo><mi>t</mi></mrow></msub><mi>|</mi></mrow></mfrac></mrow><annotation encoding="application/x-tex">w_{i,t} = \frac{s_{i,t}}{\sum_j |s_{j,t}|}</annotation></semantics></math></div>
+
+<p>where <math><semantics><msub><mi>s</mi><mrow><mi>i</mi><mo separator="true">,</mo><mi>t</mi></mrow></msub><annotation encoding="application/x-tex">s_{i,t}</annotation></semantics></math> is the raw signal. Take a concrete day with three assets and signals of +1, −1 and 0. The denominator sums the absolute values, <math><semantics><mrow><mi>|</mi><mn>1</mn><mi>|</mi><mo>+</mo><mi>|</mi><mo>−</mo><mn>1</mn><mi>|</mi><mo>+</mo><mi>|</mi><mn>0</mn><mi>|</mi><mo>=</mo><mn>2</mn></mrow><annotation encoding="application/x-tex">|1| + |-1| + |0| = 2</annotation></semantics></math>, so the target weights are +50%, −50% and 0% — a fully-invested, dollar-balanced book no matter how many of the three signals happen to be active that day. Two active assets would split the book fifty-fifty; one active asset would put the whole 100% on it alone. This is one specific, simple sizing rule among many — later sessions weight by conviction, by volatility, or by an optimiser's output instead of splitting evenly — but every one of them still answers the same question this formula answers: given today's signals, what fraction of capital goes where.</p>
+
+<p>The weight the strategy actually <em>holds</em> on day <math><semantics><mi>t</mi><annotation encoding="application/x-tex">t</annotation></semantics></math> is not <math><semantics><msub><mi>w</mi><mrow><mi>i</mi><mo separator="true">,</mo><mi>t</mi></mrow></msub><annotation encoding="application/x-tex">w_{i,t}</annotation></semantics></math> — it is the weight decided <strong>signal lag</strong> periods earlier, written <math><semantics><msub><mi>w</mi><mrow><mi>i</mi><mo separator="true">,</mo><mi>t</mi><mo>−</mo><mtext>lag</mtext></mrow></msub><annotation encoding="application/x-tex">w_{i,t-\text{lag}}</annotation></semantics></math>. The honest default is <code>lag = 1</code>. That single subscript is the entire discipline this session is about; everything else below is bookkeeping around it.</p>
+
+<p>Sum the held weights times what each asset actually returned, and you have the <a class="term" href="../unit02-markets-instruments/session03-returns-pnl-leverage.html#g-sharpe-ratio" data-term="Sharpe ratio">portfolio's</a> simple return for the day. Compounding it forward gives the <strong>equity curve</strong> — reusing <span class="xref soon" data-xref="6.1" data-auto="" title="Coming soon">Session 6.1 — What a Backtest Is (and Isn&#x27;t)</span>'s <math><semantics><mover><mi>W</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><annotation encoding="application/x-tex">\hat{W}</annotation></semantics></math> notation for a simulated wealth path:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><msub><mi>R</mi><mi>t</mi></msub><mo>=</mo><mrow><munder><mo movablelimits="false">∑</mo><mi>i</mi></munder></mrow><msub><mi>w</mi><mrow><mi>i</mi><mo separator="true">,</mo><mi>t</mi><mo>−</mo><mtext>lag</mtext></mrow></msub><mspace width="0.1667em"></mspace><msub><mi>R</mi><mrow><mi>i</mi><mo separator="true">,</mo><mi>t</mi></mrow></msub><mo separator="true">,</mo><mspace width="2em"></mspace><msub><mover><mi>W</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><mi>t</mi></msub><mo>=</mo><msub><mover><mi>W</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><mrow><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mn>1</mn><mo>+</mo><msub><mi>R</mi><mi>t</mi></msub><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mo>=</mo><mrow><munder><mo movablelimits="false">∏</mo><mrow><mi>τ</mi><mo>≤</mo><mi>t</mi></mrow></munder></mrow><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mn>1</mn><mo>+</mo><msub><mi>R</mi><mi>τ</mi></msub><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">R_t = \sum_i w_{i,t-\text{lag}}\, R_{i,t}, \qquad \hat{W}_t = \hat{W}_{t-1}(1 + R_t) = \prod_{\tau \le t} (1 + R_\tau)</annotation></semantics></math></div>
+
+<p>The last piece, <strong>turnover</strong>, measures how much of the book changes hands from one day to the next. This session uses the one-way convention: half the sum of absolute weight changes, so a book that flips completely from one asset to another in a single day shows 100% turnover, not 200%:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><msub><mpadded lspace="0"><mi>TO</mi></mpadded><mi>t</mi></msub><mo>=</mo><mfrac><mn>1</mn><mn>2</mn></mfrac><mrow><munder><mo movablelimits="false">∑</mo><mi>i</mi></munder></mrow><mrow><mo fence="true" form="prefix" stretchy="true">|</mo><msub><mi>w</mi><mrow><mi>i</mi><mo separator="true">,</mo><mi>t</mi></mrow></msub><mo>−</mo><msub><mi>w</mi><mrow><mi>i</mi><mo separator="true">,</mo><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub><mo fence="true" form="postfix" stretchy="true">|</mo></mrow></mrow><annotation encoding="application/x-tex">\mathrm{TO}_t = \frac{1}{2}\sum_i \left| w_{i,t} - w_{i,t-1} \right|</annotation></semantics></math></div>
+
+<p>Walk the three-asset day from above forward one step to see why the one-half belongs there. Suppose the book (+50%, −50%, 0%) moves the next day to (0%, −50%, +50%): the short stays put, and the long rotates from the first asset to the third. The absolute weight changes are 0.5, 0 and 0.5 for the three assets, summing to 1.0; halving that gives 50% turnover, matching the plain-English answer that half the book — one asset's worth of exposure — actually traded. Without the one-half, the identical rotation would be reported as 100% turnover even though only half the capital moved. Grinold &amp; Kahn's convention, cited below, exists precisely so that a number called "turnover" means the fraction of the portfolio that changed hands, not a sum that counts every trade as both a sale and a purchase.</p>
+
+<div class="co note"><span class="co-t">🧭 Margin note — weights, not shares</span>
+<p>Everything here works in target <em>weights</em> (a fraction of capital), never share counts or contract sizes. A real account has to translate a weight into an integer number of shares given its NAV — pure bookkeeping, and out of scope here; the discipline this session teaches applies identically either way.</p>
+</div>
+</section>
+
+<section id="s4">
+<h2><span class="no">6.2.4</span> In code: a backtester in ten lines</h2>
+<p class="lede">Three small functions carry §6.2.2's whole pipeline. Run correctly, they produce an unremarkable, believable backtest — which is exactly the point of building the honest version first.</p>
+
+<pre><span class="c"># position sizing: a +-1/0 signal to a fully-invested, equally-weighted target</span>
+<span class="k">def</span> equal_weight_positions(signal):
+    gross = signal.<span class="k">abs</span>().sum(axis=<span class="p">1</span>)
+    <span class="k">return</span> signal.div(gross.replace(<span class="p">0.0</span>, np.nan), axis=<span class="p">0</span>).fillna(<span class="p">0.0</span>)
+
+<span class="c"># the backtest itself: signal -&gt; lagged position -&gt; return -&gt; equity, one call</span>
+<span class="k">def</span> vectorized_backtest(returns, target_weights, lag=<span class="p">1</span>):
+    position = target_weights.shift(lag).fillna(<span class="p">0.0</span>)
+    strat_returns = (position * returns).sum(axis=<span class="p">1</span>)
+    equity = (<span class="p">1.0</span> + strat_returns).cumprod()
+    <span class="k">return</span> {<span class="s">"position"</span>: position, <span class="s">"returns"</span>: strat_returns, <span class="s">"equity"</span>: equity}</pre>
+
+<p>Every idiom above has a direct polars equivalent — <code>pl.col("signal").shift(1)</code> in place of <code>signal.shift(1)</code>, <code>.sum_horizontal()</code> in place of <code>.sum(axis=1)</code> — and the same reasoning applies line for line. This course writes labs in pandas because the rest of the codebase does, not because the discipline is pandas-specific: the shift is what matters, not the library that executes it.</p>
+
+<p>On an 8-asset synthetic universe with volatilities from <span data-lab="sigma_min" data-fmt=".0%">12%</span> to <span data-lab="sigma_max" data-fmt=".0%">30%</span> and <strong>zero</strong> drift on every asset — a fair game, no true edge anywhere in the data by construction — a 1-day lookback signal (<code>lag=1</code>, the honest default) turns in an entirely forgettable two simulated years: CAGR <span data-lab="demo_honest_cagr" data-fmt=".2%">−6.32%</span>, <a class="term" href="../unit02-markets-instruments/session03-returns-pnl-leverage.html#g-sharpe-ratio" data-term="Sharpe ratio">Sharpe ratio</a> <span data-lab="demo_honest_sharpe" data-fmt=".2f">−0.77</span>, a real <a class="term" href="../unit02-markets-instruments/session03-returns-pnl-leverage.html#g-drawdown" data-term="drawdown">drawdown</a> of <span data-lab="demo_honest_maxdd" data-fmt=".2%">−16.96%</span>, turnover of about <span data-lab="demo_honest_turnover" data-fmt=".0f">130</span>× a year. Nothing here should impress anyone, and it doesn't — which is the correct result on data with no edge in it.</p>
+
+<p>Zero drift on every asset is not a simplification made for convenience — it is the whole reason to test on synthetic data in the first place. On real prices you can never be sure whether a good-looking backtest found a real, if modest, effect or simply got lucky; on data built with exactly zero true edge, any measured edge has exactly one possible source: a bug in the backtester. That is the same logic <span class="xref soon" data-xref="6.1" data-auto="" title="Coming soon">Session 6.1 — What a Backtest Is (and Isn&#x27;t)</span> used with its single asset, generalised here to a universe wide enough that an accidental edge would have to survive averaging across eight independent draws rather than one.</p>
+
+<p>Two simulated years is short enough that a Sharpe of −0.77 could easily be noise rather than proof of "no edge." A separate, independent 20-year run of the same universe lets us test that properly. The <span class="term soon" data-term="standard error of the Sharpe ratio" title="Defined in Session 5.2 (coming soon)">standard error of the Sharpe ratio</span> from <span data-lab="years_long" data-fmt=".0f">20</span> years of daily data is <span data-lab="se0" data-fmt=".3f">0.224</span>, so a true Sharpe of zero should show an estimated Sharpe within about <span data-lab="se0_x4" data-fmt=".3f">0.894</span> of zero, four standard errors either way. The honest backtest's 20-year Sharpe comes in at <span data-lab="sr_honest_long" data-fmt=".2f">0.17</span> — comfortably inside that band, exactly as it should be on data built to contain no edge at all.</p>
+
+<p>Four standard errors, rather than two or three, is a deliberate margin, not a stylistic choice. A course full of labs each running dozens of statistical checks is, collectively, running hundreds of them, and at a two-standard-error threshold a meaningful fraction of perfectly correct results would flag as suspicious purely by chance. <span class="xref soon" data-xref="6.7" data-auto="" title="Coming soon">Session 6.7 — Overfitting Statistics: PSR, DSR, MinTRL &amp; PBO</span> makes this multiple-testing problem the centre of an entire session; here it is enough to note that a four-standard-error band keeps a single false alarm rare without needing that later machinery.</p>
+
+<div class="co tip"><span class="co-t">💡 Looking ahead</span>
+<p><span class="xref soon" data-xref="6.5" data-auto="" title="Coming soon">Session 6.5 — Transaction Costs &amp; Capacity</span> adds spread, commission, slippage and market impact on top of this pipeline; every number on this page ignores costs entirely, on purpose, so that the one effect under study — the lag — is the only thing that changes.</p>
+</div>
+</section>
+
+<section id="s5">
+<h2><span class="no">6.2.5</span> The one-line bug that fakes a 56 Sharpe</h2>
+<p class="lede">Delete four characters from the code above — <code>.shift(1)</code> becomes nothing — and the identical signal on the identical data turns into the best backtest you will ever see. It is also completely fake.</p>
+
+<p><span class="xref soon" data-xref="6.1" data-auto="" title="Coming soon">Session 6.1 — What a Backtest Is (and Isn&#x27;t)</span> already showed a mild version of this: a slow moving-average filter, applied to its own close instead of the prior one, turned a Sharpe of 0.03 into 1.49. That signal changes only gradually, so the leak from one day's own return is small. Push the same mistake to its logical extreme — a signal that looks back just one day — and the leak stops being small.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 220" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">SAME SIGNAL, TWO FILL ASSUMPTIONS</text>
+  <rect x="26" y="32" width="326" height="176" rx="9" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="189" y="54" font-size="11" font-weight="700" text-anchor="middle" fill="#D64B2A">THE NAIVE LINE</text>
+  <rect x="46" y="66" width="286" height="24" rx="5" fill="#fff" stroke="#F2CDBF"/>
+  <text x="58" y="82" font-size="9.5" fill="#1F2C38" font-family="IBM Plex Mono,monospace">position = target_weights</text>
+  <rect x="46" y="96" width="286" height="24" rx="5" fill="#fff" stroke="#F2CDBF"/>
+  <text x="58" y="112" font-size="9.5" fill="#1F2C38">no shift: lag = 0</text>
+  <text x="189" y="146" font-size="9.5" text-anchor="middle" fill="#D64B2A" font-weight="600">trades day t's signal against day t's return</text>
+  <text x="189" y="164" font-size="9" text-anchor="middle" fill="#4A5A68">payoff = sign(R_t) x R_t = |R_t| , never negative</text>
+  <rect x="368" y="32" width="326" height="176" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="531" y="54" font-size="11" font-weight="700" text-anchor="middle" fill="#1F7A55">THE DISCIPLINED LINE</text>
+  <rect x="388" y="66" width="286" height="24" rx="5" fill="#fff" stroke="#BFE0CF"/>
+  <text x="400" y="82" font-size="9.5" fill="#1F2C38" font-family="IBM Plex Mono,monospace">position = target_weights.shift(1)</text>
+  <rect x="388" y="96" width="286" height="24" rx="5" fill="#fff" stroke="#BFE0CF"/>
+  <text x="400" y="112" font-size="9.5" fill="#1F2C38">lag = 1, the honest default</text>
+  <text x="531" y="146" font-size="9.5" text-anchor="middle" fill="#1F7A55" font-weight="600">trades only on yesterday's close</text>
+  <text x="531" y="164" font-size="9" text-anchor="middle" fill="#4A5A68">Sharpe consistent with zero true edge</text>
+</svg>
+<figcaption>fig 6.2.3 — the entire bug is one missing method call, and its consequence is not subtle</figcaption>
+</figure>
+
+<p>Run both lines on the same 8-asset universe from §6.2.4. Removing the shift alone — same signal, same data, same universe — reports a CAGR of <span data-lab="demo_buggy_cagr" data-fmt=",.0%">1,283%</span>, a <a class="term" href="../unit02-markets-instruments/session03-returns-pnl-leverage.html#g-sharpe-ratio" data-term="Sharpe ratio">Sharpe</a> of <span data-lab="demo_buggy_sharpe" data-fmt=".1f">56.2</span>, and a <a class="term" href="../unit02-markets-instruments/session03-returns-pnl-leverage.html#g-drawdown" data-term="drawdown">drawdown</a> of exactly <span data-lab="demo_buggy_maxdd" data-fmt=".2%">0.00%</span> — not "small," exactly zero, every single day, for two straight years. That last number is not a statistical fluke: because the naive weight on each asset is the sign of that same asset's same-day return, the naive payoff is <code>sign(R) * R = |R|</code>, which cannot be negative. A strategy that never has a single losing day is not lucky — it is <span class="term soon" data-term="look-ahead bias" title="Defined in Session 4.2 (coming soon)">look-ahead bias</span> wearing a Sharpe ratio as a disguise.</p>
+
+<p>The identity behind that zero is short enough to check by hand: for any number <math><semantics><mi>x</mi><annotation encoding="application/x-tex">x</annotation></semantics></math>, <math><semantics><mrow><mpadded lspace="0"><mi>sign</mi></mpadded><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>x</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mo>×</mo><mi>x</mi></mrow><annotation encoding="application/x-tex">\mathrm{sign}(x) \times x</annotation></semantics></math> equals <math><semantics><mrow><mi>|</mi><mi>x</mi><mi>|</mi></mrow><annotation encoding="application/x-tex">|x|</annotation></semantics></math>, and an absolute value can never be negative. The naive weight on an asset is, up to the equal-weight denominator, the sign of that same asset's same-day return, so the naive payoff on that asset is exactly the absolute value of its own return — a coin that pays you for landing on either heads or tails. Averaging several such coins across eight assets does not undo the trick; it only makes the resulting equity curve smoother, which is exactly why fig 6.2.4's naive line looks less like noise and more like a ruler.</p>
+
+<figure class="diagram chart">
+<!-- chart:equity -->
+<svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Growth of $1 — honest vs naive backtest of the same signal (2 simulated years)">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">GROWTH OF $1 — HONEST VS NAIVE BACKTEST OF THE SAME SIGNAL (2 SIMULATED YEARS)</text>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#3A56C5" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">Honest (lag=1)</text>
+  <line x1="159.60000000000002" y1="32" x2="175.60000000000002" y2="32" stroke="#D64B2A" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="181.60000000000002" y="36" font-size="11" fill="#4A5A68">Naive (lag=0, look-ahead)</text>
+  <line x1="64" y1="256.8" x2="602" y2="256.8" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="260.8" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$1.0</text>
+  <line x1="64" y1="229.7" x2="602" y2="229.7" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="233.7" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$2.0</text>
+  <line x1="64" y1="194" x2="602" y2="194" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="198" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$5.0</text>
+  <line x1="64" y1="167" x2="602" y2="167" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="171" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$10.0</text>
+  <line x1="64" y1="140" x2="602" y2="140" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="144" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$20.0</text>
+  <line x1="64" y1="104.3" x2="602" y2="104.3" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="108.3" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$50.0</text>
+  <line x1="64" y1="77.3" x2="602" y2="77.3" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="81.3" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$100.0</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#C9CFC6" stroke-width="1"/>
+  <line x1="197.7" y1="264" x2="197.7" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="197.7" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">0.5</text>
+  <line x1="332.5" y1="264" x2="332.5" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="332.5" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">1</text>
+  <line x1="467.2" y1="264" x2="467.2" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="467.2" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">1.5</text>
+  <line x1="602" y1="264" x2="602" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="602" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">2</text>
+  <line x1="64" y1="256.8" x2="602" y2="256.8" stroke="#4A5A68" stroke-width="1"/>
+  <polyline points="64,256.8 65.1,257.2 66.1,257.3 67.2,257 69.3,257.1 70.4,257 71.5,257 72.6,256.9 73.6,256.8 75.8,257.4 76.8,257.7 77.9,257.3 80,257.7 81.1,257.8 82.2,257.9 83.3,258 85.4,258 86.5,258.6 87.5,258.6 88.6,258.3 89.7,258.3 91.8,258.1 92.9,258.2 93.9,258.5 96.1,258.2 97.2,258.1 98.2,257.7 99.3,257.8 101.4,257.3 102.5,257.3 103.6,257.4 104.6,257.7 106.8,257.5 107.9,257.6 108.9,257.4 110,257.6 112.1,257.3 113.2,257.6 114.3,257.6 115.3,257.5 117.5,257.7 118.5,257.4 119.6,257.4 120.7,257.3 122.8,256.9 123.9,257 126,256.8 127.1,257 128.2,256.9 129.2,257.1 130.3,257.1 132.5,257.4 133.5,257.2 134.6,257.2 136.7,257.4 137.8,257.8 138.9,257.8 139.9,257.9 142.1,258 143.1,257.9 144.2,258.1 145.3,258 146.4,258.2 148.5,258.2 149.6,258.4 150.6,258.1 152.8,258.3 153.8,258 154.9,258.1 157.1,258.2 158.1,258.4 159.2,258.2 160.3,258.1 162.4,258.1 163.5,258.3 164.5,258.4 165.6,258.8 167.7,259 168.8,258.9 169.9,258.7 171,258.8 173.1,258.5 174.2,258.5 175.2,258.7 176.3,258.9 177.4,258.8 179.5,259 180.6,259.2 181.7,259.2 183.8,259.3 184.9,259.7 185.9,259.6 188.1,259.5 189.1,260 190.2,260.3 191.3,260.5 192.3,260.6 194.5,260.4 195.6,260.1 196.6,260.3 197.7,260.4 199.8,260.3 200.9,260.3 202,260.2 203,259.9 205.2,260.1 206.3,260 207.3,260.1 209.5,260.5 210.5,260.2 211.6,260 212.7,259.9 214.8,260.5 215.9,260.6 217,260.6 218,260.6 220.2,261.1 221.2,261.2 222.3,261 224.4,261.2 225.5,261.5 226.6,261.5 227.6,261.6 229.8,262 230.9,262 231.9,262.1 233,262.2 234.1,262.1 236.2,261.6 237.3,261.4 238.3,261.4 239.4,261.6 241.6,262.3 242.6,262.2 244.8,261.7 245.8,262 246.9,262.1 248,262.2 250.1,262.2 251.2,261.7 252.2,261.6 253.3,261.4 255.5,262.3 256.5,262.2 257.6,261.9 258.7,262 260.8,261.7 261.9,262 262.9,262.1 264,262.3 266.2,262.2 267.2,261.9 268.3,262 269.4,262.3 270.4,262.4 272.6,262 273.6,261.6 275.8,261.6 276.8,261.6 277.9,261.5 279,261.5 281.1,261.8 282.2,261.8 283.3,262.1 284.3,261.8 286.5,262 287.5,261.9 288.6,262 289.7,262.3 291.8,262.7 292.9,262.4 294,262.6 295,262.7 296.1,262.5 298.2,262.3 299.3,262.3 300.4,261.8 301.4,261.7 303.6,261.7 304.7,261.5 306.8,261.4 307.9,261.9 308.9,261.9 310,261.8 312.1,261.9 313.2,261.7 314.3,261.8 315.4,261.3 317.5,261.2 318.6,261.2 319.6,261 320.7,261.1 322.8,261.2 323.9,261.4 325,261.4 326,261.5 328.2,261.7 329.3,261.7 330.3,261.8 332.5,261.5 333.5,261.5 334.6,261.9 335.7,261.6 337.8,261.7 338.9,261.4 340,261.5 341,261.1 342.1,261.3 344.2,261.5 345.3,261.5 346.4,261.8 348.5,261.5 349.6,261.7 350.6,261.7 351.7,261.8 353.9,261.5 354.9,261.8 356,261.7 357.1,261.6 358.1,261.8 360.3,261.9 361.3,261.7 363.5,262 364.6,262 365.6,262.2 366.7,262 367.8,262.4 369.9,263.1 371,262.9 372,262.9 373.1,263.1 375.2,262.8 376.3,262.9 377.4,263.1 378.5,263.1 380.6,262.4 381.7,262.6 382.7,262.7 383.8,263 385.9,263.4 387,263.2 388.1,263 389.2,262.8 391.3,262.8 392.4,262.9 393.4,262.6 395.6,262.7 396.6,262.8 397.7,262.8 398.8,263.1 400.9,263 402,263 403.1,262.8 405.2,263.2 406.3,263.1 407.3,263 408.4,263.1 410.5,262.7 411.6,263 412.7,263.2 413.8,262.8 415.9,263.4 417,263.7 418,263.8 419.1,263.8 421.2,263.7 422.3,263.7 423.4,263.3 425.5,263.7 426.6,263.5 427.7,263.2 428.7,263.1 429.8,263.1 431.9,263 433,262.8 434.1,262.8 435.1,263 437.3,262.6 438.4,262.6 439.4,262.6 441.6,263.1 442.6,263.2 443.7,263.1 444.8,263.1 445.8,263.4 448,263.3 449,263.2 450.1,263.2 451.2,263.1 453.3,263.4 454.4,263.6 455.5,263.4 457.6,263.7 458.7,263.3 459.7,263.1 461.9,262.7 463,262.4 464,262.4 465.1,262.6 466.2,262.2 468.3,262.5 469.4,262.7 470.4,262.6 472.6,262.6 473.7,262.7 474.7,263.3 475.8,263.2 476.9,263.4 479,263.3 480.1,263.1 481.1,263.1 483.3,263.2 484.3,263.4 485.4,263.6 486.5,263.7 488.6,264 489.7,263.7 490.8,263.4 491.8,263.2 494,263.2 495,263.6 496.1,263.5 498.3,263.9 499.3,263.7 500.4,263.6 501.5,263.6 502.5,263.4 504.7,263.5 505.7,263.2 506.8,263.2 508.9,263.3 510,263.2 511.1,263.1 513.2,263.3 514.3,263.3 515.4,263.3 516.4,263.8 517.5,263.5 519.6,263.5 520.7,263.4 521.8,263.3 523.9,263.1 525,263.2 526.1,263.3 527.1,263.6 528.2,263.3 530.3,263.2 531.4,263.3 532.5,263.5 533.5,263.1 535.7,262.7 536.8,262.5 537.8,262.4 538.9,262.6 541,262.5 542.1,262.1 543.2,261.8 545.3,261.8 546.4,261.7 547.5,262 549.6,262.1 550.7,261.9 551.7,261.8 552.8,262.1 553.9,262 556,261.9 557.1,262 558.1,261.9 559.2,262.1 561.4,262.1 562.4,262.2 563.5,262.3 564.6,262.3 566.7,262.5 567.8,262.6 568.8,262.7 571,263 572.1,262.8 573.1,262.9 574.2,262.6 576.3,262.7 577.4,262.6 578.5,262.6 579.5,261.9 581.7,261.8 582.7,261.9 583.8,262.1 584.9,261.9 587,262.1 588.1,262.1 589.2,261.9 591.3,261.9 592.4,261.6 593.4,261.7 594.5,261.7 596.7,261.6 597.7,261.8 598.8,261.8 599.9,261.6 602,261.8" fill="none" stroke="#3A56C5" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>Honest (lag=1)</title></polyline>
+  <circle cx="602" cy="261.8" r="4" fill="#3A56C5" stroke="#FBFBF8" stroke-width="2"><title>Honest (lag=1): $0.9</title></circle>
+  <polyline points="64,256.5 65.1,255.9 66.1,255.6 67.2,255.2 68.3,254.7 70.4,253.9 71.5,253.4 72.6,253 74.7,252 75.8,251.7 76.8,251.4 77.9,251 80,250.2 81.1,249.9 82.2,249.6 83.3,249.3 84.3,248.7 86.5,247.8 87.5,247.2 88.6,246.6 90.7,245.9 91.8,245.3 92.9,244.7 95,244 96.1,243.5 97.2,243.2 98.2,242.7 100.4,241.9 101.4,241.4 102.5,241.1 103.6,240.9 104.6,240.4 106.8,239.9 107.9,239.6 108.9,239.2 110,238.7 112.1,237.9 113.2,237.5 114.3,236.9 115.3,236.5 117.5,235.6 118.5,235.2 119.6,234.8 120.7,234.3 122.8,233.7 123.9,233.1 126,232.3 127.1,232 128.2,231.5 129.2,231 130.3,230.8 132.5,230.1 133.5,229.5 134.6,229 136.7,228.3 137.8,227.8 138.9,227.4 139.9,227 141,226.7 143.1,226.2 144.2,225.9 145.3,225.5 147.4,224.3 148.5,224.1 149.6,223.8 150.6,223.4 151.7,223 153.8,221.8 154.9,221.3 156,220.9 158.1,220.1 159.2,219.6 160.3,219.4 161.3,219.2 163.5,218.1 164.5,217.7 165.6,217.2 167.7,216.4 168.8,215.9 169.9,215.4 171,215 173.1,214.2 174.2,213.9 175.2,213.4 176.3,212.8 178.4,211.9 179.5,211.6 180.6,211.3 181.7,211 183.8,210.4 184.9,210 185.9,209.5 188.1,208.9 189.1,208.3 190.2,207.9 191.3,207.6 192.3,207.2 194.5,206.6 195.6,206.3 196.6,205.8 198.8,205.1 199.8,204.8 200.9,204.5 202,204.3 204.1,203.5 205.2,203.1 206.3,202.9 207.3,202.3 209.5,201.4 210.5,201 211.6,200.7 212.7,200.4 214.8,199.4 215.9,199 217,198.6 218,198.2 220.2,197.5 221.2,197.2 222.3,196.8 224.4,196 225.5,195.4 226.6,194.9 227.6,194.3 228.7,194.1 230.9,193.3 231.9,193.1 233,192.9 234.1,192.3 236.2,191.7 237.3,191.1 238.3,190.9 239.4,190.6 241.6,189.5 242.6,189 243.7,188.5 245.8,188 246.9,187.6 248,187.1 250.1,186.4 251.2,185.9 252.2,185.5 253.3,185.3 255.5,184.2 256.5,183.9 257.6,183.5 258.7,182.9 260.8,181.8 261.9,181.4 262.9,181.1 264,180.7 266.2,180 267.2,179.6 268.3,179.3 269.4,178.7 270.4,178.5 272.6,177.7 273.6,177.1 275.8,176.2 276.8,175.9 277.9,175.6 279,174.9 280.1,174.7 282.2,174.1 283.3,173.6 284.3,173 285.4,172.7 287.5,171.7 288.6,171.5 289.7,170.9 290.8,170.5 292.9,169.6 294,169.2 295,168.7 296.1,168.5 298.2,167.7 299.3,167.5 300.4,167.1 302.5,166.5 303.6,166.1 304.7,165.7 306.8,164.9 307.9,164.4 308.9,163.9 310,163.4 311.1,163 313.2,162 314.3,161.6 315.4,161 316.4,160.7 318.6,159.9 319.6,159.4 320.7,159 321.8,158.7 323.9,158 325,157.6 326,157.3 328.2,156.4 329.3,156.1 330.3,155.7 332.5,154.9 333.5,154.3 334.6,153.8 335.7,153.4 337.8,152.9 338.9,152.4 340,151.8 341,151.4 342.1,151.1 344.2,150.3 345.3,149.9 346.4,149.4 347.4,149.1 349.6,148.2 350.6,147.8 351.7,147.3 353.9,146.4 354.9,146 356,145.5 357.1,145.1 359.2,144.2 360.3,143.9 361.3,143.5 362.4,143.1 364.6,142.2 365.6,142 366.7,141.5 368.8,140.6 369.9,139.9 371,139.5 372,139 374.2,138.4 375.2,137.9 376.3,137.5 377.4,137.1 378.5,136.7 380.6,135.5 381.7,135.1 382.7,134.6 383.8,134.3 385.9,133.5 387,133 388.1,132.5 389.2,132 391.3,131.3 392.4,131 394.5,130.1 395.6,129.8 396.6,129.2 397.7,129 399.8,128.1 400.9,127.8 402,127.5 403.1,127.1 405.2,126.2 406.3,126 407.3,125.7 408.4,125.3 410.5,124.6 411.6,124.3 412.7,123.8 413.8,123.3 414.8,122.9 417,121.9 418,121.5 419.1,121.2 420.2,120.9 422.3,119.9 423.4,119.5 425.5,118.6 426.6,118.1 427.7,117.5 428.7,117.3 430.9,116.3 431.9,115.9 433,115.6 434.1,115.1 435.1,114.9 437.3,114.2 438.4,113.8 439.4,113.2 440.5,112.8 442.6,111.8 443.7,111.2 444.8,110.8 445.8,110.5 448,109.6 449,109.3 450.1,109 451.2,108.4 453.3,107.6 454.4,107.3 456.5,106.6 457.6,106.2 458.7,105.7 459.7,105.3 461.9,104.6 463,104 464,103.8 465.1,103.4 466.2,103 468.3,102.4 469.4,102 470.4,101.8 472.6,101.1 473.7,100.9 474.7,100.1 475.8,99.9 476.9,99.4 479,98.5 480.1,98.1 481.1,97.9 483.3,97.1 484.3,96.7 485.4,96.3 486.5,96.1 488.6,95 489.7,94.4 490.8,94.1 491.8,93.7 494,93 495,92.5 496.1,92.1 498.3,91.4 499.3,90.9 500.4,90.5 501.5,90.2 502.5,89.6 504.7,88.9 505.7,88.5 506.8,87.9 508.9,87 510,86.7 511.1,86.2 513.2,85.5 514.3,85.2 515.4,84.9 516.4,84.4 518.6,83.6 519.6,83.2 520.7,82.4 521.8,81.9 522.9,81.7 525,81.1 526.1,80.6 527.1,80.1 529.3,79.4 530.3,78.9 531.4,78.5 532.5,78.1 534.6,77 535.7,76.6 536.8,76.2 537.8,75.8 538.9,75.5 541,74.8 542.1,74.3 543.2,73.8 545.3,73.2 546.4,72.8 547.5,72.3 549.6,71.8 550.7,71.4 551.7,70.8 552.8,70.4 554.9,69.8 556,69.5 557.1,69.2 558.1,68.7 560.3,68 561.4,67.6 562.4,67.2 563.5,66.8 565.6,66 566.7,65.7 567.8,65.2 568.8,64.9 569.9,64.7 572.1,63.9 573.1,63.4 575.3,62.7 576.3,62.4 577.4,61.7 578.5,61.4 579.5,60.7 581.7,60 582.7,59.7 583.8,59.2 584.9,58.6 587,57.6 588.1,57.4 589.2,57.1 591.3,56.4 592.4,55.9 593.4,55.4 594.5,54.7 596.7,54.1 597.7,53.6 598.8,53.2 599.9,52.7 602,52" fill="none" stroke="#D64B2A" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>Naive (lag=0, look-ahead)</title></polyline>
+  <circle cx="602" cy="52" r="4" fill="#D64B2A" stroke="#FBFBF8" stroke-width="2"><title>Naive (lag=0, look-ahead): $191.3</title></circle>
+  <text x="614" y="56" font-size="11" fill="#1F2C38">Naive: $191.3</text>
+  <text x="614" y="265.8" font-size="11" fill="#1F2C38">Honest: $0.9</text>
+</svg>
+<!-- /chart:equity -->
+<figcaption>fig 6.2.4 — the same signal, two fill assumptions: growth of $1 over two simulated years</figcaption>
+</figure>
+
+<table>
+<thead><tr><th>Metric</th><th>Honest (lag = 1)</th><th>Naive (lag = 0)</th></tr></thead>
+<tbody>
+<tr><td>CAGR</td><td><span data-lab="demo_honest_cagr" data-fmt=".2%">−6.32%</span></td><td><span data-lab="demo_buggy_cagr" data-fmt=",.0%">1,283%</span></td></tr>
+<tr><td>Sharpe ratio</td><td><span data-lab="demo_honest_sharpe" data-fmt=".2f">−0.77</span></td><td><span data-lab="demo_buggy_sharpe" data-fmt=".1f">56.2</span></td></tr>
+<tr><td>Drawdown</td><td><span data-lab="demo_honest_maxdd" data-fmt=".2%">−16.96%</span></td><td><span data-lab="demo_buggy_maxdd" data-fmt=".2%">0.00%</span></td></tr>
+<tr><td>Turnover, per year</td><td><span data-lab="demo_honest_turnover" data-fmt=".0f">130</span>×</td><td><span data-lab="demo_buggy_turnover" data-fmt=".0f">130</span>×</td></tr>
+<tr><td>Final value of $1</td><td><span data-lab="demo_final_honest" data-fmt="$,.2f">$0.88</span></td><td><span data-lab="demo_final_buggy" data-fmt="$,.2f">$191.32</span></td></tr>
+</tbody>
+</table>
+
+<figure class="diagram chart">
+<!-- chart:drawdown -->
+<svg viewBox="0 0 720 220" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Drawdown of the honest backtest, by simulated year">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">DRAWDOWN OF THE HONEST BACKTEST, BY SIMULATED YEAR</text>
+  <line x1="64" y1="184" x2="602" y2="184" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="188" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">−20%</text>
+  <line x1="64" y1="148" x2="602" y2="148" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="152" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">−15%</text>
+  <line x1="64" y1="112" x2="602" y2="112" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="116" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">−10%</text>
+  <line x1="64" y1="76" x2="602" y2="76" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="80" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">−5%</text>
+  <line x1="64" y1="40" x2="602" y2="40" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="44" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0%</text>
+  <line x1="64" y1="184" x2="602" y2="184" stroke="#C9CFC6" stroke-width="1"/>
+  <line x1="197.7" y1="184" x2="197.7" y2="188" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="197.7" y="202" font-size="11" text-anchor="middle" fill="#4A5A68">0.5</text>
+  <line x1="332.5" y1="184" x2="332.5" y2="188" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="332.5" y="202" font-size="11" text-anchor="middle" fill="#4A5A68">1</text>
+  <line x1="467.2" y1="184" x2="467.2" y2="188" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="467.2" y="202" font-size="11" text-anchor="middle" fill="#4A5A68">1.5</text>
+  <line x1="602" y1="184" x2="602" y2="188" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="602" y="202" font-size="11" text-anchor="middle" fill="#4A5A68">2</text>
+  <polygon points="64,40 64,40 65.1,48.4 66.1,49.8 67.2,45.4 69.3,46.7 70.4,43.8 71.5,43.8 72.6,41.8 73.6,41.5 75.8,51.3 76.8,56.6 77.9,49.2 80,56.5 81.1,58.6 82.2,60.3 83.3,62.4 85.4,63.4 86.5,72.8 87.5,72.5 88.6,67.2 89.7,68.7 91.8,64.3 92.9,67 93.9,71.8 96.1,66.2 97.2,64.5 98.2,57.7 99.3,58.9 101.4,49.6 102.5,49.8 103.6,51.2 104.6,56.8 106.8,53.4 107.9,55.2 108.9,51.8 110,54.5 112.1,50.5 113.2,55.2 114.3,54.9 115.3,53.8 117.5,58.1 118.5,51.3 119.6,52.6 120.7,49.6 122.8,42.5 123.9,44.4 126,40.4 127.1,44 128.2,43 129.2,45.8 130.3,46.7 132.5,51.6 133.5,49.1 134.6,48.3 136.7,51.2 137.8,58.7 138.9,59.1 139.9,60.1 142.1,62 143.1,60.2 144.2,65.1 145.3,62.2 146.4,66.1 148.5,67 149.6,70.1 150.6,65.2 152.8,68.7 153.8,62.1 154.9,65 157.1,66.3 158.1,69.8 159.2,66.8 160.3,64.7 162.4,63.7 163.5,68 164.5,69.3 165.6,77.5 167.7,80.8 168.8,77.7 169.9,75.5 171,76.9 173.1,71.3 174.2,72.3 175.2,74.7 176.3,78.8 177.4,77.2 179.5,80.2 180.6,83 181.7,84.2 183.8,86 184.9,92.6 185.9,91.2 188.1,89.2 189.1,97.6 190.2,102.1 191.3,106.3 192.3,107.3 194.5,104.1 195.6,99.8 196.6,102.7 197.7,103.8 199.8,102.4 200.9,102.3 202,100.1 203,96 205.2,98.6 206.3,96.9 207.3,98.8 209.5,105.5 210.5,100.8 211.6,96.8 212.7,96.6 214.8,105.6 215.9,107.9 217,107.8 218,108.1 220.2,115.9 221.2,117.8 222.3,115 224.4,118.3 225.5,122.4 226.6,121.9 227.6,124.2 229.8,130.9 230.9,131.3 231.9,132.7 233,133.8 234.1,131.6 236.2,123.7 237.3,120.2 238.3,120.6 239.4,123.5 241.6,135.3 242.6,134.7 244.8,126.1 245.8,130 246.9,131.7 248,134.2 250.1,133.2 251.2,125.9 252.2,123.9 253.3,121.2 255.5,135.3 256.5,133.7 257.6,129.6 258.7,130.8 260.8,125.2 261.9,130.9 262.9,132.1 264,136.1 266.2,134.3 267.2,129.7 268.3,130.4 269.4,134.9 270.4,136.5 272.6,130.9 273.6,124 275.8,124.5 276.8,124.2 277.9,122.3 279,122.9 281.1,126.8 282.2,127.3 283.3,132.9 284.3,127 286.5,130.8 287.5,129.5 288.6,130.6 289.7,135.3 291.8,141.4 292.9,137.5 294,140.5 295,141.9 296.1,138.7 298.2,135.6 299.3,134.8 300.4,127.9 301.4,125.3 303.6,126 304.7,122.6 306.8,120.6 307.9,128.6 308.9,129.4 310,127.6 312.1,129.8 313.2,125.6 314.3,127.6 315.4,119.9 317.5,116.9 318.6,117.3 319.6,113.9 320.7,115.7 322.8,118.1 323.9,121.1 325,121.1 326,122.2 328.2,125.8 329.3,125.3 330.3,126.8 332.5,123.1 333.5,122.4 334.6,128.4 335.7,124.9 337.8,125.1 338.9,120.5 340,123.3 341,116.5 342.1,119.7 344.2,122.5 345.3,123.1 346.4,126.7 348.5,122.2 349.6,125.9 350.6,126.4 351.7,127.1 353.9,123 354.9,127.6 356,125.7 357.1,123.6 358.1,127.3 360.3,128.5 361.3,125.8 363.5,130.4 364.6,130.9 365.6,134.7 366.7,131.2 367.8,137.7 369.9,148.1 371,145.2 372,145 373.1,148.5 375.2,143.8 376.3,144.5 377.4,148.7 378.5,148.8 380.6,137.4 381.7,141 382.7,142 383.8,146.2 385.9,152.6 387,150.1 388.1,145.9 389.2,143.7 391.3,144 392.4,145.6 393.4,140.4 395.6,141.7 396.6,143.9 397.7,143.7 398.8,148.9 400.9,147.4 402,145.9 403.1,143 405.2,149.8 406.3,147.8 407.3,146.3 408.4,147.5 410.5,141.9 411.6,146.2 412.7,149.5 413.8,144.2 415.9,152.4 417,157 418,158.6 419.1,158.5 421.2,156.8 422.3,158.2 423.4,152.1 425.5,157.6 426.6,155.2 427.7,149.3 428.7,148.7 429.8,148.3 431.9,147 433,143.8 434.1,143 435.1,145.9 437.3,140.5 438.4,139.5 439.4,140.8 441.6,148.4 442.6,150.3 443.7,148.2 444.8,148.7 445.8,152.6 448,150.8 449,149.7 450.1,150 451.2,148.9 453.3,152.1 454.4,155.3 455.5,152.2 457.6,157.1 458.7,150.8 459.7,147.6 461.9,142.5 463,136.5 464,137.7 465.1,139.5 466.2,134.4 468.3,138.4 469.4,141.7 470.4,140.4 472.6,139.8 473.7,142.6 474.7,150.6 475.8,149.8 476.9,152.2 479,151.9 480.1,148.2 481.1,148.6 483.3,149.1 484.3,153.2 485.4,156.5 486.5,157.2 488.6,162.1 489.7,157.4 490.8,153.2 491.8,150.3 494,150 495,155.2 496.1,153.6 498.3,160.8 499.3,156.9 500.4,155.3 501.5,155.6 502.5,152.3 504.7,154.8 505.7,149.6 506.8,150 508.9,150.9 510,149 511.1,148.5 513.2,151.1 514.3,151 515.4,151.9 516.4,159.6 517.5,155.1 519.6,154.7 520.7,152.7 521.8,151 523.9,148.4 525,149.1 526.1,151.1 527.1,156.5 528.2,151.2 530.3,149 531.4,151.8 532.5,154.6 533.5,147.6 535.7,142.2 536.8,138 537.8,137 538.9,139.7 541,138.6 542.1,132.7 543.2,126.9 545.3,126.8 546.4,125 547.5,131 549.6,131.9 550.7,129.8 551.7,127.1 552.8,133 553.9,131 556,129.2 557.1,130.9 558.1,128.5 559.2,132.6 561.4,132.3 562.4,134.7 563.5,136.3 564.6,134.9 566.7,138.2 567.8,140.8 568.8,141.7 571,146.4 572.1,142.7 573.1,144.6 574.2,140.3 576.3,142 577.4,139.9 578.5,139.9 579.5,129.7 581.7,127.5 582.7,128.7 583.8,132.5 584.9,129.7 587,132.2 588.1,131.9 589.2,129.8 591.3,129.7 592.4,123.4 593.4,126.2 594.5,126 596.7,124.6 597.7,128.2 598.8,126.7 599.9,123.9 602,128.1 602,40" fill="#D64B2A" fill-opacity="0.10"/>
+  <polyline points="64,40 65.1,48.4 66.1,49.8 67.2,45.4 69.3,46.7 70.4,43.8 71.5,43.8 72.6,41.8 73.6,41.5 75.8,51.3 76.8,56.6 77.9,49.2 80,56.5 81.1,58.6 82.2,60.3 83.3,62.4 85.4,63.4 86.5,72.8 87.5,72.5 88.6,67.2 89.7,68.7 91.8,64.3 92.9,67 93.9,71.8 96.1,66.2 97.2,64.5 98.2,57.7 99.3,58.9 101.4,49.6 102.5,49.8 103.6,51.2 104.6,56.8 106.8,53.4 107.9,55.2 108.9,51.8 110,54.5 112.1,50.5 113.2,55.2 114.3,54.9 115.3,53.8 117.5,58.1 118.5,51.3 119.6,52.6 120.7,49.6 122.8,42.5 123.9,44.4 126,40.4 127.1,44 128.2,43 129.2,45.8 130.3,46.7 132.5,51.6 133.5,49.1 134.6,48.3 136.7,51.2 137.8,58.7 138.9,59.1 139.9,60.1 142.1,62 143.1,60.2 144.2,65.1 145.3,62.2 146.4,66.1 148.5,67 149.6,70.1 150.6,65.2 152.8,68.7 153.8,62.1 154.9,65 157.1,66.3 158.1,69.8 159.2,66.8 160.3,64.7 162.4,63.7 163.5,68 164.5,69.3 165.6,77.5 167.7,80.8 168.8,77.7 169.9,75.5 171,76.9 173.1,71.3 174.2,72.3 175.2,74.7 176.3,78.8 177.4,77.2 179.5,80.2 180.6,83 181.7,84.2 183.8,86 184.9,92.6 185.9,91.2 188.1,89.2 189.1,97.6 190.2,102.1 191.3,106.3 192.3,107.3 194.5,104.1 195.6,99.8 196.6,102.7 197.7,103.8 199.8,102.4 200.9,102.3 202,100.1 203,96 205.2,98.6 206.3,96.9 207.3,98.8 209.5,105.5 210.5,100.8 211.6,96.8 212.7,96.6 214.8,105.6 215.9,107.9 217,107.8 218,108.1 220.2,115.9 221.2,117.8 222.3,115 224.4,118.3 225.5,122.4 226.6,121.9 227.6,124.2 229.8,130.9 230.9,131.3 231.9,132.7 233,133.8 234.1,131.6 236.2,123.7 237.3,120.2 238.3,120.6 239.4,123.5 241.6,135.3 242.6,134.7 244.8,126.1 245.8,130 246.9,131.7 248,134.2 250.1,133.2 251.2,125.9 252.2,123.9 253.3,121.2 255.5,135.3 256.5,133.7 257.6,129.6 258.7,130.8 260.8,125.2 261.9,130.9 262.9,132.1 264,136.1 266.2,134.3 267.2,129.7 268.3,130.4 269.4,134.9 270.4,136.5 272.6,130.9 273.6,124 275.8,124.5 276.8,124.2 277.9,122.3 279,122.9 281.1,126.8 282.2,127.3 283.3,132.9 284.3,127 286.5,130.8 287.5,129.5 288.6,130.6 289.7,135.3 291.8,141.4 292.9,137.5 294,140.5 295,141.9 296.1,138.7 298.2,135.6 299.3,134.8 300.4,127.9 301.4,125.3 303.6,126 304.7,122.6 306.8,120.6 307.9,128.6 308.9,129.4 310,127.6 312.1,129.8 313.2,125.6 314.3,127.6 315.4,119.9 317.5,116.9 318.6,117.3 319.6,113.9 320.7,115.7 322.8,118.1 323.9,121.1 325,121.1 326,122.2 328.2,125.8 329.3,125.3 330.3,126.8 332.5,123.1 333.5,122.4 334.6,128.4 335.7,124.9 337.8,125.1 338.9,120.5 340,123.3 341,116.5 342.1,119.7 344.2,122.5 345.3,123.1 346.4,126.7 348.5,122.2 349.6,125.9 350.6,126.4 351.7,127.1 353.9,123 354.9,127.6 356,125.7 357.1,123.6 358.1,127.3 360.3,128.5 361.3,125.8 363.5,130.4 364.6,130.9 365.6,134.7 366.7,131.2 367.8,137.7 369.9,148.1 371,145.2 372,145 373.1,148.5 375.2,143.8 376.3,144.5 377.4,148.7 378.5,148.8 380.6,137.4 381.7,141 382.7,142 383.8,146.2 385.9,152.6 387,150.1 388.1,145.9 389.2,143.7 391.3,144 392.4,145.6 393.4,140.4 395.6,141.7 396.6,143.9 397.7,143.7 398.8,148.9 400.9,147.4 402,145.9 403.1,143 405.2,149.8 406.3,147.8 407.3,146.3 408.4,147.5 410.5,141.9 411.6,146.2 412.7,149.5 413.8,144.2 415.9,152.4 417,157 418,158.6 419.1,158.5 421.2,156.8 422.3,158.2 423.4,152.1 425.5,157.6 426.6,155.2 427.7,149.3 428.7,148.7 429.8,148.3 431.9,147 433,143.8 434.1,143 435.1,145.9 437.3,140.5 438.4,139.5 439.4,140.8 441.6,148.4 442.6,150.3 443.7,148.2 444.8,148.7 445.8,152.6 448,150.8 449,149.7 450.1,150 451.2,148.9 453.3,152.1 454.4,155.3 455.5,152.2 457.6,157.1 458.7,150.8 459.7,147.6 461.9,142.5 463,136.5 464,137.7 465.1,139.5 466.2,134.4 468.3,138.4 469.4,141.7 470.4,140.4 472.6,139.8 473.7,142.6 474.7,150.6 475.8,149.8 476.9,152.2 479,151.9 480.1,148.2 481.1,148.6 483.3,149.1 484.3,153.2 485.4,156.5 486.5,157.2 488.6,162.1 489.7,157.4 490.8,153.2 491.8,150.3 494,150 495,155.2 496.1,153.6 498.3,160.8 499.3,156.9 500.4,155.3 501.5,155.6 502.5,152.3 504.7,154.8 505.7,149.6 506.8,150 508.9,150.9 510,149 511.1,148.5 513.2,151.1 514.3,151 515.4,151.9 516.4,159.6 517.5,155.1 519.6,154.7 520.7,152.7 521.8,151 523.9,148.4 525,149.1 526.1,151.1 527.1,156.5 528.2,151.2 530.3,149 531.4,151.8 532.5,154.6 533.5,147.6 535.7,142.2 536.8,138 537.8,137 538.9,139.7 541,138.6 542.1,132.7 543.2,126.9 545.3,126.8 546.4,125 547.5,131 549.6,131.9 550.7,129.8 551.7,127.1 552.8,133 553.9,131 556,129.2 557.1,130.9 558.1,128.5 559.2,132.6 561.4,132.3 562.4,134.7 563.5,136.3 564.6,134.9 566.7,138.2 567.8,140.8 568.8,141.7 571,146.4 572.1,142.7 573.1,144.6 574.2,140.3 576.3,142 577.4,139.9 578.5,139.9 579.5,129.7 581.7,127.5 582.7,128.7 583.8,132.5 584.9,129.7 587,132.2 588.1,131.9 589.2,129.8 591.3,129.7 592.4,123.4 593.4,126.2 594.5,126 596.7,124.6 597.7,128.2 598.8,126.7 599.9,123.9 602,128.1" fill="none" stroke="#D64B2A" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>drawdown</title></polyline>
+  <text x="694" y="22" font-size="11" text-anchor="end" fill="#1F2C38">worst −17.0%</text>
+</svg>
+<!-- /chart:drawdown -->
+<figcaption>fig 6.2.5 — the honest backtest's real drawdown; the naive version has none to show, at any zoom level</figcaption>
+</figure>
+
+<p>Notice what does <em>not</em> change between the two rows: turnover is about <span data-lab="demo_buggy_turnover" data-fmt=".0f">130</span>× a year either way, because both versions hold the same weights — only the day they are allowed to apply them differs. A turnover report or a trade log would never catch this bug; only the timing of the join would. Concretely, on the honest strategy's single worst day it lost <span data-lab="worst_day_honest" data-fmt=".2%">−1.35%</span> — and the naive version, trading that exact same crash against itself, reports a gain of <span data-lab="worst_day_buggy" data-fmt=".2%">1.36%</span> on that identical day. <span class="xref soon" data-xref="6.4" data-auto="" title="Coming soon">Session 6.4 — The Bias Hall of Fame</span> catalogues every other classic way a backtest lies — survivorship, data snooping, stale and untradable prices, and the <span class="xref soon" data-xref="4.2" data-auto="" title="Coming soon">Session 4.2 — Point-in-Time Data &amp; Data Biases</span> version of look-ahead bias, which lives in the data rather than in the code. This one lives entirely in a single misaligned index.</p>
+
+<p>None of this requires careless code. pandas is forgiving by design — it aligns <code>DataFrame</code>s on their index automatically, broadcasts a <code>Series</code> across columns without complaint, and never refuses to multiply two frames just because one of them silently carries information from the wrong day. That forgiveness is usually a feature. It is also why an accidental same-day merge, a resample that closes its window on the wrong side, or a rolling function computed before instead of after a shift, all fail in exactly the way this deliberately planted bug does — quietly, and with a result that looks better, not worse.</p>
+
+<div class="co warn"><span class="co-t">⚠️ Pitfall — "it ran without an error, so the shift must be fine"</span>
+<p>A vectorized backtest with a missing or wrong shift never raises an exception. Every DataFrame lines up, every column multiplies cleanly, and the number that comes out is not just plausible — it looks like the best result you have ever produced. Treat a backtest with zero drawdown, or a Sharpe far outside anything in <span class="xref soon" data-xref="6.1" data-auto="" title="Coming soon">Session 6.1 — What a Backtest Is (and Isn&#x27;t)</span>'s or this session's honest runs, as a bug report on your indexing before you treat it as a discovery.</p>
+</div>
+</section>
+
+<section id="s6">
+<h2><span class="no">6.2.6</span> Does a longer lookback save you?</h2>
+<p class="lede">A slower signal leaks less of tomorrow's answer into today's decision — but "less" is not "zero," at any lookback anyone actually trades.</p>
+
+<p>A signal built from a <em>k</em>-day lookback sums <em>k</em> days of returns, one of which is day <em>t</em> itself. An un-shifted signal therefore leaks a <code>1/k</code> share of the day's own return into that day's decision — shrinking, by construction, as <em>k</em> grows:</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 190" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">HOW MUCH OF THE LOOKBACK WINDOW IS DAY t? (drawn to scale)</text>
+  <text x="26" y="52" font-size="10.5" fill="#4A5A68">k = 1</text>
+  <rect x="80" y="38" width="614" height="26" rx="4" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="387" y="56" font-size="10" text-anchor="middle" fill="#D64B2A" font-weight="600">day t is 100% of the window — the whole signal leaks</text>
+  <text x="26" y="112" font-size="10.5" fill="#4A5A68">k = 20</text>
+  <rect x="80" y="98" width="583" height="26" rx="4" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <rect x="663" y="98" width="31" height="26" rx="4" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="371" y="116" font-size="9.5" text-anchor="middle" fill="#3A56C5">19 other days — already known</text>
+  <text x="678" y="150" font-size="9.5" text-anchor="middle" fill="#D64B2A">day t</text>
+  <text x="678" y="163" font-size="9" text-anchor="middle" fill="#D64B2A">5% leaks</text>
+  <text x="360" y="182" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">The leak shrinks with k. It does not reach zero for any finite k.</text>
+</svg>
+<figcaption>fig 6.2.6 — day t's share of a k-day lookback window, drawn to scale for k = 1 and k = 20</figcaption>
+</figure>
+
+<p>The 20-year universe from §6.2.4 confirms this directly: the naive-minus-honest Sharpe gap shrinks steadily as the lookback grows, but it is still large at a 60-day lookback — a window most trend-following desks would call "slow."</p>
+
+<p>Real time-series-momentum signals, of the kind Moskowitz, Ooi &amp; Pedersen (2012) study across 58 futures markets (below), typically look back one to twelve months — roughly 21 to 252 trading days — squarely inside and beyond the range this table tests. Their signal also differs from this lab's sign-only toy in a way worth naming: they scale the position by realised volatility rather than sizing every asset equally. That changes exactly how much this bug would move the final Sharpe ratio; it changes nothing about whether the bug exists, because the leak lives in the shift, not in the sizing.</p>
+
+<table>
+<thead><tr><th>Lookback k (days)</th><th>Honest Sharpe</th><th>Naive Sharpe</th><th>Bias (naive − honest)</th></tr></thead>
+<tbody>
+<tr><td>1</td><td><span data-lab="lookback_k1_honest" data-fmt=".2f">0.17</span></td><td><span data-lab="lookback_k1_buggy" data-fmt=".2f">55.78</span></td><td><span data-lab="lookback_k1_bias" data-fmt=".2f">55.61</span></td></tr>
+<tr><td>5</td><td><span data-lab="lookback_k5_honest" data-fmt=".2f">−0.12</span></td><td><span data-lab="lookback_k5_buggy" data-fmt=".2f">16.41</span></td><td><span data-lab="lookback_k5_bias" data-fmt=".2f">16.53</span></td></tr>
+<tr><td>20</td><td><span data-lab="lookback_k20_honest" data-fmt=".2f">−0.33</span></td><td><span data-lab="lookback_k20_buggy" data-fmt=".2f">7.74</span></td><td><span data-lab="lookback_k20_bias" data-fmt=".2f">8.07</span></td></tr>
+<tr><td>60</td><td><span data-lab="lookback_k60_honest" data-fmt=".2f">−0.15</span></td><td><span data-lab="lookback_k60_buggy" data-fmt=".2f">4.52</span></td><td><span data-lab="lookback_k60_bias" data-fmt=".2f">4.67</span></td></tr>
+</tbody>
+</table>
+
+<figure class="diagram chart">
+<!-- chart:bias_by_lookback -->
+<svg viewBox="0 0 720 280" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Sharpe ratio by lookback window — honest vs naive, 20 simulated years">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">SHARPE RATIO BY LOOKBACK WINDOW — HONEST VS NAIVE, 20 SIMULATED YEARS</text>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#3A56C5" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">Honest (lag=1)</text>
+  <line x1="159.60000000000002" y1="32" x2="175.60000000000002" y2="32" stroke="#D64B2A" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="181.60000000000002" y="36" font-size="11" fill="#4A5A68">Naive (lag=0)</text>
+  <line x1="64" y1="236" x2="690" y2="236" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="240" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">−20.0</text>
+  <line x1="64" y1="200" x2="690" y2="200" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="204" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.0</text>
+  <line x1="64" y1="164" x2="690" y2="164" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="168" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">20.0</text>
+  <line x1="64" y1="128" x2="690" y2="128" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="132" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">40.0</text>
+  <line x1="64" y1="92" x2="690" y2="92" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="96" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">60.0</text>
+  <line x1="64" y1="56" x2="690" y2="56" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="60" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">80.0</text>
+  <line x1="64" y1="200" x2="690" y2="200" stroke="#C9CFC6" stroke-width="1"/>
+  <path d="M117.2,200 V199.8 Q117.2,199.7 117.4,199.7 H141.1 Q141.2,199.7 141.2,199.8 V200 Z" fill="#3A56C5"><title>k=1 · Honest (lag=1): 0.2</title></path>
+  <text x="129.2" y="193.7" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.2</text>
+  <path d="M143.2,200 V103.6 Q143.2,99.6 147.2,99.6 H163.2 Q167.2,99.6 167.2,103.6 V200 Z" fill="#D64B2A"><title>k=1 · Naive (lag=0): 55.8</title></path>
+  <text x="155.2" y="93.6" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">55.8</text>
+  <text x="142.2" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">k=1</text>
+  <path d="M273.8,200 V200.1 Q273.8,200.2 273.9,200.2 H297.6 Q297.8,200.2 297.8,200.1 V200 Z" fill="#3A56C5"><title>k=5 · Honest (lag=1): −0.1</title></path>
+  <text x="285.8" y="213.2" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">−0.1</text>
+  <path d="M299.8,200 V174.5 Q299.8,170.5 303.8,170.5 H319.8 Q323.8,170.5 323.8,174.5 V200 Z" fill="#D64B2A"><title>k=5 · Naive (lag=0): 16.4</title></path>
+  <text x="311.8" y="164.5" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">16.4</text>
+  <text x="298.8" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">k=5</text>
+  <path d="M430.2,200 V200.3 Q430.2,200.6 430.5,200.6 H454 Q454.2,200.6 454.2,200.3 V200 Z" fill="#3A56C5"><title>k=20 · Honest (lag=1): −0.3</title></path>
+  <text x="442.2" y="213.6" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">−0.3</text>
+  <path d="M456.2,200 V190.1 Q456.2,186.1 460.2,186.1 H476.2 Q480.2,186.1 480.2,190.1 V200 Z" fill="#D64B2A"><title>k=20 · Naive (lag=0): 7.7</title></path>
+  <text x="468.2" y="180.1" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">7.7</text>
+  <text x="455.2" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">k=20</text>
+  <path d="M586.8,200 V200.1 Q586.8,200.3 586.9,200.3 H610.6 Q610.8,200.3 610.8,200.1 V200 Z" fill="#3A56C5"><title>k=60 · Honest (lag=1): −0.2</title></path>
+  <text x="598.8" y="213.3" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">−0.2</text>
+  <path d="M612.8,200 V195.9 Q612.8,191.9 616.8,191.9 H632.8 Q636.8,191.9 636.8,195.9 V200 Z" fill="#D64B2A"><title>k=60 · Naive (lag=0): 4.5</title></path>
+  <text x="624.8" y="185.9" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">4.5</text>
+  <text x="611.8" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">k=60</text>
+</svg>
+<!-- /chart:bias_by_lookback -->
+<figcaption>fig 6.2.7 — the honest Sharpe stays near zero at every lookback; the naive Sharpe stays far above it at every lookback</figcaption>
+</figure>
+
+<p>Every honest column in fig 6.2.7 sits close to zero, exactly as it should on data with no true edge. Every naive column sits far above it — the smallest gap tested, at a 60-day lookback, is still more than five times the width of the 4-standard-error band from §6.2.4. A slower signal is not a safer one to leave unshifted; it is only a less dramatic advertisement of the same mistake.</p>
+
+<div class="co note"><span class="co-t">🧭 Margin note — one line, always</span>
+<p>There is no lookback long enough to make skipping <code>.shift(lag)</code> a reasonable trade-off. The line costs nothing to write and removes the leak entirely, regardless of how the signal is built — treat it as non-negotiable rather than something to weigh case by case.</p>
+</div>
+</section>
+
+<section id="s7">
+<h2><span class="no">6.2.7</span> Try it</h2>
+<p class="lede">Ten minutes with the lab open, changing exactly one number at a time.</p>
+
+<div class="co lab"><span class="co-t">🔧 Try it (10 min, in the lab)</span>
+<p>Open <code>labs/u06/<wbr>s02_vectorized_backtester.py</code>. In §3 of the notebook, change the honest backtest's <code>lag=1</code> to <code>lag=2</code> and rerun. Confirm two things: the Sharpe ratio still lands comfortably inside the same four-standard-error band around zero as the <code>lag=1</code> case (being two days late is still honest, only more conservative), and turnover barely moves — because the lag changes only <em>when</em> a decided weight gets used, never how often the weights themselves change.</p>
+</div>
+</section>
+
+<hr>
+
+<section id="s8">
+<h2><span class="no">6.2.8</span> Glossary · Check yourself · Go deeper</h2>
+<div class="gloss" id="glossary">
+<div id="g-vectorized-backtest"><b>Vectorized backtest</b> — a backtest computed as whole-array operations over the full price and return history at once (pandas/numpy), rather than looping day by day; identical in what it assumes to a day-by-day replay, only faster.</div>
+<div id="g-position"><b>Position</b> — the size and direction of a strategy's exposure to one asset at a point in time, expressed here as a weight: a fraction of the portfolio's capital, positive for long and negative for short.</div>
+<div id="g-turnover"><b>Turnover</b> — how much of a portfolio's weights change from one period to the next; reported here one-way, as half the sum of absolute weight changes, so a complete switch from one asset to another counts as 100%, not 200%.</div>
+<div id="g-signal-lag"><b>Signal lag</b> — the number of periods that must separate the information a signal uses from the position built from it, so a backtest never holds a weight decided with data it could not yet have seen.</div>
+<div id="g-equity-curve"><b>Equity curve</b> — the running value of $1 invested in a strategy since its start: the cumulative product of one plus each period's return.</div>
+</div>
+
+<h3>Check yourself</h3>
+<details class="q"><summary>1. A colleague's vectorized backtest computes <code>positions = signal</code> and then <code>returns = (positions * asset_returns).sum(axis=1)</code>, with no <code>.shift()</code> anywhere. What information is day t's position implicitly using, and when would that information actually exist in a live account?</summary><div>Day t's signal was computed from data available only at the close of day t — which is also when day t's return becomes known. The backtest is applying day t's decision to day t's own return as if the decision preceded it, but in a live account you cannot see a day's closing price, and therefore cannot finish computing that day's signal, before that same day's return has already happened.</div></details>
+<details class="q"><summary>2. A fully-invested long-short book flips overnight from 100% long asset A to 100% long asset B. Using this session's one-way convention, is the turnover 200% or 100%? Why?</summary><div>100%. One-way turnover is half the sum of absolute weight changes: |ΔA| + |ΔB| = |−1| + |+1| = 2, and half of that is 1, i.e. 100%. The convention counts the fraction of the book that traded, not a sum of every buy and every sell counted separately — which is why the "one-way" name matters.</div></details>
+<details class="q"><summary>3. A backtest reports a Sharpe ratio of 56 and has never had a single losing day across 20 simulated years. Should you be impressed? What would you check first?</summary><div>No — check the shift between signal and position first. A real strategy exposed to any risk cannot have literally zero drawdown; the combination of an extreme Sharpe ratio and a perfectly smooth equity curve is closer to a fingerprint of look-ahead bias than to evidence of skill.</div></details>
+<details class="q"><summary>4. If forgetting to shift barely moves the Sharpe ratio for a signal with a 250-day lookback, is it safe to skip the shift for that particular signal?</summary><div>No. The bias shrinks toward zero as the lookback grows but, per §6.2.6's data even at a 60-day window, never reaches it. Deciding case by case whether a given signal is "slow enough" to skip the discipline replaces a free, always-correct habit with a judgment call that can be wrong — there is no benefit to skipping it even when the visible damage is small.</div></details>
+<details class="q"><summary>5. Two assets both show a signal of exactly 0 today (flat). What happens to the portfolio's weights that day under <code>equal_weight_positions()</code>, and why doesn't dividing by zero crash the code?</summary><div>If every asset's signal is 0, gross exposure (the sum of absolute signals) is 0 for that day. The function replaces a zero gross with NaN before dividing, so the division produces NaN instead of raising an error, and the final <code>fillna(0.0)</code> turns that into an explicit, fully-cash position for the day — exactly what "no signal anywhere" should mean.</div></details>
+
+<div class="co lab"><span class="co-t">🔧 Homework (~1 h before Session 6.3)</span>
+<p>1. In the lab, add <code>k=3</code> to <code>LOOKBACKS</code> and rerun. Confirm its bias sits strictly between the k=1 and k=5 values already recorded, and write one sentence explaining why that ordering has to hold.<br>
+2. Read the abstract and introduction of Moskowitz, Ooi &amp; Pedersen (2012), below (~15 min). Note one concrete way their real time-series-momentum signal differs from this lab's sign-only toy version.<br>
+3. Setup for <span class="xref soon" data-xref="6.3" data-auto="" title="Coming soon">Session 6.3 — Build an Event-Driven Backtester</span>: before next session, write down — in your own words, no code — what state an event loop would need to remember between one bar and the next that a vectorized backtest never has to store explicitly.</p>
+</div>
+
+<h3>📚 Go deeper</h3>
+<ol class="refs">
+<li>Moskowitz, T. J., Ooi, Y. H. &amp; Pedersen, L. H. (2012). "Time Series Momentum." <em>Journal of Financial Economics</em> 104(2), 228–250. <span class="rid">SSRN 2089463</span></li>
+<li>Bailey, D. H., Borwein, J. M., López de Prado, M. &amp; Zhu, Q. J. (2014). "Pseudo-Mathematics and Financial Charlatanism: The Effects of Backtest Overfitting on Out-of-Sample Performance." <em>Notices of the American Mathematical Society</em> 61(5), 458–471. <span class="rid">https://www.ams.org/notices/<wbr>201405/rnoti-p458.pdf</span></li>
+</ol>
+
+<h3>Sources for the numbers</h3>
+<ol class="refs">
+<li>Grinold, R. C. &amp; Kahn, R. N. (2000). <em>Active Portfolio Management: A Quantitative Approach for Producing Superior Returns and Controlling Risk</em> (2nd ed.). McGraw-Hill. <span class="rid">ISBN 978-0-07-137695-2</span></li>
+</ol>
+</section>
+
+<!-- nav:foot -->
+<div class="foot">
+<span class="soon" title="Coming soon">← Prev: 6.1 · What a Backtest Is</span>
+<span class="soon" title="Coming soon">Next: 6.3 · Event-Driven →</span>
+</div>
+<p class="legal">Educational material only — not investment, legal or tax advice. Backtests and simulations are hypothetical. <a href="../start-here.html#disclaimer">Disclaimer</a> · Text CC BY 4.0 · Code MIT.</p>
+<!-- /nav:foot -->
+</main>
+</div></body></html>

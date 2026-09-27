@@ -1,0 +1,28 @@
+<svg viewBox="0 0 720 260" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Bars produced by four sampling rules — one simulated trading day">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">BARS PRODUCED BY FOUR SAMPLING RULES — ONE SIMULATED TRADING DAY</text>
+  <line x1="64" y1="216" x2="690" y2="216" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="220" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0</text>
+  <line x1="64" y1="181.6" x2="690" y2="181.6" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="185.6" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">50</text>
+  <line x1="64" y1="147.2" x2="690" y2="147.2" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="151.2" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">100</text>
+  <line x1="64" y1="112.8" x2="690" y2="112.8" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="116.8" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">150</text>
+  <line x1="64" y1="78.4" x2="690" y2="78.4" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="82.4" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">200</text>
+  <line x1="64" y1="44" x2="690" y2="44" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="48" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">250</text>
+  <line x1="64" y1="216" x2="690" y2="216" stroke="#C9CFC6" stroke-width="1"/>
+  <path d="M130.2,216 V85.8 Q130.2,81.8 134.2,81.8 H150.2 Q154.2,81.8 154.2,85.8 V216 Z" fill="#3A56C5"><title>Time (2 min): 195</title></path>
+  <text x="142.2" y="74.8" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">195</text>
+  <text x="142.2" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">Time (2 min)</text>
+  <path d="M286.8,216 V85.8 Q286.8,81.8 290.8,81.8 H306.8 Q310.8,81.8 310.8,85.8 V216 Z" fill="#3A56C5"><title>Volume: 195</title></path>
+  <text x="298.8" y="74.8" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">195</text>
+  <text x="298.8" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">Volume</text>
+  <path d="M443.2,216 V85.2 Q443.2,81.2 447.2,81.2 H463.2 Q467.2,81.2 467.2,85.2 V216 Z" fill="#3A56C5"><title>Dollar: 196</title></path>
+  <text x="455.2" y="74.2" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">196</text>
+  <text x="455.2" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">Dollar</text>
+  <path d="M599.8,216 V195.2 Q599.8,191.2 603.8,191.2 H619.8 Q623.8,191.2 623.8,195.2 V216 Z" fill="#3A56C5"><title>Tick imbalance: 36</title></path>
+  <text x="611.8" y="184.2" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">36</text>
+  <text x="611.8" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">Tick imbalance</text>
+</svg>

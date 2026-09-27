@@ -1,0 +1,29 @@
+{
+  "results": {
+    "acf_lag1": 0.25690949585514944,
+    "acf_pacf_n": 2000,
+    "acf_sig_bound": 0.043826932358995874,
+    "aic_simple_rate": 0.355,
+    "aic_true_rate": 0.45,
+    "bic_simple_rate": 0.74,
+    "bic_true_rate": 0.205,
+    "halflife_boundary": 6.578813478960585,
+    "ljung_box_p": 0.6164582983463616,
+    "order_mc_n": 200,
+    "pacf_lag1": 0.25703801486258077,
+    "pacf_lag2": 0.08127115425158589,
+    "phi_boundary": 0.9,
+    "phi_hat": 0.5878939968042485,
+    "rate_adf_reject_price": 0.025,
+    "rate_adf_reject_ret": 1.0,
+    "rate_contradict_baseline": 0.06,
+    "rate_contradict_boundary": 0.2,
+    "rate_kpss_reject_price": 0.95,
+    "rate_kpss_reject_ret": 0.05,
+    "se_phi_hat": 0.2090365405067508,
+    "se_theta_hat": 0.23574610531928744,
+    "theta_hat": -0.4275153846909284
+  },
+  "seed": 20260926,
+  "session": "5.4"
+}

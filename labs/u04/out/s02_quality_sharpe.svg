@@ -1,0 +1,22 @@
+<svg viewBox="0 0 720 260" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Long-short Sharpe of the SAME quality signal, sorted on two versions of the same data">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">LONG-SHORT SHARPE OF THE SAME QUALITY SIGNAL, SORTED ON TWO VERSIONS OF THE SAME DATA</text>
+  <line x1="64" y1="216" x2="690" y2="216" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="220" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.00</text>
+  <line x1="64" y1="181.6" x2="690" y2="181.6" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="185.6" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.25</text>
+  <line x1="64" y1="147.2" x2="690" y2="147.2" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="151.2" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.50</text>
+  <line x1="64" y1="112.8" x2="690" y2="112.8" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="116.8" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.75</text>
+  <line x1="64" y1="78.4" x2="690" y2="78.4" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="82.4" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">1.00</text>
+  <line x1="64" y1="44" x2="690" y2="44" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="48" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">1.25</text>
+  <line x1="64" y1="216" x2="690" y2="216" stroke="#C9CFC6" stroke-width="1"/>
+  <path d="M208.5,216 V150 Q208.5,146 212.5,146 H228.5 Q232.5,146 232.5,150 V216 Z" fill="#3A56C5"><title>As-reported (point-in-time): 0.51</title></path>
+  <text x="220.5" y="139" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.51</text>
+  <text x="220.5" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">As-reported (point-in-time)</text>
+  <path d="M521.5,216 V74.6 Q521.5,70.6 525.5,70.6 H541.5 Q545.5,70.6 545.5,74.6 V216 Z" fill="#D64B2A"><title>Restated (look-ahead): 1.06</title></path>
+  <text x="533.5" y="63.6" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">1.06</text>
+  <text x="533.5" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">Restated (look-ahead)</text>
+</svg>

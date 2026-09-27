@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- nav:head -->
+<title>4.4 · Time, Calendars, As-of Joins &amp; Bars</title>
+<meta name="description" content="Timestamps and time zones, exchange calendars, as-of joins that never peek, and information-driven bars (volume, dollar, imbalance).">
+<link rel="canonical" href="https://georgevrs.github.io/quant-notebook/unit04-data-engineering/session04-time-calendars-bars.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Quant Notebook">
+<meta property="og:title" content="4.4 · Time, Calendars, As-of Joins &amp; Bars">
+<meta property="og:description" content="Timestamps and time zones, exchange calendars, as-of joins that never peek, and information-driven bars (volume, dollar, imbalance).">
+<meta property="og:url" content="https://georgevrs.github.io/quant-notebook/unit04-data-engineering/session04-time-calendars-bars.html">
+<meta name="twitter:card" content="summary">
+<link rel="stylesheet" href="../assets/brand.css">
+<link rel="stylesheet" href="../assets/temml.css">
+<!-- /nav:head -->
+</head>
+<body><div class="page" id="top">
+<!-- Session 4.4 — timestamps, exchange calendars, as-of joins and information-driven bars. -->
+<!-- nav:tabs -->
+<nav class="tabs">
+<a href="../index.html">⌂ Course home</a>
+<span class="soon" title="Coming soon">4.1 · Data Landscape</span>
+<span class="soon" title="Coming soon">4.2 · Point-in-Time</span>
+<span class="soon" title="Coming soon">4.3 · Security Master</span>
+<a class="active" href="session04-time-calendars-bars.html">4.4 · Time &amp; Bars</a>
+<span class="soon" title="Coming soon">4.5 · Storage Stack</span>
+<span class="soon" title="Coming soon">4.6 · Lab: Data Lake</span>
+<a href="../roadmap.html">🗺 Roadmap</a>
+</nav>
+<!-- /nav:tabs -->
+
+<header class="cover">
+<!-- nav:heading -->
+<p class="eyebrow">Unit 4 · Financial Data Engineering — Session 04 of 06</p>
+<h1>Time, Calendars, As-of Joins &amp; Bars</h1>
+<!-- /nav:heading -->
+<p class="subtitle">Every backtest quietly trusts two things about time: that a timestamp means what you think it means, and that a join never lets tomorrow's information leak into today's decision. Both break more often than engineers expect — across time zones, across exchange holidays, and across the fundamentals-reporting lag that turns an innocent-looking join into a look-ahead bug. This session builds the machinery that gets time right, then uses it to sample a tick stream into bars that respect how much actually happened, not just how many minutes passed. <mark>The core move: never join or sample on a clock that a trader living in the past could not yet have read.</mark></p>
+<div class="meta">
+<span>DURATION <b>1.5 h + lab</b></span>
+<span>LEVEL <b>Foundations</b></span>
+<span>TRACKS <b>QR · QD · IND</b></span>
+<span>HANDS-ON <b>Turn 45,000 synthetic ticks into four kinds of bars</b></span>
+</div>
+<!-- nav:labstrip -->
+<div class="labstrip"><b>📓 Companion lab</b>
+<a href="https://colab.research.google.com/github/georgevrs/quant-notebook/blob/main/labs/u04/s04_time_calendars_bars.ipynb">Open in Colab</a>
+<a href="https://github.com/georgevrs/quant-notebook/blob/main/labs/u04/s04_time_calendars_bars.ipynb">Notebook on GitHub</a>
+<a href="https://github.com/georgevrs/quant-notebook/blob/main/labs/u04/s04_time_calendars_bars.py">Source (.py)</a>
+</div>
+<!-- /nav:labstrip -->
+<div class="toc">
+<b>On this page</b>
+<ol>
+<li><a href="#s1">One instant, several clocks</a></li>
+<li><a href="#s2">A (toy) exchange calendar</a></li>
+<li><a href="#s3">As-of joins that never peek</a></li>
+<li><a href="#s4">The math: event time, thresholds &amp; why sampling changes the shape</a></li>
+<li><a href="#s5">In code: building four kinds of bars</a></li>
+<li><a href="#s6">Where people go wrong: the join that peeks</a></li>
+<li><a href="#s7">Fixed-time bars vs information-driven bars, compared</a></li>
+<li><a href="#s8">Try it</a></li>
+<li><a href="#s9">Glossary · Check yourself · Go deeper</a></li>
+</ol>
+</div>
+</header>
+
+<main>
+
+<section id="s1">
+<h2><span class="no">4.4.1</span> One instant, several clocks</h2>
+<p class="lede">A <strong>timestamp</strong> with no time zone is a bare number: it cannot be compared, joined or converted until you know which clock produced it.</p>
+
+<p>A <strong>time zone</strong> is a named rule (maintained, since 2011, by IANA's tz database) for converting between a fixed reference clock — Coordinated Universal Time (UTC) — and a local wall clock that some region's law changes twice a year. <code>America/New_York</code> sits at UTC<span data-lab="winter_utc_offset_h" data-fmt=".0f">−5</span> in January and UTC<span data-lab="summer_utc_offset_h" data-fmt=".0f">−4</span> in July: 09:30 on the exchange floor is <code>14:30Z</code> in winter and <code>13:30Z</code> in summer. Every system in a trading stack — the feed handler, the database, the risk engine, the chart you eyeball — must agree on which of these it is holding, or two systems will silently disagree by exactly one hour for eight months of the year.</p>
+
+<p>Precision matters as much as offset. Write timestamps in ISO 8601 (<code>2026-03-08T14:30:00Z</code>) rather than a locale-dependent string like <code>3/8/26 2:30 PM</code>: the format is unambiguous about year-month-day order, carries an explicit zone, and — written this way — sorts correctly even as plain text. pandas 3 can store a <code>Timestamp</code> at a resolution as fine as nanoseconds; a feed that timestamps two prints a microsecond apart needs that resolution to keep them in the right order, while a daily close needs none of it. Pick the coarsest resolution that is still unambiguous for the data at hand, store it consistently, and never let two resolutions share a column — that is a quieter version of the same bug as the naive offset above.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 230" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <rect x="20" y="14" width="680" height="200" rx="12" fill="#fff" stroke="#1F2C38" stroke-width="1.5"/>
+  <text x="40" y="40" font-size="12" fill="#4A5A68" font-family="IBM Plex Mono,monospace">ONE INSTANT, THREE HONEST CLOCKS — AND ONE THAT LIES</text>
+  <rect x="45" y="58" width="140" height="110" rx="8" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="115" y="88" font-size="13" font-weight="600" text-anchor="middle" fill="#3A56C5">EXCHANGE LOCAL</text>
+  <text x="115" y="112" font-size="13" text-anchor="middle" fill="#1F2C38" font-family="IBM Plex Mono,monospace">09:30 ET</text>
+  <text x="115" y="132" font-size="10" text-anchor="middle" fill="#4A5A68">the rulebook's clock —</text>
+  <text x="115" y="146" font-size="10" text-anchor="middle" fill="#4A5A68">has its own DST dates</text>
+  <rect x="210" y="58" width="140" height="110" rx="8" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="280" y="88" font-size="13" font-weight="600" text-anchor="middle" fill="#1F7A55">UTC</text>
+  <text x="280" y="112" font-size="13" text-anchor="middle" fill="#1F2C38" font-family="IBM Plex Mono,monospace">14:30Z</text>
+  <text x="280" y="132" font-size="10" text-anchor="middle" fill="#4A5A68">never changes —</text>
+  <text x="280" y="146" font-size="10" text-anchor="middle" fill="#4A5A68">store and join on this</text>
+  <rect x="375" y="58" width="140" height="110" rx="8" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="445" y="88" font-size="13" font-weight="600" text-anchor="middle" fill="#8A6D00">YOUR DISPLAY</text>
+  <text x="445" y="112" font-size="13" text-anchor="middle" fill="#1F2C38" font-family="IBM Plex Mono,monospace">16:30 EET</text>
+  <text x="445" y="132" font-size="10" text-anchor="middle" fill="#4A5A68">Athens — its OWN</text>
+  <text x="445" y="146" font-size="10" text-anchor="middle" fill="#4A5A68">DST calendar, not New York's</text>
+  <rect x="540" y="58" width="140" height="110" rx="8" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="610" y="88" font-size="13" font-weight="600" text-anchor="middle" fill="#D64B2A">NAIVE "UTC-5"</text>
+  <text x="610" y="112" font-size="13" text-anchor="middle" fill="#1F2C38" font-family="IBM Plex Mono,monospace">14:30Z</text>
+  <text x="610" y="132" font-size="10" text-anchor="middle" fill="#4A5A68">right today, wrong for</text>
+  <text x="610" y="146" font-size="10" text-anchor="middle" fill="#4A5A68">~8 months of the year</text>
+  <text x="360" y="198" font-size="12" text-anchor="middle" fill="#4A5A68" font-style="italic">Three representations of the same instant, and one hand-rolled shortcut that is only sometimes right.</text>
+</svg>
+<figcaption>fig 4.4.1 — one instant, three honest clocks, and the naive fixed-offset shortcut that fails for months at a time</figcaption>
+</figure>
+
+<p><strong>Daylight saving is not a rounding error — it is two calendar days a year on which the mapping from local time to UTC is not even a function.</strong> In 2026 the United States springs forward on <span data-lab="dst_start_2026">2026-03-08</span> (the local hour 02:00-03:00 never happens: <code>tz_localize</code> must be told to shift it) and falls back on <span data-lab="dst_end_2026">2026-11-01</span> (the local hour 01:00-02:00 happens twice, an <em>ambiguous</em> time that pandas will refuse to guess about). The lab localises <code>2026-03-08 02:30</code> and gets <span data-lab="spring_forward_result">03:00 EDT</span> back — the missing half hour is simply swallowed — and shows that the two readings of <code>2026-11-01 01:30</code> are <span data-lab="fallback_gap_h" data-fmt=".0f">1</span> hour apart in UTC.</p>
+
+<div class="co key"><span class="co-t">📌 Key idea — store UTC, display local</span>
+<p>Every timestamp that crosses a system boundary should already be UTC (or carry an explicit offset); conversion to a human's local clock happens only at the edge, for display. <mark>A naive datetime with no time zone attached is not a fact about the world — it is a guess waiting to be wrong twice a year.</mark></p>
+</div>
+
+<div class="co note"><span class="co-t">🧭 Margin note — DST is jurisdiction-specific too</span>
+<p>The European Union's clock changes (EU Directive 2000/84/EC) fall on the last Sunday of March and October — in 2026, 29 March and 25 October — not the United States' second-Sunday-of-March / first-Sunday-of-November rule. For three weeks every spring and one week every autumn, New York and Frankfurt are <em>not</em> both on daylight time at once, and the UTC gap between them is briefly one hour different from the rest of the year. A global system that hard-codes "New York is 6 hours behind Frankfurt" is wrong on four weeks of most years.</p>
+</div>
+</section>
+
+<section id="s2">
+<h2><span class="no">4.4.2</span> A (toy) exchange calendar</h2>
+<p class="lede">A time zone converts a reading. An <strong>exchange calendar</strong> answers the harder question: which readings sit inside a trading session at all?</p>
+
+<p>Weekends are the easy five-sevenths of the problem. What is left is exchange-specific and changes slowly: roughly nine full closures a year, a couple of early closes, and — every so often — a change to the hours themselves. On 5 November 2024 the Tokyo Stock Exchange moved its close from 15:00 to 15:30 JST, its first change to trading hours in seventy years; treat a calendar as a fact you look up for a dated jurisdiction, never as a constant you hard-code once.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 150" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <rect x="15" y="40" width="128" height="62" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="79" y="63" font-size="10.5" text-anchor="middle" fill="#3A56C5" font-weight="600">1 · SESSIONS</text>
+  <text x="79" y="80" font-size="9" text-anchor="middle" fill="#4A5A68">open/close per</text>
+  <text x="79" y="92" font-size="9" text-anchor="middle" fill="#4A5A68">weekday, local tz</text>
+  <rect x="161" y="40" width="128" height="62" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="225" y="63" font-size="10.5" text-anchor="middle" fill="#3A56C5" font-weight="600">2 · HOLIDAYS</text>
+  <text x="225" y="80" font-size="9" text-anchor="middle" fill="#4A5A68">fixed + moveable</text>
+  <text x="225" y="92" font-size="9" text-anchor="middle" fill="#4A5A68">rules (Good Friday)</text>
+  <rect x="307" y="40" width="128" height="62" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="371" y="63" font-size="10.5" text-anchor="middle" fill="#3A56C5" font-weight="600">3 · WEEKEND SHIFT</text>
+  <text x="371" y="80" font-size="9" text-anchor="middle" fill="#4A5A68">Sat -&gt; Fri,</text>
+  <text x="371" y="92" font-size="9" text-anchor="middle" fill="#4A5A68">Sun -&gt; Mon</text>
+  <rect x="453" y="40" width="128" height="62" rx="9" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="517" y="63" font-size="10.5" text-anchor="middle" fill="#8A6D00" font-weight="600">4 · HALF DAYS</text>
+  <text x="517" y="80" font-size="9" text-anchor="middle" fill="#4A5A68">1:00pm ET closes,</text>
+  <text x="517" y="92" font-size="9" text-anchor="middle" fill="#4A5A68">lunch breaks</text>
+  <rect x="599" y="40" width="106" height="62" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="652" y="63" font-size="10.5" text-anchor="middle" fill="#1F7A55" font-weight="600">5 · QUERY</text>
+  <text x="652" y="80" font-size="9" text-anchor="middle" fill="#4A5A68">"is this instant</text>
+  <text x="652" y="92" font-size="9" text-anchor="middle" fill="#4A5A68">inside a session?"</text>
+  <path d="M144 71 H159" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M290 71 H305" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M436 71 H451" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M582 71 H597" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <text x="360" y="126" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">Each layer is a small rule; together they answer one boolean, for one timestamp, correctly.</text>
+  <defs><marker id="s2a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F2C38"/></marker></defs>
+</svg>
+<figcaption>fig 4.4.2 — building an exchange calendar: five layers stacked into one query</figcaption>
+</figure>
+
+<p>The lab implements exactly this stack for a simplified NYSE-style calendar: fixed holidays (New Year's Day, Independence Day, Juneteenth, Christmas), rules that move with the calendar (Martin Luther King Jr. Day is the third Monday of January; Good Friday is fixed by Easter, computed with the Gregorian algorithm since it moves by up to a month), a weekend-observance shift, and two early closes at 1:00pm ET. In <span data-lab="thanksgiving_2026">2026-11-26</span>'s year there are <span data-lab="n_nyse_holidays_2026" data-fmt="d">10</span> full closures, <span data-lab="n_nyse_half_days_2026" data-fmt="d">2</span> early closes, and <span data-lab="n_trading_days_2026" data-fmt=",d">251</span> trading days in total. Independence Day falls on a Saturday in 2026, so the exchange actually closes on <span data-lab="independence_day_observed_2026">2026-07-03</span> instead — the kind of one-line rule that silently breaks a calendar built by hand.</p>
+
+<table>
+<thead><tr><th>Exchange</th><th>Local hours</th><th>Time zone</th><th>Worth knowing</th></tr></thead>
+<tbody>
+<tr><td>NYSE / Nasdaq</td><td>09:30–16:00</td><td>America/New_York</td><td>1:00pm ET close, day after Thanksgiving &amp; Christmas Eve</td></tr>
+<tr><td>London Stock Exchange</td><td>08:00–16:30</td><td>Europe/London</td><td>closed for UK bank holidays, not US ones</td></tr>
+<tr><td>Deutsche Börse Xetra</td><td>09:00–17:30</td><td>Europe/Berlin</td><td>core session; a separate extended window runs to 22:00 CET</td></tr>
+<tr><td>Tokyo Stock Exchange</td><td>09:00–11:30, 12:30–15:30</td><td>Asia/Tokyo</td><td>lunch break; close moved 15:00→15:30 on 5 Nov 2024</td></tr>
+</tbody>
+</table>
+
+<p>Two more edge cases are worth knowing before you trust a calendar. Financial systems deliberately ignore <strong>leap seconds</strong> — the occasional extra second inserted into UTC to track Earth's slowing rotation — because a calendar built on a minute that occasionally has 61 seconds is more disruptive than letting exchange clocks drift a fraction of a second and resynchronise instead. And an instrument that trades on more than one market — a dual-listed stock, an ETF holding foreign equities — is genuinely open only when <em>both</em> calendars agree: the correct trading calendar for it is the intersection of the two, never either one alone.</p>
+
+<div class="co tip"><span class="co-t">💡 Looking ahead</span>
+<p>A production system does not hand-roll this: it calls a maintained calendar package (<code>pandas_market_calendars</code>, or its upstream <code>exchange_calendars</code>) with fifty-plus exchanges kept current by other people. What you build here is small on purpose — enough to see every moving part once. The bars this calendar feeds, and the corporate actions that also change what a "price" means, are <span class="xref soon" data-xref="4.3" data-auto="" title="Coming soon">Session 4.3 — Corporate Actions, Security Master &amp; Continuous Futures</span>'s job; the columnar store everything eventually lands in is <span class="xref soon" data-xref="4.5" data-auto="" title="Coming soon">Session 4.5 — The Research Storage Stack</span>.</p>
+</div>
+</section>
+
+<section id="s3">
+<h2><span class="no">4.4.3</span> As-of joins that never peek</h2>
+<p class="lede">An <strong>as-of join</strong> attaches to each row of one table the most recent matching row of another — <em>as of</em> that row's timestamp, never a later one.</p>
+
+<p>Point-in-time research (<span class="xref soon" data-xref="4.2" data-auto="" title="Coming soon">Session 4.2 — Point-in-Time Data &amp; Data Biases</span>'s subject) depends on exactly one discipline at the join: the key you join on must be the moment a fact became <em>knowable</em>, not the moment it happened. A quarter's earnings are true as of the last day of the quarter, but nobody could trade on them until the filing actually posted — typically weeks later. Join daily prices to fundamentals on the filing date and you have a correct, if unglamorous, point-in-time table; join on the quarter's end date instead and every price row silently "knows" a number before it existed.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 150" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <rect x="18" y="40" width="150" height="62" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="93" y="64" font-size="10.5" text-anchor="middle" fill="#3A56C5" font-weight="600">1 · TWO STREAMS</text>
+  <text x="93" y="82" font-size="9" text-anchor="middle" fill="#4A5A68">prices (daily) +</text>
+  <text x="93" y="94" font-size="9" text-anchor="middle" fill="#4A5A68">fundamentals (filed)</text>
+  <rect x="188" y="40" width="150" height="62" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="263" y="64" font-size="10.5" text-anchor="middle" fill="#3A56C5" font-weight="600">2 · SORT</text>
+  <text x="263" y="82" font-size="9" text-anchor="middle" fill="#4A5A68">both, by their</text>
+  <text x="263" y="94" font-size="9" text-anchor="middle" fill="#4A5A68">join-time column</text>
+  <rect x="358" y="40" width="176" height="62" rx="9" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="446" y="60" font-size="10.5" text-anchor="middle" fill="#8A6D00" font-weight="600">3 · MERGE_ASOF</text>
+  <text x="446" y="76" font-size="9" text-anchor="middle" fill="#4A5A68">backward, on AVAILABLE</text>
+  <text x="446" y="88" font-size="9" text-anchor="middle" fill="#4A5A68">time, with a tolerance</text>
+  <rect x="554" y="40" width="148" height="62" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="628" y="64" font-size="10.5" text-anchor="middle" fill="#1F7A55" font-weight="600">4 · P-I-T PANEL</text>
+  <text x="628" y="82" font-size="9" text-anchor="middle" fill="#4A5A68">one row per price,</text>
+  <text x="628" y="94" font-size="9" text-anchor="middle" fill="#4A5A68">honest as of that day</text>
+  <path d="M169 71 H186" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s3a)"/>
+  <path d="M339 71 H356" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s3a)"/>
+  <path d="M535 71 H552" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s3a)"/>
+  <text x="360" y="126" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">The only step that can leak the future is step 3 — get its join key right and the rest follows.</text>
+  <defs><marker id="s3a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F2C38"/></marker></defs>
+</svg>
+<figcaption>fig 4.4.3 — the as-of join pipeline: two sorted streams in, one point-in-time panel out</figcaption>
+</figure>
+
+<p>The lab builds sixteen quarters of synthetic fundamentals across four years, each with a reporting lag jittered around <span data-lab="reporting_lag_mean_days" data-fmt=".0f">44</span> days, and joins them to <a class="term" href="../unit03-math-toolkit/session05-simulation-monte-carlo.html#g-geometric-brownian-motion" data-term="geometric Brownian motion">simulated</a> daily prices with <code>pandas.merge_asof(..., direction="backward")</code> on the filing timestamp. A second, deliberately buggy version joins on the quarter's end date instead: it knows the future on <span data-lab="pct_days_leaking" data-fmt=".0%">46%</span> of trading days, by as much as <span data-lab="max_leak_days" data-fmt=".0f">53</span> days right after a quarter closes and <span data-lab="mean_leak_days" data-fmt=".0f">22</span> days on average across the whole leaking window — exactly the shape of bug <span class="xref soon" data-xref="4.2" data-auto="" title="Coming soon">Session 4.2 — Point-in-Time Data &amp; Data Biases</span> calls <span class="term soon" data-term="look-ahead bias" title="Defined in Session 4.2 (coming soon)">look-ahead bias</span>.</p>
+
+<table>
+<thead><tr><th><code>direction</code></th><th>Matches</th><th>Use it for</th></tr></thead>
+<tbody>
+<tr><td><code>backward</code> (default)</td><td>the last right-row at or before the left key</td><td>almost everything in research — "what did we know by then?"</td></tr>
+<tr><td><code>forward</code></td><td>the first right-row at or after the left key</td><td>rare: e.g. "the next scheduled rebalance after this signal"</td></tr>
+<tr><td><code>nearest</code></td><td>whichever right-row is closest either way</td><td>never for point-in-time joins — it can match on the future</td></tr>
+</tbody>
+</table>
+
+<p>A <code>tolerance</code> matters just as much as direction: without one, a backward join carries a value forward forever once a source stops reporting — a delisted company's last known price, an index constituent that quietly stopped filing. The lab drops two consecutive quarters to open a real 180-plus-day gap and shows that a 200-day tolerance turns <span data-lab="n_stale_avoided" data-fmt="d">51</span> rows that would otherwise have silently reused a stale number into an honest, explicit missing value. The same discipline works in SQL: DuckDB's native <code>ASOF LEFT JOIN</code> — this unit's research engine, alongside <span class="term soon" data-term="polars" title="Defined in Session 4.5 (coming soon)">polars</span> — reproduces the pandas result exactly, over Arrow-backed tables it can query where they already sit.</p>
+
+<p>DuckDB's <code>ASOF JOIN</code> requires exactly one inequality on the ordering column (<code>px.date &gt;= fx.available_time</code> above) and, in its plain form, keeps only the closest preceding match per left row; <code>ASOF LEFT JOIN</code> additionally keeps left rows with no match yet — the SQL equivalent of <code>merge_asof</code>'s left-join default. <code>nearest</code> and <code>forward</code> are not simply wrong, either: aligning a trade print to the prevailing quote a few milliseconds either side of it is a <code>nearest</code> problem, because the question is "what price was live," not "what could I have known." The point-in-time discipline bites specifically when the answer to a join changes who could have legally acted on it — every signal-construction join, and few pure microstructure-alignment ones.</p>
+
+<div class="co note"><span class="co-t">🧭 Margin note — merge inputs must already be sorted</span>
+<p><code>merge_asof</code> (and DuckDB's <code>ASOF JOIN</code>) require both sides sorted on the join column; an unsorted key does not raise an error, it silently returns wrong matches. Sort explicitly, every time, even when you are fairly sure the data already is.</p>
+</div>
+</section>
+
+<section id="s4">
+<h2><span class="no">4.4.4</span> The math: event time, thresholds &amp; why sampling changes the shape</h2>
+<p class="lede">A tick stream is a sequence of events, not a function of clock time. A <strong>bar</strong> is just a rule for cutting that sequence into pieces — and different rules produce different pieces.</p>
+
+<p>Write the tick stream as triples <math><semantics><mrow><mo fence="true" form="prefix" stretchy="true">(</mo><msub><mi>τ</mi><mi>i</mi></msub><mo separator="true">,</mo><msub><mi>p</mi><mi>i</mi></msub><mo separator="true">,</mo><msub><mi>v</mi><mi>i</mi></msub><mo fence="true" form="postfix" stretchy="true">)</mo></mrow><annotation encoding="application/x-tex">(\tau_i, p_i, v_i)</annotation></semantics></math> — the clock time, price and size of trade <math><semantics><mi>i</mi><annotation encoding="application/x-tex">i</annotation></semantics></math>. A bar-construction rule partitions the index <math><semantics><mrow><mi>i</mi><mo>=</mo><mn>1</mn><mo separator="true">,</mo><mn>2</mn><mo separator="true">,</mo><mo>…</mo></mrow><annotation encoding="application/x-tex">i = 1, 2, \ldots</annotation></semantics></math> into consecutive runs, each run becoming one bar's open/high/low/close/volume. A <strong>time bar</strong> cuts every <math><semantics><mi>Δt</mi><annotation encoding="application/x-tex">\Delta t</annotation></semantics></math> seconds of clock time, however many or few ticks land inside. A <strong>volume bar</strong> or <strong>dollar bar</strong> cuts the first time cumulative size (shares, or price times shares) crosses a threshold <math><semantics><mi>ν</mi><annotation encoding="application/x-tex">\nu</annotation></semantics></math> — a bar ends at the smallest <math><semantics><mi>T</mi><annotation encoding="application/x-tex">T</annotation></semantics></math> with</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><mrow><munderover><mo movablelimits="false">∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>T</mi></munderover></mrow><msub><mi>v</mi><mi>i</mi></msub><mo>≥</mo><mi>ν</mi></mrow><annotation encoding="application/x-tex">\sum_{i=1}^{T} v_i \ge \nu</annotation></semantics></math></div>
+
+<p>An <strong>imbalance bar</strong> tracks not size but direction. The <strong>tick rule</strong> assigns each trade a sign <math><semantics><mrow><msub><mi>b</mi><mi>t</mi></msub><mo>=</mo><mrow><mi>sign</mi></mrow><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><msub><mi>p</mi><mi>t</mi></msub><mo>−</mo><msub><mi>p</mi><mrow><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">b_t = \mathrm{sign}(p_t - p_{t-1})</annotation></semantics></math>, carrying the previous sign forward on a zero tick. A bar ends at the first <math><semantics><mi>T</mi><annotation encoding="application/x-tex">T</annotation></semantics></math> for which the running signed sum <math><semantics><msub><mi>θ</mi><mi>T</mi></msub><annotation encoding="application/x-tex">\theta_T</annotation></semantics></math> outruns an adaptive threshold:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><msub><mi>θ</mi><mi>T</mi></msub><mo>=</mo><mrow><munderover><mo movablelimits="false">∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>T</mi></munderover></mrow><msub><mi>b</mi><mi>i</mi></msub><mo separator="true">,</mo><mspace width="2em"></mspace><mi>|</mi><msub><mi>θ</mi><mi>T</mi></msub><mi>|</mi><mo>≥</mo><msub><mi>𝔼</mi><mn>0</mn></msub><mrow><mo fence="true" form="prefix" stretchy="false">[</mo><mi>T</mi><mo fence="true" form="postfix" stretchy="false">]</mo></mrow><mspace width="0.1667em"></mspace><mo fence="true" stretchy="true" symmetric="true" minsize="1.2em" maxsize="1.2em">|</mo><msub><mi>𝔼</mi><mn>0</mn></msub><mrow><mo fence="true" form="prefix" stretchy="false">[</mo><mi>b</mi><mo fence="true" form="postfix" stretchy="false">]</mo></mrow><mo fence="true" stretchy="true" symmetric="true" minsize="1.2em" maxsize="1.2em">|</mo></mrow><annotation encoding="application/x-tex">\theta_T = \sum_{i=1}^{T} b_i, \qquad |\theta_T| \ge \E_0[T]\,\bigl|\E_0[b]\bigr|</annotation></semantics></math></div>
+
+<p>where <math><semantics><mrow><msub><mi>𝔼</mi><mn>0</mn></msub><mo fence="false" symmetric="true" minsize="1.8em" maxsize="1.8em">[</mo><mi>T</mi><mo fence="false" symmetric="true" minsize="1.8em" maxsize="1.8em">]</mo></mrow><annotation encoding="application/x-tex">\E_0[T]</annotation></semantics></math> and <math><semantics><mrow><msub><mi>𝔼</mi><mn>0</mn></msub><mo fence="false" symmetric="true" minsize="1.8em" maxsize="1.8em">[</mo><mi>b</mi><mo fence="false" symmetric="true" minsize="1.8em" maxsize="1.8em">]</mo></mrow><annotation encoding="application/x-tex">\E_0[b]</annotation></semantics></math> are running estimates (an exponentially weighted average of previous bars) of the expected bar length and expected imbalance per tick. A symmetric random walk needs on the order of <math><semantics><msup><mi>threshold</mi><mn>2</mn></msup><annotation encoding="application/x-tex">\text{threshold}^2</annotation></semantics></math> ticks to drift that far, by the √n rule, while a run of same-signed ticks reaches it in a number of ticks proportional to the threshold itself — so the bar clock runs fast exactly when order flow is one-sided, and crawls when it is noise.</p>
+
+<div class="co note"><span class="co-t">🧭 Margin note — why sampling by activity looks more normal</span>
+<p>If returns are a Brownian motion running on its own internal "activity clock" — Clark's (1973) subordinated-process idea — then sampling in fixed clock time re-mixes periods of different activity into bars of equal size, which fattens the tails of the resulting distribution (a mixture of different-variance normals is never itself normal). Sampling in volume or dollar time instead approximately undoes the mixing; <span class="xref soon" data-xref="5.1" data-auto="" title="Coming soon">Session 5.1 — Stylized Facts of Returns</span> returns to this when it catalogues the stylized facts every return series shares.</p>
+</div>
+</section>
+
+<section id="s5">
+<h2><span class="no">4.4.5</span> In code: building four kinds of bars</h2>
+<p class="lede">The lab simulates one trading day of ticks — a mild busier-at-the-open-and-close shape plus a 20-minute "news" burst with a strong buy imbalance — with <span class="term soon" data-term="polars" title="Defined in Session 4.5 (coming soon)">polars</span>, then cuts it four ways.</p>
+
+<p>Time bars are a straight <code>group_by</code> on floor-divided clock time; volume and dollar bars are a vectorised cumulative-sum trick, no explicit loop required:</p>
+
+<pre><span class="c"># a new bar every time cumulative activity (shares, or price*shares) crosses `threshold`</span>
+<span class="k">def</span> threshold_bars(t, price, volume, activity, threshold):
+    bar_id = (np.cumsum(activity) <span class="p">//</span> threshold).astype(<span class="s">int</span>)
+    <span class="k">return</span> pd.DataFrame({<span class="s">"t"</span>: t, <span class="s">"price"</span>: price, <span class="s">"bar"</span>: bar_id}) \
+             .groupby(<span class="s">"bar"</span>).agg(open=(<span class="s">"price"</span>, <span class="s">"first"</span>), close=(<span class="s">"price"</span>, <span class="s">"last"</span>))</pre>
+
+<p>Tick imbalance bars need the running threshold from §4.4.4, so a single pass over the ticks does the accounting — fast enough that thirty independent trading days run in a few seconds, well inside the lab's time budget. One representative session turns <span data-lab="illustration_n_ticks" data-fmt=",d">45,678</span> ticks into <span data-lab="illustration_n_time_bars" data-fmt="d">195</span> time bars, <span data-lab="illustration_n_volume_bars" data-fmt="d">195</span> volume bars (deliberately count-matched, so the comparison in §4.4.7 is fair), <span data-lab="illustration_n_dollar_bars" data-fmt="d">196</span> dollar bars, and only <span data-lab="illustration_n_imbalance_bars" data-fmt="d">36</span> tick-imbalance bars — most of the session is quiet enough that an imbalance bar takes a long time to close.</p>
+
+<p>The tick rule that imbalance bars depend on is a single vectorised pass, not a loop: take the sign of each price change, and where two consecutive prints share a price — about 15% of ticks in the lab's synthetic stream — carry the previous sign forward instead of recording a meaningless zero.</p>
+
+<pre><span class="c"># b_t = sign(P_t - P_t-1); a repeated price carries the previous sign forward</span>
+<span class="k">def</span> tick_rule(price):
+    diffs = np.diff(price, prepend=price[<span class="p">0</span>])
+    b = np.sign(diffs)
+    b[<span class="p">0</span>] = <span class="p">1.0</span>
+    <span class="k">return</span> pd.Series(np.where(b == <span class="p">0.0</span>, np.nan, b)).ffill().to_numpy()</pre>
+
+<p>Two knobs keep the bar-cutting recursion honest: a warm-up window (200 ticks in the lab) that seeds the very first threshold before any bar has closed, and a minimum bar length (5 ticks) that stops one lucky run of same-signed prints from closing a one-tick bar and destabilising the next threshold estimate.</p>
+
+<figure class="diagram chart">
+<!-- chart:activity -->
+<svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Cumulative dollar volume through one simulated trading day">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">CUMULATIVE DOLLAR VOLUME THROUGH ONE SIMULATED TRADING DAY</text>
+  <rect x="312.3" y="40" width="27.6" height="224" fill="#1F7A55" fill-opacity="0.07"/>
+  <text x="318.3" y="53" font-size="10.5" fill="#4A5A68" font-style="italic"></text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="268" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$0</text>
+  <line x1="64" y1="219.2" x2="602" y2="219.2" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="223.2" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$200.0m</text>
+  <line x1="64" y1="174.4" x2="602" y2="174.4" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="178.4" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$400.0m</text>
+  <line x1="64" y1="129.6" x2="602" y2="129.6" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="133.6" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$600.0m</text>
+  <line x1="64" y1="84.8" x2="602" y2="84.8" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="88.8" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$800.0m</text>
+  <line x1="64" y1="40" x2="602" y2="40" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="44" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$1.0bn</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#C9CFC6" stroke-width="1"/>
+  <line x1="64" y1="264" x2="64" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="64" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">0</text>
+  <line x1="229.5" y1="264" x2="229.5" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="229.5" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">2</text>
+  <line x1="395.1" y1="264" x2="395.1" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="395.1" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">4</text>
+  <line x1="560.6" y1="264" x2="560.6" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="560.6" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">6</text>
+  <polygon points="64,264 64,264 64.3,263.8 65,263.6 66.3,263 66.6,262.8 67.4,262.5 68.4,261.8 68.9,261.7 69.6,261.4 70.5,261.1 70.9,260.8 72.5,260.3 72.6,260.2 74.1,259.5 74.5,259.4 75.5,259 76.3,258.6 77.1,258.3 78.4,257.7 79.2,257.4 79.8,257.2 81.5,256.7 81.9,256.5 83.4,256.1 84.1,255.7 84.9,255.5 86.7,254.8 87.3,254.7 87.9,254.5 90,253.8 90.5,253.7 91.5,253.3 93.2,252.9 94.1,252.6 95.4,252.1 96.6,251.8 97.3,251.5 98.8,251.1 99.7,250.7 101,250.4 101.5,250.2 102.9,249.9 104.5,249.4 106.1,249 106.8,248.7 108.8,248.2 109.6,247.9 110.4,247.7 112.5,247.2 113.4,247 114.7,246.6 116.9,246.2 117.5,245.9 118.9,245.6 120.4,245.3 122.6,244.8 123.1,244.7 124.6,244.2 125.7,244 127.7,243.6 129.6,243.1 131.9,242.8 133.1,242.4 134.9,242.2 136.5,241.7 137.4,241.5 139.7,241.2 141.9,240.8 143.5,240.5 144.6,240.2 147.6,239.6 149.2,239.4 150.7,239 152.8,238.7 154.5,238.2 156.7,237.8 158.4,237.4 160.2,237.2 161.4,236.9 163.2,236.7 165.6,236.3 167.1,236 169.1,235.5 172.5,235 173.1,234.8 175,234.5 176.5,234.1 178.2,233.9 180.3,233.4 182,233.1 186.1,232.5 186.2,232.4 189.5,231.8 191.4,231.5 192.3,231.3 196.4,230.7 198.3,230.5 200.4,230.1 201.3,229.9 203.4,229.5 205.6,229.2 208.2,228.6 209.6,228.5 212.2,228 213.7,227.8 216,227.5 217.8,227.1 221.5,226.6 223.4,226.2 225.2,226 226.2,225.8 229.4,225.3 232.6,224.8 233.9,224.5 234.9,224.4 237,224 239,223.7 241.6,223.2 243.8,222.9 245.9,222.5 248.4,222.1 251.4,221.5 253.3,221.2 254.9,221.1 258.6,220.5 260.1,220.3 261.1,220.1 263.7,219.8 265.8,219.4 269.5,218.9 271.7,218.5 273.8,218.3 276,217.8 278.6,217.5 279.8,217.2 282.5,216.7 283.5,216.6 285.2,216.3 287.8,215.9 289.5,215.5 291.9,215.2 293.9,214.8 296.3,214.5 298.2,214.2 301.3,213.8 303.9,213.3 305.3,213.1 308.3,212.7 310.6,212.2 312.3,212.1 312.5,211.9 313.1,211.3 313.2,211.1 313.7,210.6 314,210.3 314.3,210 314.5,209.7 314.7,209.4 315.3,208.9 315.5,208.5 315.6,208.4 315.9,208.1 316.2,207.7 316.5,207.4 316.7,207 317.1,206.5 317.6,205.8 317.8,205.6 318.2,205 318.3,204.7 318.5,204.6 318.9,204 319.1,203.7 319.5,203.2 319.9,202.5 320.1,202.3 320.5,201.8 320.7,201.3 320.9,201 321.4,200.2 321.6,200 321.8,199.6 322.2,199.2 322.4,198.8 322.7,198.5 323.2,197.6 323.4,197.3 323.6,197 324.1,196.4 324.2,196.2 324.4,195.8 324.7,195.4 325.1,194.8 325.4,194.2 325.7,193.8 326,193.2 326.3,192.7 326.4,192.6 326.7,192.1 327.1,191.7 327.3,191.2 327.7,190.8 328.1,190.3 328.2,189.9 328.7,189.3 329,188.5 329.3,188.1 329.5,187.7 330,187.1 330.2,186.7 330.6,186.1 330.7,185.8 331.1,185.3 331.3,184.7 331.5,184.5 331.8,184 332.1,183.4 332.6,182.6 332.7,182.3 333.1,181.6 333.4,181.2 333.6,180.8 334.1,179.8 334.4,179.2 334.7,178.7 334.9,178.3 335.1,177.9 335.2,177.5 335.8,176.5 336.2,175.9 336.5,175.3 336.8,174.8 336.9,174.5 337.3,173.9 337.5,173.6 338,172.9 338.3,172.2 338.4,172 338.9,171.2 339,170.9 339.3,170.3 339.7,169.5 340,169.2 342.8,168.6 343.8,168.1 348.4,167.1 348.8,167 352.4,166.2 353.4,165.8 355.5,165.4 357.8,164.6 360.5,164.1 363.1,163.3 364.6,163 366.7,162.5 368.1,162 371.6,161.1 373.1,160.7 375.2,160.1 378.7,159.2 379.9,158.8 382.8,158.2 385.2,157.5 386.9,157.1 389.9,156.4 391.5,156 393.7,155.5 396,154.7 396.7,154.5 399.4,153.9 401.6,153.4 402.7,153 406.4,152.1 408.4,151.4 411.6,150.7 413.1,150.2 414.6,149.9 417.5,149.1 418.3,148.7 421,148.1 421.5,147.9 425.4,146.9 425.7,146.7 428.1,146.2 432,145.1 434.1,144.6 435.6,144.1 436.7,143.9 439,143.3 442,142.3 442.9,142.1 444.8,141.5 447.8,140.7 450.1,140 451.4,139.7 454.1,138.9 455.4,138.6 458.4,137.6 459.6,137.4 460.9,137 464.2,136.2 467.2,135.3 468.6,135 470.3,134.3 472.4,133.9 474,133.3 475.6,132.9 478,132.3 479.8,131.6 481.5,131.2 484.7,130.2 486.4,129.7 487.5,129.3 489,129 492.6,128.1 493.2,128 496.3,126.8 498.1,126.4 500,125.7 500.8,125.6 503,125 505.4,124.2 508.2,123.6 509.4,123.3 511.9,122.4 513.6,122 514.3,121.7 516,121 517.2,120.7 519.9,119.6 520.8,119.4 523.5,118.5 524.2,118.2 526.4,117.6 527.9,116.9 529.7,116.4 531.8,115.6 533.4,115.3 534.3,114.8 536.8,114.1 538.1,113.6 539.1,113.3 541,112.6 543.2,111.7 544.2,111.2 545.1,111 546.7,110.1 548.5,109.5 550.1,108.7 551.9,108.1 553.1,107.5 553.9,107.2 555.5,106.4 556.2,106.3 558.3,105.4 559.1,104.9 559.9,104.7 561.9,103.4 563.3,102.9 564.5,102.2 565.3,102 566.4,101.3 567.6,100.8 568.9,100 569.8,99.6 570.9,99 572.7,98.3 573.7,97.7 574.2,97.5 575.2,97 576.8,96 577.6,95.7 578.6,95.2 579.9,94.5 580.1,94.3 581.3,93.6 583,92.8 583.6,92.4 585,91.5 585.8,91.2 586.1,90.9 587.3,90.2 588.2,89.5 588.7,89.2 590.2,88.2 591.4,87.6 592.2,87 592.9,86.5 594,85.9 594.3,85.7 595.2,85.2 596.2,84.5 597.4,83.5 598,82.9 598.2,82.9 599.4,82.1 600.6,81.3 600.9,80.9 601.4,80.5 602,80.1 602,264" fill="#3A56C5" fill-opacity="0.10"/>
+  <polyline points="64,264 64.3,263.8 65,263.6 66.3,263 66.6,262.8 67.4,262.5 68.4,261.8 68.9,261.7 69.6,261.4 70.5,261.1 70.9,260.8 72.5,260.3 72.6,260.2 74.1,259.5 74.5,259.4 75.5,259 76.3,258.6 77.1,258.3 78.4,257.7 79.2,257.4 79.8,257.2 81.5,256.7 81.9,256.5 83.4,256.1 84.1,255.7 84.9,255.5 86.7,254.8 87.3,254.7 87.9,254.5 90,253.8 90.5,253.7 91.5,253.3 93.2,252.9 94.1,252.6 95.4,252.1 96.6,251.8 97.3,251.5 98.8,251.1 99.7,250.7 101,250.4 101.5,250.2 102.9,249.9 104.5,249.4 106.1,249 106.8,248.7 108.8,248.2 109.6,247.9 110.4,247.7 112.5,247.2 113.4,247 114.7,246.6 116.9,246.2 117.5,245.9 118.9,245.6 120.4,245.3 122.6,244.8 123.1,244.7 124.6,244.2 125.7,244 127.7,243.6 129.6,243.1 131.9,242.8 133.1,242.4 134.9,242.2 136.5,241.7 137.4,241.5 139.7,241.2 141.9,240.8 143.5,240.5 144.6,240.2 147.6,239.6 149.2,239.4 150.7,239 152.8,238.7 154.5,238.2 156.7,237.8 158.4,237.4 160.2,237.2 161.4,236.9 163.2,236.7 165.6,236.3 167.1,236 169.1,235.5 172.5,235 173.1,234.8 175,234.5 176.5,234.1 178.2,233.9 180.3,233.4 182,233.1 186.1,232.5 186.2,232.4 189.5,231.8 191.4,231.5 192.3,231.3 196.4,230.7 198.3,230.5 200.4,230.1 201.3,229.9 203.4,229.5 205.6,229.2 208.2,228.6 209.6,228.5 212.2,228 213.7,227.8 216,227.5 217.8,227.1 221.5,226.6 223.4,226.2 225.2,226 226.2,225.8 229.4,225.3 232.6,224.8 233.9,224.5 234.9,224.4 237,224 239,223.7 241.6,223.2 243.8,222.9 245.9,222.5 248.4,222.1 251.4,221.5 253.3,221.2 254.9,221.1 258.6,220.5 260.1,220.3 261.1,220.1 263.7,219.8 265.8,219.4 269.5,218.9 271.7,218.5 273.8,218.3 276,217.8 278.6,217.5 279.8,217.2 282.5,216.7 283.5,216.6 285.2,216.3 287.8,215.9 289.5,215.5 291.9,215.2 293.9,214.8 296.3,214.5 298.2,214.2 301.3,213.8 303.9,213.3 305.3,213.1 308.3,212.7 310.6,212.2 312.3,212.1 312.5,211.9 313.1,211.3 313.2,211.1 313.7,210.6 314,210.3 314.3,210 314.5,209.7 314.7,209.4 315.3,208.9 315.5,208.5 315.6,208.4 315.9,208.1 316.2,207.7 316.5,207.4 316.7,207 317.1,206.5 317.6,205.8 317.8,205.6 318.2,205 318.3,204.7 318.5,204.6 318.9,204 319.1,203.7 319.5,203.2 319.9,202.5 320.1,202.3 320.5,201.8 320.7,201.3 320.9,201 321.4,200.2 321.6,200 321.8,199.6 322.2,199.2 322.4,198.8 322.7,198.5 323.2,197.6 323.4,197.3 323.6,197 324.1,196.4 324.2,196.2 324.4,195.8 324.7,195.4 325.1,194.8 325.4,194.2 325.7,193.8 326,193.2 326.3,192.7 326.4,192.6 326.7,192.1 327.1,191.7 327.3,191.2 327.7,190.8 328.1,190.3 328.2,189.9 328.7,189.3 329,188.5 329.3,188.1 329.5,187.7 330,187.1 330.2,186.7 330.6,186.1 330.7,185.8 331.1,185.3 331.3,184.7 331.5,184.5 331.8,184 332.1,183.4 332.6,182.6 332.7,182.3 333.1,181.6 333.4,181.2 333.6,180.8 334.1,179.8 334.4,179.2 334.7,178.7 334.9,178.3 335.1,177.9 335.2,177.5 335.8,176.5 336.2,175.9 336.5,175.3 336.8,174.8 336.9,174.5 337.3,173.9 337.5,173.6 338,172.9 338.3,172.2 338.4,172 338.9,171.2 339,170.9 339.3,170.3 339.7,169.5 340,169.2 342.8,168.6 343.8,168.1 348.4,167.1 348.8,167 352.4,166.2 353.4,165.8 355.5,165.4 357.8,164.6 360.5,164.1 363.1,163.3 364.6,163 366.7,162.5 368.1,162 371.6,161.1 373.1,160.7 375.2,160.1 378.7,159.2 379.9,158.8 382.8,158.2 385.2,157.5 386.9,157.1 389.9,156.4 391.5,156 393.7,155.5 396,154.7 396.7,154.5 399.4,153.9 401.6,153.4 402.7,153 406.4,152.1 408.4,151.4 411.6,150.7 413.1,150.2 414.6,149.9 417.5,149.1 418.3,148.7 421,148.1 421.5,147.9 425.4,146.9 425.7,146.7 428.1,146.2 432,145.1 434.1,144.6 435.6,144.1 436.7,143.9 439,143.3 442,142.3 442.9,142.1 444.8,141.5 447.8,140.7 450.1,140 451.4,139.7 454.1,138.9 455.4,138.6 458.4,137.6 459.6,137.4 460.9,137 464.2,136.2 467.2,135.3 468.6,135 470.3,134.3 472.4,133.9 474,133.3 475.6,132.9 478,132.3 479.8,131.6 481.5,131.2 484.7,130.2 486.4,129.7 487.5,129.3 489,129 492.6,128.1 493.2,128 496.3,126.8 498.1,126.4 500,125.7 500.8,125.6 503,125 505.4,124.2 508.2,123.6 509.4,123.3 511.9,122.4 513.6,122 514.3,121.7 516,121 517.2,120.7 519.9,119.6 520.8,119.4 523.5,118.5 524.2,118.2 526.4,117.6 527.9,116.9 529.7,116.4 531.8,115.6 533.4,115.3 534.3,114.8 536.8,114.1 538.1,113.6 539.1,113.3 541,112.6 543.2,111.7 544.2,111.2 545.1,111 546.7,110.1 548.5,109.5 550.1,108.7 551.9,108.1 553.1,107.5 553.9,107.2 555.5,106.4 556.2,106.3 558.3,105.4 559.1,104.9 559.9,104.7 561.9,103.4 563.3,102.9 564.5,102.2 565.3,102 566.4,101.3 567.6,100.8 568.9,100 569.8,99.6 570.9,99 572.7,98.3 573.7,97.7 574.2,97.5 575.2,97 576.8,96 577.6,95.7 578.6,95.2 579.9,94.5 580.1,94.3 581.3,93.6 583,92.8 583.6,92.4 585,91.5 585.8,91.2 586.1,90.9 587.3,90.2 588.2,89.5 588.7,89.2 590.2,88.2 591.4,87.6 592.2,87 592.9,86.5 594,85.9 594.3,85.7 595.2,85.2 596.2,84.5 597.4,83.5 598,82.9 598.2,82.9 599.4,82.1 600.6,81.3 600.9,80.9 601.4,80.5 602,80.1" fill="none" stroke="#3A56C5" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>cumulative dollar volume</title></polyline>
+</svg>
+<!-- /chart:activity -->
+<figcaption>fig 4.4.4 — cumulative dollar volume through the simulated session; the news burst is where the slope changes</figcaption>
+</figure>
+
+<figure class="diagram chart">
+<!-- chart:bar_counts -->
+<svg viewBox="0 0 720 260" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Bars produced by four sampling rules — one simulated trading day">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">BARS PRODUCED BY FOUR SAMPLING RULES — ONE SIMULATED TRADING DAY</text>
+  <line x1="64" y1="216" x2="690" y2="216" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="220" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0</text>
+  <line x1="64" y1="181.6" x2="690" y2="181.6" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="185.6" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">50</text>
+  <line x1="64" y1="147.2" x2="690" y2="147.2" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="151.2" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">100</text>
+  <line x1="64" y1="112.8" x2="690" y2="112.8" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="116.8" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">150</text>
+  <line x1="64" y1="78.4" x2="690" y2="78.4" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="82.4" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">200</text>
+  <line x1="64" y1="44" x2="690" y2="44" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="48" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">250</text>
+  <line x1="64" y1="216" x2="690" y2="216" stroke="#C9CFC6" stroke-width="1"/>
+  <path d="M130.2,216 V85.8 Q130.2,81.8 134.2,81.8 H150.2 Q154.2,81.8 154.2,85.8 V216 Z" fill="#3A56C5"><title>Time (2 min): 195</title></path>
+  <text x="142.2" y="74.8" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">195</text>
+  <text x="142.2" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">Time (2 min)</text>
+  <path d="M286.8,216 V85.8 Q286.8,81.8 290.8,81.8 H306.8 Q310.8,81.8 310.8,85.8 V216 Z" fill="#3A56C5"><title>Volume: 195</title></path>
+  <text x="298.8" y="74.8" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">195</text>
+  <text x="298.8" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">Volume</text>
+  <path d="M443.2,216 V85.2 Q443.2,81.2 447.2,81.2 H463.2 Q467.2,81.2 467.2,85.2 V216 Z" fill="#3A56C5"><title>Dollar: 196</title></path>
+  <text x="455.2" y="74.2" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">196</text>
+  <text x="455.2" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">Dollar</text>
+  <path d="M599.8,216 V195.2 Q599.8,191.2 603.8,191.2 H619.8 Q623.8,191.2 623.8,195.2 V216 Z" fill="#3A56C5"><title>Tick imbalance: 36</title></path>
+  <text x="611.8" y="184.2" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">36</text>
+  <text x="611.8" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">Tick imbalance</text>
+</svg>
+<!-- /chart:bar_counts -->
+<figcaption>fig 4.4.5 — the same session, cut four ways: how many bars each rule produces</figcaption>
+</figure>
+
+<div class="co tip"><span class="co-t">💡 Tip — pick the threshold from the data, not a guess</span>
+<p>Set the volume or dollar threshold to (total activity) / (bars you would have gotten with a chosen time-bar resolution). That count-matches the sampling rules so a comparison between them — like §4.4.7's — measures the shape of the returns, not just a difference in sample size.</p>
+</div>
+</section>
+
+<section id="s6">
+<h2><span class="no">4.4.6</span> Where people go wrong: the join that peeks</h2>
+<p class="lede">The bug in §4.4.3 is invisible in the code and catastrophic in the backtest — it makes an untradeable strategy look like the best idea you have ever had.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 220" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">JOINING PRICES TO QUARTERLY FUNDAMENTALS</text>
+  <rect x="26" y="32" width="326" height="176" rx="9" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="189" y="54" font-size="11" font-weight="700" text-anchor="middle" fill="#D64B2A">THE NAIVE JOIN</text>
+  <rect x="46" y="66" width="286" height="24" rx="5" fill="#fff" stroke="#F2CDBF"/>
+  <text x="58" y="82" font-size="9.5" fill="#1F2C38">join key = period_end date</text>
+  <rect x="46" y="96" width="286" height="24" rx="5" fill="#fff" stroke="#F2CDBF"/>
+  <text x="58" y="112" font-size="9.5" fill="#1F2C38">no tolerance on the match</text>
+  <text x="189" y="148" font-size="9.5" text-anchor="middle" fill="#D64B2A" font-weight="600">Knows the future ~46% of days.</text>
+  <text x="189" y="166" font-size="9" text-anchor="middle" fill="#4A5A68">Backtest Sharpe looks great; live, it never repeats.</text>
+  <rect x="368" y="32" width="326" height="176" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="531" y="54" font-size="11" font-weight="700" text-anchor="middle" fill="#1F7A55">THE DISCIPLINED JOIN</text>
+  <rect x="388" y="66" width="286" height="24" rx="5" fill="#fff" stroke="#BFE0CF"/>
+  <text x="400" y="82" font-size="9.5" fill="#1F2C38">1 · join key = filing/available time</text>
+  <rect x="388" y="96" width="286" height="24" rx="5" fill="#fff" stroke="#BFE0CF"/>
+  <text x="400" y="112" font-size="9.5" fill="#1F2C38">2 · direction="backward" + tolerance</text>
+  <text x="531" y="148" font-size="9.5" text-anchor="middle" fill="#1F7A55" font-weight="600">Never ahead of the news.</text>
+  <text x="531" y="166" font-size="9" text-anchor="middle" fill="#4A5A68">Stale data becomes an honest NaN, not a guess.</text>
+</svg>
+<figcaption>fig 4.4.6 — the same join, two join keys: one leaks the future, one never does</figcaption>
+</figure>
+
+<div class="co warn"><span class="co-t">⚠️ Pitfall — "the date on the row is close enough"</span>
+<p>A quarter's row is dated by the period it describes, not by when anyone could read it. Joining on <code>period_end</code> feels harmless — it is a real date attached to real data — which is exactly why the bug survives code review. The fix is not more care; it is a different column: join on the timestamp the source system stamped when the value became public, and if your data vendor does not give you one, treat every number as available only from a conservative, dated assumption about typical reporting lag.</p>
+</div>
+
+<p>The same discipline extends past fundamentals: any table that describes "as of period X" but was recorded or corrected later — restated financials, delisting notices, revised macro releases — needs its <em>availability</em> timestamp preserved through every join, or a backtest built on it is quietly grading itself with the answer key. <span class="xref soon" data-xref="4.2" data-auto="" title="Coming soon">Session 4.2 — Point-in-Time Data &amp; Data Biases</span> is the session that catalogues these biases in depth; this one is where you fix the join that causes them.</p>
+
+<p>A second, easily missed version of the same bug hides in cross-market joins. Aligning a US-listed ADR to its home-market ordinary share by calendar date alone breaks whenever the two exchanges disagree about which days are trading days — a US holiday is rarely a UK or Japanese one — or whenever "the close" on each side lands on a different UTC instant because the two markets keep different hours (§4.4.2). The fix is the same discipline as §4.4.3, generalised: convert every source to UTC, resolve each side against its own exchange calendar, and join on availability, never on a shared-looking date string that only coincidentally lines up most of the time.</p>
+</section>
+
+<section id="s7">
+<h2><span class="no">4.4.7</span> Fixed-time bars vs information-driven bars, compared</h2>
+<p class="lede">Sample by the clock and a burst of real activity gets crammed into one giant bar or spread thin across many empty ones. Sample by activity instead and the bar boundaries move with the market.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 210" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">SAME TICK STREAM, TWO SAMPLING CLOCKS — a burst of activity around the middle</text>
+  <text x="26" y="46" font-size="10" fill="#4A5A68">ticks:</text>
+  <circle cx="60" cy="42" r="3" fill="#4A5A68"/><circle cx="110" cy="42" r="3" fill="#4A5A68"/><circle cx="165" cy="42" r="3" fill="#4A5A68"/>
+  <circle cx="330" cy="42" r="3" fill="#D64B2A"/><circle cx="345" cy="42" r="3" fill="#D64B2A"/><circle cx="358" cy="42" r="3" fill="#D64B2A"/>
+  <circle cx="370" cy="42" r="3" fill="#D64B2A"/><circle cx="382" cy="42" r="3" fill="#D64B2A"/><circle cx="393" cy="42" r="3" fill="#D64B2A"/>
+  <circle cx="404" cy="42" r="3" fill="#D64B2A"/><circle cx="415" cy="42" r="3" fill="#D64B2A"/>
+  <circle cx="560" cy="42" r="3" fill="#4A5A68"/><circle cx="630" cy="42" r="3" fill="#4A5A68"/><circle cx="690" cy="42" r="3" fill="#4A5A68"/>
+  <text x="373" y="30" font-size="9" text-anchor="middle" fill="#D64B2A" font-style="italic">news burst</text>
+  <rect x="26" y="60" width="668" height="46" rx="6" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <line x1="138" y1="60" x2="138" y2="106" stroke="#D64B2A" stroke-width="1"/>
+  <line x1="250" y1="60" x2="250" y2="106" stroke="#D64B2A" stroke-width="1"/>
+  <line x1="362" y1="60" x2="362" y2="106" stroke="#D64B2A" stroke-width="1"/>
+  <line x1="474" y1="60" x2="474" y2="106" stroke="#D64B2A" stroke-width="1"/>
+  <line x1="586" y1="60" x2="586" y2="106" stroke="#D64B2A" stroke-width="1"/>
+  <text x="30" y="90" font-size="9" fill="#D64B2A">fixed 2-min bars: 1 empty, 1 quiet, ONE giant bar swallowing the burst</text>
+  <rect x="26" y="122" width="668" height="46" rx="6" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <line x1="180" y1="122" x2="180" y2="168" stroke="#1F7A55" stroke-width="1"/>
+  <line x1="335" y1="122" x2="335" y2="168" stroke="#1F7A55" stroke-width="1"/>
+  <line x1="358" y1="122" x2="358" y2="168" stroke="#1F7A55" stroke-width="1"/>
+  <line x1="378" y1="122" x2="378" y2="168" stroke="#1F7A55" stroke-width="1"/>
+  <line x1="398" y1="122" x2="398" y2="168" stroke="#1F7A55" stroke-width="1"/>
+  <line x1="420" y1="122" x2="420" y2="168" stroke="#1F7A55" stroke-width="1"/>
+  <line x1="560" y1="122" x2="560" y2="168" stroke="#1F7A55" stroke-width="1"/>
+  <text x="30" y="152" font-size="9" fill="#1F7A55">volume/dollar bars: wide when quiet, narrow during the burst — similar activity per bar</text>
+  <text x="360" y="196" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">The clock samples time; volume and dollar bars sample information.</text>
+</svg>
+<figcaption>fig 4.4.7 — the same burst of ticks under two sampling rules: one bar swallows it, the other spreads it out</figcaption>
+</figure>
+
+<p>The lab measures this rather than just illustrating it. Over 30 independent simulated trading days (a fresh random stream per day), the <a class="term" href="../unit03-math-toolkit/session02-distributions-fat-tails.html#g-excess-kurtosis" data-term="excess kurtosis">excess kurtosis</a> of bar log returns — zero for a perfectly normal distribution, higher for fatter tails — averages <span data-lab="kurt_time_mean" data-fmt=".1f">16.0</span> for time bars, <span data-lab="kurt_volume_mean" data-fmt=".2f">−0.06</span> for count-matched volume bars, and <span data-lab="kurt_dollar_mean" data-fmt=".2f">1.10</span> for dollar bars. Time bars are more leptokurtic than volume bars by <span data-lab="kurt_diff_time_volume_mean" data-fmt=".1f">16.1</span> ± <span data-lab="kurt_diff_time_volume_se" data-fmt=".2f">0.06</span> (four standard errors clears this easily), and more leptokurtic than dollar bars by <span data-lab="kurt_diff_time_dollar_mean" data-fmt=".1f">14.9</span> ± <span data-lab="kurt_diff_time_dollar_se" data-fmt=".2f">0.06</span> — a real, repeatable effect across <span data-lab="mc_reps" data-fmt="d">30</span> independent sessions, not a one-seed accident. The mechanism is exactly the handful of bars that straddle the news burst: swollen by extra ticks and an extra-strong move, they are the outliers that fatten the whole distribution's tail (§4.4.4).</p>
+
+<figure class="diagram chart">
+<!-- chart:time_bar_hist -->
+<svg viewBox="0 0 720 280" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Time-bar log returns (2-minute bars)">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">TIME-BAR LOG RETURNS (2-MINUTE BARS)</text>
+  <line x1="64" y1="197.7" x2="680" y2="197.7" stroke="#E4E8EC" stroke-width="1"/>
+  <line x1="64" y1="151.4" x2="680" y2="151.4" stroke="#E4E8EC" stroke-width="1"/>
+  <line x1="64" y1="105.1" x2="680" y2="105.1" stroke="#E4E8EC" stroke-width="1"/>
+  <line x1="64" y1="58.8" x2="680" y2="58.8" stroke="#E4E8EC" stroke-width="1"/>
+  <line x1="64" y1="244" x2="680" y2="244" stroke="#C9CFC6" stroke-width="1"/>
+  <line x1="104.1" y1="244" x2="104.1" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="104.1" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">0.00%</text>
+  <line x1="294.5" y1="244" x2="294.5" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="294.5" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">2.00%</text>
+  <line x1="484.9" y1="244" x2="484.9" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="484.9" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">4.00%</text>
+  <line x1="675.4" y1="244" x2="675.4" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="675.4" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">6.00%</text>
+  <rect x="64.5" y="223.3" width="24.7" height="20.7" fill="#3A56C5" fill-opacity="0.55"><title>−0.42% to −0.15%</title></rect>
+  <rect x="90.2" y="58.8" width="24.7" height="185.2" fill="#3A56C5" fill-opacity="0.55"><title>−0.15% to 0.12%</title></rect>
+  <rect x="115.8" y="225.7" width="24.7" height="18.3" fill="#3A56C5" fill-opacity="0.55"><title>0.12% to 0.39%</title></rect>
+  <rect x="475.2" y="242.8" width="24.7" height="1.2" fill="#3A56C5" fill-opacity="0.55"><title>3.89% to 4.16%</title></rect>
+  <rect x="500.8" y="242.8" width="24.7" height="1.2" fill="#3A56C5" fill-opacity="0.55"><title>4.16% to 4.43%</title></rect>
+  <rect x="526.5" y="240.3" width="24.7" height="3.7" fill="#3A56C5" fill-opacity="0.55"><title>4.43% to 4.70%</title></rect>
+  <rect x="577.8" y="241.6" width="24.7" height="2.4" fill="#3A56C5" fill-opacity="0.55"><title>4.97% to 5.24%</title></rect>
+  <rect x="629.2" y="242.8" width="24.7" height="1.2" fill="#3A56C5" fill-opacity="0.55"><title>5.51% to 5.78%</title></rect>
+  <rect x="654.8" y="241.6" width="24.7" height="2.4" fill="#3A56C5" fill-opacity="0.55"><title>5.78% to 6.05%</title></rect>
+  <polyline points="64,225.1 67.1,224.8 70.2,224.5 73.3,224.2 76.4,223.9 79.5,223.6 82.6,223.4 85.7,223.1 88.8,222.9 91.9,222.7 95,222.5 98.1,222.3 101.1,222.2 104.2,222 107.3,221.9 110.4,221.8 113.5,221.7 116.6,221.6 119.7,221.6 122.8,221.5 125.9,221.5 129,221.5 132.1,221.5 135.2,221.5 138.3,221.6 141.4,221.7 144.5,221.8 147.6,221.9 150.7,222 153.8,222.2 156.9,222.3 160,222.5 163.1,222.7 166.2,222.9 169.2,223.1 172.3,223.4 175.4,223.6 178.5,223.9 181.6,224.2 184.7,224.5 187.8,224.8 190.9,225.1 194,225.4 197.1,225.7 200.2,226.1 203.3,226.4 206.4,226.8 209.5,227.2 212.6,227.5 215.7,227.9 218.8,228.3 221.9,228.7 225,229.1 228.1,229.5 231.2,229.8 234.3,230.2 237.3,230.6 240.4,231 243.5,231.4 246.6,231.8 249.7,232.2 252.8,232.6 255.9,233 259,233.3 262.1,233.7 265.2,234.1 268.3,234.4 271.4,234.8 274.5,235.1 277.6,235.5 280.7,235.8 283.8,236.2 286.9,236.5 290,236.8 293.1,237.1 296.2,237.4 299.3,237.7 302.4,238 305.4,238.3 308.5,238.5 311.6,238.8 314.7,239 317.8,239.3 320.9,239.5 324,239.8 327.1,240 330.2,240.2 333.3,240.4 336.4,240.6 339.5,240.8 342.6,241 345.7,241.1 348.8,241.3 351.9,241.4 355,241.6 358.1,241.7 361.2,241.9 364.3,242 367.4,242.1 370.5,242.2 373.5,242.4 376.6,242.5 379.7,242.6 382.8,242.7 385.9,242.7 389,242.8 392.1,242.9 395.2,243 398.3,243.1 401.4,243.1 404.5,243.2 407.6,243.2 410.7,243.3 413.8,243.3 416.9,243.4 420,243.4 423.1,243.5 426.2,243.5 429.3,243.6 432.4,243.6 435.5,243.6 438.6,243.7 441.6,243.7 444.7,243.7 447.8,243.7 450.9,243.8 454,243.8 457.1,243.8 460.2,243.8 463.3,243.8 466.4,243.8 469.5,243.9 472.6,243.9 475.7,243.9 478.8,243.9 481.9,243.9 485,243.9 488.1,243.9 491.2,243.9 494.3,243.9 497.4,243.9 500.5,243.9 503.6,244 506.7,244 509.7,244 512.8,244 515.9,244 519,244 522.1,244 525.2,244 528.3,244 531.4,244 534.5,244 537.6,244 540.7,244 543.8,244 546.9,244 550,244 553.1,244 556.2,244 559.3,244 562.4,244 565.5,244 568.6,244 571.7,244 574.8,244 577.8,244 580.9,244 584,244 587.1,244 590.2,244 593.3,244 596.4,244 599.5,244 602.6,244 605.7,244 608.8,244 611.9,244 615,244 618.1,244 621.2,244 624.3,244 627.4,244 630.5,244 633.6,244 636.7,244 639.8,244 642.9,244 645.9,244 649,244 652.1,244 655.2,244 658.3,244 661.4,244 664.5,244 667.6,244 670.7,244 673.8,244 676.9,244 680,244" fill="none" stroke="#1F2C38" stroke-width="2" stroke-linejoin="round"><title>normal fit</title></polyline>
+  <line x1="530" y1="32" x2="546" y2="32" stroke="#1F2C38" stroke-width="2.5"/>
+  <text x="552" y="36" font-size="11" fill="#4A5A68">normal fit</text>
+</svg>
+<!-- /chart:time_bar_hist -->
+<figcaption>fig 4.4.8 — time-bar log returns against a normal curve of the same mean and variance: the burst bars sit in the tails</figcaption>
+</figure>
+
+<figure class="diagram chart">
+<!-- chart:volume_bar_hist -->
+<svg viewBox="0 0 720 280" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Volume-bar log returns (count-matched)">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">VOLUME-BAR LOG RETURNS (COUNT-MATCHED)</text>
+  <line x1="64" y1="197.7" x2="680" y2="197.7" stroke="#E4E8EC" stroke-width="1"/>
+  <line x1="64" y1="151.4" x2="680" y2="151.4" stroke="#E4E8EC" stroke-width="1"/>
+  <line x1="64" y1="105.1" x2="680" y2="105.1" stroke="#E4E8EC" stroke-width="1"/>
+  <line x1="64" y1="58.8" x2="680" y2="58.8" stroke="#E4E8EC" stroke-width="1"/>
+  <line x1="64" y1="244" x2="680" y2="244" stroke="#C9CFC6" stroke-width="1"/>
+  <line x1="188.7" y1="244" x2="188.7" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="188.7" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">0.00%</text>
+  <line x1="347.9" y1="244" x2="347.9" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="347.9" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">0.50%</text>
+  <line x1="507" y1="244" x2="507" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="507" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">1.00%</text>
+  <line x1="666.2" y1="244" x2="666.2" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="666.2" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">1.50%</text>
+  <rect x="64.5" y="221.4" width="24.7" height="22.6" fill="#3A56C5" fill-opacity="0.55"><title>−0.39% to −0.31%</title></rect>
+  <rect x="90.2" y="230.4" width="24.7" height="13.6" fill="#3A56C5" fill-opacity="0.55"><title>−0.31% to −0.23%</title></rect>
+  <rect x="115.8" y="189.8" width="24.7" height="54.2" fill="#3A56C5" fill-opacity="0.55"><title>−0.23% to −0.15%</title></rect>
+  <rect x="141.5" y="135.6" width="24.7" height="108.4" fill="#3A56C5" fill-opacity="0.55"><title>−0.15% to −0.07%</title></rect>
+  <rect x="167.2" y="58.8" width="24.7" height="185.2" fill="#3A56C5" fill-opacity="0.55"><title>−0.07% to 0.01%</title></rect>
+  <rect x="192.8" y="72.4" width="24.7" height="171.6" fill="#3A56C5" fill-opacity="0.55"><title>0.01% to 0.09%</title></rect>
+  <rect x="218.5" y="167.2" width="24.7" height="76.8" fill="#3A56C5" fill-opacity="0.55"><title>0.09% to 0.17%</title></rect>
+  <rect x="244.2" y="221.4" width="24.7" height="22.6" fill="#3A56C5" fill-opacity="0.55"><title>0.17% to 0.25%</title></rect>
+  <rect x="269.8" y="239.5" width="24.7" height="4.5" fill="#3A56C5" fill-opacity="0.55"><title>0.25% to 0.33%</title></rect>
+  <rect x="295.5" y="239.5" width="24.7" height="4.5" fill="#3A56C5" fill-opacity="0.55"><title>0.33% to 0.41%</title></rect>
+  <rect x="321.2" y="239.5" width="24.7" height="4.5" fill="#3A56C5" fill-opacity="0.55"><title>0.41% to 0.50%</title></rect>
+  <rect x="449.5" y="212.4" width="24.7" height="31.6" fill="#3A56C5" fill-opacity="0.55"><title>0.82% to 0.90%</title></rect>
+  <rect x="475.2" y="207.9" width="24.7" height="36.1" fill="#3A56C5" fill-opacity="0.55"><title>0.90% to 0.98%</title></rect>
+  <rect x="500.8" y="194.3" width="24.7" height="49.7" fill="#3A56C5" fill-opacity="0.55"><title>0.98% to 1.06%</title></rect>
+  <rect x="526.5" y="221.4" width="24.7" height="22.6" fill="#3A56C5" fill-opacity="0.55"><title>1.06% to 1.14%</title></rect>
+  <rect x="552.2" y="225.9" width="24.7" height="18.1" fill="#3A56C5" fill-opacity="0.55"><title>1.14% to 1.22%</title></rect>
+  <rect x="577.8" y="225.9" width="24.7" height="18.1" fill="#3A56C5" fill-opacity="0.55"><title>1.22% to 1.30%</title></rect>
+  <rect x="603.5" y="221.4" width="24.7" height="22.6" fill="#3A56C5" fill-opacity="0.55"><title>1.30% to 1.38%</title></rect>
+  <rect x="654.8" y="235" width="24.7" height="9" fill="#3A56C5" fill-opacity="0.55"><title>1.46% to 1.54%</title></rect>
+  <polyline points="64,219.4 67.1,218.8 70.2,218.1 73.3,217.5 76.4,216.8 79.5,216.1 82.6,215.5 85.7,214.8 88.8,214.1 91.9,213.4 95,212.7 98.1,212 101.1,211.4 104.2,210.7 107.3,210 110.4,209.3 113.5,208.6 116.6,207.9 119.7,207.2 122.8,206.5 125.9,205.8 129,205.1 132.1,204.4 135.2,203.8 138.3,203.1 141.4,202.4 144.5,201.7 147.6,201.1 150.7,200.4 153.8,199.8 156.9,199.2 160,198.5 163.1,197.9 166.2,197.3 169.2,196.7 172.3,196.1 175.4,195.5 178.5,195 181.6,194.4 184.7,193.9 187.8,193.4 190.9,192.9 194,192.4 197.1,191.9 200.2,191.5 203.3,191 206.4,190.6 209.5,190.2 212.6,189.8 215.7,189.4 218.8,189.1 221.9,188.8 225,188.4 228.1,188.2 231.2,187.9 234.3,187.6 237.3,187.4 240.4,187.2 243.5,187 246.6,186.9 249.7,186.7 252.8,186.6 255.9,186.5 259,186.4 262.1,186.4 265.2,186.4 268.3,186.4 271.4,186.4 274.5,186.4 277.6,186.5 280.7,186.6 283.8,186.7 286.9,186.8 290,187 293.1,187.2 296.2,187.4 299.3,187.6 302.4,187.8 305.4,188.1 308.5,188.4 311.6,188.7 314.7,189 317.8,189.3 320.9,189.7 324,190.1 327.1,190.5 330.2,190.9 333.3,191.3 336.4,191.8 339.5,192.3 342.6,192.8 345.7,193.3 348.8,193.8 351.9,194.3 355,194.8 358.1,195.4 361.2,196 364.3,196.6 367.4,197.2 370.5,197.8 373.5,198.4 376.6,199 379.7,199.6 382.8,200.3 385.9,200.9 389,201.6 392.1,202.2 395.2,202.9 398.3,203.6 401.4,204.3 404.5,205 407.6,205.6 410.7,206.3 413.8,207 416.9,207.7 420,208.4 423.1,209.1 426.2,209.8 429.3,210.5 432.4,211.2 435.5,211.9 438.6,212.6 441.6,213.3 444.7,213.9 447.8,214.6 450.9,215.3 454,216 457.1,216.6 460.2,217.3 463.3,217.9 466.4,218.6 469.5,219.2 472.6,219.9 475.7,220.5 478.8,221.1 481.9,221.7 485,222.3 488.1,222.9 491.2,223.5 494.3,224.1 497.4,224.7 500.5,225.3 503.6,225.8 506.7,226.4 509.7,226.9 512.8,227.4 515.9,227.9 519,228.4 522.1,228.9 525.2,229.4 528.3,229.9 531.4,230.4 534.5,230.8 537.6,231.3 540.7,231.7 543.8,232.1 546.9,232.5 550,232.9 553.1,233.3 556.2,233.7 559.3,234.1 562.4,234.5 565.5,234.8 568.6,235.2 571.7,235.5 574.8,235.8 577.8,236.1 580.9,236.4 584,236.7 587.1,237 590.2,237.3 593.3,237.6 596.4,237.8 599.5,238.1 602.6,238.3 605.7,238.6 608.8,238.8 611.9,239 615,239.3 618.1,239.5 621.2,239.7 624.3,239.9 627.4,240 630.5,240.2 633.6,240.4 636.7,240.6 639.8,240.7 642.9,240.9 645.9,241 649,241.2 652.1,241.3 655.2,241.4 658.3,241.5 661.4,241.7 664.5,241.8 667.6,241.9 670.7,242 673.8,242.1 676.9,242.2 680,242.3" fill="none" stroke="#1F2C38" stroke-width="2" stroke-linejoin="round"><title>normal fit</title></polyline>
+  <line x1="530" y1="32" x2="546" y2="32" stroke="#1F2C38" stroke-width="2.5"/>
+  <text x="552" y="36" font-size="11" fill="#4A5A68">normal fit</text>
+</svg>
+<!-- /chart:volume_bar_hist -->
+<figcaption>fig 4.4.9 — volume-bar log returns, same session: closer to the normal curve because bars adapt to activity</figcaption>
+</figure>
+
+<p>Tick imbalance bars respond to a different feature of the same session: direction, not size. Averaged over the same 30 days, a bar closes in about <span data-lab="imbalance_dur_burst_mean" data-fmt=".0f">94</span> seconds when a majority of its ticks fall inside the informed-trading burst, against <span data-lab="imbalance_dur_calm_mean" data-fmt=".0f">1188</span> seconds — nearly twenty minutes — when they do not: a gap of <span data-lab="imbalance_dur_diff_mean" data-fmt=".0f">1094</span> ± <span data-lab="imbalance_dur_diff_se" data-fmt=".0f">104</span> seconds, again comfortably past four standard errors. A one-sided run of ticks reaches the threshold in a number of ticks proportional to the threshold itself; a symmetric random walk needs the threshold <em>squared</em> — the √n rule from §4.4.4, working in your favour or against it depending on whether anyone is actually trying to move the price.</p>
+
+<p>Which clock to sample by is mostly a question of what the story behind a signal actually runs on. If the phenomenon itself is clock-driven — an option's time decay, a funding rate accruing overnight — time bars are the right sampling clock, because the thing you are measuring runs on the clock too. If the phenomenon is about information arriving in the market — an order-flow signal, a microstructure feature, anything that should behave similarly whether the session was quiet or frantic — sample by volume, dollar value, or imbalance instead, and expect the number of bars produced per day to vary a lot from one day to the next: that variation is the whole point, not a bug to smooth away.</p>
+
+<table>
+<thead><tr><th>Bar type</th><th>Cuts when…</th><th>Behaves like</th><th>Watch out for</th></tr></thead>
+<tbody>
+<tr><td>Time</td><td>Δt of clock time elapses</td><td>evenly spaced, unevenly informative</td><td>fat tails from mixing quiet and busy periods</td></tr>
+<tr><td>Volume</td><td>cumulative shares cross ν</td><td>roughly constant "activity" per bar</td><td>ν must be re-tuned as average trade size drifts</td></tr>
+<tr><td>Dollar</td><td>cumulative price×shares cross ν</td><td>volume bars, robust to price-level and split changes</td><td>nearly identical to volume bars intraday, when price barely moves</td></tr>
+<tr><td>Tick imbalance</td><td>signed order flow outruns an adaptive threshold</td><td>fast during one-sided flow, slow during noise</td><td>threshold needs a warm-up and a minimum bar length</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="s8">
+<h2><span class="no">4.4.8</span> Try it</h2>
+<p class="lede">Open the companion lab and lean on two knobs: how strong the news burst is, and how far a join is allowed to reach back.</p>
+
+<div class="co lab"><span class="co-t">🔧 Try it (12 min, in the lab)</span>
+<p>1. In §4 of the lab, raise <code>BURST_LEN_S</code> from 20 minutes to 40 and predict, before rerunning, whether the time-bar/volume-bar excess-kurtosis gap in §4.4.7 will grow or shrink. Rerun and check.<br>
+2. In §3, change the fundamentals join's <code>tolerance</code> from 200 days to 90 and rerun. <code>n_stale_avoided</code> should rise — explain in one sentence why a shorter tolerance always weakly increases it.<br>
+3. Success looks like this: your prediction from step 1 matches the direction of the new gap, and you can say which specific bars are driving it (hint: print <code>tb["n_ticks"]</code> and look for the outliers, as in §4.4.7).</p>
+</div>
+</section>
+
+<hr>
+
+<section id="s9">
+<h2><span class="no">4.4.9</span> Glossary · Check yourself · Go deeper</h2>
+<div class="gloss" id="glossary">
+<div id="g-timestamp"><b>Timestamp</b> — a reading from a clock; meaningless for comparison or joining until its time zone (or UTC offset) is known.</div>
+<div id="g-time-zone"><b>Time zone</b> — a named, dated rule for converting between UTC and a local wall clock that a jurisdiction can change (including twice a year for daylight saving).</div>
+<div id="g-exchange-calendar"><b>Exchange calendar</b> — the sessions, holidays, half days and hours that define which instants are inside a market's trading day.</div>
+<div id="g-as-of-join"><b>As-of join</b> — a join that attaches to each row the most recent matching row of another table as of its timestamp, never a later one.</div>
+<div id="g-time-bars"><b>Time bars</b> — bars formed by cutting a tick stream at fixed intervals of clock time, regardless of how much activity occurred.</div>
+<div id="g-volume-bars"><b>Volume bars</b> — bars formed by cutting a tick stream whenever cumulative traded volume crosses a threshold.</div>
+<div id="g-dollar-bars"><b>Dollar bars</b> — bars formed by cutting a tick stream whenever cumulative traded dollar value crosses a threshold.</div>
+<div id="g-imbalance-bars"><b>Imbalance bars</b> — bars formed by cutting a tick stream whenever the running signed order flow outruns an adaptive expected threshold.</div>
+</div>
+
+<h3>Check yourself</h3>
+<details class="q"><summary>1. A scheduler converts "NYSE open, 09:30 ET" to UTC by always adding 5 hours. From November to March it fires exactly on time; from March to November it is consistently an hour off. What's wrong, and what's the fix?</summary><div>The scheduler hard-codes winter's UTC<span data-lab="winter_utc_offset_h" data-fmt=".0f">−5</span> offset and ignores that <code>America/New_York</code> moves to UTC<span data-lab="summer_utc_offset_h" data-fmt=".0f">−4</span> under daylight saving. The fix is to store and convert with a real time-zone-aware timestamp (backed by the IANA tz database), never a fixed-integer offset, so the conversion is automatically correct on both sides of the two DST changeover days each year.</div></details>
+<details class="q"><summary>2. Your backtest treats every weekday as a full trading day. On 2026-11-27 it computes a whole day's return for a session that actually closed at 1:00pm. What breaks, and how do you fix it?</summary><div>Any bar, signal or fill timestamped after 1:00pm ET on that date is being generated for a session that was not open — a fabricated fact that cannot appear in live trading. The fix is an exchange calendar that knows about early closes (§4.4.2), not just holidays, and a data pipeline that queries it before treating a weekday as a normal session.</div></details>
+<details class="q"><summary>3. A colleague joins daily prices to quarterly EPS with <code>merge_asof(direction="backward")</code> on the fiscal quarter's end date, and reports an excellent backtest Sharpe ratio. What is wrong, and what would you change?</summary><div>The join key is the period the number describes, not the moment it became public — the classic <span class="term soon" data-term="look-ahead bias" title="Defined in Session 4.2 (coming soon)">look-ahead bias</span>. On every day between the quarter's end and the actual filing date, the backtest is trading on information from the future. The fix is to join on the filing/availability timestamp instead, adding a conservative assumed lag if the vendor does not supply one.</div></details>
+<details class="q"><summary>4. Why add a <code>tolerance</code> to an as-of join at all, if <code>direction="backward"</code> already prevents look-ahead?</summary><div>Backward direction stops the join from reaching into the future, but with no tolerance it will happily reach arbitrarily far into the past — silently carrying forward a stale value forever once a source stops reporting (a delisted name, a company that missed a filing). A tolerance turns "too old to trust" into an explicit missing value instead of a quiet guess.</div></details>
+<details class="q"><summary>5. A single large news event happens in the last few minutes of a fixed 5-minute time bar, which then shows an extreme return. Is that a genuine fat tail in the return distribution, or partly a sampling artifact — and what would a dollar bar have done differently?</summary><div>Partly an artifact of the sampling clock: the fixed window lumped an unusually large amount of activity into one bar, inflating both its size and its return. A dollar bar would have closed several narrower bars during the burst instead of one wide one, spreading the same price move across bars whose returns look more alike in scale — which is exactly why time-bar returns show far higher excess kurtosis than count-matched dollar-bar returns in §4.4.7.</div></details>
+
+<div class="co lab"><span class="co-t">🔧 Homework (~1 h before Session 4.5)</span>
+<p>1. In the lab, change the tick-imbalance bar's <code>ewma_alpha</code> from 0.2 to 0.05 and rerun; note how much slower the threshold adapts, and whether the burst/calm duration gap in §4.4.7 gets bigger or smaller.<br>
+2. Read Easley, López de Prado &amp; O'Hara (2012) on volume-clock order-flow toxicity (below) — it is the paper behind why imbalance bars are built in volume or tick time at all.<br>
+3. Skim the "AsOf Joins" post on duckdb.org (below); Session 4.5 picks up where this one leaves off, with Parquet, Arrow and DuckDB as a full research storage stack.</p>
+</div>
+
+<h3>📚 Go deeper</h3>
+<ol class="refs">
+<li>López de Prado, M. (2018). <em>Advances in Financial Machine Learning</em>, ch. 2 "Financial Data Structures." Wiley. <span class="rid">ISBN 978-1-119-48208-6</span></li>
+<li>Ané, T. &amp; Geman, H. (2000). "Order Flow, Transaction Clock, and Normality of Asset Returns." <em>Journal of Finance</em> 55(5), 2259–2284. <span class="rid">doi:10.1111/0022-1082.00286</span></li>
+<li>Clark, P. K. (1973). "A Subordinated Stochastic Process Model with Finite Variance for Speculative Prices." <em>Econometrica</em> 41(1), 135–155. <span class="rid">https://www.jstor.org/stable/1913889</span></li>
+<li>Easley, D., López de Prado, M. &amp; O'Hara, M. (2012). "Flow Toxicity and Liquidity in a High-Frequency World." <em>Review of Financial Studies</em> 25(5), 1457–1493. <span class="rid">doi:10.1093/rfs/hhs053</span></li>
+</ol>
+
+<h3>Sources for the numbers</h3>
+<ol class="refs">
+<li>NYSE Group (2024). "NYSE Group Announces 2024, 2025 and 2026 Holiday and Early Closings Calendar." Press release. <span class="rid">https://www.nyse.com/trade/hours-calendars</span></li>
+<li>IANA (2011–present). Time Zone Database ("tz database"), maintained under RFC 6557 (BCP 175). <span class="rid">https://www.iana.org/time-zones</span></li>
+<li>pandas development team. <em>pandas.merge_asof</em> API reference, pandas 3.x. <span class="rid">https://pandas.pydata.org/docs/reference/api/pandas.merge_asof.html</span></li>
+<li>DuckDB Labs (2023). "DuckDB's AsOf Joins: Fuzzy Temporal Lookups." <span class="rid">https://duckdb.org/2023/09/15/asof-joins-fuzzy-temporal-lookups</span></li>
+<li>Japan Exchange Group (2023). "Final Decision for Extension of Trading Hours." <span class="rid">https://www.jpx.co.jp/english/corporate/news/news-releases/1030/20230920-01.html</span></li>
+<li>Sheftel, R. et al. <em>pandas_market_calendars</em> documentation. <span class="rid">https://pandas-market-calendars.readthedocs.io/</span></li>
+</ol>
+</section>
+
+<!-- nav:foot -->
+<div class="foot">
+<span class="soon" title="Coming soon">← Prev: 4.3 · Security Master</span>
+<span class="soon" title="Coming soon">Next: 4.5 · Storage Stack →</span>
+</div>
+<p class="legal">Educational material only — not investment, legal or tax advice. Backtests and simulations are hypothetical. <a href="../start-here.html#disclaimer">Disclaimer</a> · Text CC BY 4.0 · Code MIT.</p>
+<!-- /nav:foot -->
+</main>
+</div></body></html>

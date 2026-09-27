@@ -1,0 +1,22 @@
+<svg viewBox="0 0 720 260" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Engle-Granger rejection rate at 5%: no relationship vs a real 20-day spread">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">ENGLE-GRANGER REJECTION RATE AT 5%: NO RELATIONSHIP VS A REAL 20-DAY SPREAD</text>
+  <line x1="64" y1="216" x2="690" y2="216" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="220" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0%</text>
+  <line x1="64" y1="181.6" x2="690" y2="181.6" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="185.6" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">20%</text>
+  <line x1="64" y1="147.2" x2="690" y2="147.2" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="151.2" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">40%</text>
+  <line x1="64" y1="112.8" x2="690" y2="112.8" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="116.8" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">60%</text>
+  <line x1="64" y1="78.4" x2="690" y2="78.4" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="82.4" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">80%</text>
+  <line x1="64" y1="44" x2="690" y2="44" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="48" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">100%</text>
+  <line x1="64" y1="216" x2="690" y2="216" stroke="#C9CFC6" stroke-width="1"/>
+  <path d="M208.5,216 V211 Q208.5,207 212.5,207 H228.5 Q232.5,207 232.5,211 V216 Z" fill="#D64B2A"><title>no cointegration: 5%</title></path>
+  <text x="220.5" y="200" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">5%</text>
+  <text x="220.5" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">no cointegration</text>
+  <path d="M521.5,216 V77.7 Q521.5,73.7 525.5,73.7 H541.5 Q545.5,73.7 545.5,77.7 V216 Z" fill="#3A56C5"><title>true cointegration: 83%</title></path>
+  <text x="533.5" y="66.7" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">83%</text>
+  <text x="533.5" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">true cointegration</text>
+</svg>

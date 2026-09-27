@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- nav:head -->
+<title>6.8 · Lab: The Research Protocol</title>
+<meta name="description" content="Pre-register a hypothesis, log every trial, sweep parameters, score them with PBO and DSR, and write the go/no-go memo.">
+<link rel="canonical" href="https://georgevrs.github.io/quant-notebook/unit06-backtesting-discipline/session08-lab-research-protocol.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Quant Notebook">
+<meta property="og:title" content="6.8 · Lab: The Research Protocol">
+<meta property="og:description" content="Pre-register a hypothesis, log every trial, sweep parameters, score them with PBO and DSR, and write the go/no-go memo.">
+<meta property="og:url" content="https://georgevrs.github.io/quant-notebook/unit06-backtesting-discipline/session08-lab-research-protocol.html">
+<meta name="twitter:card" content="summary">
+<link rel="stylesheet" href="../assets/brand.css">
+<link rel="stylesheet" href="../assets/temml.css">
+<!-- /nav:head -->
+</head>
+<body><div class="page" id="top">
+<!-- nav:tabs -->
+<nav class="tabs">
+<a href="../index.html">⌂ Course home</a>
+<span class="soon" title="Coming soon">6.1 · What a Backtest Is</span>
+<span class="soon" title="Coming soon">6.2 · Vectorized Backtest</span>
+<span class="soon" title="Coming soon">6.3 · Event-Driven</span>
+<span class="soon" title="Coming soon">6.4 · Bias Hall of Fame</span>
+<span class="soon" title="Coming soon">6.5 · Costs &amp; Capacity</span>
+<span class="soon" title="Coming soon">6.6 · Validation</span>
+<span class="soon" title="Coming soon">6.7 · Overfitting Stats</span>
+<a class="active" href="session08-lab-research-protocol.html">6.8 · Lab: Protocol</a>
+<a href="../roadmap.html">🗺 Roadmap</a>
+</nav>
+<!-- /nav:tabs -->
+
+<header class="cover">
+<!-- nav:heading -->
+<p class="eyebrow">Unit 6 · Backtesting &amp; Research Discipline — Session 08 of 08</p>
+<h1>Lab: The Research Protocol</h1>
+<!-- /nav:heading -->
+<p class="subtitle">Sessions 6.1–6.7 gave you a backtester, a bias hall of fame and the statistics to price in how many things you tried. This lab wires them into one small, real pipeline: pre-register a hypothesis, sweep it with vectorbt, log every trial to MLflow, score the log with PBO and DSR, and write the memo that says go or kill it. <mark>The core move: let a rule fixed in advance, not your own hopeful reading of the winner, make the call.</mark></p>
+<div class="meta">
+<span>DURATION <b>1.5 h + lab</b></span>
+<span>LEVEL <b>Intermediate</b></span>
+<span>TRACKS <b>QR · QT · QD · IND</b></span>
+<span>HANDS-ON <b>Two full sweeps, scored and decided end to end</b></span>
+</div>
+<!-- nav:labstrip -->
+<div class="labstrip"><b>📓 Companion lab</b>
+<a href="https://colab.research.google.com/github/georgevrs/quant-notebook/blob/main/labs/u06/s08_lab_research_protocol.ipynb">Open in Colab</a>
+<a href="https://github.com/georgevrs/quant-notebook/blob/main/labs/u06/s08_lab_research_protocol.ipynb">Notebook on GitHub</a>
+<a href="https://github.com/georgevrs/quant-notebook/blob/main/labs/u06/s08_lab_research_protocol.py">Source (.py)</a>
+</div>
+<!-- /nav:labstrip -->
+<div class="toc">
+<b>On this page</b>
+<ol>
+<li><a href="#s1">The mental model: three durable artefacts</a></li>
+<li><a href="#s2">Pre-registering the hypothesis and the kill criterion</a></li>
+<li><a href="#s3">The trial log: what MLflow keeps that memory doesn't</a></li>
+<li><a href="#s4">The parameter sweep, with vectorbt</a></li>
+<li><a href="#s5">Scoring honestly: PBO and DSR, read off the log</a></li>
+<li><a href="#s6">The go/no-go memo</a></li>
+<li><a href="#s7">Try it</a></li>
+<li><a href="#s8">Glossary · Check yourself · Go deeper</a></li>
+</ol>
+</div>
+</header>
+
+<main>
+
+<section id="s1">
+<h2><span class="no">6.8.1</span> The mental model: three durable artefacts</h2>
+<p class="lede">A research protocol is not a mindset — it is three physical documents that outlive the researcher's memory of what happened.</p>
+
+<p><a class="xref" href="../unit01-quant-landscape/session03-research-lifecycle.html" data-xref="1.3" data-auto="">Session 1.3 — The Quant Research Lifecycle</a> already gave you the discipline this lab industrialises: write the <a class="term" href="../unit01-quant-landscape/session03-research-lifecycle.html#g-hypothesis" data-term="hypothesis">hypothesis</a> and the <a class="term" href="../unit01-quant-landscape/session03-research-lifecycle.html#g-kill-criterion" data-term="kill criterion">kill criterion</a> before touching the data. That works for one experiment, checked by one honest person. It stops working the moment a second person joins, six months pass, or the sweep has 45 variants instead of one — nobody's memory of "what we tried" survives that. A <strong>research protocol</strong> replaces memory with three artefacts that anyone, including you in six months, can re-open and check: the pre-registration (what you committed to), the <a class="term" href="#g-trial-log" data-term="trial log">trial log</a> (what you actually ran), and the <a class="term" href="#g-go-no-go-memo" data-term="go/no-go memo">go/no-go memo</a> (what you decided, and why). This lab builds all three, for real, twice — once on a synthetic sleeve with a genuine edge, once on pure noise — and lets the identical pipeline decide both.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 216" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <rect x="20" y="14" width="680" height="184" rx="12" fill="#fff" stroke="#1F2C38" stroke-width="1.5"/>
+  <text x="40" y="40" font-size="12" fill="#4A5A68" font-family="IBM Plex Mono,monospace">THE RESEARCH PROTOCOL — three artefacts, not a feeling</text>
+  <rect x="50" y="58" width="190" height="118" rx="8" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="145" y="90" font-size="14" font-weight="600" text-anchor="middle" fill="#3A56C5">PRE-REGISTRATION</text>
+  <text x="145" y="112" font-size="10.5" text-anchor="middle" fill="#4A5A68">what you commit to</text>
+  <text x="145" y="127" font-size="10.5" text-anchor="middle" fill="#4A5A68">before any result exists</text>
+  <text x="145" y="150" font-size="9.5" text-anchor="middle" fill="#4A5A68">hypothesis, grid,</text>
+  <text x="145" y="163" font-size="9.5" text-anchor="middle" fill="#4A5A68">kill criterion</text>
+  <rect x="265" y="58" width="190" height="118" rx="8" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="360" y="90" font-size="14" font-weight="600" text-anchor="middle" fill="#8A6D00">TRIAL LOG</text>
+  <text x="360" y="112" font-size="10.5" text-anchor="middle" fill="#4A5A68">what you actually ran</text>
+  <text x="360" y="127" font-size="10.5" text-anchor="middle" fill="#4A5A68">every variant, no gaps</text>
+  <text x="360" y="150" font-size="9.5" text-anchor="middle" fill="#4A5A68">params, metrics,</text>
+  <text x="360" y="163" font-size="9.5" text-anchor="middle" fill="#4A5A68">an exact trial count</text>
+  <rect x="480" y="58" width="190" height="118" rx="8" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="575" y="90" font-size="14" font-weight="600" text-anchor="middle" fill="#1F7A55">GO/NO-GO MEMO</text>
+  <text x="575" y="112" font-size="10.5" text-anchor="middle" fill="#4A5A68">what you decided</text>
+  <text x="575" y="127" font-size="10.5" text-anchor="middle" fill="#4A5A68">and why, on the record</text>
+  <text x="575" y="150" font-size="9.5" text-anchor="middle" fill="#4A5A68">decision follows the</text>
+  <text x="575" y="163" font-size="9.5" text-anchor="middle" fill="#4A5A68">rule, not the mood</text>
+  <text x="360" y="196" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">Each artefact removes one place where after-the-fact judgement could sneak in.</text>
+</svg>
+<figcaption>fig 6.8.1 — the three artefacts a research protocol produces, and what each one is for</figcaption>
+</figure>
+
+<p>Without this, a research desk drifts toward exactly the failure mode <span class="xref soon" data-xref="6.4" data-auto="" title="Coming soon">Session 6.4 — The Bias Hall of Fame</span> catalogued: try things informally, remember the ones that worked, forget the rest, and call the survivor a discovery. With it, the count of things tried is a number in a database, not a guess — and that number is precisely what <span class="xref soon" data-xref="6.7" data-auto="" title="Coming soon">Session 6.7 — Overfitting Statistics: PSR, DSR, MinTRL &amp; PBO</span>'s statistics need to price in how impressed you should be.</p>
+
+<p>The engineering analogy is close enough to lean on directly: a research protocol is continuous integration for a hypothesis. The pre-registration is the spec, written before a single test result exists, so "passing" is defined before anyone has a number to feel good or bad about. The trial log is the build log — every run kept in the same place with the same fields, whether it looked promising or not, exactly the way a CI system keeps every job's output rather than only the ones that went green. The go/no-go memo is the release note: a short document that says what shipped, what didn't, and why, filed either way so the next person doesn't have to re-run the whole pipeline just to find out what happened last time. None of the three pieces is new engineering. What's new — for most research desks — is refusing to skip any of them because "it's just a backtest."</p>
+
+<div class="co key"><span class="co-t">📌 Key idea — remove judgement from the parts that don't need it</span>
+<p>A protocol works by deciding, in advance, exactly what gets logged and exactly what rule scores it — so that the only judgement call left on decision day is one you already made before you knew the answer.</p>
+</div>
+</section>
+
+<section id="s2">
+<h2><span class="no">6.8.2</span> Pre-registering the hypothesis and the kill criterion</h2>
+<p class="lede">The pre-registration fixes four things before the sweep runs: the hypothesis, how many variants you're allowed, the primary metric, and the exact rule that kills the idea.</p>
+
+<p>This lab's pre-registration (<code>R-014</code>, continuing the numbering <a class="xref" href="../unit01-quant-landscape/session03-research-lifecycle.html" data-xref="1.3" data-auto="">Session 1.3 — The Quant Research Lifecycle</a> started) commits to a small sleeve of <span data-lab="n_assets" data-fmt=".0f">40</span> synthetic instruments, a single <a class="term" href="#g-parameter-sweep" data-term="parameter sweep">parameter sweep</a> of <span data-lab="variants_allowed" data-fmt=".0f">45</span> moving-average crossovers, and — this is the part worth reading twice — <span data-lab="t_is_years" data-fmt=".0f">20</span> years of <span class="term soon" data-term="in-sample" title="Defined in Session 6.1 (coming soon)">in-sample</span> history before any decision is made, plus <span data-lab="t_hold_years" data-fmt=".0f">8</span> frozen holdout years touched exactly once. That is a long commitment for what looks like a simple crossover rule, and §6.8.2's own numbers below explain why it has to be.</p>
+
+<table>
+<thead><tr><th>Field</th><th>What this run committed to</th></tr></thead>
+<tbody>
+<tr><td>Hypothesis</td><td>the sleeve's daily returns carry positive short-lag autocorrelation a crossover can harvest</td></tr>
+<tr><td>Universe</td><td><span data-lab="n_assets" data-fmt=".0f">40</span> synthetic instruments, equal-weighted</td></tr>
+<tr><td>Data</td><td><span data-lab="t_is_years" data-fmt=".0f">20</span>y in-sample + <span data-lab="t_hold_years" data-fmt=".0f">8</span>y frozen holdout</td></tr>
+<tr><td>Primary metric</td><td>annualised Sharpe ratio, risk-free rate 0</td></tr>
+<tr><td>Variants allowed</td><td><span data-lab="variants_allowed" data-fmt=".0f">45</span> (fast, slow) pairs, one grid, no re-fitting</td></tr>
+<tr><td>Kill criterion</td><td>go only if every one of three gates passes (below)</td></tr>
+</tbody>
+</table>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 150" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <rect x="18" y="40" width="122" height="66" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="79" y="66" font-size="10.5" text-anchor="middle" fill="#3A56C5" font-weight="600">1 · PRE-REGISTER</text>
+  <text x="79" y="84" font-size="9" text-anchor="middle" fill="#4A5A68">hypothesis, grid,</text>
+  <text x="79" y="96" font-size="9" text-anchor="middle" fill="#4A5A68">kill criterion</text>
+  <rect x="158" y="40" width="122" height="66" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="219" y="66" font-size="10.5" text-anchor="middle" fill="#3A56C5" font-weight="600">2 · SWEEP</text>
+  <text x="219" y="84" font-size="9" text-anchor="middle" fill="#4A5A68">vectorbt runs</text>
+  <text x="219" y="96" font-size="9" text-anchor="middle" fill="#4A5A68">every variant</text>
+  <rect x="298" y="40" width="122" height="66" rx="9" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="359" y="66" font-size="10.5" text-anchor="middle" fill="#8A6D00" font-weight="600">3 · LOG</text>
+  <text x="359" y="84" font-size="9" text-anchor="middle" fill="#4A5A68">every trial to</text>
+  <text x="359" y="96" font-size="9" text-anchor="middle" fill="#4A5A68">MLflow, no gaps</text>
+  <rect x="438" y="40" width="122" height="66" rx="9" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="499" y="66" font-size="10.5" text-anchor="middle" fill="#8A6D00" font-weight="600">4 · SCORE</text>
+  <text x="499" y="84" font-size="9" text-anchor="middle" fill="#4A5A68">PBO and DSR,</text>
+  <text x="499" y="96" font-size="9" text-anchor="middle" fill="#4A5A68">off the log itself</text>
+  <rect x="578" y="40" width="122" height="66" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="639" y="66" font-size="10.5" text-anchor="middle" fill="#1F7A55" font-weight="600">5 · DECIDE</text>
+  <text x="639" y="84" font-size="9" text-anchor="middle" fill="#4A5A68">go / no-go,</text>
+  <text x="639" y="96" font-size="9" text-anchor="middle" fill="#4A5A68">on the record</text>
+  <path d="M141 73 H156" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M281 73 H296" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M421 73 H436" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M561 73 H576" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <text x="360" y="130" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">Nothing after step 1 is discretionary: the rule was fixed before step 2 ran.</text>
+  <defs><marker id="s2a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F2C38"/></marker></defs>
+</svg>
+<figcaption>fig 6.8.2 — the whole protocol, five steps, the shape every section of this lab now fills in</figcaption>
+</figure>
+
+<p>The kill criterion itself is a conjunction, not a single number to eyeball: go only if the <span class="term soon" data-term="deflated Sharpe ratio" title="Defined in Session 6.7 (coming soon)">deflated Sharpe ratio</span> clears <span data-lab="dsr_bar" data-fmt=".2f">0.95</span>, the <span class="term soon" data-term="probability of backtest overfitting" title="Defined in Session 6.7 (coming soon)">probability of backtest overfitting</span> stays under <span data-lab="pbo_bar" data-fmt=".2f">0.50</span>, <em>and</em> a holdout Sharpe ratio — touched exactly once — comes back positive.</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><mtext>GO</mtext><mspace width="0.2778em"></mspace><mo stretchy="false">⟺</mo><mspace width="0.2778em"></mspace><mpadded lspace="0"><mi>DSR</mi></mpadded><mo>≥</mo><mn>0.95</mn><mtext> </mtext><mtext>and</mtext><mtext> </mtext><mpadded lspace="0"><mi>PBO</mi></mpadded><mo>&lt;</mo><mn>0.50</mn><mtext> </mtext><mtext>and</mtext><mtext> </mtext><msub><mpadded lspace="0"><mi>SR</mi></mpadded><mtext>holdout</mtext></msub><mo>&gt;</mo><mn>0</mn></mrow><annotation encoding="application/x-tex">\text{GO} \iff \mathrm{DSR} \ge 0.95 \ \text{and}\ \mathrm{PBO} \lt 0.50 \ \text{and}\ \mathrm{SR}_{\text{holdout}} \gt 0</annotation></semantics></math></div>
+<p>The three gates are not redundant — each one catches a failure the other two would miss. DSR catches optimism from trying many <em>parameter combinations</em> at once, the multiple-testing problem a single Sharpe ratio can't see past. PBO catches something subtler: mechanical overfitting built into the <em>shape</em> of the search, visible only by re-splitting the same data many ways and asking how often the in-sample winner is merely average out of sample. Neither of those touches the one thing only a frozen holdout can show — whether the relationship the whole grid was tuned to find is still there on years the sweep never got to see. A rule that dropped any one gate would be blind to exactly the failure mode the other two were never built to catch.</p>
+
+<p>Why 20 years for what is, mechanically, a simple crossover? Because a modest, entirely real edge needs a long track record before <span class="xref soon" data-xref="6.7" data-auto="" title="Coming soon">Session 6.7 — Overfitting Statistics: PSR, DSR, MinTRL &amp; PBO</span>'s deflated statistic will believe it — the same arithmetic behind that session's <span class="term soon" data-term="minimum track record length" title="Defined in Session 6.7 (coming soon)">minimum track record length</span>, checked here directly by simulation rather than the closed-form formula. Running the exact three-gate rule above <span data-lab="cal_repeats" data-fmt=".0f">400</span> times on a synthetic sleeve with a genuine annualised Sharpe ratio of <span data-lab="cal_edge_sr" data-fmt=".1f">0.9</span> and <span data-lab="variants_allowed" data-fmt=".0f">45</span> trials in the grid, the rule says go only <span data-lab="cal_edge_go_rate_3y" data-fmt=".0%">31%</span> of the time with 3 years of history, but <span data-lab="cal_edge_go_rate_8y" data-fmt=".0%">91%</span> of the time with 8 and <span data-lab="cal_edge_go_rate_20y" data-fmt=".0%">90%</span> with 20 (fig 6.8.4). Three years is not stingy — it is simply not enough data for an honest rule to trust a real edge.</p>
+
+<figure class="diagram chart">
+<!-- chart:edge_go_rate -->
+<svg viewBox="0 0 720 260" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="How much history a real SR=0.9 edge needs to clear the bar (45 trials, 400 repeats)">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">HOW MUCH HISTORY A REAL SR=0.9 EDGE NEEDS TO CLEAR THE BAR (45 TRIALS, 400 REPEATS)</text>
+  <line x1="64" y1="216" x2="690" y2="216" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="220" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0%</text>
+  <line x1="64" y1="181.6" x2="690" y2="181.6" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="185.6" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">25%</text>
+  <line x1="64" y1="147.2" x2="690" y2="147.2" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="151.2" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">50%</text>
+  <line x1="64" y1="112.8" x2="690" y2="112.8" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="116.8" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">75%</text>
+  <line x1="64" y1="78.4" x2="690" y2="78.4" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="82.4" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">100%</text>
+  <line x1="64" y1="44" x2="690" y2="44" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="48" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">125%</text>
+  <line x1="64" y1="216" x2="690" y2="216" stroke="#C9CFC6" stroke-width="1"/>
+  <path d="M156.3,216 V177 Q156.3,173 160.3,173 H176.3 Q180.3,173 180.3,177 V216 Z" fill="#D64B2A"><title>3 years: 31%</title></path>
+  <text x="168.3" y="166" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">31%</text>
+  <text x="168.3" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">3 years</text>
+  <path d="M365,216 V94.8 Q365,90.8 369,90.8 H385 Q389,90.8 389,94.8 V216 Z" fill="#3A56C5"><title>8 years: 91%</title></path>
+  <text x="377" y="83.8" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">91%</text>
+  <text x="377" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">8 years</text>
+  <path d="M573.7,216 V96.5 Q573.7,92.5 577.7,92.5 H593.7 Q597.7,92.5 597.7,96.5 V216 Z" fill="#3A56C5"><title>20 years: 90%</title></path>
+  <text x="585.7" y="85.5" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">90%</text>
+  <text x="585.7" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">20 years</text>
+</svg>
+<!-- /chart:edge_go_rate -->
+<figcaption>fig 6.8.4 — a real SR=0.9 edge needs years, not months, before the kill criterion will call it a go</figcaption>
+</figure>
+
+<div class="co tip"><span class="co-t">💡 Looking ahead</span>
+<p>Under pure noise, the same three-gate check calls a go only <span data-lab="cal_null_go_rate" data-fmt=".1%">0.2%</span> of the time across <span data-lab="cal_repeats" data-fmt=".0f">400</span> repeats (§6.8.7's Try-it lets you push the thresholds and watch both rates move) — a conservative rule, by design, because <span class="xref soon" data-xref="6.7" data-auto="" title="Coming soon">Session 6.7 — Overfitting Statistics: PSR, DSR, MinTRL &amp; PBO</span> already showed you how expensive a false go is.</p>
+</div>
+</section>
+
+<section id="s3">
+<h2><span class="no">6.8.3</span> The trial log: what MLflow keeps that memory doesn't</h2>
+<p class="lede">A trial log is a database row per attempt — not a notebook cell you happened to keep, and not your recollection of "the good one."</p>
+
+<p><strong>Experiment tracking</strong> is the practice this session owns: recording every trial's exact parameters, the metrics that resulted, and enough provenance to reproduce it, so that nobody ever has to reconstruct "what did we try" from memory or a scattered folder of notebooks. This lab uses MLflow (already installed) for it, logging one run per (fast, slow) pair before any result is inspected. A <strong>trial log</strong> is the artefact that results in: a table, one row per trial, that answers "what happened" without asking a person.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 210" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">ONE TRIAL-LOG ROW — three kinds of field, every trial</text>
+  <rect x="26" y="34" width="668" height="48" rx="8" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="46" y="53" font-size="10.5" font-weight="700" fill="#3A56C5">HYPERPARAMETERS · what varied</text>
+  <text x="300" y="53" font-size="9.5" font-family="'IBM Plex Mono',monospace" fill="#1F2C38">fast=5, slow=8</text>
+  <text x="46" y="70" font-size="9" fill="#4A5A68">the ONLY thing that changes between trials in this sweep</text>
+  <rect x="26" y="88" width="668" height="48" rx="8" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="46" y="107" font-size="10.5" font-weight="700" fill="#1F7A55">METRICS · what resulted</text>
+  <text x="300" y="107" font-size="9.5" font-family="'IBM Plex Mono',monospace" fill="#1F2C38">sharpe_in_sample, n_trades_sleeve</text>
+  <text x="46" y="124" font-size="9" fill="#4A5A68">whatever the primary metric and pre-registration need later</text>
+  <rect x="26" y="142" width="668" height="48" rx="8" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="46" y="161" font-size="10.5" font-weight="700" fill="#8A6D00">PROVENANCE · what would reproduce it</text>
+  <text x="300" y="161" font-size="9.5" font-family="'IBM Plex Mono',monospace" fill="#1F2C38">run id, seed, timestamp</text>
+  <text x="46" y="178" font-size="9" fill="#4A5A68">the row you'd need to re-run this exact trial in six months</text>
+</svg>
+<figcaption>fig 6.8.3 — the three kinds of field a trial-log row carries, whatever the sweep</figcaption>
+</figure>
+
+<p>In code, logging one trial is three lines — a parameter block, a metric block, both inside one run:</p>
+
+<pre><span class="c"># one MLflow run per (fast, slow) pair, before the winner is even known</span>
+<span class="k">with</span> mlflow.start_run(run_name=<span class="s">f"momentum_f{fast}_s{slow}"</span>):
+    mlflow.log_params({<span class="s">"project"</span>: project, <span class="s">"fast"</span>: fast, <span class="s">"slow"</span>: slow})
+    mlflow.log_metrics({<span class="s">"sharpe_in_sample"</span>: sr_is, <span class="s">"n_trades_sleeve"</span>: n_trades})</pre>
+
+<p>Read back with <code>mlflow.search_runs(...)</code>, the log for the momentum sleeve returns exactly <span data-lab="proj_momentum_n_trials" data-fmt=".0f">45</span> rows — matching <span data-lab="variants_allowed" data-fmt=".0f">45</span> pre-registered, not 44 or 46 — and its best in-sample row is the (fast, slow) pair <span data-lab="proj_momentum_fast" data-fmt=".0f">5</span>/<span data-lab="proj_momentum_slow" data-fmt=".0f">8</span>, trading <span data-lab="proj_momentum_n_trades_sleeve" data-fmt=",.0f">18,236</span> times across the sleeve over the full 28 years. Every one of those three numbers came from the log itself, not from a variable this notebook happened to still have in memory.</p>
+
+<p>This is also why a trial log outlives the sweep that created it. Once a strategy moves past a go decision, the same log-then-query habit continues under a different name: a <span class="term soon" data-term="model registry" title="Defined in Session 15.5 (coming soon)">model registry</span> tracks which model version is live, when it was promoted, and what it scored before promotion — <span class="xref soon" data-xref="15.5" data-auto="" title="Coming soon">Session 15.5 — Operations &amp; MLOps</span> owns that discipline in production. A research trial log and a live model registry are the same idea at two points in a strategy's life: nothing ships, or stays shipped, on the strength of someone's memory of how it performed.</p>
+
+<div class="co note"><span class="co-t">🧭 Margin note — the honour-system spreadsheet</span>
+<p>The alternative most researchers actually use is a spreadsheet someone updates when they remember to. It works until a trial goes unlogged because it "obviously" wasn't going to win — which is exactly the trial that turns out to matter when <span class="xref soon" data-xref="6.7" data-auto="" title="Coming soon">Session 6.7 — Overfitting Statistics: PSR, DSR, MinTRL &amp; PBO</span>'s statistics ask how many you really tried.</p>
+</div>
+</section>
+
+<section id="s4">
+<h2><span class="no">6.8.4</span> The parameter sweep, with vectorbt</h2>
+<p class="lede">A parameter sweep runs one rule many ways at once; vectorbt is built to do that across a whole grid in a single call instead of a Python loop.</p>
+
+<p>A <strong>parameter sweep</strong> is trying every combination in a fixed grid of one strategy's settings — here, all <span data-lab="variants_allowed" data-fmt=".0f">45</span> pairs from a 10-window ladder (<code>C(10, 2)</code>), long/flat on a close-vs-moving-average crossover. Sessions <span class="xref soon" data-xref="6.2" data-auto="" title="Coming soon">Session 6.2 — Build a Vectorized Backtester</span> and <span class="xref soon" data-xref="6.7" data-auto="" title="Coming soon">Session 6.7 — Overfitting Statistics: PSR, DSR, MinTRL &amp; PBO</span> hand-rolled this kind of loop in plain pandas; <code>vectorbt</code> instead broadcasts price, signal and parameter grid into one array job that a single call runs for every instrument and every (fast, slow) pair together:</p>
+
+<pre><span class="c"># every (fast, slow) pair from the window ladder, on all 40 instruments, one call</span>
+fast_ma, slow_ma = vbt.MA.run_combs(price, window=WINDOWS, r=<span class="k">2</span>, short_names=[<span class="s">"fast"</span>, <span class="s">"slow"</span>])
+entries = fast_ma.ma_crossed_above(slow_ma)
+exits = fast_ma.ma_crossed_below(slow_ma)
+pf = vbt.Portfolio.from_signals(price, entries, exits, fees=<span class="k">0.0005</span>, freq=<span class="s">"D"</span>)</pre>
+
+<p>That speed is why the sweep needs a trial log at all: a hand-timed loop makes you feel every trial go by, but a vectorised sweep returns 45 answers before you have looked at one, which is exactly when it is easiest to only remember the winner. The flat <code>0.0005</code> above is a placeholder cost so turnover isn't free — <span class="xref soon" data-xref="6.5" data-auto="" title="Coming soon">Session 6.5 — Transaction Costs &amp; Capacity</span> owns the full transaction-cost model this lab doesn't attempt. (<code>vectorbt</code> is fast and free to use, but its Commons Clause licence forbids selling a product built on it — read it before you ship anything on top.)</p>
+
+<p>Both projects below go through this identical call. <strong>Momentum pilot</strong> is 40 synthetic instruments built with a known, exaggerated daily autocorrelation of <span data-lab="phi_momentum" data-fmt=".2f">0.25</span> — measured back out of the panel at <span data-lab="phi_hat" data-fmt=".3f">0.251</span> (standard error <span data-lab="phi_se" data-fmt=".4f">0.0019</span>, so within four standard errors of the truth we built in, the same "know the truth first" method <span class="xref soon" data-xref="6.4" data-auto="" title="Coming soon">Session 6.4 — The Bias Hall of Fame</span> uses for every exhibit). <strong>Noise null</strong> is the identical construction with the autocorrelation set to exactly zero — a fair game, same as <span class="xref soon" data-xref="6.1" data-auto="" title="Coming soon">Session 6.1 — What a Backtest Is (and Isn&#x27;t)</span>'s baseline. Sweeping both and comparing each project's best in-sample Sharpe ratio against its own frozen holdout makes the honesty gap visible before any formal score is computed:</p>
+
+<p>Forty instruments, not one, for a reason worth being explicit about: averaging the crossover's return across an equal-weighted sleeve removes each individual instrument's idiosyncratic luck from the number the sweep reports, the same reason <span class="xref soon" data-xref="6.4" data-auto="" title="Coming soon">Session 6.4 — The Bias Hall of Fame</span> tests survivorship on 5,000 names rather than one. It does not, and cannot, remove the other kind of uncertainty — how much a Sharpe ratio estimated over a fixed number of calendar years can vary from the truth — which is exactly why §6.8.2's calibration turns on <em>years</em>, not on how many instruments are in the sleeve. Diversifying the universe and lengthening the history fix two different problems; a protocol that only does the first can still be fooled.</p>
+
+<p><code>vectorbt</code>'s speed here is not free of trade-offs. It assumes signals translate into fills without the order-book mechanics <span class="xref soon" data-xref="6.3" data-auto="" title="Coming soon">Session 6.3 — Build an Event-Driven Backtester</span>'s event loop models explicitly — a fine trade for a first pass at 45 variants, a bad one for anything that will trade close to its own capacity limit.</p>
+
+<figure class="diagram chart">
+<!-- chart:honesty_gap -->
+<svg viewBox="0 0 720 280" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="The winning combo&#x27;s in-sample Sharpe vs. its own frozen holdout">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">THE WINNING COMBO&#x27;S IN-SAMPLE SHARPE VS. ITS OWN FROZEN HOLDOUT</text>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#D64B2A" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">best in-sample Sharpe</text>
+  <line x1="204.4" y1="32" x2="220.4" y2="32" stroke="#3A56C5" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="226.4" y="36" font-size="11" fill="#4A5A68">holdout Sharpe (never touched until now)</text>
+  <line x1="64" y1="236" x2="690" y2="236" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="240" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.00</text>
+  <line x1="64" y1="191" x2="690" y2="191" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="195" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.50</text>
+  <line x1="64" y1="146" x2="690" y2="146" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="150" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">1.00</text>
+  <line x1="64" y1="101" x2="690" y2="101" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="105" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">1.50</text>
+  <line x1="64" y1="56" x2="690" y2="56" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="60" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">2.00</text>
+  <line x1="64" y1="236" x2="690" y2="236" stroke="#C9CFC6" stroke-width="1"/>
+  <path d="M195.5,236 V93.4 Q195.5,89.4 199.5,89.4 H215.5 Q219.5,89.4 219.5,93.4 V236 Z" fill="#D64B2A"><title>Momentum pilot · best in-sample Sharpe: 1.63</title></path>
+  <text x="207.5" y="83.4" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">1.63</text>
+  <path d="M221.5,236 V93.7 Q221.5,89.7 225.5,89.7 H241.5 Q245.5,89.7 245.5,93.7 V236 Z" fill="#3A56C5"><title>Momentum pilot · holdout Sharpe (never touched until now): 1.63</title></path>
+  <text x="233.5" y="83.7" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">1.63</text>
+  <text x="220.5" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">Momentum pilot</text>
+  <path d="M508.5,236 V201.8 Q508.5,197.8 512.5,197.8 H528.5 Q532.5,197.8 532.5,201.8 V236 Z" fill="#D64B2A"><title>Noise null · best in-sample Sharpe: 0.42</title></path>
+  <text x="520.5" y="191.8" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.42</text>
+  <path d="M534.5,236 V233.6 Q534.5,231.2 536.9,231.2 H556.1 Q558.5,231.2 558.5,233.6 V236 Z" fill="#3A56C5"><title>Noise null · holdout Sharpe (never touched until now): 0.05</title></path>
+  <text x="546.5" y="225.2" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.05</text>
+  <text x="533.5" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">Noise null</text>
+</svg>
+<!-- /chart:honesty_gap -->
+<figcaption>fig 6.8.5 — the winning combo's in-sample Sharpe ratio next to the same combo's Sharpe on years it never saw</figcaption>
+</figure>
+
+<p>Momentum pilot's winner keeps almost all of it: an in-sample Sharpe ratio of <span data-lab="proj_momentum_best_is_sharpe" data-fmt=".2f">1.63</span> against a holdout Sharpe ratio of <span data-lab="proj_momentum_holdout_sharpe" data-fmt=".2f">1.63</span>. Noise null's winner does not: <span data-lab="proj_noise_best_is_sharpe" data-fmt=".2f">0.42</span> in-sample collapses to <span data-lab="proj_noise_holdout_sharpe" data-fmt=".2f">0.05</span> on data it never touched.</p>
+
+<div class="co warn"><span class="co-t">⚠️ Pitfall — "the best in-sample Sharpe ratio is a real number"</span>
+<p>It is a real number — of the single best-looking cell in a grid you swept 45 ways. <span class="xref soon" data-xref="6.4" data-auto="" title="Coming soon">Session 6.4 — The Bias Hall of Fame</span> and <a class="xref" href="../unit01-quant-landscape/session03-research-lifecycle.html" data-xref="1.3" data-auto="">Session 1.3 — The Quant Research Lifecycle</a> already showed what a naive best-of-N figure does to your confidence; a sweep is that exact mechanism, run once per parameter pair instead of once per random seed. The fix is never to stop sweeping — it is to never report the winner's number without first scoring the whole log, which is §6.8.5's job.</p>
+</div>
+</section>
+
+<section id="s5">
+<h2><span class="no">6.8.5</span> Scoring honestly: PBO and DSR, read off the log</h2>
+<p class="lede">The deflated Sharpe ratio and the probability of backtest overfitting are <span class="xref soon" data-xref="6.7" data-auto="" title="Coming soon">Session 6.7 — Overfitting Statistics: PSR, DSR, MinTRL &amp; PBO</span>'s statistics; this section's only new move is reading their inputs straight off the trial log instead of trusting a remembered trial count.</p>
+
+<p><span class="xref soon" data-xref="6.7" data-auto="" title="Coming soon">Session 6.7 — Overfitting Statistics: PSR, DSR, MinTRL &amp; PBO</span> derives the <span class="term soon" data-term="probabilistic Sharpe ratio" title="Defined in Session 6.7 (coming soon)">probabilistic Sharpe ratio</span>, the deflated Sharpe ratio and <span class="term soon" data-term="CSCV" title="Defined in Session 6.7 (coming soon)">CSCV</span>'s probability of backtest overfitting from first principles — this lab does not repeat that derivation, only uses it. The one detail worth making explicit: DSR's trial count <code>N</code> is not typed in by hand. It is <code>len(mlflow.search_runs(...))</code> — the exact row count of the log built in §6.8.3, which is why an unlogged trial is not a shortcut, it is a wrong answer to a question DSR asks with certainty.</p>
+
+<table>
+<thead><tr><th>Project</th><th>Trials logged</th><th>DSR</th><th>PBO</th><th>Holdout Sharpe</th><th>Decision</th></tr></thead>
+<tbody>
+<tr><td>Momentum pilot</td><td><span data-lab="proj_momentum_n_trials" data-fmt=".0f">45</span></td><td><span data-lab="proj_momentum_dsr" data-fmt=".2f">1.00</span></td><td><span data-lab="proj_momentum_pbo" data-fmt=".2f">0.00</span></td><td><span data-lab="proj_momentum_holdout_sharpe" data-fmt=".2f">1.63</span></td><td><strong>GO</strong></td></tr>
+<tr><td>Noise null</td><td><span data-lab="proj_noise_n_trials" data-fmt=".0f">45</span></td><td><span data-lab="proj_noise_dsr" data-fmt=".2f">0.40</span></td><td><span data-lab="proj_noise_pbo" data-fmt=".2f">0.24</span></td><td><span data-lab="proj_noise_holdout_sharpe" data-fmt=".2f">0.05</span></td><td><strong>NO-GO</strong></td></tr>
+</tbody>
+</table>
+
+<figure class="diagram chart">
+<!-- chart:dsr_pbo -->
+<svg viewBox="0 0 720 280" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="The two probability-scale verdicts the kill criterion actually reads">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">THE TWO PROBABILITY-SCALE VERDICTS THE KILL CRITERION ACTUALLY READS</text>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#3A56C5" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">deflated Sharpe ratio</text>
+  <line x1="204.4" y1="32" x2="220.4" y2="32" stroke="#D64B2A" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="226.4" y="36" font-size="11" fill="#4A5A68">probability of backtest overfitting</text>
+  <line x1="64" y1="236" x2="690" y2="236" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="240" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.00</text>
+  <line x1="64" y1="200" x2="690" y2="200" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="204" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.25</text>
+  <line x1="64" y1="164" x2="690" y2="164" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="168" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.50</text>
+  <line x1="64" y1="128" x2="690" y2="128" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="132" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.75</text>
+  <line x1="64" y1="92" x2="690" y2="92" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="96" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">1.00</text>
+  <line x1="64" y1="56" x2="690" y2="56" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="60" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">1.25</text>
+  <line x1="64" y1="236" x2="690" y2="236" stroke="#C9CFC6" stroke-width="1"/>
+  <path d="M195.5,236 V96 Q195.5,92 199.5,92 H215.5 Q219.5,92 219.5,96 V236 Z" fill="#3A56C5"><title>Momentum pilot · deflated Sharpe ratio: 1.00</title></path>
+  <text x="207.5" y="86" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">1.00</text>
+  <path d="M221.5,236 V236 Q221.5,236 221.5,236 H245.5 Q245.5,236 245.5,236 V236 Z" fill="#D64B2A"><title>Momentum pilot · probability of backtest overfitting: 0.00</title></path>
+  <text x="233.5" y="230" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.00</text>
+  <text x="220.5" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">Momentum pilot</text>
+  <path d="M508.5,236 V182.3 Q508.5,178.3 512.5,178.3 H528.5 Q532.5,178.3 532.5,182.3 V236 Z" fill="#3A56C5"><title>Noise null · deflated Sharpe ratio: 0.40</title></path>
+  <text x="520.5" y="172.3" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.40</text>
+  <path d="M534.5,236 V205 Q534.5,201 538.5,201 H554.5 Q558.5,201 558.5,205 V236 Z" fill="#D64B2A"><title>Noise null · probability of backtest overfitting: 0.24</title></path>
+  <text x="546.5" y="195" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.24</text>
+  <text x="533.5" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">Noise null</text>
+</svg>
+<!-- /chart:dsr_pbo -->
+<figcaption>fig 6.8.6 — the two probability-scale numbers the kill criterion actually reads, both projects</figcaption>
+</figure>
+
+<p>Notice what noise null's row shows: its holdout Sharpe ratio of <span data-lab="proj_noise_holdout_sharpe" data-fmt=".2f">0.05</span> is barely positive — a naive rater who only checked the holdout might have shipped it. DSR does not agree: at <span data-lab="proj_noise_dsr" data-fmt=".2f">0.40</span>, it is nowhere near the <span data-lab="dsr_bar" data-fmt=".2f">0.95</span> bar, because it correctly prices in that this was the best of <span data-lab="proj_noise_n_trials" data-fmt=".0f">45</span> attempts, not the only one made. This is exactly why the kill criterion is a conjunction of three gates rather than a vote: a single flattering signal — even a real one, like a positive holdout — never overrides the other two.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 200" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">SAME SWEEP, TWO WAYS OF READING IT</text>
+  <rect x="26" y="32" width="326" height="156" rx="9" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="189" y="54" font-size="11" font-weight="700" text-anchor="middle" fill="#D64B2A">THE NAIVE READING</text>
+  <rect x="46" y="66" width="286" height="24" rx="5" fill="#fff" stroke="#F2CDBF"/>
+  <text x="58" y="82" font-size="9.5" fill="#1F2C38">"the best cell in the grid" → report it</text>
+  <rect x="46" y="96" width="286" height="24" rx="5" fill="#fff" stroke="#F2CDBF"/>
+  <text x="58" y="112" font-size="9.5" fill="#1F2C38">a nice holdout number → ship it</text>
+  <text x="189" y="140" font-size="9.5" text-anchor="middle" fill="#D64B2A" font-weight="600">Believes the winner, not the log.</text>
+  <text x="189" y="158" font-size="9" text-anchor="middle" fill="#4A5A68">A 45-way sweep on pure noise can pass this test.</text>
+  <rect x="368" y="32" width="326" height="156" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="531" y="54" font-size="11" font-weight="700" text-anchor="middle" fill="#1F7A55">THE DISCIPLINED READING</text>
+  <rect x="388" y="66" width="286" height="24" rx="5" fill="#fff" stroke="#BFE0CF"/>
+  <text x="400" y="82" font-size="9.5" fill="#1F2C38">1 · score the WHOLE log with PBO and DSR</text>
+  <rect x="388" y="96" width="286" height="24" rx="5" fill="#fff" stroke="#BFE0CF"/>
+  <text x="400" y="112" font-size="9.5" fill="#1F2C38">2 · require every pre-registered gate</text>
+  <text x="531" y="140" font-size="9.5" text-anchor="middle" fill="#1F7A55" font-weight="600">Believes the rule, not the winner.</text>
+  <text x="531" y="158" font-size="9" text-anchor="middle" fill="#4A5A68">A real edge with enough data still clears it.</text>
+</svg>
+<figcaption>fig 6.8.7 — reading a sweep by its best cell versus reading it through the pre-registered gates</figcaption>
+</figure>
+
+<div class="co key"><span class="co-t">📌 Key idea — PBO and DSR are read off the same log, not a separate analysis</span>
+<p>Nothing about scoring the sweep needs information the trial log doesn't already have: PBO's <span class="xref soon" data-xref="6.6" data-auto="" title="Coming soon">Session 6.6 — Validation: Walk-Forward, Purged K-Fold &amp; CPCV</span>-adjacent block splits and DSR's trial count both come out of the identical rows §6.8.3 logged. Scoring honestly is a query, not a new experiment.</p>
+</div>
+</section>
+
+<section id="s6">
+<h2><span class="no">6.8.6</span> The go/no-go memo</h2>
+<p class="lede">A go/no-go memo is the pre-registration, the trial-log summary and the decision, assembled without adding anything after the fact.</p>
+
+<p>The <strong>go/no-go memo</strong> is this session's last artefact: one document, filed whether the answer is go or kill, that a reader who wasn't in the room can audit line by line — every field traces back to either the pre-registration or the trial log, never to a fresh judgement made once the numbers were in. It is a commit message, not a hallway conversation: a hallway "yeah, this one looked good, let's run it" carries no trial count, no bar, no holdout figure, and disappears the moment everyone involved changes teams. A memo survives that. Momentum pilot's memo, filled in from this run:</p>
+
+<table>
+<thead><tr><th>Field</th><th>Value</th></tr></thead>
+<tbody>
+<tr><td>Hypothesis</td><td>positive short-lag autocorrelation, harvestable by a crossover</td></tr>
+<tr><td>Trials logged</td><td><span data-lab="proj_momentum_n_trials" data-fmt=".0f">45</span> of <span data-lab="variants_allowed" data-fmt=".0f">45</span> pre-registered</td></tr>
+<tr><td>Winning variant</td><td>fast=<span data-lab="proj_momentum_fast" data-fmt=".0f">5</span>, slow=<span data-lab="proj_momentum_slow" data-fmt=".0f">8</span></td></tr>
+<tr><td>Best in-sample Sharpe</td><td><span data-lab="proj_momentum_best_is_sharpe" data-fmt=".2f">1.63</span></td></tr>
+<tr><td>DSR / bar</td><td><span data-lab="proj_momentum_dsr" data-fmt=".2f">1.00</span> / <span data-lab="dsr_bar" data-fmt=".2f">0.95</span></td></tr>
+<tr><td>PBO / bar</td><td><span data-lab="proj_momentum_pbo" data-fmt=".2f">0.00</span> / <span data-lab="pbo_bar" data-fmt=".2f">0.50</span></td></tr>
+<tr><td>Holdout Sharpe (touched once)</td><td><span data-lab="proj_momentum_holdout_sharpe" data-fmt=".2f">1.63</span></td></tr>
+<tr><td><strong>Decision</strong></td><td><strong>GO</strong> — all three pre-registered gates passed</td></tr>
+<tr><td>Next step</td><td>move to <a class="term" href="../unit01-quant-landscape/session03-research-lifecycle.html#g-paper-trading" data-term="paper trading">paper trading</a> at pre-agreed size; capacity and full costs are <span class="xref soon" data-xref="6.5" data-auto="" title="Coming soon">Session 6.5 — Transaction Costs &amp; Capacity</span>'s job before any real capital follows</td></tr>
+</tbody>
+</table>
+
+<p>Noise null goes through the identical template and comes out the other way: <span data-lab="proj_noise_n_trials" data-fmt=".0f">45</span> trials logged, winning variant fast=<span data-lab="proj_noise_fast" data-fmt=".0f">130</span>/slow=<span data-lab="proj_noise_slow" data-fmt=".0f">180</span>, DSR <span data-lab="proj_noise_dsr" data-fmt=".2f">0.40</span> against a <span data-lab="dsr_bar" data-fmt=".2f">0.95</span> bar — <strong>NO-GO</strong>. The memo still gets filed and archived, not deleted: it is the record that stops anyone re-running the identical idea next quarter with a new seed, hoping for a kinder verdict, which is <span class="xref soon" data-xref="6.4" data-auto="" title="Coming soon">Session 6.4 — The Bias Hall of Fame</span>'s data-snooping pitfall arriving one calendar quarter at a time instead of one seed at a time.</p>
+
+<div class="co tip"><span class="co-t">💡 Looking ahead</span>
+<p>A go is not a finish line. Once live, the same strategy is protected by an operational <span class="term soon" data-term="kill switch" title="Defined in Session 15.4 (coming soon)">kill switch</span> (<span class="xref soon" data-xref="15.4" data-auto="" title="Coming soon">Session 15.4 — Pre-Trade Risk &amp; Kill Switches</span> — a different, faster circuit-breaker than this session's statistical kill criterion) and is retired by the same kind of pre-committed discipline in <span class="xref soon" data-xref="9.9" data-auto="" title="Coming soon">Session 9.9 — Performance, Attribution &amp; When to Switch Off</span>, which owns <span class="term soon" data-term="strategy retirement" title="Defined in Session 9.9 (coming soon)">strategy retirement</span> in full.</p>
+</div>
+</section>
+
+<section id="s7">
+<h2><span class="no">6.8.7</span> Try it</h2>
+<p class="lede">Move the goalposts and watch both projects' verdicts respond — the whole point of a mechanical rule is that it responds the same way regardless of which project you're rooting for.</p>
+
+<div class="co lab"><span class="co-t">🔧 Try it (15 min, in the lab)</span>
+<p>Open <code>labs/u06/<wbr>s08_lab_research_protocol.py</code>. In §2, loosen the kill criterion to <code>DSR_BAR = 0.80</code> and re-run the Monte Carlo calibration in the same cell — watch <code>cal_null_go_rate</code> climb well above its current <span data-lab="cal_null_go_rate" data-fmt=".1%">0.2%</span>. Then, in §3, raise <code>PHI_MOMENTUM</code> to <code>0.10</code> (a much smaller, more realistic edge) and re-run §3–§6: does the 20-year sweep still say GO? If not, try doubling <code>T_IS_YEARS</code> instead of the edge size. Either change should still run in well under three minutes and every assert should still pass — if one fails, that failure is the lesson: you have just found the boundary of what this much data can honestly prove.</p>
+</div>
+</section>
+
+<hr>
+
+<section id="s8">
+<h2><span class="no">6.8.8</span> Glossary · Check yourself · Go deeper</h2>
+<div class="gloss" id="glossary">
+<div id="g-trial-log"><b>Trial log</b> — a durable, queryable record of every attempt in a sweep: its parameters, its metrics and enough provenance to reproduce it, kept so nobody has to reconstruct "what did we try" from memory.</div>
+<div id="g-parameter-sweep"><b>Parameter sweep</b> — running one strategy specification across every combination in a fixed grid of its settings, mechanically, without re-fitting the grid itself partway through.</div>
+<div id="g-experiment-tracking"><b>Experiment tracking</b> — the practice (here, via MLflow) of logging every trial's parameters, metrics and provenance automatically, so the trial log is a byproduct of running the sweep, not a separate chore.</div>
+<div id="g-go-no-go-memo"><b>Go/no-go memo</b> — a one-document decision record, filed whether the answer is go or kill, whose every field traces back to the pre-registration or the trial log rather than a post-hoc judgement call.</div>
+</div>
+
+<h3>Check yourself</h3>
+<details class="q"><summary>1. Your sweep's best in-sample Sharpe ratio is 1.6 and the holdout Sharpe ratio is also a strong 1.6 — surely that is a real edge? Then you notice the whole sweep only used 2 years of history. Should you trust it?</summary><div>Not on that basis alone. §6.8.2's own calibration shows that even a genuine annualised Sharpe ratio of 0.9 clears the pre-registered bar only a minority of the time with just a few years of data and 45 trials in the grid — a good-looking holdout number from a short history is exactly the kind of point-luck the DSR gate exists to catch, not a substitute for it.</div></details>
+<details class="q"><summary>2. A colleague wants to add a 46th (fast, slow) pair to the grid after seeing which of the original 45 looked best. What's wrong with that, specifically?</summary><div>It silently changes N, the trial count DSR deflates by, without changing what the trial log says N is — unless the new trial is logged too, the log now undercounts how many things were actually tried. It is 6.4's data-snooping pitfall, just arriving one grid cell at a time instead of one random seed at a time.</div></details>
+<details class="q"><summary>3. Six months from now, a teammate asks exactly how many parameter combinations this project tried. What does the protocol answer with, and why does the precise number matter?</summary><div>The row count of <code>mlflow.search_runs(...)</code> for that project's experiment — an exact count, not a recollection of "a bunch." DSR's expected-best-of-N correction is a direct function of that count, so an approximate answer produces a wrong deflation, not just an imprecise one.</div></details>
+<details class="q"><summary>4. Noise null's winning variant showed a holdout Sharpe ratio of 0.05 — technically positive. Why did the memo still say NO-GO?</summary><div>Because the kill criterion is a conjunction of three gates, and DSR (0.40, against a 0.95 bar) failed on its own: a single positive signal, even a real one, never overrides a statistic that has already priced in how many variants were tried. One weakly favourable number out of three required is still a kill.</div></details>
+<details class="q"><summary>5. Why does the noise null memo get filed and kept, rather than just deleted since the idea failed?</summary><div>A kept NO-GO memo is the record that stops the same idea being re-run next quarter with a new random seed in the hope of a kinder verdict — the research-protocol equivalent of refusing to seed-hunt. Deleting it would let exactly that happen invisibly.</div></details>
+
+<div class="co lab"><span class="co-t">🔧 Homework (~1 h before Session 7.1)</span>
+<p>1. In the lab, swap the crossover rule for a different signal of your choosing (for example, a single-lag sign rule) and re-run §3–§6 on the existing momentum and noise panels — confirm the trial log, PBO and DSR all still make sense for the new grid.<br>
+2. Read <span class="xref soon" data-xref="6.7" data-auto="" title="Coming soon">Session 6.7 — Overfitting Statistics: PSR, DSR, MinTRL &amp; PBO</span> in full if you haven't already; this lab assumes its PSR/DSR/PBO derivations rather than repeating them.<br>
+3. Write a one-paragraph pre-registration, in the style of §6.8.2's table, for one real idea you want to test later in this course — you will not run it yet, but Unit 7 assumes you have one on file.</p>
+</div>
+
+<h3>📚 Go deeper</h3>
+<ol class="refs">
+<li>Bailey, D. H. &amp; Lopez de Prado, M. (2014). "The Deflated Sharpe Ratio: Correcting for Selection Bias, Backtest Overfitting, and Non-Normality." <em>The Journal of Portfolio Management</em> 40(5), 94–107. <span class="rid">doi:10.3905/jpm.2014.40.5.094</span></li>
+<li>Bailey, D. H., Borwein, J. M., López de Prado, M. &amp; Zhu, Q. J. (2016). "The Probability of Backtest Overfitting." <em>Journal of Computational Finance</em> 20(4), 39–69. <span class="rid">doi:10.21314/JCF.2016.322</span></li>
+<li>Lopez de Prado, M. (2018). <em>Advances in Financial Machine Learning</em>. Wiley. <span class="rid">ISBN 978-1119482086</span></li>
+</ol>
+
+<h3>Sources for the numbers</h3>
+<ol class="refs">
+<li>MLflow documentation, "Tracking" (2026). <span class="rid">https://mlflow.org/docs/latest/ml/tracking/</span></li>
+<li>VectorBT documentation, "Parameters" and <code>MA.run_combs</code> reference (2026). <span class="rid">https://vectorbt.dev/</span></li>
+<li>Harvey, C. R. &amp; Liu, Y. (2015). "Backtesting." <em>The Journal of Portfolio Management</em> 42(1), 13–28. <span class="rid">doi:10.3905/jpm.2015.42.1.013</span></li>
+</ol>
+</section>
+
+<!-- nav:foot -->
+<div class="foot">
+<span class="soon" title="Coming soon">← Prev: 6.7 · Overfitting Stats</span>
+<span class="soon" title="Coming soon">Next: 7.1 · Efficient Markets →</span>
+</div>
+<p class="legal">Educational material only — not investment, legal or tax advice. Backtests and simulations are hypothetical. <a href="../start-here.html#disclaimer">Disclaimer</a> · Text CC BY 4.0 · Code MIT.</p>
+<!-- /nav:foot -->
+</main>
+</div></body></html>

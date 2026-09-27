@@ -1,0 +1,37 @@
+<svg viewBox="0 0 720 260" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Net Sharpe ratio by assumed capital — same strategy, more money behind it">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">NET SHARPE RATIO BY ASSUMED CAPITAL — SAME STRATEGY, MORE MONEY BEHIND IT</text>
+  <line x1="64" y1="216" x2="690" y2="216" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="220" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">−1.00</text>
+  <line x1="64" y1="181.6" x2="690" y2="181.6" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="185.6" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">−0.50</text>
+  <line x1="64" y1="147.2" x2="690" y2="147.2" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="151.2" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.00</text>
+  <line x1="64" y1="112.8" x2="690" y2="112.8" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="116.8" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.50</text>
+  <line x1="64" y1="78.4" x2="690" y2="78.4" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="82.4" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">1.00</text>
+  <line x1="64" y1="44" x2="690" y2="44" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="48" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">1.50</text>
+  <line x1="64" y1="147.2" x2="690" y2="147.2" stroke="#C9CFC6" stroke-width="1"/>
+  <path d="M96.7,147.2 V88.4 Q96.7,84.4 100.7,84.4 H116.7 Q120.7,84.4 120.7,88.4 V147.2 Z" fill="#3A56C5"><title>$100m: 0.91</title></path>
+  <text x="108.7" y="77.4" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.91</text>
+  <text x="108.7" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">$100m</text>
+  <path d="M186.1,147.2 V92.4 Q186.1,88.4 190.1,88.4 H206.1 Q210.1,88.4 210.1,92.4 V147.2 Z" fill="#3A56C5"><title>$300m: 0.86</title></path>
+  <text x="198.1" y="81.4" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.86</text>
+  <text x="198.1" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">$300m</text>
+  <path d="M275.6,147.2 V100.2 Q275.6,96.2 279.6,96.2 H295.6 Q299.6,96.2 299.6,100.2 V147.2 Z" fill="#3A56C5"><title>$1bn: 0.74</title></path>
+  <text x="287.6" y="89.2" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.74</text>
+  <text x="287.6" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">$1bn</text>
+  <path d="M365,147.2 V112.8 Q365,108.8 369,108.8 H385 Q389,108.8 389,112.8 V147.2 Z" fill="#3A56C5"><title>$3bn: 0.56</title></path>
+  <text x="377" y="101.8" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.56</text>
+  <text x="377" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">$3bn</text>
+  <path d="M454.4,147.2 V137.6 Q454.4,133.6 458.4,133.6 H474.4 Q478.4,133.6 478.4,137.6 V147.2 Z" fill="#3A56C5"><title>$10bn: 0.20</title></path>
+  <text x="466.4" y="126.6" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.20</text>
+  <text x="466.4" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">$10bn</text>
+  <path d="M543.9,147.2 V152.2 Q543.9,156.2 547.9,156.2 H563.9 Q567.9,156.2 567.9,152.2 V147.2 Z" fill="#D64B2A"><title>$20bn: −0.13</title></path>
+  <text x="555.9" y="171.2" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">−0.13</text>
+  <text x="555.9" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">$20bn</text>
+  <path d="M633.3,147.2 V169.6 Q633.3,173.6 637.3,173.6 H653.3 Q657.3,173.6 657.3,169.6 V147.2 Z" fill="#D64B2A"><title>$30bn: −0.38</title></path>
+  <text x="645.3" y="188.6" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">−0.38</text>
+  <text x="645.3" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">$30bn</text>
+</svg>

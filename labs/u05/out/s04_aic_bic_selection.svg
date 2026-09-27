@@ -1,0 +1,45 @@
+<svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="How often AIC and BIC pick each candidate order (true order: ARMA(1,1))">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">HOW OFTEN AIC AND BIC PICK EACH CANDIDATE ORDER (TRUE ORDER: ARMA(1,1))</text>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#E8850C" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">AIC picks</text>
+  <line x1="127.6" y1="32" x2="143.6" y2="32" stroke="#3F8E5A" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="149.6" y="36" font-size="11" fill="#4A5A68">BIC picks</text>
+  <line x1="64" y1="256" x2="690" y2="256" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="260" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0%</text>
+  <line x1="64" y1="216" x2="690" y2="216" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="220" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">20%</text>
+  <line x1="64" y1="176" x2="690" y2="176" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="180" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">40%</text>
+  <line x1="64" y1="136" x2="690" y2="136" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="140" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">60%</text>
+  <line x1="64" y1="96" x2="690" y2="96" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="100" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">80%</text>
+  <line x1="64" y1="56" x2="690" y2="56" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="60" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">100%</text>
+  <line x1="64" y1="256" x2="690" y2="256" stroke="#C9CFC6" stroke-width="1"/>
+  <path d="M101.6,256 V251 Q101.6,247 105.6,247 H121.6 Q125.6,247 125.6,251 V256 Z" fill="#E8850C"><title>MA(1) · AIC picks: 4%</title></path>
+  <text x="113.6" y="241" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">4%</text>
+  <path d="M127.6,256 V251 Q127.6,247 131.6,247 H147.6 Q151.6,247 151.6,251 V256 Z" fill="#3F8E5A"><title>MA(1) · BIC picks: 4%</title></path>
+  <text x="139.6" y="241" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">4%</text>
+  <text x="126.6" y="274" font-size="11" text-anchor="middle" fill="#4A5A68">MA(1)</text>
+  <path d="M226.8,256 V189 Q226.8,185 230.8,185 H246.8 Q250.8,185 250.8,189 V256 Z" fill="#E8850C"><title>AR(1) · AIC picks: 36%</title></path>
+  <text x="238.8" y="179" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">36%</text>
+  <path d="M252.8,256 V112 Q252.8,108 256.8,108 H272.8 Q276.8,108 276.8,112 V256 Z" fill="#3F8E5A"><title>AR(1) · BIC picks: 74%</title></path>
+  <text x="264.8" y="102" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">74%</text>
+  <text x="251.8" y="274" font-size="11" text-anchor="middle" fill="#4A5A68">AR(1)</text>
+  <path d="M352,256 V170 Q352,166 356,166 H372 Q376,166 376,170 V256 Z" fill="#E8850C"><title>ARMA(1,1) true · AIC picks: 45%</title></path>
+  <text x="364" y="160" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">45%</text>
+  <path d="M378,256 V219 Q378,215 382,215 H398 Q402,215 402,219 V256 Z" fill="#3F8E5A"><title>ARMA(1,1) true · BIC picks: 20%</title></path>
+  <text x="390" y="209" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">20%</text>
+  <text x="377" y="274" font-size="11" text-anchor="middle" fill="#4A5A68">ARMA(1,1) true</text>
+  <path d="M477.2,256 V249 Q477.2,245 481.2,245 H497.2 Q501.2,245 501.2,249 V256 Z" fill="#E8850C"><title>ARMA(2,1) · AIC picks: 6%</title></path>
+  <text x="489.2" y="239" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">6%</text>
+  <path d="M503.2,256 V256 Q503.2,256 503.2,256 H527.2 Q527.2,256 527.2,256 V256 Z" fill="#3F8E5A"><title>ARMA(2,1) · BIC picks: 0%</title></path>
+  <text x="515.2" y="250" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0%</text>
+  <text x="502.2" y="274" font-size="11" text-anchor="middle" fill="#4A5A68">ARMA(2,1)</text>
+  <path d="M602.4,256 V241 Q602.4,237 606.4,237 H622.4 Q626.4,237 626.4,241 V256 Z" fill="#E8850C"><title>ARMA(1,2) · AIC picks: 10%</title></path>
+  <text x="614.4" y="231" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">10%</text>
+  <path d="M628.4,256 V255 Q628.4,254 629.4,254 H651.4 Q652.4,254 652.4,255 V256 Z" fill="#3F8E5A"><title>ARMA(1,2) · BIC picks: 1%</title></path>
+  <text x="640.4" y="248" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">1%</text>
+  <text x="627.4" y="274" font-size="11" text-anchor="middle" fill="#4A5A68">ARMA(1,2)</text>
+</svg>

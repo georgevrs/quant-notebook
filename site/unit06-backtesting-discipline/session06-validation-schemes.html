@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- nav:head -->
+<title>6.6 · Validation: Walk-Forward, Purged K-Fold &amp; CPCV</title>
+<meta name="description" content="Walk-forward analysis, purging and embargo, and combinatorial purged cross-validation — train/test splits that respect time.">
+<link rel="canonical" href="https://georgevrs.github.io/quant-notebook/unit06-backtesting-discipline/session06-validation-schemes.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Quant Notebook">
+<meta property="og:title" content="6.6 · Validation: Walk-Forward, Purged K-Fold &amp; CPCV">
+<meta property="og:description" content="Walk-forward analysis, purging and embargo, and combinatorial purged cross-validation — train/test splits that respect time.">
+<meta property="og:url" content="https://georgevrs.github.io/quant-notebook/unit06-backtesting-discipline/session06-validation-schemes.html">
+<meta name="twitter:card" content="summary">
+<link rel="stylesheet" href="../assets/brand.css">
+<link rel="stylesheet" href="../assets/temml.css">
+<!-- /nav:head -->
+</head>
+<body><div class="page" id="top">
+<!-- nav:tabs -->
+<nav class="tabs">
+<a href="../index.html">⌂ Course home</a>
+<span class="soon" title="Coming soon">6.1 · What a Backtest Is</span>
+<span class="soon" title="Coming soon">6.2 · Vectorized Backtest</span>
+<span class="soon" title="Coming soon">6.3 · Event-Driven</span>
+<span class="soon" title="Coming soon">6.4 · Bias Hall of Fame</span>
+<span class="soon" title="Coming soon">6.5 · Costs &amp; Capacity</span>
+<a class="active" href="session06-validation-schemes.html">6.6 · Validation</a>
+<span class="soon" title="Coming soon">6.7 · Overfitting Stats</span>
+<span class="soon" title="Coming soon">6.8 · Lab: Protocol</span>
+<a href="../roadmap.html">🗺 Roadmap</a>
+</nav>
+<!-- /nav:tabs -->
+
+<header class="cover">
+<!-- nav:heading -->
+<p class="eyebrow">Unit 6 · Backtesting &amp; Research Discipline — Session 06 of 08</p>
+<h1>Validation: Walk-Forward, Purged K-Fold &amp; CPCV</h1>
+<!-- /nav:heading -->
+<p class="subtitle">A backtest's cross-validation score is only honest if the way you split the data respects time. Shuffle a labeled panel the way you would shuffle photographs of cats and dogs, and overlapping, serially correlated financial labels leak the future into the past — quietly, without an error, without a warning. <mark>The core move: never let a training observation share information with a test observation, and prove it with a number, not a hunch.</mark></p>
+<div class="meta">
+<span>DURATION <b>1.5 h + lab</b></span>
+<span>LEVEL <b>Intermediate</b></span>
+<span>TRACKS <b>QR · QT · QD · IND</b></span>
+<span>HANDS-ON <b>Build a purged k-fold splitter and catch a k-fold lying by 1.8 points of accuracy</b></span>
+</div>
+<!-- nav:labstrip -->
+<div class="labstrip"><b>📓 Companion lab</b>
+<a href="https://colab.research.google.com/github/georgevrs/quant-notebook/blob/main/labs/u06/s06_validation_schemes.ipynb">Open in Colab</a>
+<a href="https://github.com/georgevrs/quant-notebook/blob/main/labs/u06/s06_validation_schemes.ipynb">Notebook on GitHub</a>
+<a href="https://github.com/georgevrs/quant-notebook/blob/main/labs/u06/s06_validation_schemes.py">Source (.py)</a>
+</div>
+<!-- /nav:labstrip -->
+<div class="toc">
+<b>On this page</b>
+<ol>
+<li><a href="#s1">Why standard cross-validation lies to you</a></li>
+<li><a href="#s2">Walk-forward analysis</a></li>
+<li><a href="#s3">Purging and embargo, precisely</a></li>
+<li><a href="#s4">The overlapping-label leak, in code</a></li>
+<li><a href="#s5">Combinatorial purged cross-validation</a></li>
+<li><a href="#s6">Choosing a scheme — and where people go wrong</a></li>
+<li><a href="#s7">Try it</a></li>
+<li><a href="#s8">Glossary · Check yourself · Go deeper</a></li>
+</ol>
+</div>
+</header>
+
+<main>
+
+<section id="s1">
+<h2><span class="no">6.6.1</span> Why standard cross-validation lies to you</h2>
+<p class="lede">Ordinary k-fold cross-validation assumes every observation is independent of every other. Financial data almost never is, and the gap between the assumption and the reality is where a backtest's most convincing, least detectable lies live.</p>
+
+<p>You already know the shape of the problem from <span class="xref soon" data-xref="6.1" data-auto="" title="Coming soon">Session 6.1 — What a Backtest Is (and Isn&#x27;t)</span> and <span class="xref soon" data-xref="6.4" data-auto="" title="Coming soon">Session 6.4 — The Bias Hall of Fame</span>: a <span class="term soon" data-term="historical simulation" title="Defined in Session 6.1 (coming soon)">historical simulation</span> can look excellent and still say nothing about live performance, because it quietly used information it would not have had in real time. Cross-validation is supposed to be the ML-flavoured defence against that: hold out a slice of data the model never trained on, and score it there. In a vision or NLP dataset, shuffling observations into folds is harmless, because one labeled photo of a cat tells you nothing about the label of a different, unrelated photo. Three properties of financial data break that assumption, and all three get worse the more realistic your labels become.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 224" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">THREE WAYS FINANCIAL DATA BREAKS THE IID ASSUMPTION</text>
+  <rect x="26" y="34" width="205" height="150" rx="9" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="128" y="60" font-size="12" font-weight="700" text-anchor="middle" fill="#D64B2A">OVERLAPPING LABELS</text>
+  <text x="128" y="90" font-size="9.5" text-anchor="middle" fill="#4A5A68">a label built from returns</text>
+  <text x="128" y="104" font-size="9.5" text-anchor="middle" fill="#4A5A68">H days into the future</text>
+  <text x="128" y="128" font-size="9.5" text-anchor="middle" fill="#4A5A68">shares those returns with</text>
+  <text x="128" y="142" font-size="9.5" text-anchor="middle" fill="#4A5A68">every label within H days</text>
+  <text x="128" y="164" font-size="9.5" text-anchor="middle" fill="#D64B2A" font-weight="600">§6.6.4</text>
+  <rect x="257" y="34" width="205" height="150" rx="9" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="359" y="60" font-size="12" font-weight="700" text-anchor="middle" fill="#D64B2A">SERIAL CORRELATION</text>
+  <text x="359" y="90" font-size="9.5" text-anchor="middle" fill="#4A5A68">features built from trailing</text>
+  <text x="359" y="104" font-size="9.5" text-anchor="middle" fill="#4A5A68">windows change slowly —</text>
+  <text x="359" y="128" font-size="9.5" text-anchor="middle" fill="#4A5A68">a point's nearest neighbour</text>
+  <text x="359" y="142" font-size="9.5" text-anchor="middle" fill="#4A5A68">in feature space is usually</text>
+  <text x="359" y="164" font-size="9.5" text-anchor="middle" fill="#D64B2A" font-weight="600">its neighbour in TIME</text>
+  <rect x="488" y="34" width="205" height="150" rx="9" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="590" y="60" font-size="12" font-weight="700" text-anchor="middle" fill="#D64B2A">SMALL EFFECTIVE N</text>
+  <text x="590" y="90" font-size="9.5" text-anchor="middle" fill="#4A5A68">markets share one</text>
+  <text x="590" y="104" font-size="9.5" text-anchor="middle" fill="#4A5A68">macro history, so a</text>
+  <text x="590" y="128" font-size="9.5" text-anchor="middle" fill="#4A5A68">decade of daily bars is a</text>
+  <text x="590" y="142" font-size="9.5" text-anchor="middle" fill="#4A5A68">handful of independent</text>
+  <text x="590" y="164" font-size="9.5" text-anchor="middle" fill="#D64B2A" font-weight="600">regimes, not 2,500 draws</text>
+  <text x="360" y="206" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">Any one of the three is enough to make a shuffled fold leak; finance usually has all three at once.</text>
+</svg>
+<figcaption>fig 6.6.1 — the three properties of financial data that a plain k-fold split assumes away</figcaption>
+</figure>
+
+<p>This session gives you the toolkit that survives all three. <strong>Walk-forward analysis</strong> is the oldest and simplest: never validate on anything that isn't strictly later in time than everything you trained on, and re-fit as you go. <strong>Purging</strong> and <strong>embargo</strong> are the surgical fix for a labeled, panel-style dataset: cut out exactly the training observations that share information with the test fold, and a little more besides. <strong>Purged k-fold cross-validation</strong> combines the two into a drop-in replacement for ordinary k-fold. <strong>Combinatorial purged cross-validation</strong> (CPCV) then reuses the same idea to generate many honest backtest paths instead of one. All four exist because of the same failure mode: <a class="term" href="#g-leakage" data-term="leakage">leakage</a>, information from the test set reaching the training set by any route at all — a shared label window, a slowly moving feature, or a careless shuffle.</p>
+
+<div class="co key"><span class="co-t">📌 Key idea — the question every scheme in this session answers</span>
+<p>"Does any training observation know something about the test observation that live trading would not have known yet?" If the answer is yes, your validation score is not an estimate of live performance — it is an estimate of how well your model memorises the past. Every method below is a different way of forcing the answer to be no.</p>
+</div>
+
+<p>Recall the engineering analogy this course keeps coming back to: a backtest is a unit test that can pass by luck, and look-ahead is train/test leakage under a different name. This session is that analogy taken literally into the validation harness itself. The stakes are ordinary, not exotic: a leaked cross-validation score doesn't announce itself with a crash or a stack trace, it just reports a Sharpe ratio or an accuracy figure that is a little too good, in the one direction that gets a mediocre idea greenlit for <a class="term" href="../unit01-quant-landscape/session03-research-lifecycle.html#g-paper-trading" data-term="paper trading">paper trading</a> — or, worse, real capital — instead of sent back for more work. Nobody discovers the mistake until the live numbers quietly fail to match the backtest, months later, with real money already committed.</p>
+</section>
+
+<section id="s2">
+<h2><span class="no">6.6.2</span> Walk-forward analysis</h2>
+<p class="lede">The oldest validation discipline in systematic trading is also the simplest to state: decide everything using only data strictly before the moment you are simulating, then move the clock forward and repeat.</p>
+
+<p><strong>Walk-forward analysis</strong> splits the sample into a sequence of train/test pairs that all point the same direction in time. You fit — or re-fit, or re-select a parameter — on a training window, apply the result, untouched, to the very next chunk of data, then roll the whole window forward and repeat. Two variants differ only in what happens to the training window as you roll: an <strong>anchored</strong> (expanding) walk-forward keeps every observation from the start of the sample, so the training window grows each fold; a <strong>rolling</strong> (sliding) walk-forward keeps the window's length fixed and drops the oldest data as it adds the newest, which adapts faster to a changing market at the cost of a shorter effective history each fold.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 210" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">WALK-FORWARD ANALYSIS — roll the clock, never look back</text>
+  <rect x="26" y="36" width="150" height="52" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="101" y="58" font-size="11" text-anchor="middle" fill="#3A56C5" font-weight="600">1 · TRAIN</text>
+  <text x="101" y="76" font-size="9.5" text-anchor="middle" fill="#4A5A68">fit on the past window</text>
+  <rect x="196" y="36" width="150" height="52" rx="9" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="271" y="58" font-size="11" text-anchor="middle" fill="#8A6D00" font-weight="600">2 · TEST</text>
+  <text x="271" y="76" font-size="9.5" text-anchor="middle" fill="#4A5A68">score the next window only</text>
+  <rect x="366" y="36" width="150" height="52" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="441" y="58" font-size="11" text-anchor="middle" fill="#1F7A55" font-weight="600">3 · RECORD</text>
+  <text x="441" y="76" font-size="9.5" text-anchor="middle" fill="#4A5A68">append to the OOS path</text>
+  <rect x="536" y="36" width="158" height="52" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="615" y="58" font-size="11" text-anchor="middle" fill="#3A56C5" font-weight="600">4 · ROLL</text>
+  <text x="615" y="76" font-size="9.5" text-anchor="middle" fill="#4A5A68">advance the window, repeat</text>
+  <path d="M178 62 H194" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M348 62 H364" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M518 62 H534" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M615 90 C 615 118, 101 118, 101 92" stroke="#1F2C38" stroke-width="1.5" fill="none" stroke-dasharray="3 3" marker-end="url(#s2a)"/>
+  <text x="360" y="140" font-size="10.5" text-anchor="middle" fill="#4A5A68">anchored: window 1 keeps growing → → →</text>
+  <rect x="26" y="150" width="80" height="14" fill="#3A56C5"/><rect x="106" y="150" width="80" height="14" fill="#3A56C5"/><rect x="186" y="150" width="80" height="14" fill="#3A56C5"/><rect x="266" y="150" width="60" height="14" fill="#B99B22"/>
+  <text x="360" y="182" font-size="10.5" text-anchor="middle" fill="#4A5A68">rolling: window slides, same length each time → → →</text>
+  <rect x="26" y="192" width="80" height="14" fill="#3A56C5"/><rect x="106" y="192" width="60" height="14" fill="#B99B22"/>
+  <rect x="106" y="150" width="0" height="0"/>
+</svg>
+<figcaption>fig 6.6.2 — walk-forward's four-step loop, and the one difference between its anchored and rolling variants</figcaption>
+</figure>
+
+<p>The lab runs both variants on a synthetic daily return series with a small, genuine, first-order autocorrelation of <span data-lab="wf_phi" data-fmt=".0%">6%</span> — a real but modest momentum edge, the kind you can plausibly find and just as plausibly talk yourself out of trusting. The "strategy" is deliberately simple: pick a lookback window from a small grid and go with the sign of the trailing sum of returns. Picking that window by looking at the whole sample — including the days you are about to "test" on — and reporting the resulting Sharpe ratio is exactly the mistake <span class="xref soon" data-xref="6.1" data-auto="" title="Coming soon">Session 6.1 — What a Backtest Is (and Isn&#x27;t)</span> warns about: it is not <a class="term" href="../unit01-quant-landscape/session03-research-lifecycle.html#g-out-of-sample" data-term="out-of-sample">out-of-sample</a>, no matter how the code is organised. Over <span data-lab="wf_n_days" data-fmt=",.0f">2,016</span> simulated days split into <span data-lab="wf_n_folds" data-fmt=".0f">8</span> walk-forward folds, that whole-sample selection reports an annualised <a class="term" href="../unit02-markets-instruments/session03-returns-pnl-leverage.html#g-sharpe-ratio" data-term="Sharpe ratio">Sharpe ratio</a> of <span data-lab="wf_is_sharpe" data-fmt=".2f">0.54</span> using a lookback of <span data-lab="wf_is_best_L" data-fmt=".0f">80</span> days. Walking forward honestly — choosing the lookback using only the training window, applying it strictly out-of-sample, then rolling — reports <span data-lab="wf_anchored_sharpe" data-fmt=".2f">0.31</span> (anchored) and <span data-lab="wf_rolling_sharpe" data-fmt=".2f">0.44</span> (rolling) on the very same underlying data.</p>
+
+<table>
+<thead><tr><th>Walk-forward variant</th><th>Training window</th><th>Best for</th><th>This lab's OOS Sharpe</th></tr></thead>
+<tbody>
+<tr><td><strong>Anchored</strong> (expanding)</td><td>Grows every fold; never forgets</td><td>Slow-moving relationships, small samples</td><td><span data-lab="wf_anchored_sharpe" data-fmt=".2f">0.31</span></td></tr>
+<tr><td><strong>Rolling</strong> (sliding)</td><td>Fixed length; forgets the oldest data</td><td>Regimes that drift or break</td><td><span data-lab="wf_rolling_sharpe" data-fmt=".2f">0.44</span></td></tr>
+</tbody>
+</table>
+
+<figure class="diagram chart">
+<!-- chart:wf_equity -->
+<svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Growth of $1 over the out-of-sample window: honest vs look-ahead">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">GROWTH OF $1 OVER THE OUT-OF-SAMPLE WINDOW: HONEST VS LOOK-AHEAD</text>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#3A56C5" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">walk-forward (honest)</text>
+  <line x1="204.4" y1="32" x2="220.4" y2="32" stroke="#D64B2A" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="226.4" y="36" font-size="11" fill="#4A5A68">in-sample L (look-ahead)</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="268" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$0.80</text>
+  <line x1="64" y1="221.6" x2="602" y2="221.6" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="225.6" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$1.00</text>
+  <line x1="64" y1="179.2" x2="602" y2="179.2" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="183.2" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$1.20</text>
+  <line x1="64" y1="136.8" x2="602" y2="136.8" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="140.8" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$1.40</text>
+  <line x1="64" y1="94.4" x2="602" y2="94.4" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="98.4" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$1.60</text>
+  <line x1="64" y1="52" x2="602" y2="52" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="56" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$1.80</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#C9CFC6" stroke-width="1"/>
+  <line x1="63.5" y1="264" x2="63.5" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="63.5" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">0</text>
+  <line x1="198.1" y1="264" x2="198.1" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="198.1" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">1</text>
+  <line x1="332.7" y1="264" x2="332.7" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="332.7" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">2</text>
+  <line x1="467.4" y1="264" x2="467.4" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="467.4" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">3</text>
+  <line x1="602" y1="264" x2="602" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="602" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">4</text>
+  <line x1="64" y1="221.6" x2="602" y2="221.6" stroke="#4A5A68" stroke-width="1"/>
+  <polyline points="64,222 65.1,219.8 66.1,218.8 67.2,221.9 68.3,223.1 69.9,227.1 70.9,227.8 72.5,231.9 73.6,235 75.2,232.4 76.3,233.8 77.9,230.7 79,234.2 80.6,235 81.6,232.4 83.2,231.9 84.3,234.4 85.9,242.5 87.5,239.6 88.6,243.9 90.7,242.1 91.2,243.2 92.9,238.7 94.5,237.7 95.5,239.8 96.6,238.1 98.7,243.6 100.3,244.4 101.4,236.6 101.9,237.6 103.5,229.2 105.7,224.6 106.7,221.5 108.3,223.3 109.4,227.8 109.9,229.1 111.5,223.9 113.2,222.4 114.8,229.9 115.8,228.6 116.9,232.8 119,235.8 120.1,236.2 121.7,232.3 122.8,234.7 123.8,229.3 124.9,227.7 127,215 128.1,215.8 129.2,212.9 130.2,214 131.9,209.7 134,219.2 135.1,219.2 135.6,221.6 138.3,224.6 138.8,228.4 139.9,222.5 141.5,220.8 142.5,221.8 144.7,228.1 145.2,229.9 146.8,228.7 148.4,229 149.5,236.4 150.6,235.1 152.2,237.9 153.8,235.4 154.8,241 155.9,241.3 158,236.7 158.6,238.1 160.7,236.5 161.2,231.5 162.8,231.5 165,239.1 165.5,241.2 167.1,236.1 168.7,240 170.3,235.4 170.9,238 172.5,236.9 174.1,236.1 175.7,230.9 176.2,226.3 178.3,216.5 178.9,218.6 180.5,221.8 181.5,216.2 183.1,223.2 184.7,221.3 186.3,217.3 187.4,217.4 188.5,213.3 190.6,214.5 192.2,222.4 193.3,217.6 193.8,217.1 195.4,220.1 196.5,220.7 198.1,217.7 200.2,217.6 200.8,217.5 202.9,213.6 204,213.4 205,211.8 206.1,207.6 207.7,208.1 208.8,198.6 210.4,197.3 211.5,201.8 213.1,203.5 215.2,202.9 216.3,198.5 217.9,202.7 218.9,194.6 220.5,202.4 221.1,202.9 223.2,206.3 223.7,209.2 225.9,208.9 226.9,205.5 227.5,202.8 229.1,206.7 230.7,206.8 231.8,210.3 233.9,215.7 234.4,222.3 236.6,230.2 237.6,229 239.2,233 240.8,229.4 241.4,229.4 243,237.6 244,231.3 245.6,233.1 246.7,231.2 248.3,234.1 249.4,234 251,232.3 252.1,233.3 253.1,235 255.3,231.5 256.3,225.1 257.4,227.3 259.5,228.3 261.1,235.1 262.2,231.6 262.7,229.7 264.3,235.9 266.5,229.1 267,228.9 268.6,227.7 269.7,224.9 270.8,220.7 272.4,224.8 274.5,231.3 275,226.7 277.2,233.1 277.7,230.3 278.8,230.8 280.9,224.4 282.5,221.9 283.6,219 285.2,216.3 286.3,223.1 287.9,221 289.5,213.1 290.5,216.7 291.6,216.2 293.2,220.4 293.7,222.7 295.3,215.3 296.9,214 298.5,217.2 300.1,211.3 301.2,210.4 302.8,216.6 303.3,215.7 305,205.1 306,202.1 307.1,193.6 308.7,190.1 310.8,190.7 312.4,184.4 313.5,176.4 315.1,177.8 316.2,169.8 317.8,175 318.8,180.4 319.9,178.6 321,178.7 322,184.7 323.7,180.7 325.8,177.8 326.3,179.1 327.4,175.8 329,181.5 330.1,179.6 331.7,190.5 333.8,195.7 334.9,195.5 336.5,193.3 338.1,189.1 339.1,193.5 340.2,190.9 341.3,197.1 342.9,201 344,196.4 345.6,194.9 346.6,198.8 348.2,191.3 349.3,200 351.4,202.3 352,197.7 353,198.9 355.2,198.6 356.8,191.7 357.3,189.9 358.9,196.7 360.5,194.6 361.6,196.5 362.7,193.6 364.3,198.4 365.9,195.5 367.5,186.9 368.5,187.3 369.6,192.9 370.7,189.1 372.8,191.6 373.9,184.9 375.5,180.7 376.5,185.3 378.1,185.3 379.7,186.4 380.3,193 382.4,189 384,193 385.1,190.2 385.6,195.5 387.2,191.1 388.3,199.3 390.4,198 392,198.9 393.1,195.3 393.6,195.6 395.2,200 396.8,195.9 398.4,188.3 399.5,186.6 401.1,191.7 402.2,193.1 403.8,182.4 404.9,187.1 407,191.8 408.1,186.3 409.1,194.5 410.2,197.3 411.3,197.8 413.4,193.9 415,185 415.5,184.5 416.6,193.5 418.7,193.6 420.4,199.8 420.9,195.9 422,189.3 423.6,188.1 424.6,190.5 426.2,187.1 428.4,194.8 429.4,191 430.5,184.4 432.6,183.2 433.7,180.1 435.3,180.1 435.8,185.5 436.9,181.3 438.5,183.4 439.6,188.2 441.7,191 443.3,198.4 444.4,193 445.5,196.8 447.1,195.6 448.1,191.5 449.7,197.5 451.3,196.6 451.9,200.6 453.5,202 454.5,199.9 456.1,202.8 458.3,198.6 459.4,192.5 460.4,194.6 461.5,189.5 462.6,195.5 464.2,195.9 465.8,192.7 467.4,195.6 469,193.6 470,197 471.6,197.1 472.7,192.1 473.2,193.5 475.4,189.5 477,197.7 478.1,196.1 478.6,199.5 480.7,202.2 482.3,200.7 483.4,206.1 485,198.5 486.1,194.9 487.1,193.2 488.2,194.9 490.3,187.1 491.9,189.9 492.5,184 494.1,189.8 495.1,190 497.3,182 497.8,181.9 499.4,174.2 501,181.4 501.6,178.2 503.2,182.1 504.8,176.1 505.8,182.5 507.4,178.7 508.5,172.4 510.6,167.2 512.2,179.3 512.8,179.3 513.8,180.1 516,189.6 517.1,186.1 518.1,193.2 520.3,191.4 520.8,196.9 521.9,195.8 523.5,185.4 525.1,180.2 526.1,187.9 527.7,184.1 528.8,184.3 530.4,184.2 531.5,178.5 533.6,186.2 534.7,184 535.8,190.2 537.9,189.7 538.4,193.5 540,198.6 541.1,194.7 542.7,194.8 544.3,190.2 545.9,191.8 547,194.1 548.6,187.6 549.6,187.8 550.7,195.2 552.8,201 553.9,201.5 555.5,193 556.6,196 558.2,196 559.3,191.8 559.8,186.8 561.4,181.3 563.5,185.3 564.1,185.1 565.1,182.1 566.7,171.3 567.8,171.2 569.9,164.3 571,168 572.1,165.4 573.1,168.3 574.8,162.8 576.9,164.2 578.5,172 579.6,174.3 581.2,181.4 582.2,176.2 583.3,179.7 584.4,177.3 585.4,185.3 587.6,184.6 589.2,189.3 589.7,187.5 591.3,184.4 592.4,192 594.5,196.6 595.6,194.2 597.2,198.2 597.7,194 599.9,193.4 600.9,186.1 602,188.4" fill="none" stroke="#3A56C5" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>walk-forward (honest)</title></polyline>
+  <circle cx="602" cy="188.4" r="4" fill="#3A56C5" stroke="#FBFBF8" stroke-width="2"><title>walk-forward (honest): $1.16</title></circle>
+  <polyline points="64,222 65.1,219.8 66.1,218.8 67.7,222.5 69.3,219.4 69.9,221.1 71.5,217.7 73.1,218.3 74.2,211.9 75.2,211.9 76.3,213.4 77.9,214.7 79,212.8 80.6,213.1 81.6,210.2 83.2,209.7 85.4,213.1 85.9,208.1 87.5,204.7 88.6,209.8 90.7,209.4 92.3,205.6 93.4,206.8 94.5,203.2 96.1,207.6 97.1,206.1 98.2,204.8 99.3,210.3 100.9,212.7 102.5,203.1 104.1,198.9 105.7,194.9 106.7,191.5 107.8,192.5 108.9,196.3 109.9,192.5 111.5,198.6 113.7,196.8 115.3,203 115.8,203.2 116.9,198.5 119,204.7 120.1,204.2 121.7,208.7 122.8,206.1 123.8,212.1 126,219 127,211.1 128.1,211.9 129.7,208.4 130.8,212.7 131.9,214.2 132.9,208.6 134.5,213 136.1,214.7 138.3,210.4 138.8,214.5 139.9,208.1 141.5,206.3 143.1,210.5 144.7,206.9 145.7,211.3 146.8,207.4 148.9,212.9 149.5,207.3 150.6,205.8 152.2,209 153.8,211.9 154.8,205.6 155.9,205.8 158,200.5 158.6,202.1 160.7,200.2 161.2,194.2 163.9,199.2 165,195 166.6,203 167.6,203.8 169.2,195.5 170.3,193.8 170.9,196.9 172.5,195.6 174.1,196.7 175.1,204.5 177.3,214.5 178.3,210.4 178.9,212.6 181,216.3 182.1,225.3 183.1,222.8 184.7,220.9 186.3,217 187.4,217.1 188.5,213 190.6,222.4 191.7,218.1 193.3,209.5 194.9,210.3 196,213 196.5,211.6 198.1,214.7 199.7,215.5 200.8,214.6 202.9,210.7 204,210.4 205,208.8 206.1,204.5 207.7,205.1 208.8,195.4 210.4,194.1 211.5,198.7 213.1,197.1 215.2,196.5 216.3,192 217.9,196.4 218.9,188 220,193.8 221.6,193.5 223.2,191 223.7,194 225.9,194.3 226.9,197.9 227.5,200.7 229.1,196.7 231.2,197 231.8,194.4 233.9,197 235,205.2 236.6,195.6 237.6,194.1 238.7,197.9 240.8,203.1 241.9,200 243.5,209.6 244.6,206.9 245.1,208.4 246.7,205.4 247.8,208.8 249.9,207 251,208.2 252.6,206.6 254.2,212.7 255.3,212.6 255.8,217.4 257.9,216.2 259.5,216.8 260.1,212.5 262.2,211.6 263.3,215.1 264.3,212.9 266.5,220.3 267,220.1 268.6,218.9 269.7,216 270.8,211.6 272.9,216.6 274,215.1 275,205.4 276.1,207.7 277.7,215.6 278.8,215 280.9,221.9 282.5,224.4 283.6,227.3 285.2,226.3 286.3,232.9 287.9,230.9 289.5,223.3 290.5,226.7 291.1,228.4 292.7,223 293.7,226 295.3,218.8 296.9,217.4 298,219.6 299.1,219.8 301.2,213.6 302.3,216.8 303.3,212.8 305,202.1 306,199 307.1,190.4 308.7,186.8 310.8,187.5 312.4,181.1 313.5,173 315.1,174.4 316.2,166.3 317.2,171.9 318.3,176 319.4,173.6 321.5,172.9 322.6,177.4 324.2,178.9 324.7,181.7 326.3,181.7 327.4,185 329.5,185.1 331.1,179.9 331.7,185.6 333.3,184.7 334.3,178.7 336.5,177.4 338.1,172.9 339.1,177.6 340.2,180.4 341.8,172 342.9,174.5 344,169.4 345.6,167.7 346.6,172 348.2,180.2 349.3,170.9 351.4,173.5 352,168.3 353,169.6 355.2,169.2 356.8,176.8 357.8,179.5 358.9,176.3 360,179.2 362.1,175.4 363.2,177.1 364.8,170.8 365.9,175.2 367.5,165.8 368.5,166.3 370.1,174.1 370.7,176.4 372.3,176.8 373.9,166.6 375.5,162.1 376.5,167 378.1,167 379.7,161 380.3,168.3 382.4,172.6 383.5,172 385.1,165.2 385.6,171.1 387.2,166.2 388.8,166.3 389.9,169.6 392,170.1 393.1,174.1 393.6,173.8 395.8,168.5 396.8,164.4 398.4,155.7 399.5,153.8 400.6,158.3 402.2,155.5 403.8,167.6 405.4,161.4 405.9,159.8 408.1,171.6 409.1,162.8 410.2,165.9 411.8,163.7 412.9,166.7 415,155.4 415.5,154.8 416.6,164.9 418.7,161.8 419.3,160 420.9,169.2 422,161.9 423.6,160.5 425.2,164.6 426.2,167.1 427.8,161.3 429.4,159.9 430.5,152.3 432.6,151 433.7,147.5 435.3,147.5 436.4,157.5 436.9,158.4 439.1,152.7 440.7,154.7 441.2,151.6 442.8,154.2 444.4,141.4 445.5,146.1 446.5,143.1 448.1,149.6 449.7,142.5 451.3,141.3 451.9,146.4 452.9,148.2 455.6,145.3 456.1,146.3 458.3,151.4 459.4,158.8 460.4,156.4 461.5,162.2 462.6,151.3 464.2,151.8 465.8,147.9 466.8,148.7 469,153.6 470,149.7 471.6,149.8 472.7,143.9 473.2,145.5 474.8,141 476.4,144.5 477.5,137 479.1,141.1 480.2,134.4 482.3,134 483.4,136.3 485,146.1 486.1,150.5 487.1,148.6 488.2,150.6 490.3,141.4 491.9,144.7 492.5,137.7 494.1,144.5 495.1,146.1 497.3,155.4 497.8,155.3 499.4,146.7 501,154.7 501.6,158.3 503.2,154.1 504.8,160.7 505.8,153.8 507.4,149.6 508.5,142.6 510.6,136.8 511.2,143.1 512.8,145.9 514.9,136.5 516,139 517.1,134.8 518.7,142.3 520.3,141.6 521.3,131 521.9,133.6 523.5,120.4 525.1,113.8 526.7,126.5 527.2,125.1 529.9,130 530.9,123.8 532,121.5 533.6,130.7 534.7,133.4 535.8,125.8 537.9,126.2 539,132 540.6,120.8 541.6,119.7 542.2,115.8 544.3,113.3 545.4,115.7 546.4,114 548.6,124 549.6,123.9 550.7,114.3 552.8,122 553.9,121.5 554.5,129 556.1,131.4 558.2,128.3 559.3,123 559.8,116.4 561.4,109.4 563,109.9 564.6,117.9 565.7,123.5 566.7,115.1 567.8,115 569.9,106.7 571,111.2 572.1,114.3 573.1,110.9 574.8,117.5 576.9,107.2 578.5,116.6 579.6,113.8 580.1,108.6 582.2,105.8 583.8,112.6 584.4,113.3 585.4,103.1 587.6,102.2 588.6,104.6 589.7,98.3 591.8,95.1 592.9,105.9 593.5,104.3 595.6,92.8 596.7,95.8 597.7,104.7 599.9,105.4 600.9,115.3 602,112.3" fill="none" stroke="#D64B2A" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>in-sample L (look-ahead)</title></polyline>
+  <circle cx="602" cy="112.3" r="4" fill="#D64B2A" stroke="#FBFBF8" stroke-width="2"><title>in-sample L (look-ahead): $1.52</title></circle>
+  <text x="614" y="116.3" font-size="11" fill="#1F2C38">look-ahead: $1.52</text>
+  <text x="614" y="192.4" font-size="11" fill="#1F2C38">honest: $1.16</text>
+</svg>
+<!-- /chart:wf_equity -->
+<figcaption>fig 6.6.3 — the same out-of-sample window, two ways: honest walk-forward vs. a lookback chosen with hindsight</figcaption>
+</figure>
+
+<p>One path proves nothing by itself — <span class="xref soon" data-xref="6.4" data-auto="" title="Coming soon">Session 6.4 — The Bias Hall of Fame</span> is a whole session on how a single convincing backtest can be luck. So the lab redraws the entire synthetic panel from scratch <span data-lab="wf_mc_n" data-fmt=".0f">60</span> times and checks the gap. Averaged across redraws, whole-sample selection beats anchored walk-forward by <span data-lab="wf_gap_anchored_mean" data-fmt=".2f">0.39</span> Sharpe points (standard error <span data-lab="wf_gap_anchored_se" data-fmt=".3f">0.046</span> — more than 8 standard errors from zero) and beats rolling walk-forward by <span data-lab="wf_gap_rolling_mean" data-fmt=".2f">0.42</span> points (standard error <span data-lab="wf_gap_rolling_se" data-fmt=".3f">0.058</span>). The gap is not a fluke of one seed; it is what happens, reliably, when a parameter is chosen with knowledge of the exact data it will be judged on.</p>
+
+<p>Two practical choices drive every walk-forward setup: how long each test window is, and how the training window behaves as it rolls. A shorter test window rolls forward more often and produces a longer, more informative out-of-sample path, at the cost of re-fitting more often — expensive for a slow model, irrelevant for the sign-of-a-sum rule used here. Anchored windows suit slowly changing relationships and small total samples, because they never throw data away; rolling windows suit markets that drift or break, at the cost of a shorter effective history in every fold. Neither variant is free of judgement calls — window lengths, fold counts and re-fit frequency are themselves choices you could overfit by trying many of them and keeping the one that flatters your backtest, which is precisely the "number of trials" problem <span class="xref soon" data-xref="6.7" data-auto="" title="Coming soon">Session 6.7 — Overfitting Statistics: PSR, DSR, MinTRL &amp; PBO</span> puts a number on. Systematic trading shops that predate modern ML tooling by decades still run walk-forward as their default discipline for exactly this reason: it needs no labeled panel, no purge horizon, nothing but the willingness to never let the model see its own exam paper in advance.</p>
+
+<div class="co tip"><span class="co-t">💡 Looking ahead</span>
+<p>Walk-forward answers "is this one honest?" one path at a time. <span class="xref soon" data-xref="6.7" data-auto="" title="Coming soon">Session 6.7 — Overfitting Statistics: PSR, DSR, MinTRL &amp; PBO</span> answers a harder question — "how much should I discount a Sharpe ratio for the number of parameter combinations I tried before finding this one?" — and needs exactly the walk-forward and CPCV paths this session builds as its raw material.</p>
+</div>
+</section>
+
+<section id="s3">
+<h2><span class="no">6.6.3</span> Purging and embargo, precisely</h2>
+<p class="lede">Walk-forward analysis is a way of splitting a single ordered SEQUENCE. A labeled machine-learning panel needs something more surgical, because its "test set" can sit anywhere in time and its labels reach forward past the test set's own edges.</p>
+
+<p>Suppose a label is built from information over the horizon <math><semantics><mrow><mo fence="true" form="prefix" stretchy="false">[</mo><mi>t</mi><mo>+</mo><mn>1</mn><mo separator="true">,</mo><mi>t</mi><mo>+</mo><mi>H</mi><mo fence="true" form="postfix" stretchy="false">]</mo></mrow><annotation encoding="application/x-tex">[t+1, t+H]</annotation></semantics></math> — a fixed-horizon return, or the triple-barrier label that <span class="xref soon" data-xref="12.2" data-auto="" title="Coming soon">Session 12.2 — Labeling: Triple Barrier &amp; Meta-Labeling</span> builds on this same idea. Two labels at times <math><semantics><mi>i</mi><annotation encoding="application/x-tex">i</annotation></semantics></math> and <math><semantics><mi>j</mi><annotation encoding="application/x-tex">j</annotation></semantics></math> share at least one day of information whenever <math><semantics><mrow><mi>|</mi><mi>i</mi><mo>−</mo><mi>j</mi><mi>|</mi><mo>&lt;</mo><mi>H</mi></mrow><annotation encoding="application/x-tex">|i-j| \lt H</annotation></semantics></math>. <strong>Purging</strong> is the rule that follows directly from that fact: remove from the training set every observation whose horizon overlaps any test observation's horizon, on either side of the test block. <strong>Embargo</strong> is a second, one-directional rule for a subtler leak: even after purging removes every overlapping label, a training observation that starts just after the test block can still have FEATURES — a moving average, a rolling volatility estimate — that were computing over days that fall inside the test window, because features are serially correlated even once labels no longer overlap. Embargo removes a further block of observations immediately after the test set to close that gap. Neither correction runs backward past a test set that has already been embargoed forward from an earlier fold — time only flows one way, so the fix only needs to point one way too.</p>
+
+<p><math><semantics><mi>H</mi><annotation encoding="application/x-tex">H</annotation></semantics></math> is not a free parameter you tune for a better score — it is a fact about how the label was built, and you should be able to point to the line of code that fixes it. A fixed-horizon label with a 20-day lookahead has <math><semantics><mrow><mi>H</mi><mo>=</mo><mn>20</mn></mrow><annotation encoding="application/x-tex">H=20</annotation></semantics></math>; a triple-barrier label's vertical barrier (the maximum holding period before the position is closed regardless of the profit-taking or stop-loss barriers) plays exactly the same role, which is why <span class="xref soon" data-xref="12.2" data-auto="" title="Coming soon">Session 12.2 — Labeling: Triple Barrier &amp; Meta-Labeling</span> inherits this session's purging machinery rather than reinventing it. Embargo, by contrast, is closer to a judgement call: a common default sizes it to a small percentage of the total sample, or to the longest lookback window used anywhere in the feature set, whichever is easier to defend to a reviewer.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 172" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">ONE TEST FOLD, READ LEFT TO RIGHT IN TIME</text>
+  <rect x="26" y="70" width="90" height="40" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="71" y="94" font-size="10" text-anchor="middle" fill="#3A56C5" font-weight="600">TRAIN</text>
+  <rect x="116" y="70" width="90" height="40" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="161" y="88" font-size="9.5" text-anchor="middle" fill="#D64B2A" font-weight="600">PURGE</text>
+  <text x="161" y="101" font-size="8.5" text-anchor="middle" fill="#4A5A68">label overlap</text>
+  <rect x="206" y="70" width="110" height="40" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="261" y="94" font-size="10" text-anchor="middle" fill="#8A6D00" font-weight="600">TEST FOLD</text>
+  <rect x="316" y="70" width="90" height="40" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="361" y="88" font-size="9.5" text-anchor="middle" fill="#D64B2A" font-weight="600">PURGE</text>
+  <text x="361" y="101" font-size="8.5" text-anchor="middle" fill="#4A5A68">label overlap</text>
+  <rect x="406" y="70" width="90" height="40" fill="#20303C"/>
+  <text x="451" y="88" font-size="9.5" text-anchor="middle" fill="#E7EEF3" font-weight="600">EMBARGO</text>
+  <text x="451" y="101" font-size="8.5" text-anchor="middle" fill="#C9D2F1">serial correlation</text>
+  <rect x="496" y="70" width="198" height="40" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="595" y="94" font-size="10" text-anchor="middle" fill="#3A56C5" font-weight="600">TRAIN resumes</text>
+  <path d="M40 55 H680" stroke="#1F2C38" stroke-width="1.2" marker-end="url(#s3a)"/>
+  <text x="680" y="48" font-size="9.5" text-anchor="end" fill="#4A5A68">time →</text>
+  <text x="360" y="140" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">Purge is symmetric (label overlap cuts both ways); embargo only ever points forward.</text>
+  <defs><marker id="s3a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F2C38"/></marker></defs>
+</svg>
+<figcaption>fig 6.6.4 — the anatomy of one purged, embargoed test fold (no numbers baked in — see table below for this session's worked example)</figcaption>
+</figure>
+
+<p>A small worked example, sized to fit on the page: <span data-lab="toy_n" data-fmt=".0f">20</span> observations, a label horizon of <math><semantics><mrow><mi>H</mi><mo>=</mo></mrow><annotation encoding="application/x-tex">H=</annotation></semantics></math><span data-lab="toy_H" data-fmt=".0f">4</span> days, one test fold covering indices <span data-lab="toy_test_start" data-fmt=".0f">8</span>–<span data-lab="toy_test_last" data-fmt=".0f">11</span>, and an embargo of <span data-lab="toy_embargo" data-fmt=".0f">6</span> observations. Purging alone clears indices <span data-lab="toy_purge_lo" data-fmt=".0f">5</span> through <span data-lab="toy_purge_hi" data-fmt=".0f">14</span> — everywhere a horizon of length <math><semantics><mi>H</mi><annotation encoding="application/x-tex">H</annotation></semantics></math> could reach across the fold boundary. Embargo then reaches three observations further, through index <span data-lab="toy_embargo_hi" data-fmt=".0f">17</span>. Of the original 20 observations, only <span data-lab="toy_train_count" data-fmt=".0f">7</span> remain usable for training this fold — a blunt reminder that purging and embargo cost you data, which is exactly why the next section measures what you buy back with it.</p>
+
+<table>
+<thead><tr><th>Zone</th><th>Indices removed</th><th>Reason</th></tr></thead>
+<tbody>
+<tr><td>Test fold</td><td><span data-lab="toy_test_start" data-fmt=".0f">8</span>–<span data-lab="toy_test_last" data-fmt=".0f">11</span></td><td>held out, scored, never trained on</td></tr>
+<tr><td>Purge (both sides)</td><td><span data-lab="toy_purge_lo" data-fmt=".0f">5</span>–<span data-lab="toy_purge_hi" data-fmt=".0f">14</span></td><td>label horizon overlaps the test fold</td></tr>
+<tr><td>Embargo (forward only)</td><td>up to <span data-lab="toy_embargo_hi" data-fmt=".0f">17</span></td><td>features past the fold can still be serially correlated with it</td></tr>
+</tbody>
+</table>
+
+<div class="co note"><span class="co-t">🧭 Margin note — purge vs. embargo, in one line</span>
+<p>Purge answers "did this label peek at the test set?" Embargo answers "could this FEATURE still smell of the test set even once the labels are clean?" You need a value for <math><semantics><mi>H</mi><annotation encoding="application/x-tex">H</annotation></semantics></math> to purge; embargo just needs an honest guess at how long your features' memory runs.</p>
+</div>
+</section>
+
+<section id="s4">
+<h2><span class="no">6.6.4</span> The overlapping-label leak, in code</h2>
+<p class="lede">Here is the leak in numbers, on a labeled panel built the way a real one behaves: a feature you can observe today, and a label that depends on where a latent process ends up over the next H days.</p>
+
+<p>The lab constructs <span data-lab="leak_n" data-fmt=",.0f">2,000</span> samples from a single autocorrelated latent process (an AR(1) "regime" with persistence <span data-lab="leak_rho" data-fmt=".2f">0.90</span>). Each sample's feature is <span data-lab="leak_m_lags" data-fmt=".0f">5</span> noisy trailing readings of that process — a stand-in for the trailing indicators every technical feature set is built from — and its label is the sign of the process's summed path over the next <span data-lab="leak_H" data-fmt=".0f">40</span> days, exactly the fixed-horizon label <span class="xref soon" data-xref="12.2" data-auto="" title="Coming soon">Session 12.2 — Labeling: Triple Barrier &amp; Meta-Labeling</span> will generalise into a full triple-barrier label. Consecutive samples' labels overlap almost entirely: sample 500 and sample 510 share 30 of their 40 label days. A simple 3-nearest-neighbour classifier is trained and scored four ways on the identical data:</p>
+
+<pre><span class="c"># the from-scratch splitter this session contributes to quantnb</span>
+<span class="k">class</span> PurgedKFold:
+    <span class="k">def</span> split(self, n):
+        <span class="c"># contiguous folds, then purge + embargo around each one</span>
+        <span class="k">for</span> start, stop <span class="k">in</span> fold_bounds(n, self.n_splits):
+            mask = purge_and_embargo(n, [(start, stop)], self.H, self.embargo)
+            <span class="k">yield</span> np.where(mask)[0], np.arange(start, stop)</pre>
+
+<p>Naive k-fold means scikit-learn's <code>KFold(shuffle=True)</code>: five folds, randomly assigned, exactly the default a careless copy-paste reaches for. Purged k-fold uses the splitter above with the embargo set equal to <math><semantics><mi>H</mi><annotation encoding="application/x-tex">H</annotation></semantics></math>. A genuine holdout trains on the first 70% and tests on the final 30%, with a gap of <math><semantics><mi>H</mi><annotation encoding="application/x-tex">H</annotation></semantics></math> days between them — a second, independent honest estimate that never even sees the purging machinery. And because the data-generating process is a known, jointly normal one, the lab also computes the <strong>Bayes-optimal</strong> accuracy in closed form: the best any classifier could ever do from these features is <math><semantics><mrow><mi>ℙ</mi><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mtext>correct</mtext><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mo>=</mo><mstyle displaystyle="false" scriptlevel="0"><mfrac><mn>1</mn><mn>2</mn></mfrac></mstyle><mo>+</mo><mstyle displaystyle="false" scriptlevel="0"><mfrac><mrow><mrow><mi>arcsin</mi><mo>⁡</mo><mspace width="0.1667em"></mspace></mrow><mi>r</mi></mrow><mi>π</mi></mfrac></mstyle></mrow><annotation encoding="application/x-tex">\Prob(\text{correct}) = \tfrac12 + \tfrac{\arcsin r}{\pi}</annotation></semantics></math>, the classical result for jointly normal variables, where <math><semantics><mi>r</mi><annotation encoding="application/x-tex">r</annotation></semantics></math> is the correlation between the optimal linear combination of the features and the label (derived from the AR(1) covariance structure, and checked numerically in the lab).</p>
+
+<table>
+<thead><tr><th>Validation scheme</th><th>Mean accuracy</th><th>What it tells you</th></tr></thead>
+<tbody>
+<tr><td>Naive k-fold (shuffled)</td><td><span data-lab="leak_naive_acc" data-fmt=".1%">56.8%</span></td><td>inflated — leaks across the overlap</td></tr>
+<tr><td>Purged k-fold</td><td><span data-lab="leak_purged_acc" data-fmt=".1%">55.0%</span></td><td>honest — matches the independent check</td></tr>
+<tr><td>Holdout (independent check)</td><td><span data-lab="leak_holdout_acc" data-fmt=".1%">55.4%</span></td><td>honest, and never touches the purging code</td></tr>
+<tr><td>Bayes-optimal bound</td><td><span data-lab="leak_bayes_acc" data-fmt=".1%">61.6%</span></td><td>the ceiling — no classifier can beat this on this data</td></tr>
+</tbody>
+</table>
+
+<figure class="diagram chart">
+<!-- chart:leak_scores -->
+<svg viewBox="0 0 720 260" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Same data, same classifier, four validation scores (means over 50 redraws)">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">SAME DATA, SAME CLASSIFIER, FOUR VALIDATION SCORES (MEANS OVER 50 REDRAWS)</text>
+  <line x1="64" y1="216" x2="690" y2="216" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="220" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.0%</text>
+  <line x1="64" y1="173" x2="690" y2="173" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="177" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">20.0%</text>
+  <line x1="64" y1="130" x2="690" y2="130" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="134" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">40.0%</text>
+  <line x1="64" y1="87" x2="690" y2="87" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="91" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">60.0%</text>
+  <line x1="64" y1="44" x2="690" y2="44" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="48" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">80.0%</text>
+  <line x1="64" y1="216" x2="690" y2="216" stroke="#C9CFC6" stroke-width="1"/>
+  <path d="M130.2,216 V98 Q130.2,94 134.2,94 H150.2 Q154.2,94 154.2,98 V216 Z" fill="#D64B2A"><title>Naive k-fold: 56.8%</title></path>
+  <text x="142.2" y="87" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">56.8%</text>
+  <text x="142.2" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">Naive k-fold</text>
+  <path d="M286.8,216 V101.8 Q286.8,97.8 290.8,97.8 H306.8 Q310.8,97.8 310.8,101.8 V216 Z" fill="#3A56C5"><title>Purged k-fold: 55.0%</title></path>
+  <text x="298.8" y="90.8" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">55.0%</text>
+  <text x="298.8" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">Purged k-fold</text>
+  <path d="M443.2,216 V100.9 Q443.2,96.9 447.2,96.9 H463.2 Q467.2,96.9 467.2,100.9 V216 Z" fill="#3F8E5A"><title>Holdout: 55.4%</title></path>
+  <text x="455.2" y="89.9" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">55.4%</text>
+  <text x="455.2" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">Holdout</text>
+  <path d="M599.8,216 V87.7 Q599.8,83.7 603.8,83.7 H619.8 Q623.8,83.7 623.8,87.7 V216 Z" fill="#4A5A68"><title>Bayes bound: 61.6%</title></path>
+  <text x="611.8" y="76.7" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">61.6%</text>
+  <text x="611.8" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">Bayes bound</text>
+</svg>
+<!-- /chart:leak_scores -->
+<figcaption>fig 6.6.5 — the same classifier, the same data, four validation numbers (means over 50 redrawn datasets)</figcaption>
+</figure>
+
+<p>Purged k-fold and the independent holdout agree to within half a point, and both sit comfortably below the theoretical ceiling — exactly what an honest, finite-sample estimate of real but modest predictive power should look like. Naive k-fold does not: it overstates accuracy by <span data-lab="leak_gap_mean" data-fmt=".1%">1.8%</span> on average, a gap with a Monte Carlo standard error of only <span data-lab="leak_gap_se" data-fmt=".2%">0.19%</span> over <span data-lab="leak_mc_n" data-fmt=".0f">50</span> redrawn datasets — more than nine standard errors from zero, never once seed-hunted. The mechanism is exactly fig 6.6.1's "serial correlation" panel: because the features are smooth, a query point's nearest neighbour in feature space is usually its neighbour in time, and shuffled k-fold routinely puts that time-neighbour in the opposite fold, where its label — built from an overlapping window of the same underlying path — hands the classifier a preview of the answer.</p>
+
+<p>Nothing about this mechanism is specific to a 3-nearest-neighbour classifier — it is the sharpest, easiest-to-see instance of a general problem. Any model flexible enough to exploit local structure in feature space — a random forest splitting on a narrow range of a trailing indicator, a gradient-boosted tree memorising a handful of similar rows, even a well-regularised linear model if the features are informative enough — can pick up the same spurious edge from a temporally close, overlapping-label neighbour that naive k-fold hands it. A less flexible model leaks less only because it is worse at exploiting the opportunity, not because the opportunity isn't there.</p>
+
+<figure class="diagram chart">
+<!-- chart:leak_mc_hist -->
+<svg viewBox="0 0 720 280" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Naive-minus-purged accuracy gap across 50 redrawn datasets">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">NAIVE-MINUS-PURGED ACCURACY GAP ACROSS 50 REDRAWN DATASETS</text>
+  <line x1="64" y1="197.7" x2="680" y2="197.7" stroke="#E4E8EC" stroke-width="1"/>
+  <line x1="64" y1="151.4" x2="680" y2="151.4" stroke="#E4E8EC" stroke-width="1"/>
+  <line x1="64" y1="105.1" x2="680" y2="105.1" stroke="#E4E8EC" stroke-width="1"/>
+  <line x1="64" y1="58.8" x2="680" y2="58.8" stroke="#E4E8EC" stroke-width="1"/>
+  <line x1="64" y1="244" x2="680" y2="244" stroke="#C9CFC6" stroke-width="1"/>
+  <line x1="166.7" y1="244" x2="166.7" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="166.7" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">0.0%</text>
+  <line x1="280.7" y1="244" x2="280.7" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="280.7" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">1.0%</text>
+  <line x1="394.8" y1="244" x2="394.8" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="394.8" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">2.0%</text>
+  <line x1="508.9" y1="244" x2="508.9" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="508.9" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">3.0%</text>
+  <line x1="623" y1="244" x2="623" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="623" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">4.0%</text>
+  <rect x="64.5" y="197.7" width="9.3" height="46.3" fill="#D64B2A" fill-opacity="0.55"><title>−0.9% to −0.8%</title></rect>
+  <rect x="115.8" y="197.7" width="9.3" height="46.3" fill="#D64B2A" fill-opacity="0.55"><title>−0.5% to −0.4%</title></rect>
+  <rect x="126.1" y="151.4" width="9.3" height="92.6" fill="#D64B2A" fill-opacity="0.55"><title>−0.4% to −0.3%</title></rect>
+  <rect x="136.4" y="197.7" width="9.3" height="46.3" fill="#D64B2A" fill-opacity="0.55"><title>−0.3% to −0.2%</title></rect>
+  <rect x="146.6" y="197.7" width="9.3" height="46.3" fill="#D64B2A" fill-opacity="0.55"><title>−0.2% to −0.1%</title></rect>
+  <rect x="167.2" y="105.1" width="9.3" height="138.9" fill="#3A56C5" fill-opacity="0.55"><title>0.0% to 0.1%</title></rect>
+  <rect x="198" y="197.7" width="9.3" height="46.3" fill="#3A56C5" fill-opacity="0.55"><title>0.3% to 0.4%</title></rect>
+  <rect x="228.8" y="151.4" width="9.3" height="92.6" fill="#3A56C5" fill-opacity="0.55"><title>0.5% to 0.6%</title></rect>
+  <rect x="249.3" y="197.7" width="9.3" height="46.3" fill="#3A56C5" fill-opacity="0.55"><title>0.7% to 0.8%</title></rect>
+  <rect x="269.8" y="197.7" width="9.3" height="46.3" fill="#3A56C5" fill-opacity="0.55"><title>0.9% to 1.0%</title></rect>
+  <rect x="280.1" y="197.7" width="9.3" height="46.3" fill="#3A56C5" fill-opacity="0.55"><title>1.0% to 1.1%</title></rect>
+  <rect x="300.6" y="197.7" width="9.3" height="46.3" fill="#3A56C5" fill-opacity="0.55"><title>1.2% to 1.3%</title></rect>
+  <rect x="321.2" y="197.7" width="9.3" height="46.3" fill="#3A56C5" fill-opacity="0.55"><title>1.3% to 1.4%</title></rect>
+  <rect x="331.4" y="105.1" width="9.3" height="138.9" fill="#3A56C5" fill-opacity="0.55"><title>1.4% to 1.5%</title></rect>
+  <rect x="352" y="58.8" width="9.3" height="185.2" fill="#3A56C5" fill-opacity="0.55"><title>1.6% to 1.7%</title></rect>
+  <rect x="372.5" y="197.7" width="9.3" height="46.3" fill="#3A56C5" fill-opacity="0.55"><title>1.8% to 1.9%</title></rect>
+  <rect x="382.8" y="151.4" width="9.3" height="92.6" fill="#3A56C5" fill-opacity="0.55"><title>1.9% to 2.0%</title></rect>
+  <rect x="393" y="197.7" width="9.3" height="46.3" fill="#3A56C5" fill-opacity="0.55"><title>2.0% to 2.1%</title></rect>
+  <rect x="403.3" y="105.1" width="9.3" height="138.9" fill="#3A56C5" fill-opacity="0.55"><title>2.1% to 2.2%</title></rect>
+  <rect x="413.6" y="197.7" width="9.3" height="46.3" fill="#3A56C5" fill-opacity="0.55"><title>2.2% to 2.2%</title></rect>
+  <rect x="423.8" y="197.7" width="9.3" height="46.3" fill="#3A56C5" fill-opacity="0.55"><title>2.2% to 2.3%</title></rect>
+  <rect x="434.1" y="197.7" width="9.3" height="46.3" fill="#3A56C5" fill-opacity="0.55"><title>2.3% to 2.4%</title></rect>
+  <rect x="444.4" y="197.7" width="9.3" height="46.3" fill="#3A56C5" fill-opacity="0.55"><title>2.4% to 2.5%</title></rect>
+  <rect x="454.6" y="151.4" width="9.3" height="92.6" fill="#3A56C5" fill-opacity="0.55"><title>2.5% to 2.6%</title></rect>
+  <rect x="464.9" y="197.7" width="9.3" height="46.3" fill="#3A56C5" fill-opacity="0.55"><title>2.6% to 2.7%</title></rect>
+  <rect x="475.2" y="151.4" width="9.3" height="92.6" fill="#3A56C5" fill-opacity="0.55"><title>2.7% to 2.8%</title></rect>
+  <rect x="485.4" y="197.7" width="9.3" height="46.3" fill="#3A56C5" fill-opacity="0.55"><title>2.8% to 2.9%</title></rect>
+  <rect x="495.7" y="197.7" width="9.3" height="46.3" fill="#3A56C5" fill-opacity="0.55"><title>2.9% to 3.0%</title></rect>
+  <rect x="526.5" y="151.4" width="9.3" height="92.6" fill="#3A56C5" fill-opacity="0.55"><title>3.1% to 3.2%</title></rect>
+  <rect x="536.8" y="197.7" width="9.3" height="46.3" fill="#3A56C5" fill-opacity="0.55"><title>3.2% to 3.3%</title></rect>
+  <rect x="557.3" y="197.7" width="9.3" height="46.3" fill="#3A56C5" fill-opacity="0.55"><title>3.4% to 3.5%</title></rect>
+  <rect x="598.4" y="197.7" width="9.3" height="46.3" fill="#3A56C5" fill-opacity="0.55"><title>3.8% to 3.9%</title></rect>
+  <rect x="629.2" y="197.7" width="9.3" height="46.3" fill="#3A56C5" fill-opacity="0.55"><title>4.1% to 4.1%</title></rect>
+  <rect x="649.7" y="197.7" width="9.3" height="46.3" fill="#3A56C5" fill-opacity="0.55"><title>4.2% to 4.3%</title></rect>
+  <rect x="670.2" y="197.7" width="9.3" height="46.3" fill="#3A56C5" fill-opacity="0.55"><title>4.4% to 4.5%</title></rect>
+  <line x1="166.7" y1="42" x2="166.7" y2="244" stroke="#4A5A68" stroke-width="1"/>
+  <text x="171.7" y="38" font-size="10.5" text-anchor="start" fill="#1F2C38">→ purged wins (no leak)</text>
+</svg>
+<!-- /chart:leak_mc_hist -->
+<figcaption>fig 6.6.6 — the naive-minus-purged gap across 50 independent redraws: reliably positive, never once favouring the naive score</figcaption>
+</figure>
+
+<div class="co warn"><span class="co-t">⚠️ Pitfall — "cross-validation is cross-validation, right?"</span>
+<p><code>KFold(shuffle=True)</code> is <em>the</em> scikit-learn default reflex for "get me an honest score," and it is precisely wrong for panel data with a time axis. It doesn't raise an exception, doesn't warn, and — as fig 6.6.5 shows — doesn't even look absurd. It just quietly reports a number a few points too high, in the direction that gets a mediocre model shipped.</p>
+</div>
+</section>
+
+<section id="s5">
+<h2><span class="no">6.6.5</span> Combinatorial purged cross-validation</h2>
+<p class="lede">Purged k-fold gives you one honest score. CPCV gives you a whole distribution of them, by testing on every combination of held-out groups instead of just one partition — and reconstructing several complete out-of-sample paths from the pieces.</p>
+
+<p>Split the <math><semantics><mi>T</mi><annotation encoding="application/x-tex">T</annotation></semantics></math> observations into <math><semantics><mi>N</mi><annotation encoding="application/x-tex">N</annotation></semantics></math> contiguous groups instead of <math><semantics><mi>N</mi><annotation encoding="application/x-tex">N</annotation></semantics></math> folds used one at a time. <strong>Combinatorial purged cross-validation</strong> tests on every combination of <math><semantics><mi>k</mi><annotation encoding="application/x-tex">k</annotation></semantics></math> of those <math><semantics><mi>N</mi><annotation encoding="application/x-tex">N</annotation></semantics></math> groups, purging and embargoing the training set with respect to all <math><semantics><mi>k</mi><annotation encoding="application/x-tex">k</annotation></semantics></math> held-out groups at once, and fits and scores <math><semantics><mrow><mo fence="true">(</mo><mfrac linethickness="0px"><mi>N</mi><mi>k</mi></mfrac><mo fence="true">)</mo></mrow><annotation encoding="application/x-tex">\binom{N}{k}</annotation></semantics></math> times in total. Each of the <math><semantics><mi>N</mi><annotation encoding="application/x-tex">N</annotation></semantics></math> groups turns up as part of a test set in exactly <math><semantics><mrow><mo fence="true">(</mo><mfrac linethickness="0px"><mrow><mi>N</mi><mo>−</mo><mn>1</mn></mrow><mrow><mi>k</mi><mo>−</mo><mn>1</mn></mrow></mfrac><mo fence="true">)</mo></mrow><annotation encoding="application/x-tex">\binom{N-1}{k-1}</annotation></semantics></math> of those combinations — and that count is also the number of complete, non-overlapping out-of-sample <strong>paths</strong> you can stitch back together, one prediction per group, with every path built from a different, disjoint set of splits:</p>
+
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><mi>φ</mi><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>N</mi><mo separator="true">,</mo><mi>k</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mo>=</mo><mrow><mo fence="true">(</mo><mfrac linethickness="0px"><mrow><mi>N</mi><mo>−</mo><mn>1</mn></mrow><mrow><mi>k</mi><mo>−</mo><mn>1</mn></mrow></mfrac><mo fence="true">)</mo></mrow><mo>=</mo><mfrac><mi>k</mi><mi>N</mi></mfrac><mrow><mo fence="true">(</mo><mfrac linethickness="0px"><mi>N</mi><mi>k</mi></mfrac><mo fence="true">)</mo></mrow></mrow><annotation encoding="application/x-tex">\varphi(N,k) = \binom{N-1}{k-1} = \frac{k}{N}\binom{N}{k}</annotation></semantics></math></div>
+
+<p>López de Prado's own illustration uses <math><semantics><mrow><mi>N</mi><mo>=</mo><mn>6</mn></mrow><annotation encoding="application/x-tex">N=6</annotation></semantics></math> groups, testing <math><semantics><mrow><mi>k</mi><mo>=</mo><mn>2</mn></mrow><annotation encoding="application/x-tex">k=2</annotation></semantics></math> at a time: <math><semantics><mrow><mrow><mo fence="true">(</mo><mfrac linethickness="0px"><mn>6</mn><mn>2</mn></mfrac><mo fence="true">)</mo></mrow><mo>=</mo><mn>15</mn></mrow><annotation encoding="application/x-tex">\binom{6}{2}=15</annotation></semantics></math> splits, reconstructing <math><semantics><mrow><mi>φ</mi><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mn>6,2</mn><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mo>=</mo></mrow><annotation encoding="application/x-tex">\varphi(6,2)=</annotation></semantics></math><span data-lab="cpcv_book_small_paths" data-fmt=".0f">5</span> paths. Scaled up to <math><semantics><mrow><mi>N</mi><mo>=</mo><mn>15</mn></mrow><annotation encoding="application/x-tex">N=15</annotation></semantics></math>, <math><semantics><mrow><mi>k</mi><mo>=</mo><mn>11</mn></mrow><annotation encoding="application/x-tex">k=11</annotation></semantics></math> — his own worked example — the same formula gives <math><semantics><mrow><mi>φ</mi><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mn>15,11</mn><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mo>=</mo></mrow><annotation encoding="application/x-tex">\varphi(15,11)=</annotation></semantics></math><span data-lab="cpcv_book_example_paths" data-fmt=",.0f">1,001</span> paths from one historical dataset. The lab reruns the §6.6.4 dataset with <math><semantics><mrow><mi>N</mi><mo>=</mo></mrow><annotation encoding="application/x-tex">N=</annotation></semantics></math><span data-lab="cpcv_N" data-fmt=".0f">10</span> groups and <math><semantics><mrow><mi>k</mi><mo>=</mo></mrow><annotation encoding="application/x-tex">k=</annotation></semantics></math><span data-lab="cpcv_k" data-fmt=".0f">2</span>: <span data-lab="cpcv_n_splits" data-fmt=".0f">45</span> purged-and-embargoed splits, reconstructing <span data-lab="cpcv_n_paths" data-fmt=".0f">9</span> complete paths — and, because <math><semantics><mrow><mi>k</mi><mo>=</mo><mn>2</mn></mrow><annotation encoding="application/x-tex">k=2</annotation></semantics></math> turns the reconstruction into exactly the classic round-robin tournament-scheduling problem (every pair of groups meets exactly once; every path is one "round" in which every group plays exactly once), the lab builds those 9 paths with the textbook circle-method algorithm, then cross-checks both counts against skfolio's independent <code>CombinatorialPurgedCV</code> implementation.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 220" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">CPCV — TEST EVERY COMBINATION OF k GROUPS, RECONSTRUCT φ PATHS</text>
+  <rect x="26" y="34" width="300" height="94" rx="9" fill="#fff" stroke="#1F2C38" stroke-width="1.5"/>
+  <text x="176" y="52" font-size="10" text-anchor="middle" fill="#4A5A68" font-family="IBM Plex Mono,monospace">N GROUPS, ONE SPLIT (k=2 shown)</text>
+  <rect x="38" y="62" width="34" height="24" rx="4" fill="#EDF0FC" stroke="#3A56C5"/><rect x="76" y="62" width="34" height="24" rx="4" fill="#FFF6C9" stroke="#B99B22"/>
+  <rect x="114" y="62" width="34" height="24" rx="4" fill="#EDF0FC" stroke="#3A56C5"/><rect x="152" y="62" width="34" height="24" rx="4" fill="#EDF0FC" stroke="#3A56C5"/>
+  <rect x="190" y="62" width="34" height="24" rx="4" fill="#FFF6C9" stroke="#B99B22"/><rect x="228" y="62" width="34" height="24" rx="4" fill="#EDF0FC" stroke="#3A56C5"/>
+  <rect x="266" y="62" width="34" height="24" rx="4" fill="#EDF0FC" stroke="#3A56C5"/>
+  <text x="176" y="102" font-size="9" text-anchor="middle" fill="#8A6D00">sticky = this split's test groups (purged + embargoed)</text>
+  <text x="176" y="116" font-size="9" text-anchor="middle" fill="#3A56C5">blue = trainable this split</text>
+  <rect x="394" y="34" width="300" height="94" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="544" y="52" font-size="10" text-anchor="middle" fill="#1F7A55" font-family="IBM Plex Mono,monospace">ONE RECONSTRUCTED PATH</text>
+  <rect x="406" y="62" width="34" height="24" rx="4" fill="#1F7A55"/><rect x="444" y="62" width="34" height="24" rx="4" fill="#1F7A55"/>
+  <rect x="482" y="62" width="34" height="24" rx="4" fill="#1F7A55"/><rect x="520" y="62" width="34" height="24" rx="4" fill="#1F7A55"/>
+  <rect x="558" y="62" width="34" height="24" rx="4" fill="#1F7A55"/><rect x="596" y="62" width="34" height="24" rx="4" fill="#1F7A55"/>
+  <rect x="634" y="62" width="34" height="24" rx="4" fill="#1F7A55"/>
+  <text x="544" y="102" font-size="9" text-anchor="middle" fill="#1F7A55">every group tested exactly once,</text>
+  <text x="544" y="116" font-size="9" text-anchor="middle" fill="#1F7A55">from a DIFFERENT split each time</text>
+  <path d="M330 80 H390" stroke="#1F2C38" stroke-width="2" marker-end="url(#s5a)"/>
+  <text x="360" y="72" font-size="9.5" text-anchor="middle" fill="#4A5A68">φ times</text>
+  <text x="360" y="160" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">One backtest path becomes φ(N,k) — a distribution of scores, not a single lucky (or unlucky) number.</text>
+  <defs><marker id="s5a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F2C38"/></marker></defs>
+</svg>
+<figcaption>fig 6.6.7 — from one split to one of φ reconstructed out-of-sample paths</figcaption>
+</figure>
+
+<table>
+<thead><tr><th>(N, k)</th><th>Splits, C(N,k)</th><th>Paths, φ(N,k)</th><th>Source</th></tr></thead>
+<tbody>
+<tr><td>6, 2</td><td>15</td><td><span data-lab="cpcv_book_small_paths" data-fmt=".0f">5</span></td><td>textbook illustration (AFML)</td></tr>
+<tr><td>10, 2</td><td><span data-lab="cpcv_n_splits" data-fmt=".0f">45</span></td><td><span data-lab="cpcv_n_paths" data-fmt=".0f">9</span></td><td>this lab, verified against skfolio</td></tr>
+<tr><td>15, 11</td><td>1,365</td><td><span data-lab="cpcv_book_example_paths" data-fmt=",.0f">1,001</span></td><td>AFML's own worked example</td></tr>
+</tbody>
+</table>
+
+<p>The nine reconstructed paths on the §6.6.4 dataset average <span data-lab="cpcv_path_acc_mean" data-fmt=".1%">54.5%</span> accuracy, with a standard deviation across paths of <span data-lab="cpcv_path_acc_sd" data-fmt=".2%">0.79%</span> and a range from <span data-lab="cpcv_path_acc_min" data-fmt=".1%">52.9%</span> to <span data-lab="cpcv_path_acc_max" data-fmt=".1%">55.4%</span>. That spread is the entire point: a single purged k-fold run reports one number and hides how much it would have moved had history run slightly differently. CPCV reports the distribution directly.</p>
+
+<p>Choosing <math><semantics><mi>N</mi><annotation encoding="application/x-tex">N</annotation></semantics></math> and <math><semantics><mi>k</mi><annotation encoding="application/x-tex">k</annotation></semantics></math> is a real trade-off, not a default to leave alone. A larger <math><semantics><mi>N</mi><annotation encoding="application/x-tex">N</annotation></semantics></math> means finer-grained groups, more splits to fit and score, and — per the table above — many more reconstructed paths; a larger <math><semantics><mi>k</mi><annotation encoding="application/x-tex">k</annotation></semantics></math> means each split trains on less data, because more of it is held out and purged away at once. López de Prado's own <math><semantics><mrow><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>N</mi><mo separator="true">,</mo><mi>k</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mo>=</mo><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mn>15,11</mn><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">(N,k)=(15,11)</annotation></semantics></math> example trades a demanding 1,365 model fits for 1,001 usable paths; the <math><semantics><mrow><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>N</mi><mo separator="true">,</mo><mi>k</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mo>=</mo><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mn>10,2</mn><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">(N,k)=(10,2)</annotation></semantics></math> version in this lab is a fraction of the compute for a ninth of the paths — plenty to see the spread in fig 6.6.8, far cheaper to run inside a parameter sweep. Start small, and grow <math><semantics><mi>N</mi><annotation encoding="application/x-tex">N</annotation></semantics></math> only once you have measured how long one split costs to fit.</p>
+
+<figure class="diagram chart">
+<!-- chart:cpcv_paths -->
+<svg viewBox="0 0 720 260" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Nine reconstructed CPCV paths, same dataset (N=10, k=2)">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">NINE RECONSTRUCTED CPCV PATHS, SAME DATASET (N=10, K=2)</text>
+  <line x1="64" y1="216" x2="690" y2="216" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="220" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.0%</text>
+  <line x1="64" y1="173" x2="690" y2="173" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="177" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">20.0%</text>
+  <line x1="64" y1="130" x2="690" y2="130" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="134" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">40.0%</text>
+  <line x1="64" y1="87" x2="690" y2="87" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="91" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">60.0%</text>
+  <line x1="64" y1="44" x2="690" y2="44" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="48" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">80.0%</text>
+  <line x1="64" y1="216" x2="690" y2="216" stroke="#C9CFC6" stroke-width="1"/>
+  <path d="M86.8,216 V104.4 Q86.8,100.4 90.8,100.4 H106.8 Q110.8,100.4 110.8,104.4 V216 Z" fill="#3A56C5"><title>path 1: 53.8%</title></path>
+  <text x="98.8" y="93.4" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">53.8%</text>
+  <text x="98.8" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">path 1</text>
+  <path d="M156.3,216 V101.5 Q156.3,97.5 160.3,97.5 H176.3 Q180.3,97.5 180.3,101.5 V216 Z" fill="#3A56C5"><title>path 2: 55.1%</title></path>
+  <text x="168.3" y="90.5" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">55.1%</text>
+  <text x="168.3" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">path 2</text>
+  <path d="M225.9,216 V102.5 Q225.9,98.5 229.9,98.5 H245.9 Q249.9,98.5 249.9,102.5 V216 Z" fill="#3A56C5"><title>path 3: 54.6%</title></path>
+  <text x="237.9" y="91.5" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">54.6%</text>
+  <text x="237.9" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">path 3</text>
+  <path d="M295.4,216 V101.4 Q295.4,97.4 299.4,97.4 H315.4 Q319.4,97.4 319.4,101.4 V216 Z" fill="#3A56C5"><title>path 4: 55.1%</title></path>
+  <text x="307.4" y="90.4" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">55.1%</text>
+  <text x="307.4" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">path 4</text>
+  <path d="M365,216 V106.3 Q365,102.3 369,102.3 H385 Q389,102.3 389,106.3 V216 Z" fill="#3A56C5"><title>path 5: 52.9%</title></path>
+  <text x="377" y="95.3" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">52.9%</text>
+  <text x="377" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">path 5</text>
+  <path d="M434.6,216 V101.9 Q434.6,97.9 438.6,97.9 H454.6 Q458.6,97.9 458.6,101.9 V216 Z" fill="#3A56C5"><title>path 6: 54.9%</title></path>
+  <text x="446.6" y="90.9" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">54.9%</text>
+  <text x="446.6" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">path 6</text>
+  <path d="M504.1,216 V102.5 Q504.1,98.5 508.1,98.5 H524.1 Q528.1,98.5 528.1,102.5 V216 Z" fill="#3A56C5"><title>path 7: 54.6%</title></path>
+  <text x="516.1" y="91.5" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">54.6%</text>
+  <text x="516.1" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">path 7</text>
+  <path d="M573.7,216 V100.9 Q573.7,96.9 577.7,96.9 H593.7 Q597.7,96.9 597.7,100.9 V216 Z" fill="#3A56C5"><title>path 8: 55.4%</title></path>
+  <text x="585.7" y="89.9" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">55.4%</text>
+  <text x="585.7" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">path 8</text>
+  <path d="M643.2,216 V103.4 Q643.2,99.4 647.2,99.4 H663.2 Q667.2,99.4 667.2,103.4 V216 Z" fill="#3A56C5"><title>path 9: 54.2%</title></path>
+  <text x="655.2" y="92.4" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">54.2%</text>
+  <text x="655.2" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">path 9</text>
+</svg>
+<!-- /chart:cpcv_paths -->
+<figcaption>fig 6.6.8 — nine honest out-of-sample paths from one dataset, instead of one honest number</figcaption>
+</figure>
+
+<div class="co note"><span class="co-t">🧭 Margin note — CPCV is not CSCV</span>
+<p>Don't confuse this session's CPCV (many purged train/test paths from ONE labeled dataset) with the CSCV method <span class="xref soon" data-xref="6.7" data-auto="" title="Coming soon">Session 6.7 — Overfitting Statistics: PSR, DSR, MinTRL &amp; PBO</span> uses to compute the probability of backtest overfitting: CSCV resamples a matrix of many STRATEGIES' P&amp;L to ask "how many of the paths I tried were actually skill?" CPCV instead answers "how would my ONE strategy's validated score have moved if history had shuffled its groups differently?" — and the paths it produces are exactly the raw material <span class="xref soon" data-xref="6.7" data-auto="" title="Coming soon">Session 6.7 — Overfitting Statistics: PSR, DSR, MinTRL &amp; PBO</span> and <span class="xref soon" data-xref="12.4" data-auto="" title="Coming soon">Session 12.4 — Gradient Boosting for Cross-Sectional Alpha</span> build on next.</p>
+</div>
+</section>
+
+<section id="s6">
+<h2><span class="no">6.6.6</span> Choosing a scheme — and where people go wrong</h2>
+<p class="lede">All four schemes in this session answer the same question — "would this look this good live?" — for different shapes of problem. Picking the wrong one is the single most common validation mistake this course will show you.</p>
+
+<table>
+<thead><tr><th>Your problem looks like…</th><th>Use</th><th>Why</th></tr></thead>
+<tbody>
+<tr><td>One strategy, re-optimised periodically over a single history</td><td><strong>Walk-forward analysis</strong></td><td>matches how you would actually trade it live</td></tr>
+<tr><td>A labeled panel (features → label) with overlapping label windows</td><td><strong>Purged k-fold</strong></td><td>reuses more of the data than a single holdout, without leaking</td></tr>
+<tr><td>You need the VARIANCE of an honest score, not just its mean</td><td><strong>CPCV</strong></td><td>reconstructs many non-overlapping honest paths from one dataset</td></tr>
+<tr><td>Any of the above, shuffled with scikit-learn's <code>KFold</code> default</td><td><strong>Never</strong></td><td>fig 6.6.5 measured the cost: about two points of accuracy, silently</td></tr>
+</tbody>
+</table>
+
+<p>The naive-vs-disciplined contrast is worth stating plainly, because the naive version is not a strawman — it is the first thing that works, compiles, and returns a plausible-looking number.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 220" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+<text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">SAME LABELED PANEL, TWO WAYS TO VALIDATE IT</text>
+<rect x="26" y="32" width="326" height="176" rx="9" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+<text x="189" y="54" font-size="11" font-weight="700" text-anchor="middle" fill="#D64B2A">THE NAIVE WAY</text>
+<rect x="46" y="66" width="286" height="24" rx="5" fill="#fff" stroke="#F2CDBF"/>
+<text x="58" y="82" font-size="9.5" fill="#1F2C38" font-family="IBM Plex Mono,monospace">KFold(shuffle=True), 5 folds</text>
+<rect x="46" y="96" width="286" height="24" rx="5" fill="#fff" stroke="#F2CDBF"/>
+<text x="58" y="112" font-size="9.5" fill="#1F2C38">score, report, move on</text>
+<text x="189" y="148" font-size="9.5" text-anchor="middle" fill="#D64B2A" font-weight="600">Reports 56.8% when the truth is 55%.</text>
+<text x="189" y="166" font-size="9" text-anchor="middle" fill="#4A5A68">Nine SE of pure, silent optimism.</text>
+<rect x="368" y="32" width="326" height="176" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+<text x="531" y="54" font-size="11" font-weight="700" text-anchor="middle" fill="#1F7A55">THE DISCIPLINED WAY</text>
+<rect x="388" y="66" width="286" height="24" rx="5" fill="#fff" stroke="#BFE0CF"/>
+<text x="400" y="82" font-size="9.5" fill="#1F2C38">1 · fix the label horizon H</text>
+<rect x="388" y="96" width="286" height="24" rx="5" fill="#fff" stroke="#BFE0CF"/>
+<text x="400" y="112" font-size="9.5" fill="#1F2C38">2 · purge + embargo, then score</text>
+<text x="531" y="148" font-size="9.5" text-anchor="middle" fill="#1F7A55" font-weight="600">Matches an independent holdout.</text>
+<text x="531" y="166" font-size="9" text-anchor="middle" fill="#4A5A68">Costs training data; buys the truth.</text>
+</svg>
+<figcaption>fig 6.6.9 — the naive score and the disciplined score, on the identical dataset from §6.6.4</figcaption>
+</figure>
+
+<div class="co tip"><span class="co-t">💡 Tip — you rarely have to choose only one</span>
+<p>A common production pattern: use purged k-fold (or CPCV) during feature and model selection, when you need to reuse the data many times without leaking; reserve one final walk-forward pass, or a true untouched holdout, as the last check before anything gets a paper-trading allocation.</p>
+</div>
+
+<p>None of the four schemes in this session makes a mediocre idea good. What they do is cheaper and more important: they stop a mediocre idea from looking good by accident. Every number this course reports from here on — a Sharpe ratio, an accuracy, an information coefficient — is only as trustworthy as the split that produced it, which is exactly why <span class="xref soon" data-xref="6.7" data-auto="" title="Coming soon">Session 6.7 — Overfitting Statistics: PSR, DSR, MinTRL &amp; PBO</span> takes these validated numbers as its starting point rather than raw backtest output, and why <span class="xref soon" data-xref="12.4" data-auto="" title="Coming soon">Session 12.4 — Gradient Boosting for Cross-Sectional Alpha</span> will call the purged splitter built in this lab directly rather than reach for scikit-learn's default.</p>
+</section>
+
+<section id="s7">
+<h2><span class="no">6.6.7</span> Try it</h2>
+<p class="lede">Open the companion lab and break the naive version on purpose — then watch purging fix it.</p>
+
+<div class="co lab"><span class="co-t">🔧 Try it (15 min, in the lab)</span>
+<p>1. In §3 of the lab, change <code>K_NEIGHBORS</code> from 3 to 1. Re-run the naive-vs-purged comparison. Does the gap in <span data-lab="leak_gap_mean" data-fmt=".1%">1.8%</span> get bigger or smaller, and can you explain why from fig 6.6.1's "serial correlation" panel?<br>
+2. Set <code>embargo=0</code> inside <code>PurgedKFold</code> (leave purging itself alone) and re-run. How much of the leak was purging alone already fixing, and how much needed the embargo?<br>
+3. In §1, change <code>PHI</code> to 0.0 (no real edge at all) and re-run the walk-forward Monte Carlo. Success looks like this: the in-sample-vs-walk-forward GAP should shrink towards zero along with both Sharpe ratios, because there is nothing left to overfit.</p>
+</div>
+</section>
+
+<hr>
+
+<section id="s8">
+<h2><span class="no">6.6.8</span> Glossary · Check yourself · Go deeper</h2>
+<div class="gloss" id="glossary">
+<div id="g-walk-forward-analysis"><b>Walk-forward analysis</b> — validating (and re-fitting) a strategy on a sequence of train/test windows that all point forward in time, never backward.</div>
+<div id="g-purging"><b>Purging</b> — removing every training observation whose label horizon overlaps a test observation's label horizon, on either side of the test set.</div>
+<div id="g-embargo"><b>Embargo</b> — removing a further block of training observations immediately after a test set, to protect against serially correlated features that purging alone does not catch.</div>
+<div id="g-purged-k-fold-cross-validation"><b>Purged k-fold cross-validation</b> — ordinary k-fold cross-validation with purging and embargo applied around every fold, so a panel's labels can be reused for training and testing without leaking.</div>
+<div id="g-combinatorial-purged-cross-validation"><b>Combinatorial purged cross-validation</b> — testing on every combination of k held-out groups out of N (CPCV), purged and embargoed, then reconstructing φ(N,k) = C(N−1, k−1) complete out-of-sample paths from the results.</div>
+<div id="g-leakage"><b>Leakage</b> — any route by which information from a test observation reaches the training set, inflating a validation score above what live performance would show.</div>
+</div>
+
+<h3>Check yourself</h3>
+<details class="q"><summary>1. Your walk-forward loop selects a lookback window by checking which one has the best Sharpe ratio on the ENTIRE dataset, then applies it fold by fold. Is this walk-forward analysis?</summary><div>No. Walk-forward means every decision uses only data strictly before the window it is applied to. Selecting the parameter on the whole sample first and then "walking forward" with it is whole-sample optimisation wearing a walk-forward costume — exactly the §6.6.2 comparison, where it overstated the honest Sharpe ratio by roughly 0.4.</div></details>
+<details class="q"><summary>2. A colleague purges training observations that overlap the test set's labels, but sets the embargo to zero because "purging already removes the overlap." When would that go wrong?</summary><div>Whenever the FEATURES have their own memory beyond the label horizon H — a 60-day moving average feature, say, used with a 20-day label. Purging clears the label overlap correctly, but a training observation just after the test set can still have a feature value that was computed using days inside the test window. Embargo is the separate fix for that, sized to the features' memory, not the label horizon.</div></details>
+<details class="q"><summary>3. Why does naive k-fold cross-validation OVERSTATE accuracy here, rather than just adding noise in a random direction?</summary><div>Because the leak is one-directional: a shuffled fold can hand the training set a temporally close neighbour of a test point whose label overlaps it, which can only help the classifier guess correctly, never hurt it. Removing that neighbour (purging) can only lower the score or leave it unchanged — so the naive score is a biased overestimate, not a noisier one.</div></details>
+<details class="q"><summary>4. With N=8 groups and k=3 held out per split, how many splits does CPCV run, and how many complete out-of-sample paths does it reconstruct?</summary><div>C(8,3) = 56 splits. Paths: φ(8,3) = C(7,2) = 21. Check it the other way too: (k/N)·C(N,k) = (3/8)·56 = 21 — the same answer, because k·C(N,k)/N is always an integer equal to C(N−1,k−1).</div></details>
+<details class="q"><summary>5. You are validating a single systematic trend-following strategy that will be re-optimised every quarter in production, with no cross-sectional panel of labels involved. Which scheme fits best, and which would be overkill?</summary><div>Walk-forward analysis, anchored or rolling to match how the re-optimisation will actually run in production. Purged k-fold and CPCV are built for labeled panels reused many times across features or models; with one strategy and one re-optimisation cadence, they add purge/embargo machinery you do not need — walk-forward already mimics live deployment directly.</div></details>
+
+<div class="co lab"><span class="co-t">🔧 Homework (~1 h before Session 6.7)</span>
+<p>1. In the lab, extend the CPCV example from N=10 to N=8, k=2. Confirm your reconstructed path count still matches skfolio's <code>n_test_paths</code>, and that every one of the C(8,2) splits is used in exactly one path.<br>
+2. Read the skfolio and AFML definitions of purging in the references below side by side. Write, in your own words, the one sentence that would fail a code review if a `PurgedKFold` implementation got it wrong.<br>
+3. Skim <span class="xref soon" data-xref="6.7" data-auto="" title="Coming soon">Session 6.7 — Overfitting Statistics: PSR, DSR, MinTRL &amp; PBO</span>'s goal in the roadmap before next session: bring your CPCV path accuracies from §6.6.5 — you will feed them into a Sharpe-ratio deflation next.</p>
+</div>
+
+<h3>📚 Go deeper</h3>
+<ol class="refs">
+<li>López de Prado, M. (2018). <em>Advances in Financial Machine Learning</em>, ch. 7 "Cross-Validation in Finance" and ch. 12 "Backtesting through Cross-Validation". Wiley. <span class="rid">ISBN 978-1-119-48208-6</span></li>
+<li>Pardo, R. (2008). <em>The Evaluation and Optimization of Trading Strategies</em> (2nd ed.), ch. 11 "Walk-Forward Analysis". Wiley. <span class="rid">ISBN 978-0-470-12801-5</span></li>
+<li>Bergmeir, C., Hyndman, R. J. &amp; Koo, B. (2018). "A note on the validity of cross-validation for evaluating autoregressive time series prediction." <em>Computational Statistics &amp; Data Analysis</em> 120, 70–83. <span class="rid">doi:10.1016/j.csda.2017.11.003</span></li>
+</ol>
+
+<h3>Sources for the numbers</h3>
+<ol class="refs">
+<li>Bergmeir, C. &amp; Benítez, J. M. (2012). "On the use of cross-validation for time series predictor evaluation." <em>Information Sciences</em> 191, 192–213. <span class="rid">doi:10.1016/j.ins.2011.12.028</span></li>
+<li>skfolio developers. <code>CombinatorialPurgedCV</code> reference. <em>skfolio documentation</em>, retrieved September 2026. <span class="rid">https://skfolio.org/<wbr>generated/<wbr>skfolio.model_selection.<wbr>CombinatorialPurgedCV.html</span></li>
+</ol>
+</section>
+
+<!-- nav:foot -->
+<div class="foot">
+<span class="soon" title="Coming soon">← Prev: 6.5 · Costs &amp; Capacity</span>
+<span class="soon" title="Coming soon">Next: 6.7 · Overfitting Stats →</span>
+</div>
+<p class="legal">Educational material only — not investment, legal or tax advice. Backtests and simulations are hypothetical. <a href="../start-here.html#disclaimer">Disclaimer</a> · Text CC BY 4.0 · Code MIT.</p>
+<!-- /nav:foot -->
+</main>
+</div></body></html>

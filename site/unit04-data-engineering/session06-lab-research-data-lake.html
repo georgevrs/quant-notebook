@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- nav:head -->
+<title>4.6 · Lab: Build Your Research Data Lake</title>
+<meta name="description" content="Build an idempotent, tested, point-in-time data pipeline with quality checks and lineage — the foundation for every later lab.">
+<link rel="canonical" href="https://georgevrs.github.io/quant-notebook/unit04-data-engineering/session06-lab-research-data-lake.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Quant Notebook">
+<meta property="og:title" content="4.6 · Lab: Build Your Research Data Lake">
+<meta property="og:description" content="Build an idempotent, tested, point-in-time data pipeline with quality checks and lineage — the foundation for every later lab.">
+<meta property="og:url" content="https://georgevrs.github.io/quant-notebook/unit04-data-engineering/session06-lab-research-data-lake.html">
+<meta name="twitter:card" content="summary">
+<link rel="stylesheet" href="../assets/brand.css">
+<link rel="stylesheet" href="../assets/temml.css">
+<!-- /nav:head -->
+</head>
+<body><div class="page" id="top">
+<!-- Session 4.6 — Unit 4 capstone lab. See AUTHORING.md. -->
+<!-- nav:tabs -->
+<nav class="tabs">
+<a href="../index.html">⌂ Course home</a>
+<span class="soon" title="Coming soon">4.1 · Data Landscape</span>
+<span class="soon" title="Coming soon">4.2 · Point-in-Time</span>
+<span class="soon" title="Coming soon">4.3 · Security Master</span>
+<span class="soon" title="Coming soon">4.4 · Time &amp; Bars</span>
+<span class="soon" title="Coming soon">4.5 · Storage Stack</span>
+<a class="active" href="session06-lab-research-data-lake.html">4.6 · Lab: Data Lake</a>
+<a href="../roadmap.html">🗺 Roadmap</a>
+</nav>
+<!-- /nav:tabs -->
+
+<header class="cover">
+<!-- nav:heading -->
+<p class="eyebrow">Unit 4 · Financial Data Engineering — Session 06 of 06</p>
+<h1>Lab: Build Your Research Data Lake</h1>
+<!-- /nav:heading -->
+<p class="subtitle">Every lab from here on needs the same three things: prices that don't lie about splits, joins that don't peek at the future, and a place to put the result that a later session can just query. This lab builds all three — three synthetic symbols, a stock split, a renamed ticker and a quarterly index review, turned into a small, tested Parquet lake behind DuckDB and polars views. <mark>A lake only earns your trust once building it twice, from the same inputs, produces the same bytes.</mark></p>
+<div class="meta">
+<span>DURATION <b>1.5 h + lab</b></span>
+<span>LEVEL <b>Foundations</b></span>
+<span>TRACKS <b>QR · QD · IND</b></span>
+<span>HANDS-ON <b>A 3-symbol, 3-year Parquet lake behind DuckDB + polars views</b></span>
+</div>
+<!-- nav:labstrip -->
+<div class="labstrip"><b>📓 Companion lab</b>
+<a href="https://colab.research.google.com/github/georgevrs/quant-notebook/blob/main/labs/u04/s06_lab_research_data_lake.ipynb">Open in Colab</a>
+<a href="https://github.com/georgevrs/quant-notebook/blob/main/labs/u04/s06_lab_research_data_lake.ipynb">Notebook on GitHub</a>
+<a href="https://github.com/georgevrs/quant-notebook/blob/main/labs/u04/s06_lab_research_data_lake.py">Source (.py)</a>
+</div>
+<!-- /nav:labstrip -->
+<div class="toc">
+<b>On this page</b>
+<ol>
+<li><a href="#s1">What a research data lake is</a></li>
+<li><a href="#s2">The pipeline, end to end</a></li>
+<li><a href="#s3">Corporate actions, applied</a></li>
+<li><a href="#s4">As-of joins &amp; bars, applied</a></li>
+<li><a href="#s5">The storage layer, applied</a></li>
+<li><a href="#s6">Quality gates, lineage &amp; idempotency</a></li>
+<li><a href="#s7">Proving it works</a></li>
+<li><a href="#s8">Try it</a></li>
+<li><a href="#s9">Glossary · Check yourself · Go deeper</a></li>
+</ol>
+</div>
+</header>
+
+<main>
+
+<section id="s1">
+<h2><span class="no">4.6.1</span> What a research data lake is</h2>
+<p class="lede">Every lab in this course reads data from somewhere. This section names the three jobs that "somewhere" has to do, and why skipping any one of them shows up as a bug three sessions later.</p>
+
+<p>Forget the enterprise-scale meaning of "data lake." For one researcher, a <strong>research data lake</strong> is nothing more than a folder of <span class="xref soon" data-xref="4.5" data-style="short" data-auto="" title="Coming soon">Session 4.5</span> files on a laptop, built by one script that can be rerun from nothing, plus a couple of query views on top. The alternative — reading a raw CSV fresh in every notebook — feels simpler until the second notebook disagrees with the first about a stock split, and there is no record of which one is right.</p>
+
+<p>The lake in this lab has three tiers, and each one has exactly one job. <strong>Raw landing</strong> holds the <span class="term soon" data-term="data vendor" title="Defined in Session 4.1 (coming soon)">vendor</span> feed exactly as it arrived, including its mistakes — a raw feed showing a fake −50% return on a split day is not a bug in the feed, it is what a real feed looks like. <strong>Curated</strong> is where <span class="xref soon" data-xref="4.3" data-style="short" data-auto="" title="Coming soon">Session 4.3</span>'s corporate-action adjustment and <span class="xref soon" data-xref="4.4" data-style="short" data-auto="" title="Coming soon">Session 4.4</span>'s as-of joins and bars run, and where a <strong>data contract</strong> is enforced before anything is written. <strong>Query views</strong> — a DuckDB view and a polars lazy frame over the same <span class="term soon" data-term="Parquet" title="Defined in Session 4.5 (coming soon)">Parquet</span> files — are the only tier a later lab is ever allowed to touch.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 230" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <rect x="20" y="14" width="680" height="200" rx="12" fill="#fff" stroke="#1F2C38" stroke-width="1.5"/>
+  <text x="40" y="40" font-size="12" fill="#4A5A68" font-family="IBM Plex Mono,monospace">THE LAKE — three tiers, one job each</text>
+  <rect x="40" y="58" width="200" height="110" rx="8" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="140" y="92" font-size="15" font-weight="600" text-anchor="middle" fill="#3A56C5">RAW LANDING</text>
+  <text x="140" y="114" font-size="11.5" text-anchor="middle" fill="#4A5A68">vendor feed, unmodified —</text>
+  <text x="140" y="130" font-size="11.5" text-anchor="middle" fill="#4A5A68">bugs and all, never edited</text>
+  <rect x="260" y="58" width="200" height="110" rx="8" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="360" y="92" font-size="15" font-weight="600" text-anchor="middle" fill="#8A6D00">CURATED</text>
+  <text x="360" y="114" font-size="11.5" text-anchor="middle" fill="#4A5A68">adjusted, joined, barred —</text>
+  <text x="360" y="130" font-size="11.5" text-anchor="middle" fill="#4A5A68">data contract enforced</text>
+  <rect x="480" y="58" width="200" height="110" rx="8" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="580" y="92" font-size="15" font-weight="600" text-anchor="middle" fill="#1F7A55">QUERY VIEWS</text>
+  <text x="580" y="114" font-size="11.5" text-anchor="middle" fill="#4A5A68">DuckDB view,</text>
+  <text x="580" y="130" font-size="11.5" text-anchor="middle" fill="#4A5A68">polars lazy frame</text>
+  <text x="360" y="198" font-size="12" text-anchor="middle" fill="#4A5A68" font-style="italic">Every later lab queries the query tier — never the raw feed directly.</text>
+</svg>
+<figcaption>fig 4.6.1 — the lake's three tiers: raw is never edited, curated is where the rules run, query is all a later lab ever sees</figcaption>
+</figure>
+
+<p>Each tier exists because of a specific way research goes wrong without it. Skip the raw tier and there is no way to tell, months later, whether a strange number came from the market or from a script that overwrote its own input. Skip curation and every notebook re-derives its own version of "adjusted," each subtly different. Skip a query tier and every lab pays the cost of re-reading and re-parsing the same files, in whatever ad hoc way that lab's author chose that day. None of this is really about performance — a few years of daily bars for a handful of symbols fits in memory twice over. It is about a research team, even a team of one working across many sessions, being able to trust a number without re-deriving it from scratch.</p>
+
+<div class="co key"><span class="co-t">📌 Key idea — the lake is not the strategy</span>
+<p>Nothing in this session predicts a return. Its job is narrower and, in practice, more consequential: if a later unit's strategy looks brilliant because of a stock split nobody adjusted for, the bug will not be in the strategy code — it will be here, in a tier that was supposed to have caught it.</p>
+</div>
+</section>
+
+<section id="s2">
+<h2><span class="no">4.6.2</span> The pipeline, end to end</h2>
+<p class="lede">Five stages turn a raw feed into something a query can trust. Each one has exactly one classic bug, and this lab's asserts exist to catch it.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 176" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">THE PIPELINE — raw feed in, a queryable lake out</text>
+  <rect x="22" y="38" width="120" height="66" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="82" y="64" font-size="11" text-anchor="middle" fill="#3A56C5" font-weight="600">1 · INGEST</text>
+  <text x="82" y="81" font-size="9.5" text-anchor="middle" fill="#4A5A68">raw vendor feed</text>
+  <text x="82" y="94" font-size="9.5" text-anchor="middle" fill="#4A5A68">kept immutable</text>
+  <rect x="164" y="38" width="120" height="66" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="224" y="64" font-size="11" text-anchor="middle" fill="#3A56C5" font-weight="600">2 · ADJUST</text>
+  <text x="224" y="81" font-size="9.5" text-anchor="middle" fill="#4A5A68">corp actions →</text>
+  <text x="224" y="94" font-size="9.5" text-anchor="middle" fill="#4A5A68">adjusted price</text>
+  <rect x="306" y="38" width="120" height="66" rx="9" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="366" y="64" font-size="11" text-anchor="middle" fill="#8A6D00" font-weight="600">3 · VALIDATE</text>
+  <text x="366" y="81" font-size="9.5" text-anchor="middle" fill="#4A5A68">data contract</text>
+  <text x="366" y="94" font-size="9.5" text-anchor="middle" fill="#4A5A68">quality gate</text>
+  <rect x="448" y="38" width="120" height="66" rx="9" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="508" y="64" font-size="11" text-anchor="middle" fill="#8A6D00" font-weight="600">4 · BAR + WRITE</text>
+  <text x="508" y="81" font-size="9.5" text-anchor="middle" fill="#4A5A68">as-of join,</text>
+  <text x="508" y="94" font-size="9.5" text-anchor="middle" fill="#4A5A68">bars → Parquet</text>
+  <rect x="590" y="38" width="108" height="66" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="644" y="64" font-size="11" text-anchor="middle" fill="#1F7A55" font-weight="600">5 · QUERY</text>
+  <text x="644" y="81" font-size="9.5" text-anchor="middle" fill="#4A5A68">DuckDB view,</text>
+  <text x="644" y="94" font-size="9.5" text-anchor="middle" fill="#4A5A68">polars lazy scan</text>
+  <path d="M145 71 H161" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M287 71 H303" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M429 71 H445" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M571 71 H587" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <text x="82" y="126" font-size="9" text-anchor="middle" fill="#D64B2A">bug: editing</text>
+  <text x="82" y="138" font-size="9" text-anchor="middle" fill="#D64B2A">the raw file itself</text>
+  <text x="224" y="126" font-size="9" text-anchor="middle" fill="#D64B2A">bug: ratio applied</text>
+  <text x="224" y="138" font-size="9" text-anchor="middle" fill="#D64B2A">the wrong way round</text>
+  <text x="366" y="126" font-size="9" text-anchor="middle" fill="#D64B2A">bug: a check that</text>
+  <text x="366" y="138" font-size="9" text-anchor="middle" fill="#D64B2A">always says OK</text>
+  <text x="508" y="126" font-size="9" text-anchor="middle" fill="#D64B2A">bug: as-of join</text>
+  <text x="508" y="138" font-size="9" text-anchor="middle" fill="#D64B2A">direction=nearest</text>
+  <text x="644" y="126" font-size="9" text-anchor="middle" fill="#D64B2A">bug: skips</text>
+  <text x="644" y="138" font-size="9" text-anchor="middle" fill="#D64B2A">partition pruning</text>
+  <text x="360" y="164" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">Each stage is a function with its own asserts — and its own classic bug, shown in coral.</text>
+  <defs><marker id="s2a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F2C38"/></marker></defs>
+</svg>
+<figcaption>fig 4.6.2 — the pipeline: ingest, adjust, validate, bar and write, query — and the bug that lives at each stage</figcaption>
+</figure>
+
+<table>
+<thead><tr><th>Stage</th><th>What runs</th><th>What it prevents</th></tr></thead>
+<tbody>
+<tr><td>1 · Ingest</td><td>the raw feed lands in a git-ignored cache, byte for byte</td><td>silent edits to history</td></tr>
+<tr><td>2 · Adjust</td><td>back-adjustment, applying <span class="xref soon" data-xref="4.3" data-style="short" data-auto="" title="Coming soon">Session 4.3</span>'s adjustment factors</td><td>fake crashes from splits and dividends</td></tr>
+<tr><td>3 · Validate</td><td>the curated table is checked against its data contract</td><td>a bad row shipping to every later lab</td></tr>
+<tr><td>4 · Bar + write</td><td>an as-of join for reference data, bars, then a partitioned write</td><td>a join that peeks at the future; one unqueryable file</td></tr>
+<tr><td>5 · Query</td><td>a DuckDB view and a polars lazy frame over the same files</td><td>scanning bytes a query does not need</td></tr>
+</tbody>
+</table>
+
+<p>Raw landing being immutable is the load-bearing rule in this whole diagram, and it is worth saying why. If a bug in the adjustment stage is discovered next month, the fix is to rerun stages 2 through 5 against the same raw files and get a corrected curated table — nothing upstream needs to be re-fetched or reconstructed from memory. If the raw feed itself is allowed to be edited in place — a "quick fix" for one bad row, applied directly to the landing file — that guarantee is gone: nobody can prove, later, whether today's raw file is what the vendor actually sent. The discipline is the same one an append-only event log gives a production system: never mutate history, only add stages that read it.</p>
+
+<div class="co tip"><span class="co-t">💡 Looking ahead</span>
+<p>Everything after Unit 4 assumes this pipeline already ran. A strategy session in <span class="xref soon" data-xref="5.1" data-style="short" data-auto="" title="Coming soon">Session 5.1</span> and onward reads the query tier and never touches raw vendor files — the same discipline a production trading system needs between its market-data feed and its signal code.</p>
+</div>
+</section>
+
+<section id="s3">
+<h2><span class="no">4.6.3</span> Corporate actions, applied</h2>
+<p class="lede">A stock split is one line in a corporate-actions feed and, if you ignore it, a manufactured crash in every return you compute afterwards.</p>
+
+<p>ALPHA, one of this lab's three synthetic symbols, does a 2-for-1 split partway through its three-year window. The raw feed does exactly what a real vendor feed does: from the ex-date on, the price is halved and the share volume doubles, with nothing flagging that a split happened. On its own, that single day's raw return is <span data-lab="raw_split_return" data-fmt=".1%">−50.8%</span> — a number no strategy earned and no risk model should ever see.</p>
+
+<p>Fixing it is <span class="xref soon" data-xref="4.3" data-style="short" data-auto="" title="Coming soon">Session 4.3</span>'s job: an <span class="term soon" data-term="adjustment factor" title="Defined in Session 4.3 (coming soon)">adjustment factor</span>, a multiplier that is 1.0 after the corporate action and <math><semantics><mrow><mn>1</mn><mi>/</mi><mtext>ratio</mtext></mrow><annotation encoding="application/x-tex">1/\text{ratio}</annotation></semantics></math> before it, so the whole history reads in today's share terms. Multiplying raw prices by that factor is a <span class="term soon" data-term="ratio adjustment" title="Defined in Session 4.3 (coming soon)">ratio adjustment</span>; carrying it back through the full history is a <span class="term soon" data-term="back-adjustment" title="Defined in Session 4.3 (coming soon)">back-adjustment</span>, producing the <span class="term soon" data-term="adjusted price" title="Defined in Session 4.3 (coming soon)">adjusted price</span> this lake actually stores. Applied correctly, the same day's adjusted return falls to an ordinary <span data-lab="adj_split_return" data-fmt=".1%">−1.6%</span> — this lab's own bug: an early draft applied the factor the wrong way round and multiplied by the ratio instead of dividing, which is exactly what the assert in the code below catches.</p>
+
+<pre><span class="c"># 1.0 before the event would UNDO nothing; 1/ratio brings the pre-split leg down</span>
+<span class="c"># to today's post-split terms, matching the level the raw feed already shows after the split.</span>
+<span class="k">def</span> adjustment_factor(n, event_day, ratio):
+    factor = np.ones(n)
+    factor[:event_day] = <span class="p">1.0</span> / ratio
+    <span class="k">return</span> factor
+
+adjusted_price = raw_price * adjustment_factor(len(raw_price), SPLIT_DAY, SPLIT_RATIO)</pre>
+
+<p>The direction is easy to get backward, and worth checking by reasoning about units rather than memorising a rule. A 2-for-1 split doubles the number of shares outstanding and halves the price per share; the company's total value on the day does not change. So a price series expressed consistently in <em>today's</em> shares must show the pre-split leg at half its recorded level, not double it — dividing, not multiplying. Go the other way, as this lab's own first draft did, and the adjusted series records the company as having lost three-quarters of its value overnight, which is a worse bug than the one it was supposed to fix. A cash dividend is the other everyday corporate action, adjusted by a small multiplicative factor on the ex-dividend date rather than a large one at a split; <span class="xref soon" data-xref="4.3" data-style="short" data-auto="" title="Coming soon">Session 4.3</span> covers both in full, along with mergers, spin-offs and the identifier changes they bring.</p>
+
+<figure class="diagram chart">
+<!-- chart:split_adjustment -->
+<svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="ALPHA around its 2-for-1 split: raw feed vs. back-adjusted price">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">ALPHA AROUND ITS 2-FOR-1 SPLIT: RAW FEED VS. BACK-ADJUSTED PRICE</text>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#D64B2A" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">Raw price (as delivered)</text>
+  <line x1="223.60000000000002" y1="32" x2="239.60000000000002" y2="32" stroke="#3A56C5" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="245.60000000000002" y="36" font-size="11" fill="#4A5A68">Adjusted price (back-adjusted)</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="268" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$40</text>
+  <line x1="64" y1="221.6" x2="602" y2="221.6" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="225.6" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$60</text>
+  <line x1="64" y1="179.2" x2="602" y2="179.2" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="183.2" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$80</text>
+  <line x1="64" y1="136.8" x2="602" y2="136.8" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="140.8" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$100</text>
+  <line x1="64" y1="94.4" x2="602" y2="94.4" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="98.4" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$120</text>
+  <line x1="64" y1="52" x2="602" y2="52" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="56" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$140</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#C9CFC6" stroke-width="1"/>
+  <line x1="121" y1="264" x2="121" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="121" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">1.8</text>
+  <line x1="234.9" y1="264" x2="234.9" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="234.9" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">1.9</text>
+  <line x1="348.8" y1="264" x2="348.8" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="348.8" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">2</text>
+  <line x1="462.8" y1="264" x2="462.8" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="462.8" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">2.1</text>
+  <line x1="576.7" y1="264" x2="576.7" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="576.7" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">2.2</text>
+  <polyline points="64,112.5 68.5,107.4 73,106 77.6,110.6 82.1,109.7 86.6,109.5 91.1,109.3 95.6,116.4 100.2,117.5 104.7,119.1 109.2,119.3 113.7,120.2 118.3,117.5 122.8,120.1 127.3,118.2 131.8,117.2 136.3,115.1 140.9,111.9 145.4,113.7 149.9,110.1 154.4,108.9 158.9,108.9 163.5,108.3 168,110.5 172.5,109.2 177,108 181.5,107.7 186.1,100 190.6,96.1 195.1,100.1 199.6,96.6 204.2,94.5 208.7,97 213.2,92.1 217.7,96.9 222.2,96.1 226.8,99.3 231.3,100.9 235.8,97.5 240.3,101.5 244.8,98 249.4,96.4 253.9,92.9 258.4,90 262.9,84.2 267.4,81.6 272,80.9 276.5,76.8 281,77.7 285.5,77.5 290.1,80 294.6,79.4 299.1,82.1 303.6,77.7 308.1,83.7 312.7,77.6 317.2,78.7 321.7,76.7 326.2,72.4 330.7,73.6 335.3,213.4 339.8,213.2 344.3,211.9 348.8,211.4 353.3,210.3 357.9,211.6 362.4,210.2 366.9,210.7 371.4,209.9 375.9,208.6 380.5,208 385,204.7 389.5,205.5 394,208 398.6,210.2 403.1,209.4 407.6,211.1 412.1,210.1 416.6,209.9 421.2,210.3 425.7,210.1 430.2,209.5 434.7,208.8 439.2,209.9 443.8,210 448.3,212.5 452.8,212.8 457.3,213.5 461.8,212.6 466.4,216.4 470.9,215.2 475.4,213.8 479.9,216.2 484.5,218.1 489,216.7 493.5,215.1 498,217.6 502.5,217.6 507.1,215.6 511.6,214.2 516.1,215.8 520.6,216.3 525.1,215.9 529.7,214.9 534.2,213.7 538.7,212.6 543.2,214.1 547.7,210.4 552.3,210.9 556.8,209.7 561.3,209.6 565.8,210.3 570.4,213.1 574.9,213.8 579.4,211 583.9,209.3 588.4,206.4 593,205.7 597.5,205.7 602,205.1" fill="none" stroke="#D64B2A" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>Raw price (as delivered)</title></polyline>
+  <polyline points="64,230.6 68.5,228.1 73,227.4 77.6,229.7 82.1,229.2 86.6,229.1 91.1,229.1 95.6,232.6 100.2,233.1 104.7,233.9 109.2,234.1 113.7,234.5 118.3,233.2 122.8,234.4 127.3,233.5 131.8,233 136.3,231.9 140.9,230.3 145.4,231.2 149.9,229.4 154.4,228.8 158.9,228.9 163.5,228.6 168,229.6 172.5,229 177,228.4 181.5,228.3 186.1,224.4 190.6,222.4 195.1,224.5 199.6,222.7 204.2,221.7 208.7,222.9 213.2,220.4 217.7,222.9 222.2,222.4 226.8,224.1 231.3,224.9 235.8,223.2 240.3,225.1 244.8,223.4 249.4,222.6 253.9,220.8 258.4,219.4 262.9,216.5 267.4,215.2 272,214.9 276.5,212.8 281,213.2 285.5,213.1 290.1,214.4 294.6,214.1 299.1,215.5 303.6,213.2 308.1,216.2 312.7,213.2 317.2,213.7 321.7,212.8 326.2,210.6 330.7,211.2 335.3,213.4 339.8,213.2 344.3,211.9 348.8,211.4 353.3,210.3 357.9,211.6 362.4,210.2 366.9,210.7 371.4,209.9 375.9,208.6 380.5,208 385,204.7 389.5,205.5 394,208 398.6,210.2 403.1,209.4 407.6,211.1 412.1,210.1 416.6,209.9 421.2,210.3 425.7,210.1 430.2,209.5 434.7,208.8 439.2,209.9 443.8,210 448.3,212.5 452.8,212.8 457.3,213.5 461.8,212.6 466.4,216.4 470.9,215.2 475.4,213.8 479.9,216.2 484.5,218.1 489,216.7 493.5,215.1 498,217.6 502.5,217.6 507.1,215.6 511.6,214.2 516.1,215.8 520.6,216.3 525.1,215.9 529.7,214.9 534.2,213.7 538.7,212.6 543.2,214.1 547.7,210.4 552.3,210.9 556.8,209.7 561.3,209.6 565.8,210.3 570.4,213.1 574.9,213.8 579.4,211 583.9,209.3 588.4,206.4 593,205.7 597.5,205.7 602,205.1" fill="none" stroke="#3A56C5" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>Adjusted price (back-adjusted)</title></polyline>
+</svg>
+<!-- /chart:split_adjustment -->
+<figcaption>fig 4.6.3 — ALPHA's raw feed shows the split as a cliff; the back-adjusted price does not</figcaption>
+</figure>
+
+<p>The same window has a second, quieter problem: BETA is renamed BETA2 partway through — same company, new ticker. A pipeline that joins on the ticker string alone would see two different symbols with adjacent, unrelated histories. A <span class="xref soon" data-xref="4.3" data-style="short" data-auto="" title="Coming soon">Session 4.3</span> <span class="term soon" data-term="security master" title="Defined in Session 4.3 (coming soon)">security master</span> gives every ticker string a permanent <span class="term soon" data-term="security identifier" title="Defined in Session 4.3 (coming soon)">security identifier</span> that survives the rename, so this lake's curated table carries <span data-lab="n_distinct_tickers" data-fmt="">4</span> tickers but only <span data-lab="n_distinct_security_ids" data-fmt="">3</span> underlying securities — the number every later join should actually use.</p>
+
+<div class="co note"><span class="co-t">🧭 Margin note — a security identifier is a primary key</span>
+<p>An engineer would never join two tables on a user's display name, because names change. A ticker is a display name for a company; the security identifier is the primary key. <span class="xref soon" data-xref="4.3" data-style="short" data-auto="" title="Coming soon">Session 4.3</span> builds the full security master; this lab only needs to remember never to join on the string that can change.</p>
+</div>
+</section>
+
+<section id="s4">
+<h2><span class="no">4.6.4</span> As-of joins &amp; bars, applied</h2>
+<p class="lede">A join that is even slightly wrong about time turns clean history into a leak from the future.</p>
+
+<p>This lake attaches a quarterly index-committee review — whether each security counts as an index member — to the daily curated table. Getting the review "as of" a given date right is <span class="xref soon" data-xref="4.4" data-style="short" data-auto="" title="Coming soon">Session 4.4</span>'s job: an <span class="term soon" data-term="as-of join" title="Defined in Session 4.4 (coming soon)">as-of join</span> matches each row to the most recent review on or before its <span class="term soon" data-term="timestamp" title="Defined in Session 4.4 (coming soon)">timestamp</span>, and never a later one. Pandas' <code>merge_asof</code> makes the correct version, <code>direction="backward"</code>, and the tempting shortcut, <code>direction="nearest"</code>, one keyword apart — and on this lake's <span data-lab="n_reviews" data-fmt="">36</span> quarterly reviews, the shortcut matches a review that has not happened yet on <span data-lab="naive_join_lookahead_rows" data-fmt=",">1,023</span> of <span data-lab="duck_rows_total" data-fmt=",">2,271</span> rows, changing the membership flag on <span data-lab="naive_join_wrong_rows" data-fmt=",">559</span> of them. That is exactly the shape of <span class="term soon" data-term="look-ahead bias" title="Defined in Session 4.2 (coming soon)">look-ahead bias</span>: information a backtest could not have had, arriving early.</p>
+
+<div class="co tip"><span class="co-t">💡 Tip — read the direction keyword every time</span>
+<p><code>nearest</code> is the right choice for genuinely undated reference data, like rounding a trade to the nearest quote. For anything that becomes known on a date — a review, a filing, a restated number — the only safe default is <code>backward</code>.</p>
+</div>
+
+<p>The same table also feeds <span class="xref soon" data-xref="4.4" data-style="short" data-auto="" title="Coming soon">Session 4.4</span>'s bars. A daily row is a <span class="term soon" data-term="time bars" title="Defined in Session 4.4 (coming soon)">time bar</span>: one per calendar day, regardless of how much traded. A <span class="term soon" data-term="dollar bars" title="Defined in Session 4.4 (coming soon)">dollar bar</span> instead closes whenever cumulative traded value crosses a threshold, and a <span class="term soon" data-term="volume bars" title="Defined in Session 4.4 (coming soon)">volume bar</span> does the same on shares traded — both sample by information, not by the clock (López de Prado, 2018). ALPHA's <span data-lab="n_time_bars" data-fmt="">757</span> time bars became <span data-lab="n_dollar_bars" data-fmt="">453</span> dollar bars and <span data-lab="n_volume_bars" data-fmt="">466</span> volume bars once this lab made trading volume rise with the size of the day's move, exactly as busy markets do: a dollar bar closes every <span data-lab="days_per_dollar_bar_busy" data-fmt=".1f">2.0</span> days near the split, against <span data-lab="days_per_dollar_bar_quiet" data-fmt=".1f">2.7</span> days in quieter stretches.</p>
+
+<table>
+<thead><tr><th>Sampling rule</th><th>Bar count on ALPHA</th><th>Adapts to activity?</th></tr></thead>
+<tbody>
+<tr><td>Time bar — one per day</td><td><span data-lab="n_time_bars" data-fmt="">757</span></td><td>no — every day gets one, however quiet</td></tr>
+<tr><td>Volume bar — every <em>N</em> shares traded</td><td><span data-lab="n_volume_bars" data-fmt="">466</span></td><td>yes</td></tr>
+<tr><td>Dollar bar — every $<em>N</em> traded</td><td><span data-lab="n_dollar_bars" data-fmt="">453</span></td><td>yes, and robust to the price level itself</td></tr>
+</tbody>
+</table>
+
+<p>The "nearest" shortcut earns its keep in an ordinary pandas exercise — matching a trade to the closest quote a few milliseconds away rarely cares which side of "closest" it fell on. It stops being harmless the moment the right-hand table is something that becomes true on a date, like an index review, a filing or a restated number, because "nearest" has no concept of before and after: it will happily hand a row of March data a fact that was only announced in June. This lab's own numbers show the effect is not rare on a quarterly review schedule — it does not need daily reviews or an adversarial dataset to matter, only the wrong keyword. Information-driven bars earn their place for a related reason: López de Prado (2018) reports that dollar bars bring a return series closer to independent and identically distributed than fixed-time bars do, which matters because most of the statistical machinery later units rely on — standard errors, hypothesis tests, the Sharpe ratio's own confidence interval — assumes exactly that.</p>
+</section>
+
+<section id="s5">
+<h2><span class="no">4.6.5</span> The storage layer, applied</h2>
+<p class="lede">The curated table is written once, as files a query engine can prune without ever opening them.</p>
+
+<p>The curated table lands as <span class="xref soon" data-xref="4.5" data-style="short" data-auto="" title="Coming soon">Session 4.5</span>'s <span class="term soon" data-term="Parquet" title="Defined in Session 4.5 (coming soon)">Parquet</span> — a <span class="term soon" data-term="columnar storage" title="Defined in Session 4.5 (coming soon)">columnar</span>, compressed, typed file format — partitioned by symbol in the Hive convention (<code>symbol=ALPHA/…</code>). Written this way, the same rows that take <span data-lab="csv_bytes" data-fmt=",">162,060</span> bytes as CSV take <span data-lab="parquet_bytes" data-fmt=",">77,724</span> bytes as partitioned Parquet — about <span data-lab="compression_ratio" data-fmt=".1f">2.1</span>× smaller on this small a table, and the gap only grows with more history, because Parquet's column-oriented, dictionary-encoded layout is exactly what makes a query engine's next trick possible (Melnik et al., 2010).</p>
+
+<p><span class="xref soon" data-xref="4.5" data-style="short" data-auto="" title="Coming soon">Session 4.5</span>'s <span class="term soon" data-term="DuckDB" title="Defined in Session 4.5 (coming soon)">DuckDB</span> reads the partitioned directory directly: a query that filters on <code>symbol</code> skips every file whose partition value cannot match, without opening it. This lab checks that literally — a view over all <span data-lab="duck_rows_total" data-fmt=",">2,271</span> rows returns exactly <span data-lab="duck_rows_one_symbol" data-fmt="">757</span> rows for one symbol, the same count pandas gives directly from memory. <span class="term soon" data-term="polars" title="Defined in Session 4.5 (coming soon)">polars</span>' <span class="term soon" data-term="lazy evaluation" title="Defined in Session 4.5 (coming soon)">lazy evaluation</span> does the analogous thing on the read side: a <code>scan_parquet(...).filter(...).select(...)</code> pipeline builds a query plan and only touches bytes once <code>.collect()</code> runs, with the filter and the column projection pushed down ahead of it. Cross-checking a polars-lazy mean against the same pandas column agrees to within <span data-lab="cross_engine_diff" data-fmt=".1e">0.0e+00</span> — two independent engines, one number.</p>
+
+<p>None of this needs its own conversion step. Writing the curated pandas table to Parquet in this lab goes through a <span class="term soon" data-term="Apache Arrow" title="Defined in Session 4.5 (coming soon)">pyarrow.Table</span> first — the same columnar, in-memory format DuckDB and polars both read and write natively, so a value moves between pandas, Arrow, DuckDB and polars without ever being serialised to text or copied through a row-by-row loop. Partitioning by symbol, rather than by date, is a bet on how this lake is actually queried: almost every research question in this course asks "give me this symbol's history," while "give me every symbol on this one day" is rare. A production system ingesting live ticks would likely choose the opposite split, or partition by both — the right partition key follows the query pattern, not a rule.</p>
+
+<div class="co note"><span class="co-t">🧭 Margin note — when Parquet plus DuckDB is not enough</span>
+<p>This stack comfortably serves one researcher's history on a laptop. Sell-side desks and market-makers querying tick data at nanosecond resolution across years often reach for <span class="term soon" data-term="kdb+" title="Defined in Session 4.5 (coming soon)">kdb+</span> instead — a proprietary, in-memory time-series database with real licensing costs. <span class="xref soon" data-xref="4.5" data-style="short" data-auto="" title="Coming soon">Session 4.5</span> makes that trade-off explicit; nothing in this course needs it.</p>
+</div>
+</section>
+
+<section id="s6">
+<h2><span class="no">4.6.6</span> Quality gates, lineage &amp; idempotency</h2>
+<p class="lede">This is the part only this session owns: the discipline that makes a pipeline safe to rerun, and a table safe to trust without re-deriving it.</p>
+
+<p>A <strong>data contract</strong> is the schema and the rules a curated table promises to satisfy: which columns must exist, which may never be null, and which values must make sense. A <strong>data quality check</strong> tests real data against that contract and reports every violation, not just the first. This lab's contract is six columns, non-null keys, no duplicate (date, symbol) pairs, ascending timestamps, and positive prices, non-negative volume and a positive adjustment factor — checked once on the clean curated table (<span data-lab="clean_violations" data-fmt="">0</span> violations) and then again on a copy with four deliberately injected problems, which the same check catches all <span data-lab="caught_violations" data-fmt="">4</span> of.</p>
+
+<pre><span class="k">def</span> check_quality(df):
+    <span class="c"># returns every violation, not just the first — a data contract you can act on</span>
+    problems = []
+    <span class="k">if</span> df[<span class="s">"date"</span>].isna().any() <span class="k">or</span> df[<span class="s">"symbol"</span>].isna().any():
+        problems.append(<span class="s">"null key column"</span>)
+    <span class="k">if</span> df.duplicated([<span class="s">"date"</span>, <span class="s">"symbol"</span>]).any():
+        problems.append(<span class="s">"duplicate (date, symbol) rows"</span>)
+    <span class="c"># … ascending timestamps, positive price, non-negative volume, positive adj_factor</span>
+    <span class="k">return</span> problems</pre>
+
+<table>
+<thead><tr><th>Check</th><th>Catches</th><th>Why it matters</th></tr></thead>
+<tbody>
+<tr><td>required columns present</td><td>a stage that silently dropped a column</td><td>a KeyError three files away, not here</td></tr>
+<tr><td>no null keys</td><td>a row nobody can join or partition</td><td>nulls in a partition column corrupt the layout</td></tr>
+<tr><td>no duplicate (date, symbol)</td><td>a row written twice by a rerun</td><td>a bar or a return counted twice</td></tr>
+<tr><td>timestamps ascending</td><td>an out-of-order write, or a bad merge</td><td>breaks every as-of join downstream</td></tr>
+<tr><td>price &gt; 0, volume ≥ 0, adj_factor &gt; 0</td><td>a sign error surviving to production</td><td>the exact bug §4.6.3 found in this lab's first draft</td></tr>
+</tbody>
+</table>
+
+<p>An <strong>idempotent pipeline</strong> run twice with the same inputs and the same seed either writes byte-identical output or — better — recognises that nothing changed and skips the rewrite. This lab fingerprints its parameters and its seed together, hashes the curated table's content with <code>quantnb.repro.content_fingerprint</code>, and only rebuilds the Parquet dataset when either has changed. The first call reports <code><span data-lab="run1_status" data-fmt="">built</span></code>; the second, with nothing changed, reports <code><span data-lab="run2_status" data-fmt="">skipped (already built)</span></code> — <mark>calling the pipeline a second time is a question, not a rebuild</mark>. <strong>Data lineage</strong> is the record that makes that question answerable at all: a small manifest, keyed by fingerprint, logging the pipeline version, the parameters, the seed and the row count of every build that ever ran, so a suspicious number downstream can be traced back to the exact run that produced it.</p>
+
+<p>This is <a class="xref" href="../unit01-quant-landscape/session05-quant-lab-setup.html" data-xref="1.5" data-style="short" data-auto="">Session 1.5</a>'s <a class="term" href="../unit01-quant-landscape/session05-quant-lab-setup.html#g-run-manifest" data-term="run manifest">run manifest</a> — commit, package versions, a data fingerprint and a <a class="term" href="../unit01-quant-landscape/session05-quant-lab-setup.html#g-random-seed" data-term="random seed">random seed</a>, recorded so one lab's result can be reproduced — applied to a dataset that gets rebuilt many times rather than to a single script run once. <a class="xref" href="../unit01-quant-landscape/session05-quant-lab-setup.html" data-xref="1.5" data-style="short" data-auto="">Session 1.5</a>'s manifest answers "what produced this number"; this lake's lineage answers the same question for "what produced these files," and the two ideas share a mechanism on purpose: a <a class="term" href="../unit01-quant-landscape/session05-quant-lab-setup.html#g-data-cache" data-term="data cache">data cache</a> keeps expensive results around, keyed by exactly the inputs that determine them, and both a run and a data-lake build are just results that happen to be a folder of Parquet files instead of a printed metric.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 220" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">SAME PIPELINE, TWO WAYS TO RUN IT</text>
+  <rect x="26" y="32" width="326" height="176" rx="9" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="189" y="54" font-size="11" font-weight="700" text-anchor="middle" fill="#D64B2A">NO CONTRACT, NO LINEAGE</text>
+  <rect x="46" y="66" width="286" height="24" rx="5" fill="#fff" stroke="#F2CDBF"/>
+  <text x="58" y="82" font-size="9.5" fill="#1F2C38">rerun always overwrites everything</text>
+  <rect x="46" y="96" width="286" height="24" rx="5" fill="#fff" stroke="#F2CDBF"/>
+  <text x="58" y="112" font-size="9.5" fill="#1F2C38">bad rows ship silently, no gate</text>
+  <text x="189" y="148" font-size="9.5" text-anchor="middle" fill="#D64B2A" font-weight="600">A bad batch reaches a backtest.</text>
+  <text x="189" y="166" font-size="9" text-anchor="middle" fill="#4A5A68">Nobody can say which run produced it.</text>
+  <rect x="368" y="32" width="326" height="176" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="531" y="54" font-size="11" font-weight="700" text-anchor="middle" fill="#1F7A55">CONTRACT + LINEAGE</text>
+  <rect x="388" y="66" width="286" height="24" rx="5" fill="#fff" stroke="#BFE0CF"/>
+  <text x="400" y="82" font-size="9.5" fill="#1F2C38">1 · every write passes check_quality()</text>
+  <rect x="388" y="96" width="286" height="24" rx="5" fill="#fff" stroke="#BFE0CF"/>
+  <text x="400" y="112" font-size="9.5" fill="#1F2C38">2 · every build logs a fingerprinted manifest</text>
+  <text x="531" y="148" font-size="9.5" text-anchor="middle" fill="#1F7A55" font-weight="600">A bad batch is caught before it ships.</text>
+  <text x="531" y="166" font-size="9" text-anchor="middle" fill="#4A5A68">A rerun with the same inputs is a no-op.</text>
+</svg>
+<figcaption>fig 4.6.4 — the same pipeline, run without and with a contract and a lineage manifest</figcaption>
+</figure>
+</section>
+
+<section id="s7">
+<h2><span class="no">4.6.7</span> Proving it works</h2>
+<p class="lede">A lake is only useful if a research query on it gives an answer you can trust — and this one shows exactly what happens when it doesn't.</p>
+
+<p>The whole point of the last six sections is a query. Reading ALPHA's history back through the query tier and computing a <a class="term" href="../unit02-markets-instruments/session03-returns-pnl-leverage.html#g-sharpe-ratio" data-term="Sharpe ratio">Sharpe ratio</a> and a <a class="term" href="../unit02-markets-instruments/session03-returns-pnl-leverage.html#g-drawdown" data-term="drawdown">drawdown</a> — synthetic excess returns, risk-free rate 0 — on the raw feed and on the curated, adjusted table gives two very different answers to the same question.</p>
+
+<table>
+<thead><tr><th>Metric</th><th>Raw feed (unadjusted)</th><th>Curated (adjusted)</th></tr></thead>
+<tbody>
+<tr><td>Sharpe ratio</td><td><span data-lab="sharpe_raw" data-fmt=".2f">−0.02</span></td><td><span data-lab="sharpe_adjusted" data-fmt=".2f">0.76</span></td></tr>
+<tr><td>Maximum drawdown</td><td><span data-lab="maxdd_raw" data-fmt=".1%">−52.7%</span></td><td><span data-lab="maxdd_adjusted" data-fmt=".1%">−19.0%</span></td></tr>
+<tr><td>Return on the split day</td><td><span data-lab="raw_split_return" data-fmt=".1%">−50.8%</span></td><td><span data-lab="adj_split_return" data-fmt=".1%">−1.6%</span></td></tr>
+</tbody>
+</table>
+
+<p>Nothing about ALPHA's underlying business changed on the split day. The raw-feed column is not a worse investment — it is the same investment measured with a bug. <mark>the Sharpe ratio and the drawdown both belong to <a class="xref" href="../unit02-markets-instruments/session03-returns-pnl-leverage.html" data-xref="2.3" data-style="short" data-auto="">Session 2.3</a>; whether they mean anything belongs to this lake</mark>.</p>
+
+<div class="co warn"><span class="co-t">⚠️ Pitfall — "the vendor already adjusts for splits"</span>
+<p>Some vendors do, for some fields, some of the time: a "close" column and an "adjusted close" column sitting side by side in the same file, with nothing in the schema saying which later code was written against. The moment a new script points at the unadjusted column by mistake — or a data provider quietly changes which column carries the adjustment — this exact bug reappears, and it will not raise an exception; it will just make one symbol's history look like it crashed. The fix is never to trust a claim about a column's name. It is to check the contract yourself, the way <code>check_quality</code> does here, every time a new feed enters the raw tier — trust the assert, not the label.</p>
+</div>
+</section>
+
+<section id="s8">
+<h2><span class="no">4.6.8</span> Try it</h2>
+<p class="lede">Open the companion lab and break the pipeline on purpose — then watch the contract catch it.</p>
+<div class="co lab"><span class="co-t">🔧 Try it (15 min, in the lab)</span>
+<p>1. In §2, change <code>SPLIT_RATIO</code> from <code>2.0</code> to <code>3.0</code> (a 3-for-1 split) and rerun from the top. Recompute the raw split-day return by hand (it should land near <math><semantics><mrow><mn>1</mn><mi>/</mi><mn>3</mn><mo>−</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">1/3 - 1</annotation></semantics></math>) and check it against the lab's printed number.<br>
+2. In §4, change the naive join's <code>direction="nearest"</code> to <code>direction="forward"</code>. Does <code>naive_join_lookahead_rows</code> go up or down, and why does "always forward" make the look-ahead worse, not better?<br>
+3. In §5, comment out <code>check_quality</code>'s duplicate-row check, rerun the corrupted-copy test, and read the assertion error. Success looks like this: the assert fails with a message telling you exactly which violation went uncaught.</p>
+</div>
+</section>
+
+<hr>
+
+<section id="s9">
+<h2><span class="no">4.6.9</span> Glossary · Check yourself · Go deeper</h2>
+<div class="gloss" id="glossary">
+<div id="g-data-contract"><b>Data contract</b> — the schema and rules a curated table promises to satisfy: required columns, non-null keys, and value ranges every later query can rely on without re-checking them.</div>
+<div id="g-data-quality-check"><b>Data quality check</b> — code that tests real data against a data contract and reports every violation it finds, run before the data is trusted downstream.</div>
+<div id="g-idempotent-pipeline"><b>Idempotent pipeline</b> — a pipeline that, run twice with the same inputs and the same seed, either produces byte-identical output or detects that nothing changed and skips the rewrite.</div>
+<div id="g-data-lineage"><b>Data lineage</b> — a record of which inputs, parameters, seed and pipeline version produced a given build, so a downstream number can be traced back to the run that made it.</div>
+</div>
+
+<h3>Check yourself</h3>
+<details class="q"><summary>1. Why does the lake write curated data as partitioned Parquet with a `symbol` column, rather than one large CSV?</summary><div>Partitioning by symbol lets a query engine skip every file that cannot match a `WHERE symbol = …` filter without opening it, and Parquet's columnar layout lets it read only the columns a query needs. A single CSV forces a full scan and a full row parse every time — one file, but no gates to skip through it.</div></details>
+<details class="q"><summary>2. A colleague reruns the pipeline twice in a row and is annoyed that the second run "did nothing." Is that a bug?</summary><div>No — it is the point. An idempotent pipeline recognises that the fingerprint of the parameters, seed and data content has not changed, and reports a verified no-op rather than silently rewriting the same bytes. A pipeline that instead rewrites (and possibly reorders or reformats) identical data on every run makes "did the data change?" unanswerable from the files alone.</div></details>
+<details class="q"><summary>3. What happens if you compute a Sharpe ratio directly on ALPHA's raw, unadjusted prices?</summary><div>The 2-for-1 split alone manufactures a one-day return of about <span data-lab="raw_split_return" data-fmt=".1%">−50.8%</span> and a maximum drawdown of <span data-lab="maxdd_raw" data-fmt=".1%">−52.7%</span> that has nothing to do with the business. The adjusted series instead shows a maximum drawdown of <span data-lab="maxdd_adjusted" data-fmt=".1%">−19.0%</span> — the number that actually reflects what happened.</div></details>
+<details class="q"><summary>4. Why does a lineage manifest record the seed alongside the parameters?</summary><div>Because this lake is built from synthetic data, the seed is part of what determines the content — two runs with identical parameters but different seeds produce different (equally valid) data. A cache key or a fingerprint that omits the seed would treat two different datasets as the same one, and an idempotency check built on it would wrongly skip a rebuild.</div></details>
+<details class="q"><summary>5. An as-of join uses `direction="nearest"` instead of `direction="backward"`. What could go wrong, concretely?</summary><div>`nearest` can match a row to a review, filing or price that has not happened yet as of that row's date — a look-ahead leak. On this lab's own panel, a nearest-match join picks a future review on <span data-lab="naive_join_lookahead_rows" data-fmt=",">1,023</span> of <span data-lab="duck_rows_total" data-fmt=",">2,271</span> rows, changing the resulting value on <span data-lab="naive_join_wrong_rows" data-fmt=",">559</span> of them.</div></details>
+
+<div class="co lab"><span class="co-t">🔧 Homework (~1 h before Session 5.1)</span>
+<p>1. Add a fourth synthetic symbol to the lab with its own split, and confirm the data contract still reports zero violations on the resulting curated table.<br>
+2. Write one additional data-quality check — for example, that no daily return exceeds ±50% after adjustment — and confirm it fires on the corrupted copy but not on the clean one.<br>
+3. Read López de Prado's chapter on financial data structures (below) and, in your own words, write two sentences on why a fixed-time bar can make a return series look more normally distributed than it really is.</p>
+</div>
+
+<h3>📚 Go deeper</h3>
+<ol class="refs">
+<li>López de Prado, M. (2018). <em>Advances in Financial Machine Learning</em>, ch. 2 "Financial Data Structures." Wiley. <span class="rid">ISBN 978-1-119-48208-6</span></li>
+<li>Kleppmann, M. (2017). <em>Designing Data-Intensive Applications: The Big Ideas Behind Reliable, Scalable, and Maintainable Systems</em>. O'Reilly. <span class="rid">ISBN 978-1-4493-7332-0</span></li>
+<li>Raasveldt, M. &amp; Mühleisen, H. (2019). "DuckDB: an Embeddable Analytical Database." <em>Proceedings of the 2019 ACM SIGMOD International Conference on Management of Data</em>, 1981–1984. <span class="rid">doi:10.1145/3299869.3320212</span></li>
+<li>Armbrust, M. et al. (2020). "Delta Lake: High-Performance ACID Table Storage over Cloud Object Stores." <em>Proceedings of the VLDB Endowment</em> 13(12), 3411–3424. <span class="rid">doi:10.14778/3415478.3415560</span></li>
+</ol>
+
+<h3>Sources for the numbers</h3>
+<ol class="refs">
+<li>Melnik, S., Gubarev, A., Long, J. J., Romer, G., Shivakumar, S., Tolton, M. &amp; Vassilakis, T. (2010). "Dremel: Interactive Analysis of Web-Scale Datasets." <em>Proceedings of the VLDB Endowment</em> 3(1), 330–339 — the columnar, dictionary-encoded layout Parquet builds on. <span class="rid">doi:10.14778/1920841.1920886</span></li>
+<li>DuckDB documentation. "Hive Partitioning" — filter pushdown into Hive-style partitioned Parquet directories. Accessed September 2026. <span class="rid">https://duckdb.org/docs/lts/data/partitioning/hive_partitioning</span></li>
+<li>Polars documentation. "Lazy API" — predicate and projection pushdown in the lazy query engine. Accessed September 2026. <span class="rid">https://docs.pola.rs/user-guide/concepts/lazy-api/</span></li>
+</ol>
+</section>
+
+<!-- nav:foot -->
+<div class="foot">
+<span class="soon" title="Coming soon">← Prev: 4.5 · Storage Stack</span>
+<span class="soon" title="Coming soon">Next: 5.1 · Stylized Facts →</span>
+</div>
+<p class="legal">Educational material only — not investment, legal or tax advice. Backtests and simulations are hypothetical. <a href="../start-here.html#disclaimer">Disclaimer</a> · Text CC BY 4.0 · Code MIT.</p>
+<!-- /nav:foot -->
+</main>
+</div></body></html>

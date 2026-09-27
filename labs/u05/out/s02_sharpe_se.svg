@@ -1,0 +1,23 @@
+<svg viewBox="0 0 720 260" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="SE of the annualised Sharpe ratio under mild autocorrelation">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">SE OF THE ANNUALISED SHARPE RATIO UNDER MILD AUTOCORRELATION</text>
+  <line x1="64" y1="216" x2="690" y2="216" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="220" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.00</text>
+  <line x1="64" y1="173" x2="690" y2="173" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="177" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.20</text>
+  <line x1="64" y1="130" x2="690" y2="130" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="134" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.40</text>
+  <line x1="64" y1="87" x2="690" y2="87" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="91" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.60</text>
+  <line x1="64" y1="44" x2="690" y2="44" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="48" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.80</text>
+  <line x1="64" y1="216" x2="690" y2="216" stroke="#C9CFC6" stroke-width="1"/>
+  <path d="M156.3,216 V95.7 Q156.3,91.7 160.3,91.7 H176.3 Q180.3,91.7 180.3,95.7 V216 Z" fill="#D64B2A"><title>Naive (i.i.d.): 0.58</title></path>
+  <text x="168.3" y="84.7" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.58</text>
+  <text x="168.3" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">Naive (i.i.d.)</text>
+  <path d="M365,216 V75.5 Q365,71.5 369,71.5 H385 Q389,71.5 389,75.5 V216 Z" fill="#3A56C5"><title>Autocorrelation-corrected: 0.67</title></path>
+  <text x="377" y="64.5" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.67</text>
+  <text x="377" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">Autocorrelation-corrected</text>
+  <path d="M573.7,216 V76.7 Q573.7,72.7 577.7,72.7 H593.7 Q597.7,72.7 597.7,76.7 V216 Z" fill="#4A5A68"><title>Empirical (Monte Carlo): 0.67</title></path>
+  <text x="585.7" y="65.7" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0.67</text>
+  <text x="585.7" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">Empirical (Monte Carlo)</text>
+</svg>

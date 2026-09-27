@@ -1,0 +1,32 @@
+<svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="60-trading-day-ahead volatility forecast from the same day">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">60-TRADING-DAY-AHEAD VOLATILITY FORECAST FROM THE SAME DAY</text>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#E8850C" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">EWMA forecast (flat)</text>
+  <line x1="198.0" y1="32" x2="214.0" y2="32" stroke="#3A56C5" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="220.0" y="36" font-size="11" fill="#4A5A68">GARCH(1,1) forecast</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="268" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">15%</text>
+  <line x1="64" y1="193.3" x2="602" y2="193.3" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="197.3" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">20%</text>
+  <line x1="64" y1="122.7" x2="602" y2="122.7" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="126.7" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">25%</text>
+  <line x1="64" y1="52" x2="602" y2="52" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="56" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">30%</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#C9CFC6" stroke-width="1"/>
+  <line x1="169.8" y1="264" x2="169.8" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="169.8" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">0.05</text>
+  <line x1="284.7" y1="264" x2="284.7" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="284.7" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">0.1</text>
+  <line x1="399.6" y1="264" x2="399.6" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="399.6" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">0.15</text>
+  <line x1="514.5" y1="264" x2="514.5" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="514.5" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">0.2</text>
+  <line x1="64" y1="251.6" x2="602" y2="251.6" stroke="#4A5A68" stroke-width="1"/>
+  <text x="68" y="246.6" font-size="10.5" fill="#4A5A68">true long-run vol</text>
+  <polyline points="64,64.9 73.1,64.9 82.2,64.9 91.4,64.9 100.5,64.9 109.6,64.9 118.7,64.9 127.8,64.9 136.9,64.9 146.1,64.9 155.2,64.9 164.3,64.9 173.4,64.9 182.5,64.9 191.7,64.9 200.8,64.9 209.9,64.9 219,64.9 228.1,64.9 237.3,64.9 246.4,64.9 255.5,64.9 264.6,64.9 273.7,64.9 282.8,64.9 292,64.9 301.1,64.9 310.2,64.9 319.3,64.9 328.4,64.9 337.6,64.9 346.7,64.9 355.8,64.9 364.9,64.9 374,64.9 383.2,64.9 392.3,64.9 401.4,64.9 410.5,64.9 419.6,64.9 428.7,64.9 437.9,64.9 447,64.9 456.1,64.9 465.2,64.9 474.3,64.9 483.5,64.9 492.6,64.9 501.7,64.9 510.8,64.9 519.9,64.9 529.1,64.9 538.2,64.9 547.3,64.9 556.4,64.9 565.5,64.9 574.6,64.9 583.8,64.9 592.9,64.9 602,64.9" fill="none" stroke="#E8850C" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>EWMA forecast (flat)</title></polyline>
+  <circle cx="602" cy="64.9" r="4" fill="#E8850C" stroke="#FBFBF8" stroke-width="2"><title>EWMA forecast (flat): 29%</title></circle>
+  <polyline points="64,91.7 73.1,93.9 82.2,96 91.4,98.1 100.5,100.1 109.6,102.1 118.7,104.1 127.8,106.1 136.9,108 146.1,110 155.2,111.8 164.3,113.7 173.4,115.5 182.5,117.4 191.7,119.1 200.8,120.9 209.9,122.6 219,124.4 228.1,126.1 237.3,127.7 246.4,129.4 255.5,131 264.6,132.6 273.7,134.2 282.8,135.7 292,137.2 301.1,138.8 310.2,140.2 319.3,141.7 328.4,143.1 337.6,144.6 346.7,146 355.8,147.4 364.9,148.7 374,150.1 383.2,151.4 392.3,152.7 401.4,154 410.5,155.2 419.6,156.5 428.7,157.7 437.9,158.9 447,160.1 456.1,161.3 465.2,162.4 474.3,163.6 483.5,164.7 492.6,165.8 501.7,166.9 510.8,167.9 519.9,169 529.1,170 538.2,171.1 547.3,172.1 556.4,173.1 565.5,174 574.6,175 583.8,175.9 592.9,176.9 602,177.8" fill="none" stroke="#3A56C5" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>GARCH(1,1) forecast</title></polyline>
+  <circle cx="602" cy="177.8" r="4" fill="#3A56C5" stroke="#FBFBF8" stroke-width="2"><title>GARCH(1,1) forecast: 21%</title></circle>
+  <text x="614" y="68.9" font-size="11" fill="#1F2C38">EWMA: 29%</text>
+  <text x="614" y="181.8" font-size="11" fill="#1F2C38">GARCH: 21%</text>
+</svg>

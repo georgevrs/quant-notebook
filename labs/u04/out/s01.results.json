@@ -1,0 +1,30 @@
+{
+  "results": {
+    "annual_gb_one_symbol": 0.984103344,
+    "annual_gb_universe": 492.051672,
+    "bars_pq_bytes": 23369,
+    "bytes_per_bar": 59.92051282051282,
+    "bytes_per_quote": 29.158991666666665,
+    "bytes_per_tick": 20.30465,
+    "compression_ratio": 2.611286084714585,
+    "duckdb_matches_pandas": true,
+    "m_subintervals": 78,
+    "mu_mc": 0.08,
+    "n_bars": 390,
+    "n_quotes": 120000,
+    "n_ticks": 20000,
+    "quotes_pq_bytes": 3499079,
+    "raw_to_bar_ratio": 167.10907612649237,
+    "sd_bar": 0.00035074741130285093,
+    "sd_ratio": 8.831760866327846,
+    "sd_rv": 3.9714323860388675e-05,
+    "session_hours": 6.5,
+    "sigma_mc": 0.25,
+    "spread_bps": 4.0,
+    "ticks_pq_bytes": 406093,
+    "universe_size": 500,
+    "var_ratio_emp": 75.18339817915857
+  },
+  "seed": 20260926,
+  "session": "4.1"
+}

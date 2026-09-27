@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- nav:head -->
+<title>4.3 · Corporate Actions, Security Master &amp; Continuous Futures</title>
+<meta name="description" content="Adjust prices correctly, keep identifiers straight through ticker changes, and stitch futures into continuous series without inventing returns.">
+<link rel="canonical" href="https://georgevrs.github.io/quant-notebook/unit04-data-engineering/session03-corporate-actions-security-master.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Quant Notebook">
+<meta property="og:title" content="4.3 · Corporate Actions, Security Master &amp; Continuous Futures">
+<meta property="og:description" content="Adjust prices correctly, keep identifiers straight through ticker changes, and stitch futures into continuous series without inventing returns.">
+<meta property="og:url" content="https://georgevrs.github.io/quant-notebook/unit04-data-engineering/session03-corporate-actions-security-master.html">
+<meta name="twitter:card" content="summary">
+<link rel="stylesheet" href="../assets/brand.css">
+<link rel="stylesheet" href="../assets/temml.css">
+<!-- /nav:head -->
+</head>
+<body><div class="page" id="top">
+<!-- Session 4.3 — security master, adjustment factors and continuous futures. 2.2 owns corporate
+     actions and the dividend/split economics; 2.4 owns futures pricing and roll yield. This
+     session owns the pipeline arithmetic that turns known events into one clean series. See
+     AUTHORING.md. -->
+<!-- nav:tabs -->
+<nav class="tabs">
+<a href="../index.html">⌂ Course home</a>
+<span class="soon" title="Coming soon">4.1 · Data Landscape</span>
+<span class="soon" title="Coming soon">4.2 · Point-in-Time</span>
+<a class="active" href="session03-corporate-actions-security-master.html">4.3 · Security Master</a>
+<span class="soon" title="Coming soon">4.4 · Time &amp; Bars</span>
+<span class="soon" title="Coming soon">4.5 · Storage Stack</span>
+<span class="soon" title="Coming soon">4.6 · Lab: Data Lake</span>
+<a href="../roadmap.html">🗺 Roadmap</a>
+</nav>
+<!-- /nav:tabs -->
+
+<header class="cover">
+<!-- nav:heading -->
+<p class="eyebrow">Unit 4 · Financial Data Engineering — Session 03 of 06</p>
+<h1>Corporate Actions, Security Master &amp; Continuous Futures</h1>
+<!-- /nav:heading -->
+<p class="subtitle">A dividend, a split and a futures roll look unrelated. To a data pipeline they are the same problem: a known, dated event that moves the quoted price without moving your wealth, and a security master's whole job is to fold that event into history as one clean number. <mark>The core move: an adjustment factor is not a fact about the world, it is a number you multiply in — and every convention for chaining those numbers trades away something.</mark></p>
+<div class="meta">
+<span>DURATION <b>1.5 h + lab</b></span>
+<span>LEVEL <b>Foundations</b></span>
+<span>TRACKS <b>QR · QD · IND</b></span>
+<span>HANDS-ON <b>Build a security master's arithmetic and two continuous-futures series from <span data-lab="cf_n_contracts" data-fmt="d">32</span> synthetic contracts</b></span>
+</div>
+<!-- nav:labstrip -->
+<div class="labstrip"><b>📓 Companion lab</b>
+<a href="https://colab.research.google.com/github/georgevrs/quant-notebook/blob/main/labs/u04/s03_corporate_actions_security_master.ipynb">Open in Colab</a>
+<a href="https://github.com/georgevrs/quant-notebook/blob/main/labs/u04/s03_corporate_actions_security_master.ipynb">Notebook on GitHub</a>
+<a href="https://github.com/georgevrs/quant-notebook/blob/main/labs/u04/s03_corporate_actions_security_master.py">Source (.py)</a>
+</div>
+<!-- /nav:labstrip -->
+<div class="toc">
+<b>On this page</b>
+<ol>
+<li><a href="#s1">The security master: one identity, many labels</a></li>
+<li><a href="#s2">From corporate action to adjusted price</a></li>
+<li><a href="#s3">Continuous futures: splicing contracts that die</a></li>
+<li><a href="#s4">Back-adjustment vs ratio adjustment: the math</a></li>
+<li><a href="#s5">Building it: a roll schedule, in code</a></li>
+<li><a href="#s6">Where people go wrong</a></li>
+<li><a href="#s7">Try it</a></li>
+<li><a href="#s8">Glossary · Check yourself · Go deeper</a></li>
+</ol>
+</div>
+</header>
+
+<main>
+
+<section id="s1">
+<h2><span class="no">4.3.1</span> The security master: one identity, many labels</h2>
+<p class="lede">Before you can adjust a price, you have to know which company you are talking about — through a name change, a ticker reused by a stranger, and a merger that ends one history and starts another.</p>
+
+<p>Every vendor, exchange and regulator names a security differently. A <strong>security identifier</strong> is any of those codes: a ticker, a <strong>CUSIP</strong> (nine characters, North America), an <strong>ISIN</strong> (twelve characters, the global standard fixed by ISO 6166 — a two-letter ISO country code, a nine-character national body that is often just a CUSIP or local code padded out, and one check digit computed by the Luhn algorithm), or a <strong>FIGI</strong> (twelve alphanumeric characters, open and free, issued through Bloomberg's Object Management Group allocation process). Only some of these are safe to build a history on. A ticker is a mailbox: exchanges reuse them, sometimes within a year of a delisting. A CUSIP can be reassigned after some corporate reorganisations, and an ISIN inherits whatever its national numbering agency does to the code it wraps. A FIGI is the outlier by design: once assigned to a given instrument it is never reused, even after that instrument stops trading — it is simply retired and stays queryable (OpenFIGI's own specification is explicit about this). That permanence is about the <em>instrument</em>, not the company: a bond exchange or a share-class change still mints a new FIGI, so chaining one company's identifiers through time is still a security master's job even once you have picked the sturdiest identifier available.</p>
+
+<p>A <strong>security master</strong> is the reference database that solves this: it assigns one <em>permanent internal key</em> to each company, maps every external identifier and every date range it was valid for onto that key, and stores the timeline of corporate actions against it. One level up from the security sits the issuer: GLEIF's Legal Entity Identifier (LEI) system answers "who owns whom" for the company itself — its direct and ultimate parent — which a security master usually carries as one more attribute of the permanent key, since one issuer can stand behind many securities (common stock, preferred stock, several bond series). Get the key wrong and every later step — adjustment, index membership, point-in-time joins (<span class="xref soon" data-xref="4.2" data-auto="" title="Coming soon">Session 4.2 — Point-in-Time Data &amp; Data Biases</span>) — inherits the mistake.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 250" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">ONE PERMANENT KEY, MANY LABELS — a security master maps every identifier onto it</text>
+  <rect x="210" y="30" width="300" height="54" rx="10" fill="#E9F5EF" stroke="#1F7A55" stroke-width="2"/>
+  <text x="360" y="53" font-size="12.5" font-weight="700" text-anchor="middle" fill="#1F7A55">PERMANENT INTERNAL KEY</text>
+  <text x="360" y="70" font-size="9.5" text-anchor="middle" fill="#4A5A68">assigned once · never reused</text>
+  <rect x="20" y="112" width="150" height="88" rx="9" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="95" y="136" font-size="11" font-weight="700" text-anchor="middle" fill="#D64B2A">TICKER</text>
+  <text x="95" y="154" font-size="9.5" text-anchor="middle" fill="#4A5A68">what a screen shows</text>
+  <text x="95" y="168" font-size="9.5" text-anchor="middle" fill="#4A5A68">exchanges recycle it</text>
+  <text x="95" y="185" font-size="9" text-anchor="middle" fill="#D64B2A" font-weight="600">highest reuse risk</text>
+  <rect x="197" y="112" width="150" height="88" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="272" y="136" font-size="11" font-weight="700" text-anchor="middle" fill="#3A56C5">CUSIP · ISIN</text>
+  <text x="272" y="154" font-size="9.5" text-anchor="middle" fill="#4A5A68">issuer-level codes</text>
+  <text x="272" y="168" font-size="9.5" text-anchor="middle" fill="#4A5A68">can be reassigned</text>
+  <text x="272" y="185" font-size="9" text-anchor="middle" fill="#3A56C5" font-weight="600">stable, not immune</text>
+  <rect x="374" y="112" width="150" height="88" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="449" y="136" font-size="11" font-weight="700" text-anchor="middle" fill="#1F7A55">FIGI</text>
+  <text x="449" y="154" font-size="9.5" text-anchor="middle" fill="#4A5A68">open, free, global</text>
+  <text x="449" y="168" font-size="9.5" text-anchor="middle" fill="#4A5A68">retired, never reused</text>
+  <text x="449" y="185" font-size="9" text-anchor="middle" fill="#1F7A55" font-weight="600">built for this job</text>
+  <rect x="551" y="112" width="150" height="88" rx="9" fill="#F5F6F2" stroke="#4A5A68" stroke-width="1.5"/>
+  <text x="626" y="136" font-size="11" font-weight="700" text-anchor="middle" fill="#1F2C38">LEI (the issuer)</text>
+  <text x="626" y="154" font-size="9.5" text-anchor="middle" fill="#4A5A68">identifies the company,</text>
+  <text x="626" y="168" font-size="9.5" text-anchor="middle" fill="#4A5A68">not one security</text>
+  <text x="626" y="185" font-size="9" text-anchor="middle" fill="#4A5A68" font-weight="600">one level up</text>
+  <path d="M95 108 L330 88" stroke="#D64B2A" stroke-width="1.5" marker-end="url(#s1a)"/>
+  <path d="M272 108 L340 86" stroke="#3A56C5" stroke-width="1.5" marker-end="url(#s1a)"/>
+  <path d="M449 108 L380 86" stroke="#1F7A55" stroke-width="1.5" marker-end="url(#s1a)"/>
+  <path d="M626 108 L400 90" stroke="#4A5A68" stroke-width="1.5" marker-end="url(#s1a)"/>
+  <text x="360" y="228" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">The ticker is where it trades today; the permanent key is who it is, always.</text>
+  <defs><marker id="s1a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F2C38"/></marker></defs>
+</svg>
+<figcaption>fig 4.3.1 — a security master's job: one permanent key, every label that has ever pointed to it, and the dates each was valid</figcaption>
+</figure>
+
+<table>
+<thead><tr><th>Identifier</th><th>Scope</th><th>Who assigns it</th><th>Reuse risk</th></tr></thead>
+<tbody>
+<tr><td>Ticker</td><td>one exchange, one moment</td><td>the exchange</td><td>high — routinely recycled</td></tr>
+<tr><td>CUSIP</td><td>North America</td><td>CUSIP Global Services</td><td>low, but not zero after some reorganisations</td></tr>
+<tr><td>ISIN (ISO 6166)</td><td>global</td><td>the national numbering agency</td><td>low; inherits the CUSIP/local code it wraps</td></tr>
+<tr><td>FIGI</td><td>global, any asset class</td><td>an open, free allocation process</td><td>none by design — retired, never reissued</td></tr>
+</tbody>
+</table>
+
+<p>A worked example makes the failure concrete. Say a permanent identifier — call it <strong>PERM-00185</strong> — traded under the ticker "QNTX" from <span data-lab="sm_a_start" data-fmt="$.2f">$42.00</span> to <span data-lab="sm_a_end" data-fmt="$.2f">$95.00</span> before being acquired: a true return of <span data-lab="sm_a_return" data-fmt="+.1%">+126.2%</span>. Years later an unrelated company, <strong>PERM-00931</strong>, is assigned the now-free ticker "QNTX" and trades from <span data-lab="sm_b_start" data-fmt="$.2f">$18.00</span> down to <span data-lab="sm_b_end" data-fmt="$.2f">$11.50</span>, a true return of <span data-lab="sm_b_return" data-fmt="+.1%">−36.1%</span>. A pipeline that joins history on the ticker alone splices the two into one "QNTX" track record running end to end at <span data-lab="sm_naive_return" data-fmt="+.1%">−72.6%</span> — a number that is neither company's return, built on a fabricated one-day jump of <span data-lab="sm_gap_jump" data-fmt="+.1%">−81.1%</span> the moment the ticker changes hands. Nothing in the raw data is wrong; the key is.</p>
+
+<div class="co key"><span class="co-t">📌 Key idea — the ticker is a label, not a key</span>
+<p>Key every table you build on the permanent identifier the security master hands you, keep the ticker (and CUSIP, and name) as a date-ranged <em>attribute</em> of that key, and never join two datasets on a ticker alone. <span class="xref soon" data-xref="4.2" data-auto="" title="Coming soon">Session 4.2 — Point-in-Time Data &amp; Data Biases</span> covers the twin failure — a company that vanishes from a naive universe (survivorship bias) rather than one that is silently merged with a stranger.</p>
+</div>
+</section>
+
+<section id="s2">
+<h2><span class="no">4.3.2</span> From corporate action to adjusted price</h2>
+<p class="lede"><a class="term" href="../unit02-markets-instruments/session02-equities-indices-etfs.html#g-corporate-action" data-term="corporate action">Corporate action</a> economics — why a dividend or a split moves the quoted price — is <a class="xref" href="../unit02-markets-instruments/session02-equities-indices-etfs.html" data-xref="2.2" data-auto="">Session 2.2 — Equities, Indices &amp; ETFs</a>'s territory (§2.2.2-§2.2.3). This session owns what a pipeline does with that fact: turn each event into a number, and chain the numbers correctly.</p>
+
+<p>Call the number one event contributes an <strong>adjustment factor</strong> <math><semantics><mi>ϕ</mi><annotation encoding="application/x-tex">\phi</annotation></semantics></math>. A cash <a class="term" href="../unit02-markets-instruments/session02-equities-indices-etfs.html#g-dividend" data-term="dividend">dividend</a> paid on the ex-date, worth a fraction <math><semantics><mi>q</mi><annotation encoding="application/x-tex">q</annotation></semantics></math> of the price, contributes <math><semantics><mrow><mi>ϕ</mi><mo>=</mo><mn>1</mn><mi>/</mi><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mn>1</mn><mo>+</mo><mi>q</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">\phi = 1/(1+q)</annotation></semantics></math> — this is exactly CRSP's own "factor to adjust price" (CFACPR) convention for its US stock database. An N-for-1 <a class="term" href="../unit02-markets-instruments/session02-equities-indices-etfs.html#g-stock-split" data-term="stock split">split</a> contributes <math><semantics><mrow><mi>ϕ</mi><mo>=</mo><mn>1</mn><mi>/</mi><mi>N</mi></mrow><annotation encoding="application/x-tex">\phi = 1/N</annotation></semantics></math>. Both shrink history: a euro of dividend or a share split in the past bought less of today's company than it looks like on the raw tape. Multiplying every <math><semantics><mi>ϕ</mi><annotation encoding="application/x-tex">\phi</annotation></semantics></math> still ahead of a given day gives the cumulative <strong>adjustment factor</strong> that day carries; multiplying that into the raw quote gives the <strong>adjusted price</strong> — anchored so that <em>today's</em> value never gets restated, only the past moves.</p>
+
+<p>A security master usually keeps a second column for exactly the case this simple picture glosses over: the factor that adjusts a <em>price</em> is not always the factor that adjusts a <em>share count</em>. CRSP's own US stock database carries a cumulative factor to adjust price and a separate cumulative factor to adjust shares, and its own documentation is explicit that the two usually agree but not always — a partial buyback or an odd-lot tender can move one without moving the other by the same amount. A pipeline that multiplies one factor into both prices and share counts will occasionally get a market capitalisation or an index weight wrong even when the adjusted price series itself is fine.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 150" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <rect x="14" y="40" width="118" height="62" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="73" y="64" font-size="10.5" text-anchor="middle" fill="#3A56C5" font-weight="600">1 · RAW QUOTE</text>
+  <text x="73" y="80" font-size="9" text-anchor="middle" fill="#4A5A68">what the tape</text>
+  <text x="73" y="92" font-size="9" text-anchor="middle" fill="#4A5A68">printed today</text>
+  <rect x="152" y="40" width="118" height="62" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="211" y="64" font-size="10.5" text-anchor="middle" fill="#3A56C5" font-weight="600">2 · KNOWN</text>
+  <text x="211" y="78" font-size="10.5" text-anchor="middle" fill="#3A56C5" font-weight="600">ACTION?</text>
+  <text x="211" y="93" font-size="9" text-anchor="middle" fill="#4A5A68">from the master</text>
+  <rect x="290" y="40" width="118" height="62" rx="9" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="349" y="64" font-size="10.5" text-anchor="middle" fill="#8A6D00" font-weight="600">3 · COMPUTE φ</text>
+  <text x="349" y="80" font-size="9" text-anchor="middle" fill="#4A5A68">1/(1+q) or 1/N</text>
+  <text x="349" y="92" font-size="9" text-anchor="middle" fill="#4A5A68">one factor, one event</text>
+  <rect x="428" y="40" width="128" height="62" rx="9" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="492" y="60" font-size="10" text-anchor="middle" fill="#8A6D00" font-weight="600">4 · COMPOUND</text>
+  <text x="492" y="74" font-size="9" text-anchor="middle" fill="#4A5A68">multiply into every</text>
+  <text x="492" y="87" font-size="9" text-anchor="middle" fill="#4A5A68">day still ahead of it</text>
+  <rect x="576" y="34" width="126" height="76" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="639" y="55" font-size="10" text-anchor="middle" fill="#1F7A55" font-weight="600">5 · ADJUSTED</text>
+  <text x="639" y="68" font-size="10" text-anchor="middle" fill="#1F7A55" font-weight="600">PRICE / TOTAL-</text>
+  <text x="639" y="81" font-size="10" text-anchor="middle" fill="#1F7A55" font-weight="600">RETURN INDEX</text>
+  <text x="639" y="97" font-size="8.5" text-anchor="middle" fill="#4A5A68">today unchanged</text>
+  <path d="M133 71 H150" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M271 71 H288" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M409 71 H426" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M557 71 H574" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <text x="360" y="132" font-size="11" text-anchor="middle" fill="#4A5A68" font-style="italic">Every event is one factor; every factor compounds into the days before it.</text>
+  <defs><marker id="s2a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F2C38"/></marker></defs>
+</svg>
+<figcaption>fig 4.3.2 — the adjustment pipeline: a raw quote plus a known action becomes one compounding factor</figcaption>
+</figure>
+
+<table>
+<thead><tr><th>Action</th><th>Per-event factor <math><semantics><mi>ϕ</mi><annotation encoding="application/x-tex">\phi</annotation></semantics></math></th><th>Effect on earlier prices</th></tr></thead>
+<tbody>
+<tr><td>Cash dividend, yield <math><semantics><mi>q</mi><annotation encoding="application/x-tex">q</annotation></semantics></math></td><td><math><semantics><mrow><mn>1</mn><mi>/</mi><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mn>1</mn><mo>+</mo><mi>q</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">1/(1+q)</annotation></semantics></math></td><td>shrinks by about <math><semantics><mi>q</mi><annotation encoding="application/x-tex">q</annotation></semantics></math></td></tr>
+<tr><td>Split, N-for-1</td><td><math><semantics><mrow><mn>1</mn><mi>/</mi><mi>N</mi></mrow><annotation encoding="application/x-tex">1/N</annotation></semantics></math></td><td>shrinks by a factor of N</td></tr>
+<tr><td>Reverse split, 1-for-N</td><td><math><semantics><mi>N</mi><annotation encoding="application/x-tex">N</annotation></semantics></math></td><td>grows by a factor of N</td></tr>
+<tr><td>Two or more actions on one day</td><td>the product of each <math><semantics><mi>ϕ</mi><annotation encoding="application/x-tex">\phi</annotation></semantics></math></td><td>multiplication commutes — order never matters</td></tr>
+</tbody>
+</table>
+
+<p>The lab builds one stock over <span data-lab="ca_years" data-fmt="d">4</span> years carrying <span data-lab="ca_n_divs" data-fmt="d">4</span> quarterly dividends of <span data-lab="ca_div_yield_q" data-fmt=".1%">0.5%</span> of the price each and a <span data-lab="ca_split_ratio" data-fmt="d">3</span>-for-1 split at year <span data-lab="ca_split_year" data-fmt=".1f">2.0</span>, so the cumulative factor carried by the very first day is <span data-lab="ca_cum_factor_day0" data-fmt=".3f">0.327</span> — the four dividend factors of <span data-lab="ca_factor_div" data-fmt=".4f">0.9950</span> each and the one split factor of <span data-lab="ca_factor_split" data-fmt=".4f">0.3333</span>, multiplied together. The adjusted price this produces is, to nine decimal places, exactly proportional to the true reinvested value the stock actually earned: its CAGR is <span data-lab="ca_adjusted_cagr" data-fmt="+.2%">−5.98%</span>, matching the true CAGR of <span data-lab="ca_true_cagr" data-fmt="+.2%">−5.98%</span> to the assert's tolerance, while the raw, un-adjusted quote implies a CAGR of <span data-lab="ca_raw_naive_cagr" data-fmt="+.2%">−28.92%</span> — a stock that actually lost value slowly looks, on the raw tape alone, like it lost value five times faster. A <strong>total-return index</strong> is nothing more than this same adjusted price rebased to a round number at the start (<span data-lab="ca_tri_start" data-fmt=".0f">100</span> here, ending at <span data-lab="ca_tri_end" data-fmt=".2f">78.13</span>) — the way S&amp;P DJI and MSCI publish theirs: same shape, different base.</p>
+
+<figure class="diagram chart">
+<!-- chart:adjusted_vs_raw -->
+<svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Raw quoted price vs adjusted price, one stock, four corporate actions (elapsed years)">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">RAW QUOTED PRICE VS ADJUSTED PRICE, ONE STOCK, FOUR CORPORATE ACTIONS (ELAPSED YEARS)</text>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#4A5A68" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">raw quoted price</text>
+  <line x1="172.4" y1="32" x2="188.4" y2="32" stroke="#3A56C5" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="194.4" y="36" font-size="11" fill="#4A5A68">adjusted price / total-return index (rebased)</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="268" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$0</text>
+  <line x1="64" y1="211" x2="602" y2="211" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="215" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$20</text>
+  <line x1="64" y1="158" x2="602" y2="158" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="162" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$40</text>
+  <line x1="64" y1="105" x2="602" y2="105" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="109" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$60</text>
+  <line x1="64" y1="52" x2="602" y2="52" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="56" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$80</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#C9CFC6" stroke-width="1"/>
+  <line x1="64" y1="264" x2="64" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="64" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">0</text>
+  <line x1="198.5" y1="264" x2="198.5" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="198.5" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">1</text>
+  <line x1="333" y1="264" x2="333" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="333" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">2</text>
+  <line x1="467.5" y1="264" x2="467.5" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="467.5" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">3</text>
+  <line x1="602" y1="264" x2="602" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="602" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">4</text>
+  <polyline points="64,105 65.1,103.4 66.7,96.5 67.2,97.3 68.8,100.6 69.9,95.4 70.9,102.1 72.5,99.3 74.7,99.5 75.7,104.5 77.3,106.6 77.9,102.5 80,108.7 81.1,110.9 82.7,108.3 83.2,111.4 84.3,108.9 85.9,118.5 88,121 89.1,118.6 90.7,125.9 91.8,128 92.8,123.7 94.4,118.1 95.5,117.1 97.1,121 98.7,114.7 99.2,112.3 100.8,114.1 101.9,118.4 104,117.1 104.6,112.9 106.7,113.8 107.8,107.9 109.9,119.4 111,117.7 112,120.8 113.6,119 114.7,121.3 116.3,120.4 117.4,125.5 118.4,126.8 120.6,118.9 121.6,120.9 122.7,125.3 124.3,122.3 125.9,122.3 126.4,119.4 128.6,117.7 129.6,113.8 131.2,120.9 132.3,120.2 133.9,123.2 135,119.5 136.1,120.1 138.2,118.4 139.3,119.5 140.3,117.9 141.4,119.5 143,123.4 144.6,125.4 145.1,121.7 146.7,119.8 147.8,125 149.9,131.5 150.5,132 152.1,130.2 154.2,122.3 155.3,121.9 156.3,119.8 157.4,126.1 159,131.2 161.1,132.8 162.2,128.3 163.3,125.2 164.3,128.7 166.5,124.1 167.5,126.7 168.6,125.6 169.7,120.3 171.8,119.4 172.9,115.8 173.9,113.5 175,117.4 176.6,118.1 177.7,113.6 179.3,120.4 180.4,119.2 182.5,119.6 183.6,112.6 185.2,114.5 186.8,110.6 187.8,115.9 188.4,118.6 190,111.1 191,114.4 193.2,114.2 193.7,113.1 195.8,107.1 196.4,111.6 199,110.6 199.6,107.7 200.6,106.3 202.8,99.8 203.3,101.9 204.9,96.3 206.5,105.5 208.1,101.7 208.6,100.9 210.8,109.5 211.8,111.3 213.4,107.2 214.5,111.4 216.1,109.1 217.2,106.6 218.2,99.7 219.3,101.8 222,106.1 223.1,101.8 223.6,96.8 225.2,95.1 226.8,99.5 228.4,96.5 230,98.7 230.5,102.3 232.1,106.5 233.2,104.4 235.3,102.1 235.9,99.7 237.5,100.8 239.1,98.2 240.7,105.4 241.2,102.8 242.8,104.6 243.9,106.2 246,100.4 247.1,104.5 248.7,102 249.7,108.7 250.8,109.5 251.9,114.6 254,114.1 254.5,111.3 256.7,116 258.3,111.3 258.8,112.5 260.9,109.6 262,110.8 263.1,107.4 264.1,107.2 265.2,111.9 266.8,106.3 269,115.2 270.6,111.4 271.1,114.3 272.2,115.2 274.3,121.9 275.4,129.5 277,126.4 278.6,130.5 279.1,127.7 280.7,124.2 282.3,123.5 283.9,126.2 284.4,124.2 286.6,119.1 288.2,117.5 289.2,121.8 290.8,118.9 291.9,124.6 292.4,121 294.6,116.6 295.6,114.4 297.2,117.2 298.3,115.8 299.4,111 300.4,116.7 302,119.3 303.6,118.9 304.7,114.4 306.3,114.3 307.4,122.2 308.4,119 310,119.5 311.7,121.4 313.3,127.7 314.9,126.5 315.4,129.5 317,130.3 318.1,125.2 319.7,123.5 320.7,120.3 322.9,122 324.5,119.7 325,122.8 327.1,123.5 328.2,131.2 329.8,136.3 330.9,220.9 331.9,221.2 334.1,223.1 335.1,222.8 336.7,221.2 337.8,220.4 338.3,220.5 340.5,222.1 341.5,222 342.6,220.1 344.2,222.9 345.3,223.1 346.3,221.4 348.5,224 349.5,223.4 350.6,224.6 352.2,223.6 353.3,225.5 354.3,224.8 356.5,224.2 357.6,224.9 359.2,224.3 360.8,226.4 361.8,224.8 363.4,224 365,224.1 366.1,225.4 367.7,224 368.8,224.2 370.4,223.3 371.4,224.1 372.5,222.9 373.6,222.9 375.2,221.4 376.2,221.9 377.3,221.1 380,222.2 380.5,222.1 382.1,220.7 383.7,221.1 385.3,220.5 386.4,222.2 387.4,222.7 389,222.3 389.6,222.6 391.2,224.4 392.8,224 394.4,224.7 396,221.7 396.5,222.1 398.6,220.1 399.7,220.1 400.8,221.9 401.9,220.9 403.5,221.1 404.5,221.2 406.1,220.2 408.3,221.5 408.8,221.1 410.4,221.4 412,222.4 413.6,222.1 414.1,223.1 416.3,224.2 417.3,223.6 417.9,224.6 419.5,225.5 420.5,224.6 422.1,225.8 423.7,226.3 425.3,224.6 426.9,225.5 428,223.9 429.1,223.2 431.2,222.7 432.3,223.6 433.9,222.1 434.4,222.3 436.5,222.4 437.6,221.5 438.7,219.9 440.3,219.4 441.9,221.3 442.4,221.3 444.5,220.4 445.6,222.2 447.2,223.4 448.3,222 449.4,221.8 451.5,222.3 452,222 454.2,221.5 455.2,220.3 456.8,219.7 457.4,220.2 458.4,220 460.6,217.3 461.6,219 462.7,218 464.8,219.5 465.9,218.4 467,216.6 469.1,214.6 470.2,214.8 471.8,216.1 472.8,218.6 474.4,217.4 475.5,215.8 476.6,215.2 477.6,216.4 478.7,215.4 480.8,216.4 481.9,215.6 483.5,213.5 485.1,215.3 485.6,214.7 486.7,214.3 488.3,216.7 489.4,217.9 491,218 492.6,219.3 493.7,219 495.8,220.8 496.9,220.9 497.9,222.6 499,221.8 500.6,222.7 501.7,222.5 503.3,220.6 504.3,221.2 505.9,219.8 507.5,220 509.1,218.7 510.2,219.3 511.8,217.9 512.9,219.8 515,220.5 516.1,222.3 517.7,222.6 518.7,223.9 519.3,224.7 521.4,224.7 521.9,224.2 524.1,224.3 525.7,227.6 526.7,227.2 527.8,227.2 528.9,228.1 529.9,227.3 532.1,227.6 532.6,226.9 534.8,228.4 535.8,227.6 536.9,226.9 538.5,226.5 540.6,227.2 541.7,226.3 542.8,225.8 544.4,225.9 545.4,225 547,225.7 548.1,226.6 549.2,226.9 550.8,225.3 551.8,225.4 554,226.3 554.5,226.8 555.6,224.8 557.7,226.3 558.8,225.4 559.8,225.6 561.4,227.1 563.6,226.7 564.1,226.1 565.7,223.1 566.8,223.4 568.4,225 570,226.9 571,227.6 572.6,227 573.2,226.6 575.3,225.5 575.8,226 577.4,225.4 578.5,225.9 580.1,224 582.3,223.8 583.9,221.9 584.9,221.6 586,223.4 587.6,224.2 589.2,223.8 589.7,224.7 591.9,224.6 592.9,224.4 593.5,223.1 595.1,223.4 596.7,222.1 597.7,223.4 598.8,222.8 600.4,223.6 602,223.4" fill="none" stroke="#4A5A68" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><title>raw quoted price</title></polyline>
+  <circle cx="602" cy="223.4" r="4" fill="#4A5A68" stroke="#FBFBF8" stroke-width="2"><title>raw quoted price: $15</title></circle>
+  <polyline points="64,212 65.1,211.5 66.7,209.3 67.2,209.5 68.8,210.6 69.9,208.9 70.9,211.1 72.5,210.2 74.7,210.3 75.7,211.9 77.3,212.6 77.9,211.2 80,213.3 81.1,214 82.7,213.1 83.2,214.1 84.3,213.3 85.9,216.5 88,217.3 89.1,216.5 90.7,218.9 91.8,219.6 92.8,218.1 94.4,216.3 95.5,216 97.1,217.3 98.7,215.2 99.2,214.4 100.8,215 101.9,216.4 104,216 104.6,214.6 106.7,214.9 107.8,213 109.9,216.7 111,216.2 112,217.2 113.6,216.6 114.7,217.4 116.3,217.1 117.4,218.7 118.4,219.2 120.6,216.6 121.6,217.2 122.7,218.7 124.3,217.7 125.9,217.7 126.4,216.8 128.6,216.2 129.6,214.9 131.2,217.3 132.3,217 133.9,218 135,216.8 136.1,217 138.2,216.4 139.3,216.8 140.3,216.3 141.4,216.8 143,218.1 144.6,218.5 145.1,217.3 146.7,216.6 147.8,218.3 149.9,220.5 150.5,220.7 152.1,220 154.2,217.5 155.3,217.3 156.3,216.6 157.4,218.7 159,220.4 161.1,220.9 162.2,219.5 163.3,218.4 164.3,219.6 166.5,218.1 167.5,218.9 168.6,218.5 169.7,216.8 171.8,216.5 172.9,215.3 173.9,214.6 175,215.9 176.6,216.1 177.7,214.6 179.3,216.9 180.4,216.5 182.5,216.6 183.6,214.3 185.2,214.9 186.8,213.6 187.8,215.4 188.4,216.2 190,213.8 191,214.9 193.2,214.8 193.7,214.4 195.8,212.5 196.4,214 199,213.6 199.6,212.7 200.6,212.2 202.8,210.1 203.3,210.8 204.9,208.9 206.5,212 208.1,210.7 208.6,210.5 210.8,213.3 211.8,213.9 213.4,212.5 214.5,213.9 216.1,213.1 217.2,212.3 218.2,210 219.3,210.7 222,212.2 223.1,210.7 223.6,209.1 225.2,208.5 226.8,210 228.4,209 230,209.7 230.5,210.9 232.1,212.3 233.2,211.6 235.3,210.8 235.9,210 237.5,210.4 239.1,209.5 240.7,211.9 241.2,211.1 242.8,211.7 243.9,212.2 246,210.3 247.1,211.6 248.7,210.8 249.7,213 250.8,213.3 251.9,214.9 254,214.8 254.5,213.9 256.7,215.4 258.3,213.9 258.8,214.2 260.9,213.3 262,213.7 263.1,212.6 264.1,212.5 265.2,214.1 266.8,212.2 269,215.1 270.6,213.9 271.1,214.8 272.2,215.1 274.3,217.3 275.4,219.8 277,218.8 278.6,219.9 279.1,219 280.7,217.9 282.3,217.6 283.9,218.5 284.4,217.9 286.6,216.2 288.2,215.7 289.2,217.1 290.8,216.1 291.9,218 292.4,216.8 294.6,215.4 295.6,214.6 297.2,215.6 298.3,215.1 299.4,213.5 300.4,215.4 302,216.2 303.6,216.1 304.7,214.6 306.3,214.6 307.4,217.2 308.4,216.1 310,216.3 311.7,216.9 313.3,219 314.9,218.6 315.4,219.6 317,219.9 318.1,218.2 319.7,217.6 320.7,216.6 322.9,217.1 324.5,216.4 325,217.4 327.1,217.6 328.2,220.2 329.8,221.9 330.9,221.4 331.9,221.6 334.1,223.5 335.1,223.2 336.7,221.6 337.8,220.9 338.3,220.9 340.5,222.5 341.5,222.4 342.6,220.6 344.2,223.3 345.3,223.5 346.3,221.8 348.5,224.4 349.5,223.8 350.6,225 352.2,224 353.3,225.8 354.3,225.2 356.5,224.6 357.6,225.3 359.2,224.7 360.8,226.7 361.8,225.2 363.4,224.4 365,224.5 366.1,225.7 367.7,224.4 368.8,224.6 370.4,223.7 371.4,224.5 372.5,223.3 373.6,223.4 375.2,221.9 376.2,222.3 377.3,221.5 380,222.6 380.5,222.5 382.1,221.1 383.7,221.5 385.3,221 386.4,222.6 387.4,223.1 389,222.8 389.6,223 391.2,224.8 392.8,224.4 394.4,225.1 396,222.1 396.5,222.5 398.6,220.6 399.7,220.5 400.8,222.3 401.9,221.3 403.5,221.5 404.5,221.6 406.1,220.6 408.3,221.9 408.8,221.5 410.4,221.8 412,222.6 413.6,222.3 414.1,223.3 416.3,224.4 417.3,223.8 417.9,224.8 419.5,225.7 420.5,224.8 422.1,226 423.7,226.5 425.3,224.8 426.9,225.7 428,224.1 429.1,223.4 431.2,222.9 432.3,223.8 433.9,222.3 434.4,222.5 436.5,222.6 437.6,221.8 438.7,220.1 440.3,219.7 441.9,221.5 442.4,221.5 444.5,220.6 445.6,222.5 447.2,223.6 448.3,222.2 449.4,222 451.5,222.6 452,222.2 454.2,221.7 455.2,220.5 456.8,219.9 457.4,220.4 458.4,220.2 460.6,217.5 461.6,219.2 462.7,218.2 464.8,219.7 465.9,218.7 467,216.8 469.1,214.8 470.2,215.1 471.8,216.3 472.8,218.8 474.4,217.7 475.5,216.1 476.6,215.4 477.6,216.6 478.7,215.6 480.8,216.7 481.9,215.8 483.5,213.8 485.1,215.6 485.6,214.9 486.7,214.5 488.3,216.9 489.4,218.1 491,218.2 492.6,219.5 493.7,219.2 495.8,221 496.9,221.1 497.9,222.8 499,222 500.6,222.9 501.7,222.7 503.3,220.8 504.3,221.4 505.9,220.1 507.5,220.2 509.1,218.9 510.2,219.5 511.8,218.2 512.9,220 515,220.7 516.1,222.5 517.7,222.8 518.7,224.1 519.3,224.9 521.4,224.9 521.9,224.4 524.1,224.5 525.7,227.7 526.7,227.4 527.8,227.4 528.9,228.3 529.9,227.5 532.1,227.8 532.6,227.1 534.8,228.6 535.8,227.8 536.9,227.1 538.5,226.7 540.6,227.4 541.7,226.5 542.8,225.9 544.4,225.9 545.4,225 547,225.7 548.1,226.6 549.2,226.9 550.8,225.3 551.8,225.4 554,226.3 554.5,226.8 555.6,224.8 557.7,226.3 558.8,225.4 559.8,225.6 561.4,227.1 563.6,226.7 564.1,226.1 565.7,223.1 566.8,223.4 568.4,225 570,226.9 571,227.6 572.6,227 573.2,226.6 575.3,225.5 575.8,226 577.4,225.4 578.5,225.9 580.1,224 582.3,223.8 583.9,221.9 584.9,221.6 586,223.4 587.6,224.2 589.2,223.8 589.7,224.7 591.9,224.6 592.9,224.4 593.5,223.1 595.1,223.4 596.7,222.1 597.7,223.4 598.8,222.8 600.4,223.6 602,223.4" fill="none" stroke="#3A56C5" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>adjusted price / total-return index (rebased)</title></polyline>
+  <circle cx="602" cy="223.4" r="4" fill="#3A56C5" stroke="#FBFBF8" stroke-width="2"><title>adjusted price / total-return index (rebased): $15</title></circle>
+  <text x="614" y="227.4" font-size="11" fill="#1F2C38">raw: $15</text>
+  <line x1="607" y1="223.4" x2="614" y2="233.4" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="614" y="241.4" font-size="11" fill="#1F2C38">adjusted: $15</text>
+</svg>
+<!-- /chart:adjusted_vs_raw -->
+<figcaption>fig 4.3.3 — the raw quote a pipeline receives against the adjusted price it computes: same today, diverging into the past</figcaption>
+</figure>
+
+<div class="co note"><span class="co-t">🧭 Margin note — adjustment on adjustment</span>
+<p>A security master rarely learns about a dividend before its ex-date. Until the fourth dividend in the lab's example is entered, every day before it carries a cumulative factor missing one <math><semantics><mi>ϕ</mi><annotation encoding="application/x-tex">\phi</annotation></semantics></math>; once it posts, <em>every</em> historical adjusted price before that date — <span data-lab="ca_stale_rows_changed" data-fmt=",d">900</span> of <span data-lab="ca_years" data-fmt="d">4</span>-years'-worth of rows, <span data-lab="ca_stale_pct" data-fmt=".0%">89%</span> of the table — must be rescaled by <span data-lab="ca_stale_ratio" data-fmt=".4f">1.0050</span>, not just the new row appended. A pipeline that only ever appends will quietly drift out of sync with itself.</p>
+</div>
+</section>
+
+<section id="s3">
+<h2><span class="no">4.3.3</span> Continuous futures: splicing contracts that die</h2>
+<p class="lede"><a class="xref" href="../unit02-markets-instruments/session04-futures.html" data-xref="2.4" data-auto="">Session 2.4 — Futures: Carry, Basis, Roll &amp; Margin</a> prices a curve from cost of carry and shows what a naive front-month chart hides (§2.4.4-§2.4.5); it promised this session would build the fix. Here it is, from real per-contract data.</p>
+
+<p>A <a class="term" href="../unit02-markets-instruments/session04-futures.html#g-futures-contract" data-term="futures contract">futures contract</a> expires on a fixed date. A trend-following system, a risk model or a backtest wants one number line covering years, not thirty-two overlapping ones each alive for a quarter — a <strong>continuous futures</strong> series. Building one needs two decisions: a <strong>roll schedule</strong> — the rule that decides, for every day, which contract the series is "in" — and an adjustment convention to remove the jump the switch creates. <a class="xref" href="../unit02-markets-instruments/session04-futures.html" data-xref="2.4" data-style="short" data-auto="">Session 2.4</a>'s own pitfall callout already showed the cost of skipping both: a spliced front-month chart reads off <a class="term" href="../unit02-markets-instruments/session04-futures.html#g-contango" data-term="contango">contango</a> exactly like <a class="term" href="../unit02-markets-instruments/session04-futures.html#g-backwardation" data-term="backwardation">backwardation</a>, because the jump at every roll hides the very thing that separates them.</p>
+
+<p>Real vendors use two families of roll schedule. A <strong>calendar rule</strong> switches a fixed number of trading days before expiry — simple, and independent of what anyone is trading. A <strong>liquidity rule</strong> switches when the next contract's volume or open interest overtakes the expiring one's; CME Group's own Active Contract series is built this way, choosing the roll date from "the liquidity profile of each asset" rather than a fixed date, alongside a separate Front Contract series that always rolls two business days before expiry. The two rules need not agree.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 240" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">THE ROLL SCHEDULE — one contract's life, on repeat</text>
+  <rect x="40" y="40" width="160" height="62" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="120" y="64" font-size="10.5" font-weight="600" text-anchor="middle" fill="#3A56C5">1 · HOLD FRONT</text>
+  <text x="120" y="80" font-size="9" text-anchor="middle" fill="#4A5A68">price it off spot</text>
+  <text x="120" y="92" font-size="9" text-anchor="middle" fill="#4A5A68">by cost of carry</text>
+  <rect x="500" y="40" width="180" height="62" rx="9" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="590" y="60" font-size="10.5" font-weight="600" text-anchor="middle" fill="#8A6D00">2 · CHECK THE SIGNAL</text>
+  <text x="590" y="76" font-size="9" text-anchor="middle" fill="#4A5A68">calendar date reached, or</text>
+  <text x="590" y="88" font-size="9" text-anchor="middle" fill="#4A5A68">next contract's volume ahead?</text>
+  <rect x="500" y="152" width="180" height="62" rx="9" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="590" y="176" font-size="10.5" font-weight="600" text-anchor="middle" fill="#D64B2A">3 · ROLL</text>
+  <text x="590" y="192" font-size="9" text-anchor="middle" fill="#4A5A68">sell front, buy next —</text>
+  <text x="590" y="204" font-size="9" text-anchor="middle" fill="#4A5A68">record the gap and ratio</text>
+  <rect x="40" y="152" width="160" height="62" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="120" y="176" font-size="10.5" font-weight="600" text-anchor="middle" fill="#1F7A55">4 · NEW FRONT</text>
+  <text x="120" y="192" font-size="9" text-anchor="middle" fill="#4A5A68">next contract now</text>
+  <text x="120" y="204" font-size="9" text-anchor="middle" fill="#4A5A68">plays role 1</text>
+  <path d="M204 62 H494" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s3a)"/>
+  <path d="M590 106 V148" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s3a)"/>
+  <path d="M496 183 H204" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s3a)"/>
+  <path d="M120 148 V106" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s3a)"/>
+  <text x="360" y="132" font-size="11" text-anchor="middle" fill="#4A5A68" font-style="italic">Every quarter, the same four steps — the schedule is a rule, not a one-off choice.</text>
+  <defs><marker id="s3a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F2C38"/></marker></defs>
+</svg>
+<figcaption>fig 4.3.4 — a roll schedule is a loop: hold, watch the signal, roll, repeat with the new front contract</figcaption>
+</figure>
+
+<table>
+<thead><tr><th>Roll rule</th><th>Decides on</th><th>In the lab (contract 1 → 2)</th></tr></thead>
+<tbody>
+<tr><td>Calendar</td><td>a fixed offset before expiry</td><td>rolls at year <span data-lab="cf_roll1_cal_year" data-fmt=".2f">0.21</span>, <span data-lab="cf_cal_roll_days" data-fmt="d">10</span> trading days out</td></tr>
+<tr><td>Liquidity (volume crossover)</td><td>the next contract's volume overtaking the front's</td><td>rolls at year <span data-lab="cf_roll1_liq_year" data-fmt=".2f">0.22</span>, <span data-lab="cf_liq_roll_days" data-fmt="d">8</span> trading days out</td></tr>
+</tbody>
+</table>
+
+<p>The two rules land <span data-lab="cf_roll_gap_days" data-fmt="d">2</span> trading days apart on this contract — a small gap, but every gap moves the exact day a gain or loss is booked, which matters for anyone reconciling a fund's return to a benchmark that rolls on a different rule. The liquidity rule exists because the calendar rule can strand a real position in a contract that has already gone quiet: a fixed offset picked in advance has no way to notice that, this particular quarter, traders moved to the next contract early. Rolling into wherever the volume already is keeps a systematic strategy trading the depth the market is actually offering, at the cost of a roll date that moves around from one expiry to the next instead of landing on the same weekday every time.</p>
+
+<div class="co tip"><span class="co-t">💡 Looking ahead</span>
+<p>Session 4.5 keeps exactly this kind of per-contract, long-format data in Parquet and queries it with DuckDB and polars rather than pandas alone (<span class="xref soon" data-xref="4.5" data-style="short" data-auto="" title="Coming soon">Session 4.5</span>) — the lab uses that stack for the roll query itself.</p>
+</div>
+</section>
+
+<section id="s4">
+<h2><span class="no">4.3.4</span> Back-adjustment vs ratio adjustment: the math</h2>
+<p class="lede">Two conventions turn the same sequence of contracts into one smooth line. Both are exact about what they preserve — and exact about what they give up.</p>
+
+<p>Write <math><semantics><mrow><msub><mi>F</mi><mi>i</mi></msub><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>t</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">F_i(t)</annotation></semantics></math> for contract <math><semantics><mi>i</mi><annotation encoding="application/x-tex">i</annotation></semantics></math>'s cost-of-carry price at time <math><semantics><mi>t</mi><annotation encoding="application/x-tex">t</annotation></semantics></math> (2.4 §2.4.2's <math><semantics><mrow><mi>F</mi><mo>=</mo><mi>S</mi><msup><mi>e</mi><mrow class="tml-sml-pad"><mi>c</mi><mi>τ</mi></mrow></msup></mrow><annotation encoding="application/x-tex">F = Se^{c\tau}</annotation></semantics></math>), and say the position rolls from contract <math><semantics><mi>i</mi><annotation encoding="application/x-tex">i</annotation></semantics></math> into <math><semantics><mrow><mi>i</mi><mo>+</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">i+1</annotation></semantics></math> at time <math><semantics><msub><mi>τ</mi><mi>i</mi></msub><annotation encoding="application/x-tex">\tau_i</annotation></semantics></math>. The <em>naive spliced</em> series is just whichever contract is currently held — the chart 2.4 already warned you about. Both adjustment conventions instead shift the naive series by everything that happens at every roll still <em>ahead</em> of a given day, so that today (the most recent contract) is never restated:</p>
+
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><mtext>back-adjusted</mtext><mo form="prefix" stretchy="false">(</mo><mi>t</mi><mo form="postfix" stretchy="false">)</mo><mo>=</mo><mtext>naive</mtext><mo form="prefix" stretchy="false">(</mo><mi>t</mi><mo form="postfix" stretchy="false">)</mo><mo>+</mo><mrow style="margin-left:-0.1667em;"></mrow><mrow style="margin-left:-0.1667em;"></mrow><mrow><munder><mo movablelimits="false">∑</mo><mrow><msub><mi>τ</mi><mi>i</mi></msub><mo>&gt;</mo><mi>t</mi></mrow></munder></mrow><mrow style="margin-left:-0.1667em;"></mrow><mrow style="margin-left:-0.1667em;"></mrow><mo fence="true" symmetric="true" minsize="1.2em" maxsize="1.2em">[</mo><msub><mi>F</mi><mrow><mi>i</mi><mo>+</mo><mn>1</mn></mrow></msub><mo form="prefix" stretchy="false">(</mo><msub><mi>τ</mi><mi>i</mi></msub><mo form="postfix" stretchy="false">)</mo><mo>−</mo><msub><mi>F</mi><mi>i</mi></msub><mo form="prefix" stretchy="false">(</mo><msub><mi>τ</mi><mi>i</mi></msub><mo form="postfix" stretchy="false">)</mo><mo fence="true" symmetric="true" minsize="1.2em" maxsize="1.2em">]</mo><mo separator="true">,</mo><mspace width="2em"></mspace><mtext>ratio-adjusted</mtext><mo form="prefix" stretchy="false">(</mo><mi>t</mi><mo form="postfix" stretchy="false">)</mo><mo>=</mo><mtext>naive</mtext><mo form="prefix" stretchy="false">(</mo><mi>t</mi><mo form="postfix" stretchy="false">)</mo><mo>⋅</mo><mrow style="margin-left:-0.1667em;"></mrow><mrow style="margin-left:-0.1667em;"></mrow><mrow><munder><mo movablelimits="false">∏</mo><mrow><msub><mi>τ</mi><mi>i</mi></msub><mo>&gt;</mo><mi>t</mi></mrow></munder></mrow><mrow style="margin-left:-0.1667em;"></mrow><mrow style="margin-left:-0.1667em;"></mrow><mfrac><mrow><msub><mi>F</mi><mrow><mi>i</mi><mo>+</mo><mn>1</mn></mrow></msub><mo form="prefix" stretchy="false">(</mo><msub><mi>τ</mi><mi>i</mi></msub><mo form="postfix" stretchy="false" lspace="0em" rspace="0em">)</mo></mrow><mrow><msub><mi>F</mi><mi>i</mi></msub><mo form="prefix" stretchy="false">(</mo><msub><mi>τ</mi><mi>i</mi></msub><mo form="postfix" stretchy="false" lspace="0em" rspace="0em">)</mo></mrow></mfrac></mrow><annotation encoding="application/x-tex">\text{back-adjusted}(t) = \text{naive}(t) + \!\!\sum_{\tau_i &gt; t}\!\! \bigl[F_{i+1}(\tau_i) - F_i(\tau_i)\bigr], \qquad \text{ratio-adjusted}(t) = \text{naive}(t) \cdot \!\!\prod_{\tau_i &gt; t}\!\! \frac{F_{i+1}(\tau_i)}{F_i(\tau_i)}</annotation></semantics></math></div>
+
+<p><strong>Back-adjustment</strong> adds the dollar gap at every future roll; <strong>ratio adjustment</strong> multiplies by the price ratio at every future roll. Both are engineered to keep one promise exactly: back-adjustment reproduces the true dollar profit and loss of holding the position, day by day, roll days included; ratio adjustment reproduces the true percentage return the same way. The lab checks both as an identity, not an estimate — comparing every day's change against the previously-held contract marked one day forward, at machine-precision tolerance, the same standard 2.4 used for its own carry identity.</p>
+
+<p>Both formulas anchor to today, echoing §4.3.2's adjusted price: the most recent contract's real, tradeable quote is never restated, and everything else moves to match it. A pipeline could instead anchor to the <em>first</em> day of the history and adjust forward — leaving the earliest contract's price exactly as it traded and inflating or shrinking every later one instead. Neither choice changes a single return; it only decides which end of the series matches a number you could actually have seen print on a screen. This course, like most vendors building a live series, anchors to today, because that is the number a trading system has to agree with the exchange on right now.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 210" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">TWO CONVENTIONS, TWO PROMISES — a sketch, not data</text>
+  <rect x="26" y="34" width="326" height="150" rx="10" fill="#fff" stroke="#C9D2F1" stroke-width="1.5"/>
+  <text x="40" y="54" font-size="10.5" font-weight="700" fill="#3A56C5">BACK-ADJUSTMENT (additive)</text>
+  <line x1="46" y1="150" x2="326" y2="150" stroke="#9AA6AF" stroke-width="1" stroke-dasharray="3 2"/>
+  <text x="330" y="153" font-size="8.5" fill="#9AA6AF">zero</text>
+  <polyline points="46,168 90,140 134,150 178,120 222,100 266,90 310,80" fill="none" stroke="#3A56C5" stroke-width="2.2"/>
+  <text x="90" y="184" font-size="9.5" fill="#3A56C5" font-weight="600">deep history can cross zero</text>
+  <rect x="368" y="34" width="326" height="150" rx="10" fill="#fff" stroke="#F7D9BE" stroke-width="1.5"/>
+  <text x="382" y="54" font-size="10.5" font-weight="700" fill="#B85E10">RATIO ADJUSTMENT (multiplicative)</text>
+  <line x1="388" y1="150" x2="668" y2="150" stroke="#9AA6AF" stroke-width="1" stroke-dasharray="3 2"/>
+  <text x="672" y="153" font-size="8.5" fill="#9AA6AF">zero</text>
+  <polyline points="388,142 432,130 476,134 520,118 564,108 608,102 652,80" fill="none" stroke="#E8850C" stroke-width="2.2"/>
+  <text x="432" y="184" font-size="9.5" fill="#B85E10" font-weight="600">compresses toward zero, never crosses</text>
+  <defs></defs>
+</svg>
+<figcaption>fig 4.3.5 — the same trade-off the lab measures: additive shifts can cross zero going back in time, multiplicative ones only compress toward it</figcaption>
+</figure>
+
+<table>
+<thead><tr><th></th><th>Back-adjustment</th><th>Ratio adjustment</th></tr></thead>
+<tbody>
+<tr><td>Exact for</td><td>dollar P&amp;L, day by day</td><td>percentage return, day by day</td></tr>
+<tr><td>Distant history</td><td>can go negative</td><td>always positive</td></tr>
+<tr><td>Best for</td><td>fixed-size positions, $-stops, P&amp;L accounting</td><td>Sharpe, volatility, correlation, ML features</td></tr>
+</tbody>
+</table>
+
+<p>The lab makes the trade-off unavoidable rather than theoretical: an illustrative, deliberately extreme <span data-lab="cf_c_main" data-fmt="+.0%">−25%</span>-a-year backwardation (steeper than 2.4's own "tight" crude example), rolled through <span data-lab="cf_n_contracts" data-fmt="d">32</span> quarterly contracts over <span data-lab="cf_years" data-fmt="d">8</span> years, drives the back-adjusted series down to <span data-lab="cf_back_min" data-fmt="$,.2f">−$45.76</span> at year <span data-lab="cf_back_min_year" data-fmt=".2f">0.01</span> — a negative futures price, the textbook defect of the additive method. The ratio-adjusted series over the same contracts never dips below <span data-lab="cf_ratio_min" data-fmt="$,.2f">$9.18</span>; both still end, by construction, at today's real quote of <span data-lab="cf_naive_final" data-fmt="$,.2f">$34.64</span>.</p>
+
+<p>The distortion this buys is not cosmetic. A rule such as "buy when the price crosses its 200-day moving average," evaluated on the ratio-adjusted series, triggers on a level that has been rescaled by the cumulative product of every future roll ratio — a number with no trading meaning of its own, however faithfully it tracks percentage moves. The same rule on the back-adjusted series triggers on a level that differs from the real, tradeable quote by a known dollar amount, because that is exactly what an additive shift preserves. Neither series is wrong; a rule written in price levels only means what its author intended on the convention it was built for.</p>
+
+<figure class="diagram chart">
+<!-- chart:continuous_series -->
+<svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Three ways to splice the same contracts: naive, back-adjusted, ratio-adjusted (elapsed years)">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">THREE WAYS TO SPLICE THE SAME CONTRACTS: NAIVE, BACK-ADJUSTED, RATIO-ADJUSTED (ELAPSED YEARS)</text>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#4A5A68" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">naive spliced (front contract)</text>
+  <line x1="262.0" y1="32" x2="278.0" y2="32" stroke="#3A56C5" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="284.0" y="36" font-size="11" fill="#4A5A68">back-adjusted</text>
+  <line x1="389.2" y1="32" x2="405.2" y2="32" stroke="#E8850C" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="411.2" y="36" font-size="11" fill="#4A5A68">ratio-adjusted</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="268" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">−$50</text>
+  <line x1="64" y1="193.3" x2="602" y2="193.3" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="197.3" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$0</text>
+  <line x1="64" y1="122.7" x2="602" y2="122.7" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="126.7" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$50</text>
+  <line x1="64" y1="52" x2="602" y2="52" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="56" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">$100</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#C9CFC6" stroke-width="1"/>
+  <line x1="64" y1="264" x2="64" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="64" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">0</text>
+  <line x1="198.5" y1="264" x2="198.5" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="198.5" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">2</text>
+  <line x1="333" y1="264" x2="333" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="333" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">4</text>
+  <line x1="467.5" y1="264" x2="467.5" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="467.5" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">6</text>
+  <line x1="602" y1="264" x2="602" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="602" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">8</text>
+  <line x1="64" y1="193.3" x2="602" y2="193.3" stroke="#4A5A68" stroke-width="1"/>
+  <polyline points="64,100.4 64.5,103.3 66.7,94.9 67.5,96.5 69.3,86.6 70.1,89.6 72,90.7 72.5,85.5 74.1,76.3 75.7,75.5 76.5,70.1 78.1,80.9 80,85.2 80.5,82.6 81.9,87.6 83.5,89.8 85.3,84 86.7,95.1 88,88.1 89.6,93.5 89.9,90.5 92,88.1 93.1,83.5 94.7,82.8 95.2,90.1 96.8,82 98.4,83.7 100.3,83.2 101.4,78.9 102.7,77.4 103.5,85 104.6,83.9 105.9,74.4 107.8,74.7 108.8,70.3 110.4,71.2 111.8,80.1 113.1,78.5 114.2,84.7 115.5,83.7 116.8,90.1 118.2,83.9 119.8,84.3 121.4,91.6 123.2,94.9 124.6,92.3 125.6,95.1 127.2,90.4 128.3,88.9 129.1,101.3 130.7,98.8 132.3,93.5 133.7,99.6 135.3,96.6 136.1,99 137.1,92.8 138.5,86.1 140.1,82.1 141.7,84.9 142.5,79.4 144.1,79.9 145.7,91 146.5,86.1 148.1,84 149.4,81.5 151.3,89.7 153.1,93 153.4,93 155.5,76 156.6,81.1 157.7,74.3 159.8,80.7 160.6,72.4 161.9,75.6 163,90.3 165.1,90.3 165.7,85.3 167.8,80.8 168.6,84.4 169.7,81.1 170.7,87.3 173.1,85.4 174.5,78.7 175,83.9 177.2,86.6 177.7,90.5 179,98.8 180.9,104.5 182.2,104.8 183.3,111 185.4,111.6 186.5,106 187.6,104.3 189.4,106.5 189.7,108.1 191.3,101.8 192.6,107 194.5,105.4 195.6,104.8 197.4,113.6 198,109.6 199.8,114.7 200.6,109.6 202.2,108.9 203.6,105.6 205.4,93 206,90.3 207.8,90.8 209.7,85.5 210.5,90.1 211.8,84.4 212.6,91.2 215.3,87.7 215.8,91.8 217.2,96.2 218.8,96.8 220.6,96 221.7,89.7 222.8,94.5 223.9,92.8 225.2,91.4 226.8,101.7 228.4,105.8 229.7,113.9 230.5,115.1 232.4,110.6 233.5,112.2 234.5,117.4 235.9,119.9 238,118.5 239.1,125.4 239.9,121.7 241.5,119.5 243.3,119.8 244.1,122.8 246,119.3 246.5,123.6 248.1,123.7 249.5,121.4 251.1,114.4 251.9,109.8 253.2,115.9 255.1,111.3 255.9,112.9 257.5,109.1 258.8,111.6 260.7,110.7 261.7,117 263.1,121.2 264.7,118.3 266.3,122.1 267.4,119 268.4,118.8 269.8,111.2 270.8,111.8 272.4,103.3 273.8,103.4 275.6,100.2 277,94.1 277.5,96.1 279.6,91.9 280.4,100.9 281.8,100.9 283.6,105.4 284.4,102.9 286.3,100.4 287.9,105.1 289.2,102.4 290.3,108.6 291.1,106.9 292.7,112.8 294.3,104.9 296.2,100 297.2,107.5 298,105.4 300.2,105.3 301.5,111.3 302.3,106.7 303.4,104.3 305.2,110.6 306.6,109 307.4,111.9 309,111.1 310,114.7 312.2,112.3 313.3,111.4 314.1,118.6 315.7,120.7 317,114.9 319.1,112.4 319.7,113.2 321.3,108.5 322.3,112.6 324.2,105.7 326.1,106.9 326.6,109.5 328.5,106.4 330.1,105.1 330.6,113.1 331.7,116 333.8,113.1 334.6,106.1 336.5,105.9 337.8,111.6 338.9,114.6 340.2,114.8 341,119.3 342.6,117.6 344.5,126.1 345.3,124.6 347.1,128 348.7,127.9 350.3,123.7 351.7,123.5 353,117.6 353.3,115.7 354.9,119.1 356.8,117 358.4,120.9 359.2,116.3 360.8,119.6 362.4,116.6 363.2,114.8 364.2,125.6 366.1,124 368,126.3 368.5,127.3 370.6,120.3 371.2,121.7 373,121 374.6,114.6 376,117.3 377,113.7 378.6,116.7 380,114.3 380.8,119 382.6,122.5 383.7,119 384.8,118 386.4,113.6 388,115.1 389.6,111.3 390.9,117.6 391.7,118.3 392.5,115.6 394.4,113.7 395.2,117.1 397.3,111.2 398.6,117.6 399.4,115.6 400.5,117.5 402.7,112.5 404,114.4 405.6,110 406.9,109.4 407.7,108.4 408.8,114.3 410.7,117 412.3,114.5 413.6,109.8 414.4,118.7 416,119.6 416.8,113.3 418.9,117.6 420,114.2 421.3,116 422.1,113.7 424.5,110.9 425.1,115.6 427.2,109.4 428,117.3 428.8,114.9 431.2,126 432.5,121.8 433.9,126.6 435.2,123.5 436,125.3 437.1,123.8 438.7,122.7 439.7,129.8 442.1,129.2 442.9,128.4 444,122.8 445.1,126.1 447.5,122.8 448.6,130.2 449.6,126.1 450.7,126.2 452,121.3 453.4,122.3 454.7,119.4 456,121.6 457.4,120.5 459,118.9 460.3,127.2 461.4,121.2 463.5,119.2 464.8,127.9 465.4,126.6 467.5,127.1 468,129.7 469.6,129.4 471.2,125.3 472.8,122.4 474.2,123.8 475.5,118.6 476.6,118.5 478.4,124.2 479.2,122.1 481.4,124.2 482.4,130 483.8,126.7 484.6,126.8 486.4,119.5 487.8,120.4 489.4,118.7 490.2,112.5 491.8,113.7 492.9,108.8 493.7,112.1 495.3,110.7 497.1,112.5 498.7,119.6 500.1,119.3 500.6,121.4 502.2,127.9 503.3,127 504.9,130 506.7,129.2 508.1,132.2 509.7,132.3 510.2,128.7 511.5,135.1 512.9,137.4 515,139.4 515.3,142.7 517.7,143 519.3,139.3 520.3,140.5 521.1,138.6 522.7,141.7 524.6,140.7 525.9,145.4 526.2,146.5 528.1,146.2 529.9,149.6 530.5,148 532.1,150.7 533.9,152.4 534.8,151.5 536.6,153 537.4,151.5 538.8,152.8 539.8,152.2 541.2,153.2 543.6,153.4 544.1,155 545.4,155 547.6,157.5 548.6,154.8 549.4,157.7 550.5,157.1 552.1,158.7 553.4,157 555,156.9 556.1,155.7 557.2,152.7 559,151.9 560.9,149.6 561.7,150.9 563.6,151.2 564.4,147.7 565.4,147.1 567,149.9 568.4,150.7 569.7,147.5 571.6,148.8 572.1,152 574,152.5 575,150.1 577.2,151.3 578.2,150.2 579.9,150.6 580.9,147.8 582.5,151.7 583.1,152.6 584.7,151.1 586,152.6 587.3,154.5 588.7,149.6 589.7,151.7 591.1,149.9 592.4,152.5 594.5,152.3 595.6,149 596.7,149.7 597.7,147.6 599.6,148 601.5,144.3 602,144.4" fill="none" stroke="#4A5A68" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><title>naive spliced (front contract)</title></polyline>
+  <circle cx="602" cy="144.4" r="4" fill="#4A5A68" stroke="#FBFBF8" stroke-width="2"><title>naive spliced (front contract): $35</title></circle>
+  <polyline points="64,255.1 64.5,258 66.7,249.6 67.5,251.2 69.3,241.3 70.1,244.4 72,245.4 72.5,240.2 74.1,231 75.7,230.2 76.5,224.8 77.6,230.2 80,232.6 80.5,230.1 81.9,235.1 83.5,237.3 85.3,231.5 86.7,242.6 88,235.6 89.6,240.9 89.9,238 92,235.6 93.1,231 93.9,232.9 96.3,228.4 96.8,222.7 98.4,224.5 100.3,223.9 101.4,219.6 102.7,218.2 103.5,225.7 104.6,224.7 105.9,215.1 107.8,215.5 108.8,211 111,215.5 112.3,212.9 113.1,212 114.2,218.2 115.5,217.2 116.8,223.6 118.2,217.4 119.8,217.7 121.4,225 123.2,228.3 124.6,225.7 125.6,228.5 127.2,223.9 127.8,220.6 129.1,228.5 130.7,226 132.3,220.8 133.7,226.9 135.3,223.9 136.1,226.3 137.1,220.1 138.5,213.4 140.1,209.3 141.7,212.1 142.5,206.6 144.9,212.7 145.4,209.8 147,210.3 148.1,204.5 149.4,202.1 151.3,210.2 153.1,213.6 153.4,213.6 155.5,196.6 156.6,201.6 157.7,194.8 159.8,201.2 160.6,193 161.9,196.1 163.3,204.8 165.1,203.8 165.7,198.8 167.8,194.3 168.6,197.9 169.7,194.6 170.7,200.9 173.1,198.9 174.5,192.2 175,197.4 177.2,200.1 178.2,206.5 180.1,206.4 180.9,211.9 182.2,212.2 183.3,218.4 185.4,219 186.5,213.4 187.6,211.8 189.4,214 189.7,215.5 191.3,209.2 192.6,214.4 194.2,215.1 196.1,211.6 197.4,215.7 198,211.7 199.8,216.8 200.6,211.7 202.2,211 203.6,207.7 205.4,195.1 206,192.4 207.8,192.9 209.7,187.6 210.5,192.2 211.6,187.1 213.7,183.8 214.2,187.3 215.6,184.4 217.2,191.7 218.8,192.3 220.6,191.5 221.7,185.2 222.8,190 223.9,188.3 225.2,186.9 226.8,197.2 228.7,203.8 229.2,206 231.3,201.5 232.4,201 233.5,202.5 234.5,207.7 235.9,210.2 238,208.8 239.1,215.7 239.9,212.1 241.5,209.8 243.3,210.1 244.4,213.2 246.3,209 247.3,209.6 248.7,206.6 249.5,207.2 251.1,200.2 251.9,195.6 253.2,201.7 255.1,197.1 255.9,198.7 257.5,194.9 258.8,197.4 260.7,196.5 262.3,204.3 263.6,199.1 264.7,199.5 266.3,203.3 267.4,200.1 268.4,199.9 269.8,192.3 270.8,193 272.4,184.5 273.8,184.5 275.6,181.3 277,175.2 277.5,177.3 279.6,173 280.4,176 281.8,175.9 283.6,180.5 284.4,178 286.3,175.5 287.9,180.1 289.2,177.4 290.3,183.6 291.1,182 292.7,187.9 294.3,180 295.4,175.7 296.7,173.8 297.8,177.7 300.2,174.7 301.5,180.6 302.3,176.1 303.4,173.7 305.2,180 306.6,178.3 307.4,181.3 309,180.5 310,184 311.9,183.4 313.5,180.6 314.1,183 315.7,185.1 317,179.3 319.1,176.8 319.7,177.6 321.3,172.9 322.3,177 324.2,170 326.1,171.2 326.6,173.9 328.5,170.8 330.1,169.5 331.4,175.5 332.2,173.3 333.8,172.1 334.6,165.1 336.5,164.9 337.8,170.7 338.9,173.6 340.2,173.8 341,178.3 342.6,176.6 344.5,185.1 345.8,185.8 346.6,183.2 348.7,182.8 350.3,178.6 351.7,178.3 353,172.4 353.3,170.5 354.9,174 356.8,171.8 358.4,175.7 359.2,171.1 360.8,174.4 362.4,171.4 363.2,169.6 364.2,175.9 366.1,174.3 368,176.6 368.5,177.7 370.6,170.7 371.2,172 373,171.3 374.6,164.9 376,167.7 377,164 378.6,167 379.2,164.7 381,164.6 382.6,168 383.7,164.6 384.8,163.5 386.4,159.2 388,160.7 389.6,156.9 390.9,163.1 391.7,163.9 392.5,161.2 394.4,159.2 395.2,162.6 397.6,155.2 398.6,158.1 399.4,156 400.5,157.9 402.7,153 404,154.9 405.6,150.4 406.9,149.9 407.7,148.9 408.8,154.7 410.7,157.4 412.3,155 413.6,150.3 414.4,154.4 416,155.3 416.8,148.9 418.9,153.3 420,149.8 421.3,151.7 422.1,149.3 424.5,146.5 425.1,151.3 427.2,145.1 428,152.9 428.8,150.6 430.4,156.7 432.5,153.2 433.9,157.9 435.2,154.8 436,156.6 437.1,155.1 438.7,154 439.7,161.1 442.1,160.6 442.9,159.8 444,154.1 445.1,157.4 447,154.2 448.6,157.3 449.6,153.2 450.7,153.4 452,148.5 453.4,149.4 454.7,146.6 456,148.7 457.4,147.7 459,146.1 460.3,154.4 461.4,148.4 463.5,146.4 464.6,150.7 465.4,149.6 467.5,150 468,152.6 469.6,152.4 471.2,148.3 472.8,145.3 474.2,146.7 475.5,141.6 476.6,141.5 478.4,147.1 479.2,145 480.6,148.7 482.4,148.7 483.8,145.5 484.6,145.5 486.4,138.2 487.8,139.1 489.4,137.4 490.2,131.2 491.8,132.4 492.9,127.6 493.7,130.8 495.3,129.4 496.6,132.7 498.5,132.3 500.1,133.2 500.6,135.3 502.2,141.8 503.3,140.9 504.9,144 506.7,143.1 508.1,146.1 509.7,146.2 510.2,142.6 511.5,149 512.9,151.3 514.7,153.8 515.8,152.8 517.4,153.7 518.5,153.7 519.8,149.4 521.1,149.3 522.7,152.3 524.6,151.3 525.9,156.1 526.2,157.2 528.1,156.9 529.9,160.2 530.5,158.7 531.5,160 532.9,158.1 534.2,159.9 536.6,160.9 537.4,159.3 538.8,160.6 539.8,160.1 541.2,161.1 543.6,161.3 544.1,162.9 545.4,162.9 547.6,165.4 548.4,162.9 549.7,162.7 550.5,162.7 552.1,164.2 553.4,162.5 555,162.4 556.1,161.2 557.2,158.2 559,157.4 560.9,155.1 561.7,156.5 563.6,156.7 564.1,153.8 566,151.2 567.6,150.5 568.4,153.4 569.7,150.2 571.6,151.5 572.1,154.7 574,155.2 575,152.8 577.2,154 578.2,152.8 579.9,153.3 580.9,150.5 582,152.7 583.3,151.7 584.7,151.1 586,152.6 587.3,154.5 588.7,149.6 589.7,151.7 591.1,149.9 592.4,152.5 594.5,152.3 595.6,149 596.7,149.7 597.7,147.6 599.6,148 601.5,144.3 602,144.4" fill="none" stroke="#3A56C5" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>back-adjusted</title></polyline>
+  <circle cx="602" cy="144.4" r="4" fill="#3A56C5" stroke="#FBFBF8" stroke-width="2"><title>back-adjusted: $35</title></circle>
+  <polyline points="64,179.9 64.5,180.4 66.7,179.2 67.5,179.4 69.3,178 70.1,178.4 72,178.5 72.5,177.8 74.1,176.5 75.7,176.4 76.5,175.6 77.6,176.4 80,176.7 80.5,176.4 81.9,177.1 83.5,177.5 85.3,176.6 86.7,178.3 88,177.2 89.6,178 89.9,177.6 92,177.2 93.1,176.5 93.9,176.8 96.3,176.1 96.8,175.2 98.4,175.4 100.3,175.3 101.4,174.7 102.7,174.4 103.5,175.6 104.6,175.5 105.9,173.9 107.8,174 108.8,173.2 111,174 112.3,173.5 113.1,173.4 114.2,174.5 115.5,174.3 116.8,175.4 118.2,174.3 119.8,174.4 121.4,175.7 123.2,176.2 124.6,175.8 125.6,176.3 127.2,175.4 127.8,174.9 129.1,176.3 130.7,175.8 132.3,174.9 133.7,176 135.3,175.4 136.1,175.9 137.1,174.7 138.5,173.5 140.1,172.8 141.7,173.3 142.5,172.3 144.9,173.4 145.4,172.8 147,172.9 148.1,171.8 149.4,171.3 151.3,172.9 153.1,173.6 153.4,173.6 155.5,170.2 156.6,171.2 157.7,169.9 159.8,171.2 160.6,169.5 161.9,170.2 163.3,171.9 165.1,171.7 165.7,170.7 167.8,169.7 168.6,170.5 169.7,169.8 170.7,171.1 173.1,170.7 174.5,169.3 175,170.4 177.2,171 178.2,172.3 180.1,172.3 180.9,173.5 182.2,173.6 183.3,175 185.4,175.1 186.5,173.8 187.6,173.5 189.4,174 189.7,174.3 191.3,172.9 192.6,174.1 194.2,174.2 196.1,173.4 197.4,174.4 198,173.4 199.8,174.6 200.6,173.4 202.2,173.3 203.6,172.5 205.4,169.5 206,168.9 207.8,169 209.7,167.7 210.5,168.8 211.6,167.6 213.7,166.8 214.2,167.7 215.6,166.9 217.2,168.8 218.8,168.9 220.6,168.7 221.7,167.1 222.8,168.3 223.9,167.9 225.2,167.6 226.8,170.2 228.7,171.8 229.2,172.4 231.3,171.2 232.4,171.1 233.5,171.5 234.5,172.9 235.9,173.6 238,173.2 239.1,175.1 239.9,174.1 241.5,173.5 243.3,173.5 244.4,174.4 246.3,173.2 247.3,173.4 248.7,172.6 249.5,172.7 251.1,170.7 251.9,169.4 253.2,171.1 255.1,169.8 255.9,170.3 257.5,169.2 258.8,169.9 260.7,169.6 262.3,171.9 263.6,170.4 264.7,170.5 266.3,171.6 267.4,170.6 268.4,170.6 269.8,168.3 270.8,168.5 272.4,165.9 273.8,165.9 275.6,164.9 277,163.1 277.5,163.7 279.6,162.4 280.4,163.3 281.8,163.3 283.6,164.8 284.4,164 286.3,163.2 287.9,164.7 289.2,163.8 290.3,165.8 291.1,165.3 292.7,167.2 294.3,164.6 295.4,163.2 296.7,162.6 297.8,164 300.2,162.9 301.5,165 302.3,163.4 303.4,162.6 305.2,164.7 306.6,164.2 307.4,165.2 309,164.9 310,166.1 311.9,165.9 313.5,165 314.1,165.8 315.7,166.6 317,164.5 319.1,163.6 319.7,163.9 321.3,162.1 322.3,163.6 324.2,161.1 326.1,161.5 326.6,162.5 328.5,161.4 330.1,160.9 331.4,163.2 332.2,162.4 333.8,161.9 334.6,159.2 336.5,159.1 337.8,161.3 338.9,162.5 340.2,162.6 341,164.3 342.6,163.7 344.5,167 345.8,167.2 346.6,166.3 348.7,166.1 350.3,164.3 351.7,164.2 353,161.8 353.3,161 354.9,162.4 356.8,161.5 358.4,163.1 359.2,161.2 360.8,162.6 362.4,161.4 363.2,160.6 364.2,163.3 366.1,162.6 368,163.6 368.5,164 370.6,160.9 371.2,161.5 373,161.2 374.6,158.4 376,159.6 377,158 378.6,159.3 379.2,158.3 381,158.3 382.6,159.9 383.7,158.2 384.8,157.7 386.4,155.7 388,156.4 389.6,154.6 390.9,157.5 391.7,157.9 392.5,156.6 394.4,155.7 395.2,157.3 397.6,153.8 398.6,155.2 399.4,154.2 400.5,155.2 402.7,152.7 404,153.7 405.6,151.4 406.9,151.1 407.7,150.6 408.8,153.6 410.7,154.9 412.3,153.7 413.6,151.3 414.4,153.4 416,153.9 416.8,150.5 418.9,152.8 420,151 421.3,152 422.1,150.7 424.5,149.2 425.1,151.7 427.2,148.4 428,152.6 428.8,151.4 430.4,154.6 432.5,152.6 433.9,155.3 435.2,153.5 436,154.6 437.1,153.7 438.7,153.1 439.7,157.1 442.1,156.8 442.9,156.4 444,153.1 445.1,155 447,153.2 448.6,155 449.6,152.5 450.7,152.6 452,149.7 453.4,150.2 454.7,148.5 456,149.8 457.4,149.2 459,148.2 460.3,153.2 461.4,149.6 463.5,148.4 464.6,151 465.4,150.3 467.5,150.5 468,152.2 469.6,152.1 471.2,149.4 472.8,147.5 474.2,148.4 475.5,145.1 476.6,145 478.4,148.7 479.2,147.3 480.6,149.7 482.4,149.8 483.8,147.6 484.6,147.6 486.4,142.6 487.8,143.2 489.4,142 490.2,137.8 491.8,138.6 492.9,135.3 493.7,137.5 495.3,136.5 496.6,138.8 498.5,138.5 500.1,139.2 500.6,140.7 502.2,145.4 503.3,144.8 504.9,147 506.7,146.4 508.1,148.6 509.7,148.7 510.2,146 511.5,150.8 512.9,152.4 514.7,154.2 516.1,154.6 517.7,154.1 519.3,151.2 520.3,152.2 521.1,150.7 522.7,153.1 524.6,152.3 525.9,156 526.2,156.9 528.1,156.6 529.9,159.3 530.5,158.1 531.5,159.1 532.9,157.6 534.2,159.1 536.6,159.9 537.4,158.6 538.8,159.7 539.8,159.2 541.2,160.1 543.6,160.2 544.1,161.5 545.4,161.6 547.6,163.6 548.9,161 549.4,161.9 550.5,161.4 552.1,162.8 553.4,161.3 555,161.2 556.1,160.1 557.2,157.5 559,156.8 560.9,154.7 561.7,155.9 563.6,156.1 564.1,153.5 566,151.2 567.6,150.5 568.4,153.3 569.7,150.3 571.6,151.5 572.1,154.5 574,155 575,152.7 577.2,153.8 578.2,152.8 579.9,153.2 580.9,150.5 582,152.7 583.3,151.7 584.7,151.1 586,152.6 587.3,154.5 588.7,149.6 589.7,151.7 591.1,149.9 592.4,152.5 594.5,152.3 595.6,149 596.7,149.7 597.7,147.6 599.6,148 601.5,144.3 602,144.4" fill="none" stroke="#E8850C" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>ratio-adjusted</title></polyline>
+  <circle cx="602" cy="144.4" r="4" fill="#E8850C" stroke="#FBFBF8" stroke-width="2"><title>ratio-adjusted: $35</title></circle>
+  <text x="614" y="148.4" font-size="11" fill="#1F2C38">naive: $35</text>
+  <line x1="607" y1="144.4" x2="614" y2="154.4" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="614" y="162.4" font-size="11" fill="#1F2C38">back-adjusted: $35</text>
+  <line x1="607" y1="144.4" x2="614" y2="168.4" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="614" y="176.4" font-size="11" fill="#1F2C38">ratio-adjusted: $35</text>
+</svg>
+<!-- /chart:continuous_series -->
+<figcaption>fig 4.3.6 — the same <span data-lab="cf_n_contracts" data-fmt="d">32</span> contracts, spliced three ways: naive jumps at every roll, back-adjustment drifts negative, ratio adjustment compresses but stays positive</figcaption>
+</figure>
+
+<div class="co note"><span class="co-t">🧭 Margin note — the jump is not noise</span>
+<p>A naive series' jump at a roll is <code>spot(roll) × a fixed constant</code>, so its size is predictable, not random. Checked across <span data-lab="cf_mc_n_paths" data-fmt=",d">4,000</span> simulated paths, the mean jump at the first roll is <span data-lab="cf_mc_mean_gap" data-fmt="$,.3f">−$4.220</span> against a theoretical <span data-lab="cf_mc_theory_gap" data-fmt="$,.3f">−$4.226</span> — within <span data-lab="cf_mc_se_gap" data-fmt="$,.3f">$0.008</span> standard errors of each other, comfortably inside the course's four-standard-error bar for a Monte Carlo claim.</p>
+</div>
+</section>
+
+<section id="s5">
+<h2><span class="no">4.3.5</span> Building it: a roll schedule, in code</h2>
+<p class="lede">The same idea in code — copied from the companion lab so every number on this page matches a line you can run.</p>
+
+<p>The lab keeps per-contract volume in a long-format table, writes it to Parquet, and finds the liquidity-based roll date with one DuckDB query rather than a Python loop — exactly the shape <span class="xref soon" data-xref="4.5" data-style="short" data-auto="" title="Coming soon">Session 4.5</span> generalises into a full storage stack:</p>
+
+<pre><span class="c"># the day the NEXT contract's synthetic volume first overtakes the front's</span>
+<span class="k">SELECT</span> roll, min(day) <span class="k">AS</span> roll_day
+<span class="k">FROM</span> read_parquet(<span class="s">?</span>)
+<span class="k">WHERE</span> next_volume &gt;= front_volume
+<span class="k">GROUP BY</span> roll <span class="k">ORDER BY</span> roll</pre>
+
+<p>The two adjusted series themselves are two lines once the roll dates are known — a running sum of dollar gaps for back-adjustment, a running product of price ratios for ratio adjustment, each restricted to rolls still ahead of the day being priced:</p>
+
+<pre><span class="c"># n_rolls_after[t] counts the rolls strictly after day t</span>
+back_adjusted = naive + cum_gap_suffix[n_rolls_after]
+ratio_adjusted = naive * gap_ratio_const ** n_rolls_after</pre>
+
+<p>Because the calendar rule always rolls the same number of days before and after expiry, the ratio at every roll collapses to one constant, <span data-lab="cf_gap_ratio_const" data-fmt=".4f">0.9394</span> here — a fact the lab asserts rather than assumes, and a useful sanity check on any implementation: if your ratios are not identical under a pure calendar rule, something upstream is wrong — the contract calendar has a gap, the carry is not actually constant, or the roll dates were computed off the wrong contract. The same assertion, left running in a production pipeline rather than a one-off lab, is a cheap alarm for exactly that class of bug. The naive series' first jump, <span data-lab="cf_naive_jump1" data-fmt="$,.2f">−$5.09</span>, is <span data-lab="cf_jump_vs_daily" data-fmt=".1f">4.6</span> times the <span data-lab="cf_typical_daily_move" data-fmt="$,.2f">$1.10</span> an ordinary trading day moves at this contract's volatility — big enough that no naive-series backtest would treat it as noise, which is exactly the problem.</p>
+
+<p>Over the full <span data-lab="cf_years" data-fmt="d">8</span> years the ratio-adjusted series compounds at <span data-lab="cf_ratio_cagr" data-fmt="+.2%">+17.60%</span> against spot's own <span data-lab="cf_spot_cagr" data-fmt="+.2%">−8.42%</span> — a gap of <span data-lab="cf_cagr_gap_pp" data-fmt=".1f">26.0</span> percentage points a year that is, to nine decimal places, exactly the curve's own <span data-lab="cf_c_main" data-fmt="+.0%">−25%</span> net carry (<a class="xref" href="../unit02-markets-instruments/session04-futures.html#s5" data-xref="2.4#s5" data-style="short" data-auto="">Session 2.4</a>'s roll-yield identity, reproduced here from real per-contract data and a real roll schedule instead of one idealised curve).</p>
+</section>
+
+<section id="s6">
+<h2><span class="no">4.3.6</span> Where people go wrong</h2>
+<p class="lede">Three mistakes share one shape: treating a convenient label as if it were the underlying truth.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 220" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">SAME PIPELINE, TWO APPROACHES</text>
+  <rect x="26" y="32" width="326" height="176" rx="9" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="189" y="54" font-size="11" font-weight="700" text-anchor="middle" fill="#D64B2A">THE NAIVE WAY</text>
+  <rect x="46" y="66" width="286" height="24" rx="5" fill="#fff" stroke="#F2CDBF"/>
+  <text x="58" y="82" font-size="9.5" fill="#1F2C38">join history on the ticker</text>
+  <rect x="46" y="96" width="286" height="24" rx="5" fill="#fff" stroke="#F2CDBF"/>
+  <text x="58" y="112" font-size="9.5" fill="#1F2C38">adjust for splits, skip dividends</text>
+  <text x="189" y="148" font-size="9.5" text-anchor="middle" fill="#D64B2A" font-weight="600">Two strangers' returns, spliced into one.</text>
+  <text x="189" y="166" font-size="9" text-anchor="middle" fill="#4A5A68">A fake jump that looks like a real event.</text>
+  <rect x="368" y="32" width="326" height="176" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="531" y="54" font-size="11" font-weight="700" text-anchor="middle" fill="#1F7A55">THE DISCIPLINED WAY</text>
+  <rect x="388" y="66" width="286" height="24" rx="5" fill="#fff" stroke="#BFE0CF"/>
+  <text x="400" y="82" font-size="9.5" fill="#1F2C38">1 · join on the permanent key</text>
+  <rect x="388" y="96" width="286" height="24" rx="5" fill="#fff" stroke="#BFE0CF"/>
+  <text x="400" y="112" font-size="9.5" fill="#1F2C38">2 · chain every known action's factor</text>
+  <text x="531" y="148" font-size="9.5" text-anchor="middle" fill="#1F7A55" font-weight="600">One true history per company.</text>
+  <text x="531" y="166" font-size="9" text-anchor="middle" fill="#4A5A68">Every number traceable to a dated event.</text>
+</svg>
+<figcaption>fig 4.3.7 — the naive pipeline fails at the identifier and the factor; the disciplined one gets both from the security master</figcaption>
+</figure>
+
+<table>
+<thead><tr><th>Task</th><th>Use</th><th>Why</th></tr></thead>
+<tbody>
+<tr><td>Sharpe ratio, volatility, correlations, ML features</td><td><strong>ratio-adjusted</strong> (or true per-contract %)</td><td>reproduces the real percentage moves exactly</td></tr>
+<tr><td>Fixed-size position P&amp;L, a dollar stop-loss</td><td><strong>back-adjusted</strong></td><td>reproduces the real dollar moves exactly</td></tr>
+<tr><td>Market capitalisation, P/E, index membership on a past date</td><td>raw price × shares outstanding <em>that day</em></td><td>an adjusted price is not a historical price — it is today's price, restated</td></tr>
+</tbody>
+</table>
+
+<p>A fourth mistake is subtler: a roll rule defined as "switch into whichever contract has the most volume over the <em>next</em> ten days" cannot be backtested honestly, because on any given day you do not yet know the next ten days' volume. It is <span class="xref soon" data-xref="4.2" data-auto="" title="Coming soon">Session 4.2 — Point-in-Time Data &amp; Data Biases</span>'s look-ahead bias wearing a futures costume — a roll schedule has to be computable from information available strictly as of that day, exactly like every other point-in-time rule in this unit.</p>
+
+<p>A fifth mistake is treating the security master's mapping itself as fixed once written. §4.3.1 called CUSIP and ISIN reassignment "not zero," and it isn't: a bankruptcy reorganisation can leave a company's old CUSIP retired and a new one issued for the reorganised equity, with the same underlying business on both sides of the split. A security master has to version its own mappings — which permanent key a given ticker or CUSIP pointed to, and when that stopped being true — rather than storing one static lookup table and trusting it forever.</p>
+
+<div class="co warn"><span class="co-t">⚠️ Pitfall — "the ticker is close enough"</span>
+<p>It rarely is. §4.3.1's ticker-reuse example is not a contrived edge case: exchanges recycle three- and four-letter tickers routinely, and a delisting followed within a year or two by a fresh listing under the same letters is common enough that any pipeline joining on ticker alone will eventually splice two unrelated companies together — silently, with no error and no warning.</p>
+</div>
+</section>
+
+<section id="s7">
+<h2><span class="no">4.3.7</span> Try it</h2>
+<p class="lede">Open the companion lab, predict before you run, and see which convention breaks first.</p>
+
+<div class="co lab"><span class="co-t">🔧 Try it (15 min, in the lab)</span>
+<p>1. In section 2, add a fifth dividend to <code>DIV_DAYS</code>. Predict <code>ca_stale_rows_changed</code> before you rerun — it should equal the count of days before the new ex-date, not the whole history.<br>
+2. In section 3, tighten <code>ROLL_CAL_DAYS</code> from 10 to 3. Does the calendar roll move closer to or further from the liquidity crossover, and does <code>cf_roll_gap_days</code> grow or shrink?<br>
+3. In section 4, flip <code>C_MAIN</code> from −0.25 to +0.15 (contango instead of backwardation). Which series now has the extreme behaviour — does back-adjustment still go negative, or does ratio-adjustment do something equally odd at the other end?<br>
+Success: step 1 changes exactly the predicted count of rows; step 3 shows that back-adjustment's zero-crossing problem is specific to a persistent, one-directional curve, not to backwardation as such.</p>
+</div>
+</section>
+
+<hr>
+
+<section id="s8">
+<h2><span class="no">4.3.8</span> Glossary · Check yourself · Go deeper</h2>
+<div class="gloss" id="glossary">
+<div id="g-adjustment-factor"><b>Adjustment factor</b> — the number, computed from one corporate action or futures roll, that a pipeline multiplies into every price before that event's date.</div>
+<div id="g-adjusted-price"><b>Adjusted price</b> — a raw quoted price rescaled by the cumulative adjustment factor, anchored so today's value matches today's actual quote.</div>
+<div id="g-total-return-index"><b>Total-return index</b> — an adjusted price series rebased to a fixed starting value, the way an index provider publishes dividend-reinvested performance.</div>
+<div id="g-security-master"><b>Security master</b> — the reference database mapping every external identifier and corporate-action history for a security onto one permanent internal key.</div>
+<div id="g-security-identifier"><b>Security identifier</b> — any code (ticker, CUSIP, ISIN, FIGI) used to name a security; only some are stable and never reused.</div>
+<div id="g-continuous-futures"><b>Continuous futures</b> — a single price series built by splicing a sequence of expiring futures contracts under a roll schedule.</div>
+<div id="g-back-adjustment"><b>Back-adjustment</b> — splicing continuous futures by adding the dollar gap between contracts at each roll; exact for dollar P&amp;L, but distant history can go negative.</div>
+<div id="g-ratio-adjustment"><b>Ratio adjustment</b> — splicing continuous futures by multiplying by the price ratio between contracts at each roll; exact for percentage returns and always positive, at the cost of a distorted absolute level.</div>
+<div id="g-roll-schedule"><b>Roll schedule</b> — the rule, calendar-based or liquidity-based, that decides which contract a continuous series holds on each day.</div>
+</div>
+
+<h3>Check yourself</h3>
+<details class="q"><summary>1. A vendor's history for "AAPL" shows a huge one-day move you can't tie to any news or filing. What do you check first?</summary><div>Whether the ticker was reused — whether the row before and the row after that day actually share the same permanent identifier in the security master, not just the same ticker string. §4.3.1's PERM-00185/PERM-00931 example produces exactly this signature: a fabricated jump with no underlying event.</div></details>
+<details class="q"><summary>2. A stock pays a 0.5%-of-price dividend, then later does a 3-for-1 split. What two numbers get multiplied into the cumulative adjustment factor for a date before both events, and does the order you apply them in matter?</summary><div>The dividend factor 1/(1+q) ≈ 0.995 and the split factor 1/3 ≈ 0.333, multiplied together to about 0.331; order never matters because multiplication commutes — the lab's four dividends and one split compound to a cumulative factor of 0.327 by day 0 regardless of the sequence you apply them in.</div></details>
+<details class="q"><summary>3. You are building a moving-average crossover system sized in a fixed number of contracts, and separately computing the 20-year Sharpe ratio of a commodity strategy. Which continuous-futures adjustment fits each job?</summary><div>The crossover system: back-adjusted, because its dollar-based rules (a fixed-point stop, a fixed position size) need the series' day-to-day dollar changes to be real. The Sharpe ratio: ratio-adjusted (or the true per-contract percentage returns directly), because Sharpe is computed on percentage returns and ratio adjustment reproduces those exactly, however extreme the curve.</div></details>
+<details class="q"><summary>4. A roll rule is defined as "switch into whichever contract has the highest volume over the next ten trading days." Why can't you backtest this rule as stated?</summary><div>It looks ahead: on any day in the backtest, the next ten days' volume is not yet known. A roll schedule must be computable from information available strictly as of that day — the same point-in-time discipline Session 4.2 applies to every other rule in this unit, applied here to the decision of which contract you are even in.</div></details>
+
+<div class="co lab"><span class="co-t">🔧 Homework (~1 h before Session 4.4)</span>
+<p>1. <strong>Adjustment on adjustment, measured.</strong> In the lab's §2, add a corporate action that arrives out of date order (an earlier ex-date discovered after a later one is already in the master) and confirm the rescaling still lands on every affected row, not just the newest.<br>
+2. <strong>A third roll rule.</strong> Add an open-interest-based rule alongside the volume-crossover one in §3 (same ramp shape, different threshold) and compare all three roll schedules' first-roll dates in a small table.<br>
+3. <strong>Look one up.</strong> Search OpenFIGI's public tool for a ticker you know has been reused, and note how many FIGIs map to it over time — that count is the ticker-reuse hazard §4.3.1 describes, made concrete.<br>
+4. <strong>Read</strong> ahead to <span class="xref soon" data-xref="4.4" data-style="short" data-auto="" title="Coming soon">Session 4.4</span>, which needs a security master's dates to build as-of joins that never peek.</p>
+</div>
+
+<h3>📚 Go deeper</h3>
+<ol class="refs">
+<li>CME Group (2026). "CME Group Continuous Price Series" — Active Contract and Front Contract methodology. <span class="rid">https://www.cmegroup.com/market-data/cme-group-continuous-price-series.html</span></li>
+<li>QuantStart. "Continuous Futures Contracts for Backtesting Purposes." <span class="rid">https://www.quantstart.com/articles/Continuous-Futures-Contracts-for-Backtesting-Purposes/</span></li>
+<li>CRSP — Center for Research in Security Prices, University of Chicago Booth. "CRSP Calculations" (the Factor to Adjust Price convention this session follows). <span class="rid">http://www.crsp.com/products/documentation/crsp-calculations</span></li>
+<li>International Organization for Standardization (2021). <em>ISO 6166:2021 — Financial services: International securities identification number (ISIN)</em>. <span class="rid">https://www.iso.org/standard/78502.html</span></li>
+</ol>
+
+<h3>Sources for the numbers</h3>
+<ol class="refs">
+<li>OpenFIGI. "Overview" — the Financial Instrument Global Identifier specification (permanent, open, never reused). <span class="rid">https://www.openfigi.com/about/overview</span></li>
+<li>GLEIF — Global Legal Entity Identifier Foundation. "Access and Use LEI Data" — the free, public Global LEI Index. <span class="rid">https://www.gleif.org/en/lei-data/access-and-use-lei-data</span></li>
+</ol>
+</section>
+
+<!-- nav:foot -->
+<div class="foot">
+<span class="soon" title="Coming soon">← Prev: 4.2 · Point-in-Time</span>
+<span class="soon" title="Coming soon">Next: 4.4 · Time &amp; Bars →</span>
+</div>
+<p class="legal">Educational material only — not investment, legal or tax advice. Backtests and simulations are hypothetical. <a href="../start-here.html#disclaimer">Disclaimer</a> · Text CC BY 4.0 · Code MIT.</p>
+<!-- /nav:foot -->
+</main>
+</div></body></html>

@@ -1,0 +1,54 @@
+<svg viewBox="0 0 720 280" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="ACF and PACF of a simulated ARMA(1,1) — neither one cuts off">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">ACF AND PACF OF A SIMULATED ARMA(1,1) — NEITHER ONE CUTS OFF</text>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#E8850C" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">ACF</text>
+  <line x1="89.2" y1="32" x2="105.2" y2="32" stroke="#3F8E5A" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="111.2" y="36" font-size="11" fill="#4A5A68">PACF</text>
+  <line x1="64" y1="236" x2="690" y2="236" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="240" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">−0.10</text>
+  <line x1="64" y1="191" x2="690" y2="191" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="195" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.00</text>
+  <line x1="64" y1="146" x2="690" y2="146" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="150" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.10</text>
+  <line x1="64" y1="101" x2="690" y2="101" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="105" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.20</text>
+  <line x1="64" y1="56" x2="690" y2="56" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="60" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.30</text>
+  <line x1="64" y1="191" x2="690" y2="191" stroke="#C9CFC6" stroke-width="1"/>
+  <path d="M70.8,191 V79.4 Q70.8,75.4 74.8,75.4 H85.1 Q89.1,75.4 89.1,79.4 V191 Z" fill="#E8850C"><title>1 · ACF: 0.26</title></path>
+  <path d="M91.1,191 V79.3 Q91.1,75.3 95.1,75.3 H105.3 Q109.3,75.3 109.3,79.3 V191 Z" fill="#3F8E5A"><title>1 · PACF: 0.26</title></path>
+  <text x="90.1" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">1</text>
+  <path d="M123,191 V131.2 Q123,127.2 127,127.2 H137.2 Q141.2,127.2 141.2,131.2 V191 Z" fill="#E8850C"><title>2 · ACF: 0.14</title></path>
+  <path d="M143.2,191 V158.4 Q143.2,154.4 147.2,154.4 H157.5 Q161.5,154.4 161.5,158.4 V191 Z" fill="#3F8E5A"><title>2 · PACF: 0.08</title></path>
+  <text x="142.2" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">2</text>
+  <path d="M175.2,191 V148 Q175.2,144 179.2,144 H189.4 Q193.4,144 193.4,148 V191 Z" fill="#E8850C"><title>3 · ACF: 0.10</title></path>
+  <path d="M195.4,191 V170.7 Q195.4,166.7 199.4,166.7 H209.7 Q213.7,166.7 213.7,170.7 V191 Z" fill="#3F8E5A"><title>3 · PACF: 0.05</title></path>
+  <text x="194.4" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">3</text>
+  <path d="M227.3,191 V168.5 Q227.3,164.5 231.3,164.5 H241.6 Q245.6,164.5 245.6,168.5 V191 Z" fill="#E8850C"><title>4 · ACF: 0.06</title></path>
+  <path d="M247.6,191 V188.3 Q247.6,185.6 250.3,185.6 H263.1 Q265.8,185.6 265.8,188.3 V191 Z" fill="#3F8E5A"><title>4 · PACF: 0.01</title></path>
+  <text x="246.6" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">4</text>
+  <path d="M279.5,191 V185.9 Q279.5,181.9 283.5,181.9 H293.8 Q297.8,181.9 297.8,185.9 V191 Z" fill="#E8850C"><title>5 · ACF: 0.02</title></path>
+  <path d="M299.8,191 V193.6 Q299.8,196.2 302.4,196.2 H315.4 Q318,196.2 318,193.6 V191 Z" fill="#3F8E5A"><title>5 · PACF: −0.01</title></path>
+  <text x="298.8" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">5</text>
+  <path d="M331.7,191 V195.6 Q331.7,199.6 335.7,199.6 H345.9 Q349.9,199.6 349.9,195.6 V191 Z" fill="#E8850C"><title>6 · ACF: −0.02</title></path>
+  <path d="M351.9,191 V202.7 Q351.9,206.7 355.9,206.7 H366.2 Q370.2,206.7 370.2,202.7 V191 Z" fill="#3F8E5A"><title>6 · PACF: −0.03</title></path>
+  <text x="350.9" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">6</text>
+  <path d="M383.8,191 V186.4 Q383.8,182.4 387.8,182.4 H398.1 Q402.1,182.4 402.1,186.4 V191 Z" fill="#E8850C"><title>7 · ACF: 0.02</title></path>
+  <path d="M404.1,191 V182 Q404.1,178 408.1,178 H418.3 Q422.3,178 422.3,182 V191 Z" fill="#3F8E5A"><title>7 · PACF: 0.03</title></path>
+  <text x="403.1" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">7</text>
+  <path d="M436,191 V185.6 Q436,181.6 440,181.6 H450.2 Q454.2,181.6 454.2,185.6 V191 Z" fill="#E8850C"><title>8 · ACF: 0.02</title></path>
+  <path d="M456.2,191 V187.4 Q456.2,183.8 459.9,183.8 H470.9 Q474.5,183.8 474.5,187.4 V191 Z" fill="#3F8E5A"><title>8 · PACF: 0.02</title></path>
+  <text x="455.2" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">8</text>
+  <path d="M488.2,191 V188.1 Q488.2,185.2 491.1,185.2 H503.5 Q506.4,185.2 506.4,188.1 V191 Z" fill="#E8850C"><title>9 · ACF: 0.01</title></path>
+  <path d="M508.4,191 V189.9 Q508.4,188.7 509.6,188.7 H525.5 Q526.7,188.7 526.7,189.9 V191 Z" fill="#3F8E5A"><title>9 · PACF: 0.01</title></path>
+  <text x="507.4" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">9</text>
+  <path d="M540.3,191 V192.3 Q540.3,193.6 541.6,193.6 H557.3 Q558.6,193.6 558.6,192.3 V191 Z" fill="#E8850C"><title>10 · ACF: −0.01</title></path>
+  <path d="M560.6,191 V194.5 Q560.6,198 564.1,198 H575.4 Q578.8,198 578.8,194.5 V191 Z" fill="#3F8E5A"><title>10 · PACF: −0.02</title></path>
+  <text x="559.6" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">10</text>
+  <path d="M592.5,191 V188.4 Q592.5,185.7 595.1,185.7 H608.1 Q610.8,185.7 610.8,188.4 V191 Z" fill="#E8850C"><title>11 · ACF: 0.01</title></path>
+  <path d="M612.8,191 V188.3 Q612.8,185.6 615.5,185.6 H628.3 Q631,185.6 631,188.3 V191 Z" fill="#3F8E5A"><title>11 · PACF: 0.01</title></path>
+  <text x="611.8" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">11</text>
+  <path d="M644.7,191 V185.6 Q644.7,181.6 648.7,181.6 H658.9 Q662.9,181.6 662.9,185.6 V191 Z" fill="#E8850C"><title>12 · ACF: 0.02</title></path>
+  <path d="M664.9,191 V187.5 Q664.9,184 668.4,184 H679.7 Q683.2,184 683.2,187.5 V191 Z" fill="#3F8E5A"><title>12 · PACF: 0.02</title></path>
+  <text x="663.9" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">12</text>
+</svg>

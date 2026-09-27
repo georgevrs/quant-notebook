@@ -132,5 +132,17 @@ def test_verify_labs_skips_nondeterministic_scs_keys():
     ) == []
     # an ordinary key with the same-sized drift is still a real, reported difference
     assert verify_labs.compare({"other": -9.79e-08}, {"other": -6.04e-05}) != []
+
+
+def test_verify_labs_skips_wall_clock_timings():
+    # Session 4.5's storage-stack timings vary with disk cache / machine load by design.
+    assert verify_labs.compare(
+        {"t_duckdb_ms": 28.9, "speedup_duckdb_vs_csv": 68.5, "t_write_csv": 7.25, "other": 1.0},
+        {"t_duckdb_ms": 33.4, "speedup_duckdb_vs_csv": 62.8, "t_write_csv": 6.81, "other": 1.0},
+    ) == []
+    # a bare "t_" prefix used for something else (Student-t params, a period count) is NOT
+    # exempted — only the deliberate "_ms" suffix / "speedup_"/"slowdown_" prefix are.
+    assert verify_labs.compare({"t_nu_sim": 6.0}, {"t_nu_sim": 5.0}) != []
+    assert verify_labs.compare({"t_oos_years": 8.0}, {"t_oos_years": 7.0}) != []
     # the key must still be present on both sides
     assert verify_labs.compare({"tol_daily_scs_dw": 1.0}, {}) == ["tol_daily_scs_dw: missing after re-run"]

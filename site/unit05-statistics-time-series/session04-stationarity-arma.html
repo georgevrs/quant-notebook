@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- nav:head -->
+<title>5.4 · Stationarity &amp; ARMA Models</title>
+<meta name="description" content="Unit roots, ADF and KPSS, AR/MA/ARMA, ACF and PACF — and why returns are close to unpredictable while prices are not stationary.">
+<link rel="canonical" href="https://georgevrs.github.io/quant-notebook/unit05-statistics-time-series/session04-stationarity-arma.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Quant Notebook">
+<meta property="og:title" content="5.4 · Stationarity &amp; ARMA Models">
+<meta property="og:description" content="Unit roots, ADF and KPSS, AR/MA/ARMA, ACF and PACF — and why returns are close to unpredictable while prices are not stationary.">
+<meta property="og:url" content="https://georgevrs.github.io/quant-notebook/unit05-statistics-time-series/session04-stationarity-arma.html">
+<meta name="twitter:card" content="summary">
+<link rel="stylesheet" href="../assets/brand.css">
+<link rel="stylesheet" href="../assets/temml.css">
+<!-- /nav:head -->
+</head>
+<body><div class="page" id="top">
+<!-- nav:tabs -->
+<nav class="tabs">
+<a href="../index.html">⌂ Course home</a>
+<span class="soon" title="Coming soon">5.1 · Stylized Facts</span>
+<span class="soon" title="Coming soon">5.2 · Honest Inference</span>
+<span class="soon" title="Coming soon">5.3 · Bayesian Thinking</span>
+<a class="active" href="session04-stationarity-arma.html">5.4 · Stationarity &amp; ARMA</a>
+<span class="soon" title="Coming soon">5.5 · Volatility</span>
+<span class="soon" title="Coming soon">5.6 · Cointegration</span>
+<span class="soon" title="Coming soon">5.7 · Kalman &amp; Regimes</span>
+<a href="../roadmap.html">🗺 Roadmap</a>
+</nav>
+<!-- /nav:tabs -->
+
+<header class="cover">
+<!-- nav:heading -->
+<p class="eyebrow">Unit 5 · Statistics &amp; Time Series of Returns — Session 04 of 07</p>
+<h1>Stationarity &amp; ARMA Models</h1>
+<!-- /nav:heading -->
+<p class="subtitle">A random walk and a mean-reverting series can look identical on a chart, yet they call for completely different models and completely different trust in a forecast. This session gives you the machinery to tell them apart — the ADF and KPSS unit-root tests, the AR/MA/ARMA family that models what is left once a series is stationary, and the ACF/PACF plots that tell you which one to fit. <mark>The core move: test for stationarity before you model anything, because the standard tests have opposite null hypotheses and, near the boundary, will disagree.</mark></p>
+<div class="meta">
+<span>DURATION <b>1.5 h + lab</b></span>
+<span>LEVEL <b>Intermediate</b></span>
+<span>TRACKS <b>QR · QT · IND</b></span>
+<span>HANDS-ON <b>ADF/KPSS disagreement and ARMA order selection on simulated data</b></span>
+</div>
+<!-- nav:labstrip -->
+<div class="labstrip"><b>📓 Companion lab</b>
+<a href="https://colab.research.google.com/github/georgevrs/quant-notebook/blob/main/labs/u05/s04_stationarity_arma.ipynb">Open in Colab</a>
+<a href="https://github.com/georgevrs/quant-notebook/blob/main/labs/u05/s04_stationarity_arma.ipynb">Notebook on GitHub</a>
+<a href="https://github.com/georgevrs/quant-notebook/blob/main/labs/u05/s04_stationarity_arma.py">Source (.py)</a>
+</div>
+<!-- /nav:labstrip -->
+<div class="toc">
+<b>On this page</b>
+<ol>
+<li><a href="#s1">What "stationary" means (and why prices aren't)</a></li>
+<li><a href="#s2">Detecting a unit root: ADF and KPSS</a></li>
+<li><a href="#s3">AR, MA and ARMA: the building blocks</a></li>
+<li><a href="#s4">Reading the ACF and PACF</a></li>
+<li><a href="#s5">Choosing the order: AIC, BIC, and when they disagree</a></li>
+<li><a href="#s6">Fitting ARMA in code</a></li>
+<li><a href="#s7">Where people go wrong</a></li>
+<li><a href="#s8">Try it</a></li>
+<li><a href="#s9">Glossary · Check yourself · Go deeper</a></li>
+</ol>
+</div>
+</header>
+
+<main>
+
+<!-- ============ §1 — mental model ============ -->
+<section id="s1">
+<h2><span class="no">5.4.1</span> What "stationary" means (and why prices aren't)</h2>
+<p class="lede">Every test, every model and every confidence interval in this session rests on one question: does the series' behaviour change depending on when you look at it?</p>
+
+<p>Statisticians call this property <strong>stationarity</strong>: a series is (weakly) stationary when its mean, its variance and the way it correlates with its own past do not depend on the date. Ten years of a stationary series look statistically like any other ten years: same average, same spread, same tendency to snap back after a shock. Nothing about being stationary says the series is smooth or boring; a stationary series can be jagged and unpredictable period to period. It just cannot drift.</p>
+
+<p>Prices do drift. A stock's price today is close to yesterday's price plus an unpredictable shock, over and over, so its plausible range widens the longer you watch: a price series with this property has a <strong>unit root</strong>, meaning today's value carries the full weight of every past shock forward, undiminished. Formally, a price path is well approximated by a random walk — the purest example of a unit-root process — and a random walk is the textbook case of a non-stationary series: its variance grows in proportion to how long you have been watching it, and a shock from ten years ago is still sitting in today's level, exactly as large as the day it hit. Not every non-stationary series is a unit root, though. A series can instead be trend-stationary: stationary once you subtract a deterministic trend, rather than once you difference it. Differencing a trend-stationary series still makes it stationary, but it is the wrong fix — it throws away information and can manufacture short-term correlation that was never really there. Telling the two apart is exactly what the choice of ADF specification in <a href="#s2">§5.4.2</a>'s pitfall callout is for.</p>
+
+<p>Log returns are a different animal. Each day's log return is close to independent of the last, its average and spread don't depend on which decade you sample, and a bad day does not "carry over" — tomorrow's return does not remember yesterday's. That is <span class="xref soon" data-xref="5.1" data-auto="" title="Coming soon">Session 5.1 — Stylized Facts of Returns</span>'s near-zero <span class="term soon" data-term="autocorrelation" title="Defined in Session 5.1 (coming soon)">autocorrelation</span> restated as a stationarity claim: returns are close to stationary; the price level built by accumulating them is not.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 250" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">SAME KIND OF NOISE, TWO KINDS OF BEHAVIOUR</text>
+  <rect x="26" y="34" width="326" height="196" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="189" y="56" font-size="11" font-weight="700" text-anchor="middle" fill="#1F7A55">STATIONARY</text>
+  <line x1="46" y1="140" x2="332" y2="140" stroke="#1F7A55" stroke-width="1" stroke-dasharray="2 3"/>
+  <path d="M46,140 C70,110 90,168 114,132 C138,98 158,158 182,122 C206,150 226,104 250,146 C274,116 294,160 318,128 L332,140" fill="none" stroke="#1F7A55" stroke-width="2"/>
+  <rect x="46" y="96" width="286" height="88" fill="#1F7A55" fill-opacity="0.06"/>
+  <text x="189" y="200" font-size="9.5" text-anchor="middle" fill="#1F2C38" font-weight="600">the band stays the same width</text>
+  <text x="189" y="216" font-size="9" text-anchor="middle" fill="#4A5A68">forever — a shock always fades back</text>
+  <rect x="368" y="34" width="326" height="196" rx="9" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="531" y="56" font-size="11" font-weight="700" text-anchor="middle" fill="#D64B2A">UNIT ROOT</text>
+  <path d="M394,138 L410,150 L426,120 L442,140 L458,100 L474,128 L490,90 L506,118 L522,80 L538,112 L554,68 L570,104 L586,58 L602,96 L618,44 L634,86 L650,30 L666,74" fill="none" stroke="#D64B2A" stroke-width="2"/>
+  <path d="M394,138 L410,150 L426,120 L442,140 L458,100 L474,128 L490,90 L506,118 L522,80 L538,112 L554,68 L570,104 L586,58 L602,96 L618,44 L634,86 L650,30 L666,74 L666,220 L394,220 Z" fill="#D64B2A" fill-opacity="0.05" stroke="none"/>
+  <path d="M394,124 C420,118 460,96 500,84 C540,72 580,66 610,40" fill="none" stroke="#D64B2A" stroke-width="1" stroke-dasharray="2 3"/>
+  <path d="M394,152 C420,158 460,168 500,166 C540,164 580,160 610,148" fill="none" stroke="#D64B2A" stroke-width="1" stroke-dasharray="2 3"/>
+  <text x="531" y="200" font-size="9.5" text-anchor="middle" fill="#1F2C38" font-weight="600">the plausible range keeps widening</text>
+  <text x="531" y="216" font-size="9" text-anchor="middle" fill="#4A5A68">— every past shock is still in there</text>
+</svg>
+<figcaption>fig 5.4.1 — a stationary series wanders inside a fixed corridor; a unit-root series' plausible range widens without limit</figcaption>
+</figure>
+
+<p>The engineering analogy is exact: a random walk is what you get by integrating white noise. Each individual increment is unpredictable and mean-zero, exactly like the noise feeding it, but the running sum of unpredictable increments is not — its standard deviation grows with the square root of elapsed time, the same <math><semantics><msqrt><mrow><mi>n</mi><mspace width="0pt" height="0.5em"></mspace></mrow></msqrt><annotation encoding="application/x-tex">\sqrt{n}</annotation></semantics></math> rule that governs a sum of independent shocks anywhere else in this course. A ten-day-ahead forecast interval for a stationary series is barely wider than a one-day-ahead one, because the series keeps snapping back to its mean; a ten-year-ahead forecast interval for a price level is enormously wider than a one-year-ahead one, because nothing pulls it back. That difference is not a modelling inconvenience — it is the entire reason "the price will be roughly here in ten years" is a much harder claim to defend than "returns will average roughly this much."</p>
+
+<p>The practical stakes go beyond forecasting. Regress one unit-root series on another — two unrelated price levels, say — and ordinary least squares will often report a high <math><semantics><msup><mi>R</mi><mn class="tml-med-pad">2</mn></msup><annotation encoding="application/x-tex">R^2</annotation></semantics></math> and a strongly significant slope even when there is no real relationship at all: two series that are each independently drifting will drift together often enough, over any one sample, to look related. This is the classic "spurious regression" trap, and it is precisely why <span class="xref soon" data-xref="5.2" data-auto="" title="Coming soon">Session 5.2 — Regression &amp; Inference That Doesn&#x27;t Lie</span>'s OLS machinery assumes stationary inputs. <span class="xref soon" data-xref="5.6" data-auto="" title="Coming soon">Session 5.6 — Cointegration &amp; Mean Reversion</span> comes back to this from the opposite direction: two unit-root series occasionally really do move together in a way that survives the test properly done — that relationship is called cointegration, and testing for stationarity first is exactly what separates a genuine pairs-trading candidate from a coincidence.</p>
+
+<table>
+<thead><tr><th>Property</th><th>Stationary series</th><th>Unit-root series</th></tr></thead>
+<tbody>
+<tr><td>Mean over time</td><td>constant</td><td>can drift anywhere</td></tr>
+<tr><td>Variance over time</td><td>constant</td><td>grows with the horizon</td></tr>
+<tr><td>Effect of one shock</td><td>fades out — mean-reverting</td><td>permanent — never fades</td></tr>
+<tr><td>k-step-ahead forecast uncertainty</td><td>levels off at a ceiling</td><td>grows without bound</td></tr>
+</tbody>
+</table>
+
+<div class="co key"><span class="co-t">📌 Key idea</span>
+<p>Stationarity is not a property of the numbers looking calm — it is the property that makes a hypothesis test, a confidence interval, or a forecast horizon mean the same thing regardless of which window of history you happened to sample. Fit a model that assumes stationarity to a series that has a unit root, and every standard error you compute is quietly wrong.</p>
+</div>
+</section>
+
+<!-- ============ §2 — ADF and KPSS ============ -->
+<section id="s2">
+<h2><span class="no">5.4.2</span> Detecting a unit root: ADF and KPSS</h2>
+<p class="lede">Two tests, built the opposite way round, are the standard first check — and disagreeing with itself is exactly what makes the pair useful.</p>
+
+<p>The <strong>ADF test</strong> (Augmented Dickey-Fuller) asks whether a series' own last value helps predict its next change. Write the series as an AR(1), <math><semantics><mrow><msub><mi>r</mi><mi>t</mi></msub><mo>=</mo><mi>c</mi><mo>+</mo><mi>ϕ</mi><msub><mi>r</mi><mrow><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub><mo>+</mo><msub><mi>ε</mi><mi>t</mi></msub></mrow><annotation encoding="application/x-tex">r_t = c + \phi r_{t-1} + \varepsilon_t</annotation></semantics></math>, and re-arrange it as <math><semantics><mrow><mrow><mi mathvariant="normal">Δ</mi><mspace></mspace></mrow><msub><mi>r</mi><mi>t</mi></msub><mo>=</mo><mi>c</mi><mo>+</mo><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>ϕ</mi><mo>−</mo><mn>1</mn><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><msub><mi>r</mi><mrow><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub><mo>+</mo><msub><mi>ε</mi><mi>t</mi></msub></mrow><annotation encoding="application/x-tex">\Delta r_t = c + (\phi - 1) r_{t-1} + \varepsilon_t</annotation></semantics></math> — augmented, in practice, with enough lagged <math><semantics><mrow><mrow><mi mathvariant="normal">Δ</mi><mspace></mspace></mrow><msub><mi>r</mi><mrow><mi>t</mi><mo>−</mo><mi>i</mi></mrow></msub></mrow><annotation encoding="application/x-tex">\Delta r_{t-i}</annotation></semantics></math> terms to soak up any leftover autocorrelation in the residuals. The null hypothesis is <math><semantics><mrow><msub><mi>H</mi><mn>0</mn></msub><mo lspace="0.2222em" rspace="0.2222em">:</mo><mi>ϕ</mi><mo>=</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">H_0: \phi = 1</annotation></semantics></math>, a <strong>unit root</strong>; the alternative is <math><semantics><mrow><mi>ϕ</mi><mo>&lt;</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">\phi \lt 1</annotation></semantics></math>, stationary. A large negative test statistic rejects the unit root. Critically, ADF's null is "non-stationary" — failing to reject it is not proof of a unit root, only a failure to rule one out, exactly the <span class="term soon" data-term="p-value" title="Defined in Session 5.2 (coming soon)">p-value</span> logic from <span class="xref soon" data-xref="5.2" data-auto="" title="Coming soon">Session 5.2 — Regression &amp; Inference That Doesn&#x27;t Lie</span>.</p>
+
+<p>The <strong>KPSS test</strong> (Kwiatkowski-Phillips-Schmidt-Shin) is built the other way around: it splits the series into a deterministic part, a random-walk component and a stationary error, then tests whether the random walk's variance is exactly zero. Its null hypothesis is <math><semantics><msub><mi>H</mi><mn>0</mn></msub><annotation encoding="application/x-tex">H_0</annotation></semantics></math>: the series is stationary; rejecting it is evidence of a unit root. Run side by side, ADF and KPSS are testing <mark>opposite default assumptions</mark> — one presumes non-stationarity until proven otherwise, the other presumes stationarity until proven otherwise. That is not redundancy; it is the entire point of using both.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 150" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <rect x="14" y="40" width="122" height="62" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="75" y="63" font-size="10.5" text-anchor="middle" fill="#3A56C5" font-weight="600">1 · PLOT</text>
+  <text x="75" y="79" font-size="9" text-anchor="middle" fill="#4A5A68">the series and its</text>
+  <text x="75" y="91" font-size="9" text-anchor="middle" fill="#4A5A68">first difference</text>
+  <rect x="156" y="40" width="122" height="62" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="217" y="63" font-size="10.5" text-anchor="middle" fill="#3A56C5" font-weight="600">2 · RUN BOTH</text>
+  <text x="217" y="79" font-size="9" text-anchor="middle" fill="#4A5A68">ADF (H0: unit root)</text>
+  <text x="217" y="91" font-size="9" text-anchor="middle" fill="#4A5A68">KPSS (H0: stationary)</text>
+  <rect x="298" y="40" width="122" height="62" rx="9" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="359" y="63" font-size="10.5" text-anchor="middle" fill="#8A6D00" font-weight="600">3 · COMPARE</text>
+  <text x="359" y="79" font-size="9" text-anchor="middle" fill="#4A5A68">the two verdicts —</text>
+  <text x="359" y="91" font-size="9" text-anchor="middle" fill="#4A5A68">table 5.4.2</text>
+  <rect x="440" y="40" width="122" height="62" rx="9" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="501" y="63" font-size="10.5" text-anchor="middle" fill="#8A6D00" font-weight="600">4 · DIFFERENCE</text>
+  <text x="501" y="79" font-size="9" text-anchor="middle" fill="#4A5A68">if a unit root wins —</text>
+  <text x="501" y="91" font-size="9" text-anchor="middle" fill="#4A5A68">model \( \Delta r_t \) instead</text>
+  <rect x="582" y="40" width="122" height="62" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="643" y="63" font-size="10.5" text-anchor="middle" fill="#1F7A55" font-weight="600">5 · RE-TEST</text>
+  <text x="643" y="79" font-size="9" text-anchor="middle" fill="#4A5A68">confirm before you</text>
+  <text x="643" y="91" font-size="9" text-anchor="middle" fill="#4A5A68">fit an ARMA model</text>
+  <path d="M137 71 H154" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M279 71 H296" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M421 71 H438" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M563 71 H580" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <text x="360" y="128" font-size="11" text-anchor="middle" fill="#4A5A68" font-style="italic">Never model a series you have not tested — and never trust one test alone.</text>
+  <defs><marker id="s2a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F2C38"/></marker></defs>
+</svg>
+<figcaption>fig 5.4.2 — from a raw series to a validated model: test both ways, difference if you must, then re-test</figcaption>
+</figure>
+
+<table>
+<thead><tr><th>ADF verdict</th><th>KPSS verdict</th><th>What to conclude</th></tr></thead>
+<tbody>
+<tr><td>rejects unit root</td><td>fails to reject stationarity</td><td>agreement — treat the series as stationary</td></tr>
+<tr><td>fails to reject unit root</td><td>rejects stationarity</td><td>agreement — treat it as a unit root; difference it</td></tr>
+<tr><td>rejects unit root</td><td>also rejects stationarity</td><td>contradiction — often a trend the ADF specification missed; check the plot and try a trend term</td></tr>
+<tr><td>fails to reject unit root</td><td>fails to reject stationarity</td><td>contradiction — usually just an underpowered sample; gather more data, do not force a verdict</td></tr>
+</tbody>
+</table>
+
+<p>The word "augmented" in ADF's name is doing real work: a plain Dickey-Fuller regression with no extra lagged-difference terms only removes serial correlation if there happens to be none left to remove, and any that remains inflates the test's residual variance and biases the test toward failing to reject. In practice you let the routine choose the augmentation length itself — <code>statsmodels</code>'s <code>adfuller(..., autolag="AIC")</code> tries a range of lag counts and keeps whichever minimises AIC, the same criterion §5.4.5 uses for ARMA order — rather than hard-coding a fixed number of lags that might be wrong for the series in front of you. This is also why the two tests genuinely disagree at moderate persistence rather than only in a pathological edge case: series like short-term interest rates or dividend yields are economically mean-reverting but do so slowly, with an AR coefficient that can sit anywhere from 0.90 to 0.99 — precisely the range where a few hundred observations rarely settle the question either way.</p>
+
+<p>The lab makes both halves of this concrete. Simulate 200 GBM price paths, log them, and split each into its level and its return series. ADF rejects the unit root on the level only <span data-lab="rate_adf_reject_price" data-fmt=".1%">2.5%</span> of the time — almost exactly its nominal 5% size, because the null (a unit root) is actually true there — but rejects it on returns <span data-lab="rate_adf_reject_ret" data-fmt=".0%">100%</span> of the time, full power against a truly stationary alternative. KPSS shows the mirror image: it rejects stationarity on the level <span data-lab="rate_kpss_reject_price" data-fmt=".0%">95%</span> of the time and on returns only <span data-lab="rate_kpss_reject_ret" data-fmt=".0%">5%</span> of the time. Same two tests, same 5% threshold — the verdicts flip completely depending on which object you feed them, exactly as the session's opening claim predicts.</p>
+
+<p>Now sweep an AR(1) coefficient <math><semantics><mi>ϕ</mi><annotation encoding="application/x-tex">\phi</annotation></semantics></math> from comfortably stationary toward an exact unit root and run both tests on 150 fresh replications at each value. Far from the boundary the tests agree almost every time — at <math><semantics><mrow><mi>ϕ</mi><mo>=</mo><mn>0.50</mn></mrow><annotation encoding="application/x-tex">\phi = 0.50</annotation></semantics></math> they contradict each other in only <span data-lab="rate_contradict_baseline" data-fmt=".0%">6%</span> of replications. But around <math><semantics><mrow><mi>ϕ</mi><mo>=</mo></mrow><annotation encoding="application/x-tex">\phi =</annotation></semantics></math> <span data-lab="phi_boundary" data-fmt=".2f">0.90</span> — a series whose shocks take roughly <span data-lab="halflife_boundary" data-fmt=".0f">7</span> periods to decay halfway back to its mean, the kind of persistence real short-rate and dividend-yield series show — ADF's power to detect stationarity has fallen sharply while KPSS's tendency to (correctly, but for a genuinely persistent series, unhelpfully) flag it as non-stationary has risen, and the two flatly contradict each other in <span data-lab="rate_contradict_boundary" data-fmt=".0%">20%</span> of replications: nearly one run in five gives you one test screaming "stationary" and the other screaming "unit root" from the very same data. <span class="xref soon" data-xref="5.6" data-auto="" title="Coming soon">Session 5.6 — Cointegration &amp; Mean Reversion</span> turns exactly this decay rate into a tradable <span class="term soon" data-term="half-life of mean reversion" title="Defined in Session 5.6 (coming soon)">half-life of mean reversion</span> — the slower the decay, the longer you have to wait for a bet on reversion to pay off.</p>
+
+<figure class="diagram chart">
+<!-- chart:adf_kpss_boundary -->
+<svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="How often each test rejects its own null, as the AR(1) coefficient approaches 1">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">HOW OFTEN EACH TEST REJECTS ITS OWN NULL, AS THE AR(1) COEFFICIENT APPROACHES 1</text>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#E8850C" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">ADF (H0: unit root)</text>
+  <line x1="191.60000000000002" y1="32" x2="207.60000000000002" y2="32" stroke="#3F8E5A" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="213.60000000000002" y="36" font-size="11" fill="#4A5A68">KPSS (H0: stationary)</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="268" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0%</text>
+  <line x1="64" y1="221.6" x2="602" y2="221.6" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="225.6" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">20%</text>
+  <line x1="64" y1="179.2" x2="602" y2="179.2" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="183.2" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">40%</text>
+  <line x1="64" y1="136.8" x2="602" y2="136.8" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="140.8" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">60%</text>
+  <line x1="64" y1="94.4" x2="602" y2="94.4" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="98.4" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">80%</text>
+  <line x1="64" y1="52" x2="602" y2="52" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="56" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">100%</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#C9CFC6" stroke-width="1"/>
+  <line x1="64" y1="264" x2="64" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="64" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">0.5</text>
+  <line x1="171.6" y1="264" x2="171.6" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="171.6" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">0.6</text>
+  <line x1="279.2" y1="264" x2="279.2" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="279.2" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">0.7</text>
+  <line x1="386.8" y1="264" x2="386.8" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="386.8" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">0.8</text>
+  <line x1="494.4" y1="264" x2="494.4" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="494.4" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">0.9</text>
+  <line x1="602" y1="264" x2="602" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="602" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">1</text>
+  <line x1="64" y1="253.4" x2="602" y2="253.4" stroke="#4A5A68" stroke-width="1"/>
+  <text x="68" y="248.4" font-size="10.5" fill="#4A5A68">5% significance</text>
+  <polyline points="64,52 386.8,52 494.4,56.2 548.2,131.1 569.7,201.8 591.2,247 602,247" fill="none" stroke="#E8850C" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>ADF (H0: unit root)</title></polyline>
+  <circle cx="602" cy="247" r="4" fill="#E8850C" stroke="#FBFBF8" stroke-width="2"><title>ADF (H0: unit root): 8%</title></circle>
+  <polyline points="64,251.3 386.8,234.3 494.4,218.8 548.2,169.3 569.7,135.4 591.2,87.3 602,74.6" fill="none" stroke="#3F8E5A" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>KPSS (H0: stationary)</title></polyline>
+  <circle cx="602" cy="74.6" r="4" fill="#3F8E5A" stroke="#FBFBF8" stroke-width="2"><title>KPSS (H0: stationary): 89%</title></circle>
+  <text x="614" y="78.6" font-size="11" fill="#1F2C38">KPSS (H0: stationary): 89%</text>
+  <text x="614" y="251" font-size="11" fill="#1F2C38">ADF (H0: unit root): 8%</text>
+</svg>
+<!-- /chart:adf_kpss_boundary -->
+<figcaption>fig 5.4.3 — the two curves cross between <math><semantics><mrow><mi>ϕ</mi><mo>=</mo><mn>0.8</mn></mrow><annotation encoding="application/x-tex">\phi=0.8</annotation></semantics></math> and <math><semantics><mrow><mi>ϕ</mi><mo>=</mo><mn>0.95</mn></mrow><annotation encoding="application/x-tex">\phi=0.95</annotation></semantics></math>: exactly the zone where the tests disagree most</figcaption>
+</figure>
+
+<div class="co warn"><span class="co-t">⚠️ Pitfall — "the test told me the answer"</span>
+<p>ADF and KPSS both come in three flavours — no constant, a constant, and a constant plus a linear trend — and the choice matters as much as the test itself. Always start with a constant, add a trend term only if the plot plainly shows one, and never let a script silently pick the specification for you: a trend-stationary series tested with the wrong variant of ADF will look exactly like a unit root.</p>
+</div>
+</section>
+
+<!-- ============ §3 — AR, MA, ARMA ============ -->
+<section id="s3">
+<h2><span class="no">5.4.3</span> AR, MA and ARMA: the building blocks</h2>
+<p class="lede">Once a series is stationary (or has been differenced until it is), the next question is what shape its own memory takes.</p>
+
+<p>An <strong>autoregressive model</strong> — AR(p) for short — says today's value is a weighted sum of its own last p values plus fresh noise:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><msub><mi>r</mi><mi>t</mi></msub><mo>=</mo><mi>c</mi><mo>+</mo><msub><mi>ϕ</mi><mn>1</mn></msub><msub><mi>r</mi><mrow><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub><mo>+</mo><msub><mi>ϕ</mi><mn>2</mn></msub><msub><mi>r</mi><mrow><mi>t</mi><mo>−</mo><mn>2</mn></mrow></msub><mo>+</mo><mo>⋯</mo><mo>+</mo><msub><mi>ϕ</mi><mi>p</mi></msub><msub><mi>r</mi><mrow><mi>t</mi><mo>−</mo><mi>p</mi></mrow></msub><mo>+</mo><msub><mi>ε</mi><mi>t</mi></msub></mrow><annotation encoding="application/x-tex">r_t = c + \phi_1 r_{t-1} + \phi_2 r_{t-2} + \cdots + \phi_p r_{t-p} + \varepsilon_t</annotation></semantics></math></div>
+<p>An AR(1) is stationary exactly when <math><semantics><mrow><mi>|</mi><msub><mi>ϕ</mi><mn>1</mn></msub><mi>|</mi><mo>&lt;</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">|\phi_1| \lt 1</annotation></semantics></math> — the same condition, restated, that made ADF's null hypothesis <math><semantics><mrow><mi>ϕ</mi><mo>=</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">\phi = 1</annotation></semantics></math> the dividing line in <a href="#s2">§5.4.2</a>. For a general AR(p), the condition is that the roots of its characteristic polynomial all lie outside the unit circle; <math><semantics><mrow><mi>|</mi><mi>ϕ</mi><mi>|</mi><mo>&lt;</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">|\phi| \lt 1</annotation></semantics></math> is just the p=1 special case.</p>
+
+<p>A <strong>moving-average model</strong> — MA(q) for short — looks completely different: today's value is a weighted sum of the last q unpredictable shocks, not of past levels at all:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><msub><mi>r</mi><mi>t</mi></msub><mo>=</mo><mi>c</mi><mo>+</mo><msub><mi>ε</mi><mi>t</mi></msub><mo>+</mo><msub><mi>θ</mi><mn>1</mn></msub><msub><mi>ε</mi><mrow><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub><mo>+</mo><mo>⋯</mo><mo>+</mo><msub><mi>θ</mi><mi>q</mi></msub><msub><mi>ε</mi><mrow><mi>t</mi><mo>−</mo><mi>q</mi></mrow></msub></mrow><annotation encoding="application/x-tex">r_t = c + \varepsilon_t + \theta_1 \varepsilon_{t-1} + \cdots + \theta_q \varepsilon_{t-q}</annotation></semantics></math></div>
+<p>An MA(q) is automatically stationary for any <math><semantics><mi>θ</mi><annotation encoding="application/x-tex">\theta</annotation></semantics></math> — it is a finite sum of noise terms — but it needs an analogous condition of its own, called invertibility, before it can be rewritten as an (infinite) AR process; <code>statsmodels</code> checks this for you when it fits one. Invertibility matters practically, not just theoretically: an invertible MA(q) can be expressed as an AR(∞), which is what lets you recover today's shock <math><semantics><msub><mi>ε</mi><mi>t</mi></msub><annotation encoding="application/x-tex">\varepsilon_t</annotation></semantics></math> from the observed history and therefore produce a sensible one-step forecast at all. Fit a non-invertible MA by mistake and two completely different parameter values explain the data equally well — the likelihood cannot tell them apart — so the fitted <math><semantics><mover><mi>θ</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><annotation encoding="application/x-tex">\hat\theta</annotation></semantics></math> becomes an arbitrary pick between look-alike models rather than an estimate of anything real.</p>
+
+<p>AR and MA are also two views of the same idea: a stationary AR(1) unfolds into an MA(∞), and an invertible MA(1) unfolds into an AR(∞). ARMA, letting a small amount of each do the work, is usually the shortest honest description of a real series that would otherwise need a long pure AR or pure MA.</p>
+
+<p>An <strong>ARMA model</strong> combines both pieces into a single equation:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><msub><mi>r</mi><mi>t</mi></msub><mo>=</mo><mi>c</mi><mo>+</mo><mrow><munderover><mo movablelimits="false">∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>p</mi></munderover></mrow><msub><mi>ϕ</mi><mi>i</mi></msub><msub><mi>r</mi><mrow><mi>t</mi><mo>−</mo><mi>i</mi></mrow></msub><mo>+</mo><msub><mi>ε</mi><mi>t</mi></msub><mo>+</mo><mrow><munderover><mo movablelimits="false">∑</mo><mrow><mi>j</mi><mo>=</mo><mn>1</mn></mrow><mi>q</mi></munderover></mrow><msub><mi>θ</mi><mi>j</mi></msub><msub><mi>ε</mi><mrow><mi>t</mi><mo>−</mo><mi>j</mi></mrow></msub></mrow><annotation encoding="application/x-tex">r_t = c + \sum_{i=1}^p \phi_i r_{t-i} + \varepsilon_t + \sum_{j=1}^q \theta_j \varepsilon_{t-j}</annotation></semantics></math></div>
+<p>and is written ARMA(p,q). The appeal is parsimony: a process that would need a long pure AR or pure MA to describe well often needs only one or two terms of each once you let it mix. The running example for the rest of this session is an ARMA(1,1) with <math><semantics><mrow><mi>ϕ</mi><mo>=</mo><mn>0.6</mn></mrow><annotation encoding="application/x-tex">\phi = 0.6</annotation></semantics></math> and <math><semantics><mrow><mi>θ</mi><mo>=</mo><mo form="prefix" stretchy="false">−</mo><mn>0.4</mn></mrow><annotation encoding="application/x-tex">\theta = -0.4</annotation></semantics></math> — small enough to write out, rich enough that neither a pure AR(1) nor a pure MA(1) fully captures it, which is exactly what makes it a good test of the identification and selection tools in <a href="#s4">§5.4.4</a> and <a href="#s5">§5.4.5</a>. If <a href="#s2">§5.4.2</a>'s tests had found a unit root instead, the fix is mechanical: difference the series once (twice, on the rare occasion one difference still leaves a unit root) and fit the AR/MA structure to what remains, rather than to the original level. <code>statsmodels</code>' <code>ARIMA</code> class takes this differencing order as its middle argument — order <code>(p, d, q)</code> — so an ARMA(1,1) fit directly, as in <a href="#s6">§5.4.6</a>, is simply the special case <code>d=0</code>.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 210" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="40" y="30" font-size="12" fill="#4A5A68" font-family="IBM Plex Mono,monospace">MODELS OF A STATIONARY SERIES' OWN MEMORY</text>
+  <rect x="30" y="48" width="200" height="130" rx="8" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="130" y="78" font-size="14" font-weight="600" text-anchor="middle" fill="#3A56C5">AR(p)</text>
+  <text x="130" y="100" font-size="10" text-anchor="middle" fill="#4A5A68">conditions on its</text>
+  <text x="130" y="114" font-size="10" text-anchor="middle" fill="#4A5A68">OWN PAST VALUES</text>
+  <text x="130" y="138" font-size="9.5" text-anchor="middle" fill="#4A5A68">momentum or mean-</text>
+  <text x="130" y="152" font-size="9.5" text-anchor="middle" fill="#4A5A68">reversion in the level</text>
+  <rect x="260" y="48" width="200" height="130" rx="8" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="360" y="78" font-size="14" font-weight="600" text-anchor="middle" fill="#1F7A55">MA(q)</text>
+  <text x="360" y="100" font-size="10" text-anchor="middle" fill="#4A5A68">conditions on its</text>
+  <text x="360" y="114" font-size="10" text-anchor="middle" fill="#4A5A68">OWN PAST SHOCKS</text>
+  <text x="360" y="138" font-size="9.5" text-anchor="middle" fill="#4A5A68">a surprise that takes</text>
+  <text x="360" y="152" font-size="9.5" text-anchor="middle" fill="#4A5A68">a few periods to fade</text>
+  <rect x="490" y="48" width="200" height="130" rx="8" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="590" y="78" font-size="14" font-weight="600" text-anchor="middle" fill="#8A6D00">ARMA(p,q)</text>
+  <text x="590" y="100" font-size="10" text-anchor="middle" fill="#4A5A68">conditions on</text>
+  <text x="590" y="114" font-size="10" text-anchor="middle" fill="#4A5A68">BOTH AT ONCE</text>
+  <text x="590" y="138" font-size="9.5" text-anchor="middle" fill="#4A5A68">the workhorse — fits</text>
+  <text x="590" y="152" font-size="9.5" text-anchor="middle" fill="#4A5A68">more with fewer terms</text>
+  <text x="360" y="198" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">Same goal — describe what's left once a series is stationary — two different memories.</text>
+</svg>
+<figcaption>fig 5.4.4 — AR conditions on levels, MA on shocks, and ARMA combines both</figcaption>
+</figure>
+
+<table>
+<thead><tr><th>Model</th><th>Depends on</th><th>Typical use</th></tr></thead>
+<tbody>
+<tr><td>AR(p)</td><td>its own last p values</td><td>momentum or mean-reversion in the series' own history</td></tr>
+<tr><td>MA(q)</td><td>the last q shocks (surprises)</td><td>a shock whose effect takes a few periods to fully arrive</td></tr>
+<tr><td>ARMA(p,q)</td><td>both at once</td><td>fits real data more parsimoniously than a large pure AR or pure MA</td></tr>
+</tbody>
+</table>
+
+<div class="co tip"><span class="co-t">💡 Looking ahead</span>
+<p>Everything here models the conditional <em>mean</em> of a stationary series. <span class="xref soon" data-xref="5.5" data-auto="" title="Coming soon">Session 5.5 — Modeling Volatility</span> asks the same question about its conditional <em>variance</em> — a <span class="term soon" data-term="GARCH model" title="Defined in Session 5.5 (coming soon)">GARCH model</span> is, structurally, an ARMA model applied to squared returns instead of returns, built to capture the <span class="term soon" data-term="volatility clustering" title="Defined in Session 5.1 (coming soon)">volatility clustering</span> that AR/MA on the mean cannot touch.</p>
+</div>
+</section>
+
+<!-- ============ §4 — ACF and PACF ============ -->
+<section id="s4">
+<h2><span class="no">5.4.4</span> Reading the ACF and PACF</h2>
+<p class="lede">Before fitting anything, look at two plots — they tell you which family of model to even try.</p>
+
+<p>The <strong>ACF</strong> (autocorrelation function) at lag k is the correlation between <math><semantics><msub><mi>r</mi><mi>t</mi></msub><annotation encoding="application/x-tex">r_t</annotation></semantics></math> and <math><semantics><msub><mi>r</mi><mrow><mi>t</mi><mo>−</mo><mi>k</mi></mrow></msub><annotation encoding="application/x-tex">r_{t-k}</annotation></semantics></math>, for every k. It picks up both a direct effect and every indirect one relayed through the lags in between — lag 2's correlation partly reflects lag 1's, transmitted forward. The <strong>PACF</strong> (partial autocorrelation function) strips that relaying out: PACF at lag k is the correlation between <math><semantics><msub><mi>r</mi><mi>t</mi></msub><annotation encoding="application/x-tex">r_t</annotation></semantics></math> and <math><semantics><msub><mi>r</mi><mrow><mi>t</mi><mo>−</mo><mi>k</mi></mrow></msub><annotation encoding="application/x-tex">r_{t-k}</annotation></semantics></math> after netting out everything already explained by the lags in between, the same idea as a partial regression coefficient from <span class="xref soon" data-xref="5.2" data-auto="" title="Coming soon">Session 5.2 — Regression &amp; Inference That Doesn&#x27;t Lie</span> applied one lag at a time. Under the null of no autocorrelation at a given lag, both are approximately normal with standard deviation <math><semantics><mrow><mn>1</mn><mi>/</mi><msqrt><mi>T</mi></msqrt></mrow><annotation encoding="application/x-tex">1/\sqrt{T}</annotation></semantics></math>, so a bar beyond roughly <math><semantics><mrow><mo form="prefix" stretchy="false">±</mo><mn>1.96</mn><mi>/</mi><msqrt><mi>T</mi></msqrt></mrow><annotation encoding="application/x-tex">\pm 1.96/\sqrt{T}</annotation></semantics></math> is conventionally called significant.</p>
+
+<p>The two plots' shapes identify the model. A pure AR(p) has an ACF that tails off gradually (a damped sinusoid or exponential decay) but a PACF that cuts off sharply to zero right after lag p — the direct effect of anything further back really is zero once you control for the p lags in between. A pure MA(q) is the mirror image: its ACF cuts off sharply after lag q — by construction, a shock more than q periods old has already fully left the equation — while its PACF tails off. An ARMA(p,q) with both terms present shows neither a clean cutoff: both the ACF and the PACF decay gradually, which is itself diagnostic — it tells you a pure AR or pure MA won't be enough.</p>
+
+<table>
+<thead><tr><th>Process</th><th>ACF shape</th><th>PACF shape</th></tr></thead>
+<tbody>
+<tr><td>AR(p)</td><td>tails off (gradual decay)</td><td>cuts off sharply after lag p</td></tr>
+<tr><td>MA(q)</td><td>cuts off sharply after lag q</td><td>tails off (gradual decay)</td></tr>
+<tr><td>ARMA(p,q)</td><td>tails off</td><td>tails off — neither cuts off</td></tr>
+</tbody>
+</table>
+
+<p>On <span data-lab="acf_pacf_n" data-fmt=",">2,000</span> simulated points from the running ARMA(1,1) example, the lag-1 ACF and PACF are, as they must always be for any process, identical: <span data-lab="acf_lag1" data-fmt=".2f">0.26</span>. From lag 2 on they diverge — PACF drops to <span data-lab="pacf_lag2" data-fmt=".2f">0.08</span> and keeps shrinking, while the ACF decays more slowly, tailing off the way the table predicts for a process with a genuine AR component. With a sample this size the approximate 95% significance band sits at about <span data-lab="acf_sig_bound" data-fmt=".1%">4.4%</span> in either direction — narrow enough that the bars beyond lag 4 or so are indistinguishable from noise, which is exactly the point: real ARMA signatures are usually only visible in the first handful of lags.</p>
+
+<p>A practical rule of thumb for how far out to even plot: look at roughly <math><semantics><mrow><mrow><mi>min</mi><mo>⁡</mo></mrow><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mn>10</mn><mspace width="0.1667em"></mspace><msub><mi>log</mi><mn>10</mn></msub><mo>⁡</mo><mspace width="0.1667em"></mspace><mi>T</mi><mo separator="true">,</mo><mspace width="0.1667em"></mspace><mi>T</mi><mi>/</mi><mn>4</mn><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">\min(10 \log_{10} T,\, T/4)</annotation></semantics></math> lags rather than an arbitrary round number like 20 or 50 regardless of sample size. Plot too few lags and you can miss a slow AR decay; plot too many relative to T and you are mostly looking at noise, since the significance band <math><semantics><mrow><mo form="prefix" stretchy="false">±</mo><mn>1.96</mn><mi>/</mi><msqrt><mi>T</mi></msqrt></mrow><annotation encoding="application/x-tex">\pm 1.96/\sqrt T</annotation></semantics></math> only shrinks as the square root of the sample grows — quadrupling your data halves the band, not eliminates it. Under the hood, the PACF at each lag is computed by fitting successively longer AR regressions and reading off the coefficient on the newest lag each time (the Yule-Walker equations, or an equivalent recursion) — which is exactly why it isolates the direct effect: everything the shorter lags already explain is absorbed into their own coefficients before the new lag gets a look in.</p>
+
+<p>Worth keeping in mind while you look at fig 5.4.5: this ARMA(1,1) example was chosen to have visible structure worth reading. Run the same exercise on real daily log returns and, true to <a href="#s1">§5.4.1</a>'s opening claim, almost every bar in both plots sits inside the significance band — the near-zero <span class="xref soon" data-xref="5.1" data-auto="" title="Coming soon">Session 5.1 — Stylized Facts of Returns</span> autocorrelation showing up again, this time as a diagnosis rather than a headline number.</p>
+
+<figure class="diagram chart">
+<!-- chart:acf_pacf -->
+<svg viewBox="0 0 720 280" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="ACF and PACF of a simulated ARMA(1,1) — neither one cuts off">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">ACF AND PACF OF A SIMULATED ARMA(1,1) — NEITHER ONE CUTS OFF</text>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#E8850C" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">ACF</text>
+  <line x1="89.2" y1="32" x2="105.2" y2="32" stroke="#3F8E5A" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="111.2" y="36" font-size="11" fill="#4A5A68">PACF</text>
+  <line x1="64" y1="236" x2="690" y2="236" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="240" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">−0.10</text>
+  <line x1="64" y1="191" x2="690" y2="191" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="195" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.00</text>
+  <line x1="64" y1="146" x2="690" y2="146" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="150" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.10</text>
+  <line x1="64" y1="101" x2="690" y2="101" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="105" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.20</text>
+  <line x1="64" y1="56" x2="690" y2="56" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="60" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.30</text>
+  <line x1="64" y1="191" x2="690" y2="191" stroke="#C9CFC6" stroke-width="1"/>
+  <path d="M70.8,191 V79.4 Q70.8,75.4 74.8,75.4 H85.1 Q89.1,75.4 89.1,79.4 V191 Z" fill="#E8850C"><title>1 · ACF: 0.26</title></path>
+  <path d="M91.1,191 V79.3 Q91.1,75.3 95.1,75.3 H105.3 Q109.3,75.3 109.3,79.3 V191 Z" fill="#3F8E5A"><title>1 · PACF: 0.26</title></path>
+  <text x="90.1" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">1</text>
+  <path d="M123,191 V131.2 Q123,127.2 127,127.2 H137.2 Q141.2,127.2 141.2,131.2 V191 Z" fill="#E8850C"><title>2 · ACF: 0.14</title></path>
+  <path d="M143.2,191 V158.4 Q143.2,154.4 147.2,154.4 H157.5 Q161.5,154.4 161.5,158.4 V191 Z" fill="#3F8E5A"><title>2 · PACF: 0.08</title></path>
+  <text x="142.2" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">2</text>
+  <path d="M175.2,191 V148 Q175.2,144 179.2,144 H189.4 Q193.4,144 193.4,148 V191 Z" fill="#E8850C"><title>3 · ACF: 0.10</title></path>
+  <path d="M195.4,191 V170.7 Q195.4,166.7 199.4,166.7 H209.7 Q213.7,166.7 213.7,170.7 V191 Z" fill="#3F8E5A"><title>3 · PACF: 0.05</title></path>
+  <text x="194.4" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">3</text>
+  <path d="M227.3,191 V168.5 Q227.3,164.5 231.3,164.5 H241.6 Q245.6,164.5 245.6,168.5 V191 Z" fill="#E8850C"><title>4 · ACF: 0.06</title></path>
+  <path d="M247.6,191 V188.3 Q247.6,185.6 250.3,185.6 H263.1 Q265.8,185.6 265.8,188.3 V191 Z" fill="#3F8E5A"><title>4 · PACF: 0.01</title></path>
+  <text x="246.6" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">4</text>
+  <path d="M279.5,191 V185.9 Q279.5,181.9 283.5,181.9 H293.8 Q297.8,181.9 297.8,185.9 V191 Z" fill="#E8850C"><title>5 · ACF: 0.02</title></path>
+  <path d="M299.8,191 V193.6 Q299.8,196.2 302.4,196.2 H315.4 Q318,196.2 318,193.6 V191 Z" fill="#3F8E5A"><title>5 · PACF: −0.01</title></path>
+  <text x="298.8" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">5</text>
+  <path d="M331.7,191 V195.6 Q331.7,199.6 335.7,199.6 H345.9 Q349.9,199.6 349.9,195.6 V191 Z" fill="#E8850C"><title>6 · ACF: −0.02</title></path>
+  <path d="M351.9,191 V202.7 Q351.9,206.7 355.9,206.7 H366.2 Q370.2,206.7 370.2,202.7 V191 Z" fill="#3F8E5A"><title>6 · PACF: −0.03</title></path>
+  <text x="350.9" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">6</text>
+  <path d="M383.8,191 V186.4 Q383.8,182.4 387.8,182.4 H398.1 Q402.1,182.4 402.1,186.4 V191 Z" fill="#E8850C"><title>7 · ACF: 0.02</title></path>
+  <path d="M404.1,191 V182 Q404.1,178 408.1,178 H418.3 Q422.3,178 422.3,182 V191 Z" fill="#3F8E5A"><title>7 · PACF: 0.03</title></path>
+  <text x="403.1" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">7</text>
+  <path d="M436,191 V185.6 Q436,181.6 440,181.6 H450.2 Q454.2,181.6 454.2,185.6 V191 Z" fill="#E8850C"><title>8 · ACF: 0.02</title></path>
+  <path d="M456.2,191 V187.4 Q456.2,183.8 459.9,183.8 H470.9 Q474.5,183.8 474.5,187.4 V191 Z" fill="#3F8E5A"><title>8 · PACF: 0.02</title></path>
+  <text x="455.2" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">8</text>
+  <path d="M488.2,191 V188.1 Q488.2,185.2 491.1,185.2 H503.5 Q506.4,185.2 506.4,188.1 V191 Z" fill="#E8850C"><title>9 · ACF: 0.01</title></path>
+  <path d="M508.4,191 V189.9 Q508.4,188.7 509.6,188.7 H525.5 Q526.7,188.7 526.7,189.9 V191 Z" fill="#3F8E5A"><title>9 · PACF: 0.01</title></path>
+  <text x="507.4" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">9</text>
+  <path d="M540.3,191 V192.3 Q540.3,193.6 541.6,193.6 H557.3 Q558.6,193.6 558.6,192.3 V191 Z" fill="#E8850C"><title>10 · ACF: −0.01</title></path>
+  <path d="M560.6,191 V194.5 Q560.6,198 564.1,198 H575.4 Q578.8,198 578.8,194.5 V191 Z" fill="#3F8E5A"><title>10 · PACF: −0.02</title></path>
+  <text x="559.6" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">10</text>
+  <path d="M592.5,191 V188.4 Q592.5,185.7 595.1,185.7 H608.1 Q610.8,185.7 610.8,188.4 V191 Z" fill="#E8850C"><title>11 · ACF: 0.01</title></path>
+  <path d="M612.8,191 V188.3 Q612.8,185.6 615.5,185.6 H628.3 Q631,185.6 631,188.3 V191 Z" fill="#3F8E5A"><title>11 · PACF: 0.01</title></path>
+  <text x="611.8" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">11</text>
+  <path d="M644.7,191 V185.6 Q644.7,181.6 648.7,181.6 H658.9 Q662.9,181.6 662.9,185.6 V191 Z" fill="#E8850C"><title>12 · ACF: 0.02</title></path>
+  <path d="M664.9,191 V187.5 Q664.9,184 668.4,184 H679.7 Q683.2,184 683.2,187.5 V191 Z" fill="#3F8E5A"><title>12 · PACF: 0.02</title></path>
+  <text x="663.9" y="254" font-size="11" text-anchor="middle" fill="#4A5A68">12</text>
+</svg>
+<!-- /chart:acf_pacf -->
+<figcaption>fig 5.4.5 — neither the ACF nor the PACF cuts off cleanly: the textbook signature of a genuine ARMA process</figcaption>
+</figure>
+
+<div class="co note"><span class="co-t">🧭 Margin note — reading a real ACF/PACF plot</span>
+<p>Do not chase bars two or three lags past where the pattern clearly ends — with finitely many observations, roughly one bar in twenty will poke past the significance band by chance alone even under pure noise, the same multiple-comparisons logic <span class="xref soon" data-xref="5.2" data-auto="" title="Coming soon">Session 5.2 — Regression &amp; Inference That Doesn&#x27;t Lie</span> covers for regression. Look for a clear structural break, not the single largest bar.</p>
+</div>
+</section>
+
+<!-- ============ §5 — AIC, BIC ============ -->
+<section id="s5">
+<h2><span class="no">5.4.5</span> Choosing the order: AIC, BIC, and when they disagree</h2>
+<p class="lede">ACF and PACF narrow down the candidates; an information criterion picks among them — but "pick the smallest number" hides a real choice about what you are optimising for.</p>
+
+<p>Fitting a model by maximum likelihood always improves (or at worst does not worsen) as you add parameters, so raw likelihood cannot select an order — it would always vote for the biggest model on offer. An information criterion penalises complexity to compensate. The <strong>Akaike information criterion</strong> is</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><mpadded lspace="0"><mi>AIC</mi></mpadded><mo>=</mo><mo form="prefix" stretchy="false">−</mo><mn>2</mn><mrow><mspace width="0.1667em"></mspace><mi>ln</mi><mo>⁡</mo><mspace width="0.1667em"></mspace></mrow><mover><mi>L</mi><mo stretchy="false" class="chr-sml wbk-sml-acc" style="math-depth:0;">ˆ</mo></mover><mo>+</mo><mn>2</mn><mi>k</mi></mrow><annotation encoding="application/x-tex">\mathrm{AIC} = -2 \ln \hat L + 2k</annotation></semantics></math></div>
+<p>where <math><semantics><mover><mi>L</mi><mo stretchy="false" class="chr-sml wbk-sml-acc" style="math-depth:0;">ˆ</mo></mover><annotation encoding="application/x-tex">\hat L</annotation></semantics></math> is the maximised likelihood and k the number of parameters; the <strong>Bayesian information criterion</strong> swaps the flat penalty for one that grows with the sample:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><mpadded lspace="0"><mi>BIC</mi></mpadded><mo>=</mo><mo form="prefix" stretchy="false">−</mo><mn>2</mn><mrow><mspace width="0.1667em"></mspace><mi>ln</mi><mo>⁡</mo><mspace width="0.1667em"></mspace></mrow><mover><mi>L</mi><mo stretchy="false" class="chr-sml wbk-sml-acc" style="math-depth:0;">ˆ</mo></mover><mo>+</mo><mi>k</mi><mrow><mspace width="0.1667em"></mspace><mi>ln</mi><mo>⁡</mo><mspace width="0.1667em"></mspace></mrow><mi>T</mi></mrow><annotation encoding="application/x-tex">\mathrm{BIC} = -2 \ln \hat L + k \ln T</annotation></semantics></math></div>
+<p>with T the number of periods in the sample. Since <math><semantics><mrow><mrow><mi>ln</mi><mo>⁡</mo><mspace width="0.1667em"></mspace></mrow><mi>T</mi><mo>&gt;</mo><mn>2</mn></mrow><annotation encoding="application/x-tex">\ln T &gt; 2</annotation></semantics></math> for any <math><semantics><mrow><mi>T</mi><mo>&gt;</mo><mn>7</mn></mrow><annotation encoding="application/x-tex">T &gt; 7</annotation></semantics></math>, BIC penalises an extra parameter more harshly than AIC does at any realistic sample size — and the gap widens as T grows. The two criteria are not just two estimates of the same thing: AIC is built to minimise out-of-sample prediction error and is not guaranteed to land on the true order even with infinite data, while BIC is built to be consistent — as <math><semantics><mrow><mi>T</mi><mo>→</mo><mi>∞</mi></mrow><annotation encoding="application/x-tex">T \to \infty</annotation></semantics></math> it selects the true order with probability approaching one — at the cost of favouring smaller models than AIC in any finite sample.</p>
+
+<p>The lab makes that gap concrete rather than asymptotic. Refit the same five candidate orders — MA(1), AR(1), the true ARMA(1,1), ARMA(2,1) and ARMA(1,2) — on <span data-lab="order_mc_n" data-fmt=",">200</span> fresh 300-point draws of the running example. AIC recovers the true ARMA(1,1) order in <span data-lab="aic_true_rate" data-fmt=".0%">45%</span> of replications; BIC manages only <span data-lab="bic_true_rate" data-fmt=".0%">20%</span>. The flip side is just as stark: BIC settles for the too-simple AR(1) in <span data-lab="bic_simple_rate" data-fmt=".0%">74%</span> of replications, against AIC's <span data-lab="aic_simple_rate" data-fmt=".0%">36%</span>. Both criteria are looking at exactly the same fitted likelihoods on exactly the same data — the disagreement is entirely the penalty term, log(300) ≈ 5.7 against AIC's flat 2, doing exactly what the formulas say it should.</p>
+
+<figure class="diagram chart">
+<!-- chart:aic_bic_selection -->
+<svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="How often AIC and BIC pick each candidate order (true order: ARMA(1,1))">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">HOW OFTEN AIC AND BIC PICK EACH CANDIDATE ORDER (TRUE ORDER: ARMA(1,1))</text>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#E8850C" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">AIC picks</text>
+  <line x1="127.6" y1="32" x2="143.6" y2="32" stroke="#3F8E5A" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="149.6" y="36" font-size="11" fill="#4A5A68">BIC picks</text>
+  <line x1="64" y1="256" x2="690" y2="256" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="260" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0%</text>
+  <line x1="64" y1="216" x2="690" y2="216" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="220" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">20%</text>
+  <line x1="64" y1="176" x2="690" y2="176" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="180" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">40%</text>
+  <line x1="64" y1="136" x2="690" y2="136" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="140" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">60%</text>
+  <line x1="64" y1="96" x2="690" y2="96" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="100" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">80%</text>
+  <line x1="64" y1="56" x2="690" y2="56" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="60" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">100%</text>
+  <line x1="64" y1="256" x2="690" y2="256" stroke="#C9CFC6" stroke-width="1"/>
+  <path d="M101.6,256 V251 Q101.6,247 105.6,247 H121.6 Q125.6,247 125.6,251 V256 Z" fill="#E8850C"><title>MA(1) · AIC picks: 4%</title></path>
+  <text x="113.6" y="241" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">4%</text>
+  <path d="M127.6,256 V251 Q127.6,247 131.6,247 H147.6 Q151.6,247 151.6,251 V256 Z" fill="#3F8E5A"><title>MA(1) · BIC picks: 4%</title></path>
+  <text x="139.6" y="241" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">4%</text>
+  <text x="126.6" y="274" font-size="11" text-anchor="middle" fill="#4A5A68">MA(1)</text>
+  <path d="M226.8,256 V189 Q226.8,185 230.8,185 H246.8 Q250.8,185 250.8,189 V256 Z" fill="#E8850C"><title>AR(1) · AIC picks: 36%</title></path>
+  <text x="238.8" y="179" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">36%</text>
+  <path d="M252.8,256 V112 Q252.8,108 256.8,108 H272.8 Q276.8,108 276.8,112 V256 Z" fill="#3F8E5A"><title>AR(1) · BIC picks: 74%</title></path>
+  <text x="264.8" y="102" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">74%</text>
+  <text x="251.8" y="274" font-size="11" text-anchor="middle" fill="#4A5A68">AR(1)</text>
+  <path d="M352,256 V170 Q352,166 356,166 H372 Q376,166 376,170 V256 Z" fill="#E8850C"><title>ARMA(1,1) true · AIC picks: 45%</title></path>
+  <text x="364" y="160" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">45%</text>
+  <path d="M378,256 V219 Q378,215 382,215 H398 Q402,215 402,219 V256 Z" fill="#3F8E5A"><title>ARMA(1,1) true · BIC picks: 20%</title></path>
+  <text x="390" y="209" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">20%</text>
+  <text x="377" y="274" font-size="11" text-anchor="middle" fill="#4A5A68">ARMA(1,1) true</text>
+  <path d="M477.2,256 V249 Q477.2,245 481.2,245 H497.2 Q501.2,245 501.2,249 V256 Z" fill="#E8850C"><title>ARMA(2,1) · AIC picks: 6%</title></path>
+  <text x="489.2" y="239" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">6%</text>
+  <path d="M503.2,256 V256 Q503.2,256 503.2,256 H527.2 Q527.2,256 527.2,256 V256 Z" fill="#3F8E5A"><title>ARMA(2,1) · BIC picks: 0%</title></path>
+  <text x="515.2" y="250" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">0%</text>
+  <text x="502.2" y="274" font-size="11" text-anchor="middle" fill="#4A5A68">ARMA(2,1)</text>
+  <path d="M602.4,256 V241 Q602.4,237 606.4,237 H622.4 Q626.4,237 626.4,241 V256 Z" fill="#E8850C"><title>ARMA(1,2) · AIC picks: 10%</title></path>
+  <text x="614.4" y="231" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">10%</text>
+  <path d="M628.4,256 V255 Q628.4,254 629.4,254 H651.4 Q652.4,254 652.4,255 V256 Z" fill="#3F8E5A"><title>ARMA(1,2) · BIC picks: 1%</title></path>
+  <text x="640.4" y="248" font-size="10" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">1%</text>
+  <text x="627.4" y="274" font-size="11" text-anchor="middle" fill="#4A5A68">ARMA(1,2)</text>
+</svg>
+<!-- /chart:aic_bic_selection -->
+<figcaption>fig 5.4.6 — AIC recovers the true ARMA(1,1) far more often than BIC, which settles for the simpler AR(1)</figcaption>
+</figure>
+
+<table>
+<thead><tr><th>Situation</th><th>Lean on</th><th>Why</th></tr></thead>
+<tbody>
+<tr><td>You mainly care about forecast accuracy</td><td><strong>AIC</strong></td><td>tuned to minimise out-of-sample prediction error, even at the cost of an extra parameter</td></tr>
+<tr><td>You want the most defensible, parsimonious model to report</td><td><strong>BIC</strong></td><td>consistent — converges on the true order as data grows, and resists overfitting in the meantime</td></tr>
+<tr><td>The two disagree</td><td>fit both, check residuals</td><td>a Ljung-Box test on the smaller model's residuals (<a href="#s6">§5.4.6</a>) tells you whether the extra term is really needed</td></tr>
+</tbody>
+</table>
+
+<div class="co tip"><span class="co-t">💡 Tip</span>
+<p>Never compare AIC or BIC values computed on different sample sizes, different differencing, or different software defaults for the constant term — the additive constants in the likelihood do not cancel unless everything else about the fit is identical.</p>
+</div>
+
+<p>Neither criterion is "wrong" — they answer different questions. In quant research this is an everyday trade-off, not an academic footnote: a young ETF or a strategy that only makes sense post-2015 might give you a few hundred usable observations, nowhere near the asymptotic regime either criterion assumes. Many practitioners default to BIC precisely because its stronger penalty resists mistaking noise for structure when data is scarce, accepting some underfitting as the price of not fitting noise; others prefer AIC once there is enough history that its sensitivity to real structure earns its keep. Either default is defensible — picking one after seeing which model it selects on your data is not.</p>
+</section>
+
+<!-- ============ §6 — in code ============ -->
+<section id="s6">
+<h2><span class="no">5.4.6</span> Fitting ARMA in code</h2>
+<p class="lede">Three calls to <code>statsmodels</code> — a unit-root test, a stationarity test, and a maximum-likelihood fit — cover everything above.</p>
+
+<pre><span class="c"># statsmodels does the heavy lifting: ADF, KPSS and ARMA maximum likelihood</span>
+<span class="k">from</span> statsmodels.tsa.stattools <span class="k">import</span> adfuller, kpss
+<span class="k">from</span> statsmodels.tsa.arima.model <span class="k">import</span> ARIMA
+<span class="k">from</span> statsmodels.stats.diagnostic <span class="k">import</span> acorr_ljungbox
+
+adf = adfuller(series, autolag=<span class="s">"AIC"</span>, result_object=<span class="k">True</span>)   <span class="c"># H0: unit root</span>
+kp = kpss(series, regression=<span class="s">"c"</span>, nlags=<span class="s">"auto"</span>, result_object=<span class="k">True</span>)  <span class="c"># H0: stationary</span>
+
+fit = ARIMA(series, order=(<span class="s">1</span>, <span class="s">0</span>, <span class="s">1</span>), trend=<span class="s">"n"</span>).fit()          <span class="c"># ARMA(1,1), no separate constant</span>
+resid_ok = acorr_ljungbox(fit.resid, lags=[<span class="s">10</span>], return_df=<span class="k">True</span>)</pre>
+
+<p>On one 300-point draw of the running ARMA(1,1) example, the fit recovers <math><semantics><mrow><mover><mi>ϕ</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><mo>=</mo></mrow><annotation encoding="application/x-tex">\hat\phi =</annotation></semantics></math> <span data-lab="phi_hat" data-fmt=".2f">0.59</span> and <math><semantics><mrow><mover><mi>θ</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><mo>=</mo></mrow><annotation encoding="application/x-tex">\hat\theta =</annotation></semantics></math> <span data-lab="theta_hat" data-fmt=".2f">−0.43</span> against true values of 0.6 and −0.4, with standard errors of <span data-lab="se_phi_hat" data-fmt=".2f">0.21</span> and <span data-lab="se_theta_hat" data-fmt=".2f">0.24</span> — both true values sit comfortably inside two standard errors of their estimate. The last line is the check you should never skip: the <strong>Ljung-Box test</strong> asks whether a batch of residual autocorrelations, taken together, is distinguishable from zero. Here it returns a p-value of <span data-lab="ljung_box_p" data-fmt=".2f">0.62</span> — comfortably above 0.05, so the residuals show no leftover structure the model missed. A small Ljung-Box p-value after fitting is a direct signal to revisit <a href="#s4">§5.4.4</a>'s ACF/PACF and try a different order.</p>
+
+<div class="co note"><span class="co-t">🧭 Margin note</span>
+<p><code>trend="n"</code> tells <code>ARIMA</code> not to fit a separate mean/intercept on top of the AR and MA terms — appropriate here because the simulated series is already mean-zero. Real return series usually need <code>trend="c"</code> instead, since even a small non-zero average return matters over many periods.</p>
+</div>
+
+<p>One naming quirk worth knowing: older tutorials often import a standalone <code>ARMA</code> class from <code>statsmodels.tsa.arima_model</code>, a module removed after deprecation. The current, single entry point is <code>statsmodels.tsa.arima.model.ARIMA</code>, fitting AR, MA, ARMA and differenced models alike through one state-space maximum-likelihood routine. Fitting is iterative, so it is worth checking <code>fit.mle_retvals["converged"]</code> before trusting a model.</p>
+</section>
+
+<!-- ============ §7 — where people go wrong ============ -->
+<section id="s7">
+<h2><span class="no">5.4.7</span> Where people go wrong</h2>
+<p class="lede">Every mistake here comes from skipping a check, not from getting the algebra wrong.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 230" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">SAME DATASET, TWO WORKFLOWS</text>
+  <rect x="26" y="32" width="326" height="184" rx="9" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="189" y="54" font-size="11" font-weight="700" text-anchor="middle" fill="#D64B2A">ON AUTOPILOT</text>
+  <rect x="46" y="66" width="286" height="24" rx="5" fill="#fff" stroke="#F2CDBF"/>
+  <text x="58" y="82" font-size="9.5" fill="#1F2C38">eyeball the chart, call it fine</text>
+  <rect x="46" y="96" width="286" height="24" rx="5" fill="#fff" stroke="#F2CDBF"/>
+  <text x="58" y="112" font-size="9.5" fill="#1F2C38">fit ARMA straight on price levels</text>
+  <rect x="46" y="126" width="286" height="24" rx="5" fill="#fff" stroke="#F2CDBF"/>
+  <text x="58" y="142" font-size="9.5" fill="#1F2C38">ship whichever order has lowest AIC</text>
+  <text x="189" y="168" font-size="9.5" text-anchor="middle" fill="#D64B2A" font-weight="600">A phi near 1, wild forecasts,</text>
+  <text x="189" y="184" font-size="9" text-anchor="middle" fill="#4A5A68">and no idea why they diverge</text>
+  <rect x="368" y="32" width="326" height="184" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="531" y="54" font-size="11" font-weight="700" text-anchor="middle" fill="#1F7A55">TEST FIRST</text>
+  <rect x="388" y="66" width="286" height="24" rx="5" fill="#fff" stroke="#BFE0CF"/>
+  <text x="400" y="82" font-size="9.5" fill="#1F2C38">1 · run ADF and KPSS; difference if needed</text>
+  <rect x="388" y="96" width="286" height="24" rx="5" fill="#fff" stroke="#BFE0CF"/>
+  <text x="400" y="112" font-size="9.5" fill="#1F2C38">2 · read the ACF/PACF before choosing p, q</text>
+  <rect x="388" y="126" width="286" height="24" rx="5" fill="#fff" stroke="#BFE0CF"/>
+  <text x="400" y="142" font-size="9.5" fill="#1F2C38">3 · compare AIC/BIC, check residuals</text>
+  <text x="531" y="168" font-size="9.5" text-anchor="middle" fill="#1F7A55" font-weight="600">A model whose residuals</text>
+  <text x="531" y="184" font-size="9" text-anchor="middle" fill="#4A5A68">really do look like noise</text>
+</svg>
+<figcaption>fig 5.4.7 — fitting ARMA on autopilot versus testing, identifying and validating first</figcaption>
+</figure>
+
+<p>The single most common error is treating "my ADF test did not reject the unit root" as proof that a unit root exists. It is not — a failure to reject is, at best, a failure to rule the null out, and ADF has famously low power exactly where it matters most: a slowly mean-reverting series with <math><semantics><mrow><mi>ϕ</mi><mo>=</mo><mn>0.90</mn></mrow><annotation encoding="application/x-tex">\phi = 0.90</annotation></semantics></math> or <math><semantics><mn>0.95</mn><annotation encoding="application/x-tex">0.95</annotation></semantics></math> will often fail to reject a unit root in a few hundred observations even though it is genuinely, if slowly, stationary. <a href="#s2">§5.4.2</a>'s contradiction-rate experiment is this exact failure mode, engineered on purpose so you see it happen. The fix is procedural, not statistical: run both tests, read <a href="#s2">the table</a>'s four cells rather than one test's verdict, and when they disagree, say so rather than picking whichever answer you expected.</p>
+
+<p>The second error is fitting an ARMA model directly to a price level without testing it first. Because a near-unit-root series is highly persistent, an AR(1) fit to raw prices will typically return <math><semantics><mover><mi>ϕ</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><annotation encoding="application/x-tex">\hat\phi</annotation></semantics></math> extremely close to 1 regardless of whether the truth is 1.00 or 0.97 — the estimate cannot tell the difference well, but the forecasts it produces absolutely can, extrapolating a trend that is really just one accumulated random walk. Difference first, or model returns instead of levels, and this problem disappears on its own. Picture a backtest that fits exactly this AR(1)-on-price-levels model every month and trades the model's implied "reversion" back to a forecast mean: in sample, <math><semantics><mrow><mover><mi>ϕ</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><mo>≈</mo><mn>0.995</mn></mrow><annotation encoding="application/x-tex">\hat\phi \approx 0.995</annotation></semantics></math> fits beautifully — the model tracks the price almost perfectly one step ahead, because a near-unit-root series is, tautologically, well predicted by its own last value. Out of sample, the tiny gap between 0.995 and a true unit root is exactly where the strategy's edge was hiding, and it evaporates the moment the drift that happened to hold during the fit window stops holding.</p>
+
+<p>The third error is treating any single check in isolation as sufficient. A model can pass ADF and KPSS, look clean on the ACF/PACF, and still fail Ljung-Box if the true order needed one more term than the plots suggested. Each tool narrows the search; none of them, alone, proves a model is right — which is why the workflow in <a href="#s2">fig 5.4.2</a> ends in a validation step, not a selection step.</p>
+
+<div class="co warn"><span class="co-t">⚠️ Pitfall — "the model with the best AIC is definitely the right one"</span>
+<p>An information criterion ranks candidates against each other on one sample; it does not certify that the winner is correctly specified in any absolute sense. Always follow order selection with a residual check (Ljung-Box, <a href="#s6">§5.4.6</a>) — a model that "wins" on AIC but leaves visible autocorrelation in its residuals is still missing something the criterion could not see.</p>
+</div>
+</section>
+
+<!-- ============ §8 — try it ============ -->
+<section id="s8">
+<h2><span class="no">5.4.8</span> Try it</h2>
+<p class="lede">Fifteen minutes with the companion lab open, pushing on the two experiments most worth poking at.</p>
+
+<div class="co lab"><span class="co-t">🔧 Try it (15 min, in the lab)</span>
+<p>1. In Section 2, add 0.85 and 0.93 to <code>PHI_GRID</code> and rerun the boundary sweep. Does the contradiction rate you find in <a href="#s2">§5.4.2</a> peak at exactly <math><semantics><mrow><mi>ϕ</mi><mo>=</mo><mn>0.90</mn></mrow><annotation encoding="application/x-tex">\phi = 0.90</annotation></semantics></math>, or somewhere else once you fill in the gaps?<br>
+2. In Section 5, add a sixth candidate order, ARMA(2,2), to <code>ORDERS</code> (and a matching label) and rerun the order-selection Monte Carlo. It has one parameter too many for the true process — a well-behaved AIC should pick it rarely, and BIC almost never. Does it?<br>
+Success looks like: both cells rerun without errors, and the new phi values and the new order slot straight into the existing charts.</p>
+</div>
+</section>
+
+<hr>
+
+<!-- ============ §9 — close ============ -->
+<section id="s9">
+<h2><span class="no">5.4.9</span> Glossary · Check yourself · Go deeper</h2>
+<div class="gloss" id="glossary">
+<div id="g-stationarity"><b>stationarity</b> — the property that a series' mean, variance and autocorrelation do not depend on the date you measure them from.</div>
+<div id="g-unit-root"><b>unit root</b> — a series whose current value carries forward the full, undiminished weight of every past shock, so its variance grows without bound; the defining feature of a random walk.</div>
+<div id="g-adf-test"><b>ADF test</b> — the Augmented Dickey-Fuller test; null hypothesis: the series has a unit root.</div>
+<div id="g-kpss-test"><b>KPSS test</b> — the Kwiatkowski-Phillips-Schmidt-Shin test; null hypothesis: the series is stationary.</div>
+<div id="g-autoregressive-model"><b>autoregressive model</b> — AR(p): a series modelled as a weighted sum of its own last p values plus noise.</div>
+<div id="g-moving-average-model"><b>moving-average model</b> — MA(q): a series modelled as a weighted sum of the last q unpredictable shocks.</div>
+<div id="g-arma-model"><b>ARMA model</b> — a model combining autoregressive and moving-average terms in one equation.</div>
+<div id="g-acf"><b>ACF</b> — the autocorrelation function: the correlation between a series and its own lag k, for every k.</div>
+<div id="g-pacf"><b>PACF</b> — the partial autocorrelation function: the correlation at lag k after netting out the effect of every shorter lag.</div>
+</div>
+
+<h3>Check yourself</h3>
+<details class="q"><summary>1. You plot a fund's cumulative P&amp;L and its daily returns side by side. One wanders further from its starting point the longer you watch; the other stays inside a roughly fixed band. Which one is closer to stationary, and why does it matter before you fit a model to either?</summary><div>Returns are the (roughly) stationary series — bounded mean and variance regardless of the window. Cumulative P&amp;L behaves like a unit root: its variance grows with the horizon, so an AR(1) fit directly to its level would return <math><semantics><mover><mi>ϕ</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><annotation encoding="application/x-tex">\hat\phi</annotation></semantics></math> close to 1 and extrapolate what is really just an accumulated random walk as if it were a trend. Test first (§5.4.2); model returns, not levels.</div></details>
+<details class="q"><summary>2. On a 200-observation interest-rate series, ADF fails to reject the unit-root null (p=0.34) and KPSS also fails to reject stationarity (p=0.09). What should you conclude, and what should you do next?</summary><div>Neither "definitely a unit root" nor "definitely stationary" — this is the fourth row of the contingency table: both tests are simply inconclusive at this sample size, a common outcome for a slowly mean-reverting series. Failing to reject a null is never evidence for it (the same logic <span class="xref soon" data-xref="5.2" data-style="short" data-auto="" title="Coming soon">Session 5.2</span> attaches to p-values). Gather more data, or widen the sample, rather than forcing a verdict.</div></details>
+<details class="q"><summary>3. A residual series' ACF cuts off sharply to zero after lag 2, while its PACF decays smoothly, roughly halving every lag. Does this point to AR(2) or MA(2), and why?</summary><div>MA(2). An MA(q) process is defined by an ACF that cuts off sharply after lag q and a PACF that tails off — the mirror image of AR's signature (PACF cuts off, ACF tails off). The pattern described is exactly MA's, not AR's.</div></details>
+<details class="q"><summary>4. Fitting five candidate orders to the same 300-point series, AIC prefers ARMA(2,1) while BIC prefers the simpler AR(1). Which one do you report as "the model," and what do you check before deciding?</summary><div>Neither, automatically. Fit both and run a Ljung-Box test on each one's residuals: if AR(1)'s residuals already look like white noise, take it for parsimony (BIC's case); if they still show structure that ARMA(2,1) removes, the extra term is real and AIC's pick is doing useful work. The information criteria narrow the search — they do not replace the residual check.</div></details>
+
+<div class="co lab"><span class="co-t">🔧 Homework (~1 h before Session 5.5)</span>
+<p>1. In the lab, set <code>TRUE_THETA = 0.0</code> (a pure AR(1)) and rerun the Section 3 cell — confirm the PACF now cuts off cleanly after lag 1 while the ACF simply decays, and note how different the picture looks from the ARMA(1,1) case.<br>
+2. Read the stationarity and differencing sections of Hyndman &amp; Athanasopoulos, chapter 9 (free online, linked below).<br>
+3. Re-skim your notes on <span class="xref soon" data-xref="5.2" data-auto="" title="Coming soon">Session 5.2 — Regression &amp; Inference That Doesn&#x27;t Lie</span>'s p-values and the difference between failing to reject a null and proving it — you will need that distinction again immediately when <span class="xref soon" data-xref="5.5" data-auto="" title="Coming soon">Session 5.5 — Modeling Volatility</span> tests whether a GARCH model's residuals still show volatility clustering.</p>
+</div>
+
+<h3>📚 Go deeper</h3>
+<ol class="refs">
+<li>Box, G. E. P., Jenkins, G. M., Reinsel, G. C. &amp; Ljung, G. M. (2015). <em>Time Series Analysis: Forecasting and Control</em>, 5th ed. Wiley. <span class="rid">ISBN 978-1-118-67502-1</span></li>
+<li>Hyndman, R. J. &amp; Athanasopoulos, G. (2021). <em>Forecasting: Principles and Practice</em>, 3rd ed. OTexts. <span class="rid">https://otexts.com/fpp3/arima.html</span></li>
+<li>Dickey, D. A. &amp; Fuller, W. A. (1979). "Distribution of the Estimators for Autoregressive Time Series with a Unit Root." <em>Journal of the American Statistical Association</em> 74(366a), 427–431. <span class="rid">doi:10.1080/01621459.1979.10482531</span></li>
+<li>Kwiatkowski, D., Phillips, P. C. B., Schmidt, P. &amp; Shin, Y. (1992). "Testing the Null Hypothesis of Stationarity against the Alternative of a Unit Root." <em>Journal of Econometrics</em> 54(1-3), 159–178. <span class="rid">doi:10.1016/0304-4076(92)90104-Y</span></li>
+</ol>
+
+<h3>Sources for the numbers</h3>
+<ol class="refs">
+<li>Akaike, H. (1974). "A New Look at the Statistical Model Identification." <em>IEEE Transactions on Automatic Control</em> 19(6), 716–723. <span class="rid">doi:10.1109/TAC.1974.1100705</span></li>
+<li>Schwarz, G. (1978). "Estimating the Dimension of a Model." <em>Annals of Statistics</em> 6(2), 461–464. <span class="rid">doi:10.1214/aos/1176344136</span></li>
+<li>MacKinnon, J. G. (1994). "Approximate Asymptotic Distribution Functions for Unit-Root and Cointegration Tests." <em>Journal of Business &amp; Economic Statistics</em> 12(2), 167–176. <span class="rid">https://ideas.repec.org/a/bes/jnlbes/v12y1994i2p167-76.html</span></li>
+<li>Seabold, S. &amp; Perktold, J. (2010). "statsmodels: Econometric and Statistical Modeling with Python." <em>Proceedings of the 9th Python in Science Conference</em>, 57–61. <span class="rid">https://proceedings.scipy.org/articles/Majora-92bf1922-011</span></li>
+</ol>
+</section>
+
+<!-- nav:foot -->
+<div class="foot">
+<span class="soon" title="Coming soon">← Prev: 5.3 · Bayesian Thinking</span>
+<span class="soon" title="Coming soon">Next: 5.5 · Volatility →</span>
+</div>
+<p class="legal">Educational material only — not investment, legal or tax advice. Backtests and simulations are hypothetical. <a href="../start-here.html#disclaimer">Disclaimer</a> · Text CC BY 4.0 · Code MIT.</p>
+<!-- /nav:foot -->
+</main>
+</div></body></html>

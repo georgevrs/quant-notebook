@@ -1,0 +1,53 @@
+<svg viewBox="0 0 720 280" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="t-statistics of 200 pure-noise ‘strategies’">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">T-STATISTICS OF 200 PURE-NOISE ‘STRATEGIES’</text>
+  <line x1="64" y1="197.7" x2="680" y2="197.7" stroke="#E4E8EC" stroke-width="1"/>
+  <line x1="64" y1="151.4" x2="680" y2="151.4" stroke="#E4E8EC" stroke-width="1"/>
+  <line x1="64" y1="105.1" x2="680" y2="105.1" stroke="#E4E8EC" stroke-width="1"/>
+  <line x1="64" y1="58.8" x2="680" y2="58.8" stroke="#E4E8EC" stroke-width="1"/>
+  <line x1="64" y1="244" x2="680" y2="244" stroke="#C9CFC6" stroke-width="1"/>
+  <line x1="105.4" y1="244" x2="105.4" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="105.4" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">−2.0</text>
+  <line x1="224" y1="244" x2="224" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="224" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">−1.0</text>
+  <line x1="342.5" y1="244" x2="342.5" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="342.5" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">0.0</text>
+  <line x1="461.1" y1="244" x2="461.1" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="461.1" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">1.0</text>
+  <line x1="579.7" y1="244" x2="579.7" y2="248" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="579.7" y="262" font-size="11" text-anchor="middle" fill="#4A5A68">2.0</text>
+  <rect x="64.5" y="230.8" width="14.4" height="13.2" fill="#3A56C5" fill-opacity="0.55"><title>−2.3 to −2.2</title></rect>
+  <rect x="95.3" y="230.8" width="14.4" height="13.2" fill="#3A56C5" fill-opacity="0.55"><title>−2.1 to −2.0</title></rect>
+  <rect x="110.7" y="217.5" width="14.4" height="26.5" fill="#3A56C5" fill-opacity="0.55"><title>−2.0 to −1.8</title></rect>
+  <rect x="141.5" y="204.3" width="14.4" height="39.7" fill="#3A56C5" fill-opacity="0.55"><title>−1.7 to −1.6</title></rect>
+  <rect x="156.9" y="164.6" width="14.4" height="79.4" fill="#3A56C5" fill-opacity="0.55"><title>−1.6 to −1.4</title></rect>
+  <rect x="172.3" y="138.2" width="14.4" height="105.8" fill="#3A56C5" fill-opacity="0.55"><title>−1.4 to −1.3</title></rect>
+  <rect x="187.7" y="151.4" width="14.4" height="92.6" fill="#3A56C5" fill-opacity="0.55"><title>−1.3 to −1.2</title></rect>
+  <rect x="203.1" y="177.9" width="14.4" height="66.1" fill="#3A56C5" fill-opacity="0.55"><title>−1.2 to −1.1</title></rect>
+  <rect x="218.5" y="138.2" width="14.4" height="105.8" fill="#3A56C5" fill-opacity="0.55"><title>−1.1 to −0.9</title></rect>
+  <rect x="233.9" y="164.6" width="14.4" height="79.4" fill="#3A56C5" fill-opacity="0.55"><title>−0.9 to −0.8</title></rect>
+  <rect x="249.3" y="98.5" width="14.4" height="145.5" fill="#3A56C5" fill-opacity="0.55"><title>−0.8 to −0.7</title></rect>
+  <rect x="264.7" y="138.2" width="14.4" height="105.8" fill="#3A56C5" fill-opacity="0.55"><title>−0.7 to −0.5</title></rect>
+  <rect x="280.1" y="125" width="14.4" height="119" fill="#3A56C5" fill-opacity="0.55"><title>−0.5 to −0.4</title></rect>
+  <rect x="295.5" y="98.5" width="14.4" height="145.5" fill="#3A56C5" fill-opacity="0.55"><title>−0.4 to −0.3</title></rect>
+  <rect x="310.9" y="151.4" width="14.4" height="92.6" fill="#3A56C5" fill-opacity="0.55"><title>−0.3 to −0.1</title></rect>
+  <rect x="326.3" y="164.6" width="14.4" height="79.4" fill="#3A56C5" fill-opacity="0.55"><title>−0.1 to 0.0</title></rect>
+  <rect x="341.7" y="72" width="14.4" height="172" fill="#3A56C5" fill-opacity="0.55"><title>0.0 to 0.1</title></rect>
+  <rect x="357.1" y="138.2" width="14.4" height="105.8" fill="#3A56C5" fill-opacity="0.55"><title>0.1 to 0.2</title></rect>
+  <rect x="372.5" y="125" width="14.4" height="119" fill="#3A56C5" fill-opacity="0.55"><title>0.2 to 0.4</title></rect>
+  <rect x="387.9" y="164.6" width="14.4" height="79.4" fill="#3A56C5" fill-opacity="0.55"><title>0.4 to 0.5</title></rect>
+  <rect x="403.3" y="58.8" width="14.4" height="185.2" fill="#3A56C5" fill-opacity="0.55"><title>0.5 to 0.6</title></rect>
+  <rect x="418.7" y="151.4" width="14.4" height="92.6" fill="#3A56C5" fill-opacity="0.55"><title>0.6 to 0.8</title></rect>
+  <rect x="434.1" y="177.9" width="14.4" height="66.1" fill="#3A56C5" fill-opacity="0.55"><title>0.8 to 0.9</title></rect>
+  <rect x="449.5" y="151.4" width="14.4" height="92.6" fill="#3A56C5" fill-opacity="0.55"><title>0.9 to 1.0</title></rect>
+  <rect x="464.9" y="177.9" width="14.4" height="66.1" fill="#3A56C5" fill-opacity="0.55"><title>1.0 to 1.2</title></rect>
+  <rect x="480.3" y="164.6" width="14.4" height="79.4" fill="#3A56C5" fill-opacity="0.55"><title>1.2 to 1.3</title></rect>
+  <rect x="495.7" y="230.8" width="14.4" height="13.2" fill="#3A56C5" fill-opacity="0.55"><title>1.3 to 1.4</title></rect>
+  <rect x="511.1" y="138.2" width="14.4" height="105.8" fill="#3A56C5" fill-opacity="0.55"><title>1.4 to 1.5</title></rect>
+  <rect x="526.5" y="204.3" width="14.4" height="39.7" fill="#3A56C5" fill-opacity="0.55"><title>1.5 to 1.7</title></rect>
+  <rect x="541.9" y="217.5" width="14.4" height="26.5" fill="#3A56C5" fill-opacity="0.55"><title>1.7 to 1.8</title></rect>
+  <rect x="572.7" y="230.8" width="14.4" height="13.2" fill="#3A56C5" fill-opacity="0.55"><title>1.9 to 2.1</title></rect>
+  <rect x="588.1" y="217.5" width="14.4" height="26.5" fill="#3A56C5" fill-opacity="0.55"><title>2.1 to 2.2</title></rect>
+  <rect x="603.5" y="217.5" width="14.4" height="26.5" fill="#3A56C5" fill-opacity="0.55"><title>2.2 to 2.3</title></rect>
+  <rect x="634.3" y="230.8" width="14.4" height="13.2" fill="#3A56C5" fill-opacity="0.55"><title>2.5 to 2.6</title></rect>
+  <rect x="665.1" y="230.8" width="14.4" height="13.2" fill="#3A56C5" fill-opacity="0.55"><title>2.7 to 2.8</title></rect>
+</svg>

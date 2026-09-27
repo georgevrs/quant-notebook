@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- nav:head -->
+<title>5.5 · Modeling Volatility</title>
+<meta name="description" content="Realized-volatility estimators from OHLC data, EWMA and GARCH forecasts — volatility is the one thing you can forecast well.">
+<link rel="canonical" href="https://georgevrs.github.io/quant-notebook/unit05-statistics-time-series/session05-volatility-modeling.html">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Quant Notebook">
+<meta property="og:title" content="5.5 · Modeling Volatility">
+<meta property="og:description" content="Realized-volatility estimators from OHLC data, EWMA and GARCH forecasts — volatility is the one thing you can forecast well.">
+<meta property="og:url" content="https://georgevrs.github.io/quant-notebook/unit05-statistics-time-series/session05-volatility-modeling.html">
+<meta name="twitter:card" content="summary">
+<link rel="stylesheet" href="../assets/brand.css">
+<link rel="stylesheet" href="../assets/temml.css">
+<!-- /nav:head -->
+</head>
+<body><div class="page" id="top">
+<!-- nav:tabs -->
+<nav class="tabs">
+<a href="../index.html">⌂ Course home</a>
+<span class="soon" title="Coming soon">5.1 · Stylized Facts</span>
+<span class="soon" title="Coming soon">5.2 · Honest Inference</span>
+<span class="soon" title="Coming soon">5.3 · Bayesian Thinking</span>
+<span class="soon" title="Coming soon">5.4 · Stationarity &amp; ARMA</span>
+<a class="active" href="session05-volatility-modeling.html">5.5 · Volatility</a>
+<span class="soon" title="Coming soon">5.6 · Cointegration</span>
+<span class="soon" title="Coming soon">5.7 · Kalman &amp; Regimes</span>
+<a href="../roadmap.html">🗺 Roadmap</a>
+</nav>
+<!-- /nav:tabs -->
+
+<header class="cover">
+<!-- nav:heading -->
+<p class="eyebrow">Unit 5 · Statistics &amp; Time Series of Returns — Session 05 of 07</p>
+<h1>Modeling Volatility</h1>
+<!-- /nav:heading -->
+<p class="subtitle">Returns are close to unpredictable, but their <a class="term" href="../unit02-markets-instruments/session03-returns-pnl-leverage.html#g-volatility" data-term="volatility">volatility</a> is not: it clusters, it decays at a knowable rate, and a handful of formulas measure it far more precisely than a plain close-to-close estimate. <mark>The core move: use the whole bar — open, high, low, close — and let a fitted model, not a fixed rule of thumb, say how fast the world is actually changing.</mark></p>
+<div class="meta">
+<span>DURATION <b>1.5 h + lab</b></span>
+<span>LEVEL <b>Intermediate</b></span>
+<span>TRACKS <b>QR · QT · IND</b></span>
+<span>HANDS-ON <b>Fit a GARCH model</b></span>
+</div>
+<!-- nav:labstrip -->
+<div class="labstrip"><b>📓 Companion lab</b>
+<a href="https://colab.research.google.com/github/georgevrs/quant-notebook/blob/main/labs/u05/s05_volatility_modeling.ipynb">Open in Colab</a>
+<a href="https://github.com/georgevrs/quant-notebook/blob/main/labs/u05/s05_volatility_modeling.ipynb">Notebook on GitHub</a>
+<a href="https://github.com/georgevrs/quant-notebook/blob/main/labs/u05/s05_volatility_modeling.py">Source (.py)</a>
+</div>
+<!-- /nav:labstrip -->
+<div class="toc">
+<b>On this page</b>
+<ol>
+<li><a href="#s1">Why volatility is worth forecasting</a></li>
+<li><a href="#s2">Building realized volatility from OHLC</a></li>
+<li><a href="#s3">The estimators, in formulas</a></li>
+<li><a href="#s4">In code: efficiency, and what a gap breaks</a></li>
+<li><a href="#s5">EWMA: one parameter, a real trade-off</a></li>
+<li><a href="#s6">GARCH and GJR-GARCH: a fitted alternative</a></li>
+<li><a href="#s7">Where people go wrong</a></li>
+<li><a href="#s8">Try it</a></li>
+<li><a href="#s9">Glossary · Check yourself · Go deeper</a></li>
+</ol>
+</div>
+</header>
+
+<main>
+
+<!-- ============ §5.5.1 — the mental model ============ -->
+<section id="s1">
+<h2><span class="no">5.5.1</span> Why volatility is worth forecasting</h2>
+<p class="lede">Sessions 5.2 and 5.4 showed how little of tomorrow's return you can predict; this session shows how much of tomorrow's risk you can.</p>
+
+<p><span class="xref soon" data-xref="5.2" data-auto="" title="Coming soon">Session 5.2 — Regression &amp; Inference That Doesn&#x27;t Lie</span> and <span class="xref soon" data-xref="5.4" data-auto="" title="Coming soon">Session 5.4 — Stationarity &amp; ARMA Models</span> spent real effort showing how little of tomorrow's return you can predict: <span class="term soon" data-term="autocorrelation" title="Defined in Session 5.1 (coming soon)">autocorrelation</span> in raw returns is close to zero, and a good forecast of next week's price is barely better than today's price. <a class="term" href="../unit02-markets-instruments/session03-returns-pnl-leverage.html#g-volatility" data-term="volatility">Volatility</a> — the size of the moves, not their direction — behaves completely differently: a big move today makes a big move tomorrow more likely, whichever way prices go next. In one of this session's own simulated series (§5.5.6's GARCH process, <span data-lab="n_days_garch" data-fmt=",">2,500</span> trading days), the lag-1 autocorrelation of raw returns is <span data-lab="ret_autocorr" data-fmt="+.3f">+0.021</span> — indistinguishable from noise — while the lag-1 autocorrelation of squared returns is <span data-lab="sq_autocorr" data-fmt="+.3f">+0.153</span>, seven times larger. <mark>Tomorrow's sign is close to a coin flip; tomorrow's typical move size is not, and that gap is what the rest of this session measures and forecasts.</mark></p>
+
+<p>This matters because volatility feeds almost everything downstream of a forecast: position sizing, margin, options prices and every risk limit a desk runs. A strategy that cannot predict tomorrow's direction can still size its bet correctly if it knows tomorrow's likely range — halve the position when volatility doubles, and the dollar risk barely moves. Three different tools do three different jobs here (fig 5.5.1): measuring what already happened as precisely as possible, from a single day's own bar (<strong>realized volatility</strong>), and forecasting tomorrow's from a history of those measurements — a fixed rule (<strong>EWMA volatility</strong>), a fitted <strong>GARCH model</strong>, or, when bad news should move volatility more than equally-sized good news, a <strong>GJR-GARCH model</strong> (§5.5.5–§5.5.6).</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 230" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <rect x="20" y="14" width="680" height="196" rx="12" fill="#fff" stroke="#1F2C38" stroke-width="1.5"/>
+  <text x="40" y="38" font-size="12" fill="#4A5A68" font-family="IBM Plex Mono,monospace">THREE LENSES ON THE SAME QUANTITY, σ</text>
+  <rect x="45" y="54" width="200" height="128" rx="8" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="145" y="86" font-size="13" font-weight="700" text-anchor="middle" fill="#3A56C5">CLOSE-TO-CLOSE</text>
+  <text x="145" y="108" font-size="10.5" text-anchor="middle" fill="#4A5A68">one price a day —</text>
+  <text x="145" y="124" font-size="10.5" text-anchor="middle" fill="#4A5A68">throws away the rest</text>
+  <text x="145" y="140" font-size="10.5" text-anchor="middle" fill="#4A5A68">of the bar (§5.5.2)</text>
+  <rect x="260" y="54" width="200" height="128" rx="8" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="360" y="86" font-size="13" font-weight="700" text-anchor="middle" fill="#1F7A55">REALIZED (OHLC)</text>
+  <text x="360" y="108" font-size="10.5" text-anchor="middle" fill="#4A5A68">Parkinson, GK, YZ —</text>
+  <text x="360" y="124" font-size="10.5" text-anchor="middle" fill="#4A5A68">measures what already</text>
+  <text x="360" y="140" font-size="10.5" text-anchor="middle" fill="#4A5A68">happened, precisely</text>
+  <rect x="475" y="54" width="200" height="128" rx="8" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="575" y="86" font-size="13" font-weight="700" text-anchor="middle" fill="#8A6D00">FORECAST</text>
+  <text x="575" y="108" font-size="10.5" text-anchor="middle" fill="#4A5A68">EWMA decay, or a</text>
+  <text x="575" y="124" font-size="10.5" text-anchor="middle" fill="#4A5A68">fitted GARCH/GJR —</text>
+  <text x="575" y="140" font-size="10.5" text-anchor="middle" fill="#4A5A68">predicts tomorrow's σ</text>
+  <text x="360" y="200" font-size="12" text-anchor="middle" fill="#4A5A68" font-style="italic">Same symbol, three jobs: measure the past well, then use it to forecast.</text>
+</svg>
+<figcaption>fig 5.5.1 — the three lenses this session builds, left to right</figcaption>
+</figure>
+
+<div class="co key"><span class="co-t">📌 Key idea — measured, then forecast</span>
+<p>Every number in this session is one of two things: an estimate of a volatility that already happened (§5.5.2–§5.5.4), or a forecast of one that hasn't (§5.5.5–§5.5.6). Quoting a backward-looking estimate as if it were a forecast is the single most common mistake in this space (§5.5.7).</p>
+</div>
+</section>
+
+<!-- ============ §5.5.2 — how it works: workflow + reference table ============ -->
+<section id="s2">
+<h2><span class="no">5.5.2</span> Building realized volatility from OHLC</h2>
+<p class="lede">A close-to-close estimate uses one number per day; a real exchange already gives you four.</p>
+
+<p>Every venue timestamps four prices for each bar: the <strong>open</strong>, the <strong>high</strong> and <strong>low</strong> reached during the period, and the <strong>close</strong>. A close-to-close estimate — the standard-deviation-of-returns approach fixed in <a class="xref" href="../unit02-markets-instruments/session03-returns-pnl-leverage.html" data-xref="2.3" data-auto="">Session 2.3 — Returns, P&amp;L, Compounding &amp; Leverage</a> — uses exactly one of those four numbers per day and discards the other three. Realized volatility means any estimator of a period's volatility built directly from prices actually observed in that period, rather than from a fitted model; the OHLC formulas in this session are the most common realized-volatility tools, because they need nothing but a single day's own bar.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 150" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <rect x="25" y="40" width="118" height="62" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="84" y="65" font-size="11" text-anchor="middle" fill="#3A56C5" font-weight="600">1 · BAR</text>
+  <text x="84" y="83" font-size="9.5" text-anchor="middle" fill="#4A5A68">today's O, H, L, C</text>
+  <rect x="168" y="40" width="118" height="62" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="227" y="65" font-size="11" text-anchor="middle" fill="#3A56C5" font-weight="600">2 · RANGE</text>
+  <text x="227" y="83" font-size="9.5" text-anchor="middle" fill="#4A5A68">H−L and O−C</text>
+  <rect x="311" y="40" width="118" height="62" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="370" y="65" font-size="11" text-anchor="middle" fill="#3A56C5" font-weight="600">3 · FORMULA</text>
+  <text x="370" y="83" font-size="9.5" text-anchor="middle" fill="#4A5A68">Parkinson / GK / YZ</text>
+  <rect x="454" y="40" width="118" height="62" rx="9" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="513" y="65" font-size="11" text-anchor="middle" fill="#3A56C5" font-weight="600">4 · ANNUALISE</text>
+  <text x="513" y="83" font-size="9.5" text-anchor="middle" fill="#4A5A68">×252, then √</text>
+  <rect x="597" y="40" width="100" height="62" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="647" y="65" font-size="11" text-anchor="middle" fill="#1F7A55" font-weight="600">5 · DONE</text>
+  <text x="647" y="83" font-size="9.5" text-anchor="middle" fill="#4A5A68">vs known truth</text>
+  <path d="M146 71 H165" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M289 71 H308" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M432 71 H451" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <path d="M575 71 H594" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s2a)"/>
+  <text x="360" y="128" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">Because the lab knows the true σ, every formula can be graded, not just admired.</text>
+  <defs><marker id="s2a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F2C38"/></marker></defs>
+</svg>
+<figcaption>fig 5.5.2 — the pipeline §5.5.4's lab runs, once per formula</figcaption>
+</figure>
+
+<p>Table 1 lays out the four estimators this session builds and compares — one that ignores the bar entirely, and three that use progressively more of it.</p>
+
+<p>None of these are the same thing as <a class="term" href="../unit02-markets-instruments/session07-options-primer.html#g-implied-volatility" data-term="implied volatility">implied volatility</a> (<a class="xref" href="../unit02-markets-instruments/session07-options-primer.html" data-xref="2.7" data-auto="">Session 2.7 — Options Primer</a>), which comes from an option's market price, not from the underlying's own OHLC history — a realized estimator asks "how much did the price actually move", an implied one asks "how much movement is the options market paying for". Both matter to a trading desk; only the first is this session's subject.</p>
+
+<table>
+<thead><tr><th>Estimator</th><th>Uses</th><th>First published</th><th>Efficiency vs close-to-close</th></tr></thead>
+<tbody>
+<tr><td>Close-to-close</td><td>close only</td><td>—</td><td>1× (the baseline)</td></tr>
+<tr><td>Parkinson estimator</td><td>high, low</td><td>Parkinson (1980)</td><td>up to ~5×</td></tr>
+<tr><td>Garman-Klass estimator</td><td>open, high, low, close</td><td>Garman &amp; Klass (1980)</td><td>up to ~7.4×</td></tr>
+<tr><td>Yang-Zhang estimator</td><td>O, H, L, C and the previous close</td><td>Yang &amp; Zhang (2000)</td><td>up to ~14×</td></tr>
+</tbody>
+</table>
+
+<div class="co tip"><span class="co-t">💡 Looking ahead</span>
+<p>This is close to a free lunch in market microstructure: the same OHLC bar most systems already store contains several times more information about today's volatility than its closing price alone — §5.5.4 measures exactly how much, and exactly where that stops being true.</p>
+</div>
+</section>
+
+<!-- ============ §5.5.3 — the math ============ -->
+<section id="s3">
+<h2><span class="no">5.5.3</span> The estimators, in formulas</h2>
+<p class="lede">Words first, then three formulas — each one fixes a specific blind spot in the one before it.</p>
+
+<p>Write <math><semantics><mi>H</mi><annotation encoding="application/x-tex">H</annotation></semantics></math>, <math><semantics><mi>L</mi><annotation encoding="application/x-tex">L</annotation></semantics></math>, <math><semantics><mi>O</mi><annotation encoding="application/x-tex">O</annotation></semantics></math>, <math><semantics><mi>C</mi><annotation encoding="application/x-tex">C</annotation></semantics></math> for a single bar's high, low, open and close, all in log price, and <math><semantics><mi>n</mi><annotation encoding="application/x-tex">n</annotation></semantics></math> for the number of bars averaged. The <strong>Parkinson estimator</strong> is the simplest: the wider the day's range, the higher the variance, so squaring the log high-low range and rescaling it recovers volatility directly, without ever looking at the close:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><msubsup><mover><mi>σ</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><mi>P</mi><mn>2</mn></msubsup><mo>=</mo><mfrac><mn>1</mn><mrow><mn>4</mn><mi>n</mi><mrow><mspace width="0.1667em"></mspace><mi>ln</mi><mo>⁡</mo><mspace width="0.1667em"></mspace></mrow><mn>2</mn></mrow></mfrac><mrow><munderover><mo movablelimits="false">∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>n</mi></munderover></mrow><msup><mrow><mo fence="true" form="prefix" stretchy="true">(</mo><mrow><mi>ln</mi><mo>⁡</mo><mspace width="0.1667em"></mspace></mrow><mfrac><msub><mi>H</mi><mi>i</mi></msub><msub><mi>L</mi><mi>i</mi></msub></mfrac><mo fence="true" form="postfix" stretchy="true">)</mo></mrow><mn>2</mn></msup></mrow><annotation encoding="application/x-tex">\hat\sigma^2_P = \frac{1}{4n\ln 2}\sum_{i=1}^n \left(\ln\frac{H_i}{L_i}\right)^2</annotation></semantics></math></div>
+<p>The constant <math><semantics><mrow><mn>4</mn><mrow><mspace width="0.1667em"></mspace><mi>ln</mi><mo>⁡</mo><mspace width="0.1667em"></mspace></mrow><mn>2</mn><mo>≈</mo><mn>2.77</mn></mrow><annotation encoding="application/x-tex">4\ln 2 \approx 2.77</annotation></semantics></math> makes the estimator exactly unbiased for a driftless, continuously observed geometric Brownian motion (<a class="xref" href="../unit03-math-toolkit/session05-simulation-monte-carlo.html" data-xref="3.5" data-auto="">Session 3.5 — Simulation &amp; Monte Carlo</a>'s exact simulation scheme). Real markets — and this session's own simulation — only sample a finite number of times a day, which under-samples the true high and low by the same small, well-understood amount as <a class="xref" href="../unit03-math-toolkit/session05-simulation-monte-carlo.html" data-xref="3.5" data-auto="">Session 3.5 — Simulation &amp; Monte Carlo</a>'s <a class="term" href="../unit03-math-toolkit/session05-simulation-monte-carlo.html#g-discrete-monitoring" data-term="discrete monitoring">discrete-monitoring</a> correction for a barrier probability; §5.5.4 measures and corrects for it once, so it never contaminates the more interesting result later in that section.</p>
+
+<p>The <strong>Garman-Klass estimator</strong> keeps Parkinson's range term and adds the day's own open-to-close move, capturing a little more of what happened without needing any extra data:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><msubsup><mover><mi>σ</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><mrow><mi>G</mi><mi>K</mi></mrow><mn>2</mn></msubsup><mo>=</mo><mfrac><mn>1</mn><mi>n</mi></mfrac><mrow><munderover><mo movablelimits="false">∑</mo><mrow><mi>i</mi><mo>=</mo><mn>1</mn></mrow><mi>n</mi></munderover></mrow><mrow><mo fence="true" form="prefix" stretchy="true">[</mo><mfrac><mn>1</mn><mn>2</mn></mfrac><msup><mrow><mo fence="true" form="prefix" stretchy="true">(</mo><mrow><mi>ln</mi><mo>⁡</mo><mspace width="0.1667em"></mspace></mrow><mfrac><msub><mi>H</mi><mi>i</mi></msub><msub><mi>L</mi><mi>i</mi></msub></mfrac><mo fence="true" form="postfix" stretchy="true">)</mo></mrow><mn>2</mn></msup><mo>−</mo><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mn>2</mn><mrow><mspace width="0.1667em"></mspace><mi>ln</mi><mo>⁡</mo><mspace width="0.1667em"></mspace></mrow><mn>2</mn><mo>−</mo><mn>1</mn><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><msup><mrow><mo fence="true" form="prefix" stretchy="true">(</mo><mrow><mi>ln</mi><mo>⁡</mo><mspace width="0.1667em"></mspace></mrow><mfrac><msub><mi>C</mi><mi>i</mi></msub><msub><mi>O</mi><mi>i</mi></msub></mfrac><mo fence="true" form="postfix" stretchy="true">)</mo></mrow><mn>2</mn></msup><mo fence="true" form="postfix" stretchy="true">]</mo></mrow></mrow><annotation encoding="application/x-tex">\hat\sigma^2_{GK} = \frac{1}{n}\sum_{i=1}^n\left[\frac12\left(\ln\frac{H_i}{L_i}\right)^2 - (2\ln 2-1)\left(\ln\frac{C_i}{O_i}\right)^2\right]</annotation></semantics></math></div>
+<p>Both formulas assume trading never stops — that today's open equals yesterday's close exactly. Real markets gap overnight, and neither formula can see a jump that happened before the bar it is looking at even opens. The <strong>Yang-Zhang estimator</strong> fixes this by adding an explicit overnight term — the variance of <math><semantics><mrow><mrow><mi>ln</mi><mo>⁡</mo></mrow><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><msub><mi>O</mi><mi>t</mi></msub><mi>/</mi><msub><mi>C</mi><mrow><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">\ln(O_t / C_{t-1})</annotation></semantics></math> across the window — to a weighted blend of the plain open-to-close variance and the Rogers &amp; Satchell (1991) estimator, a range formula that, unlike Parkinson and Garman-Klass, does not assume zero drift:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><msubsup><mover><mi>σ</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><mrow><mi>Y</mi><mi>Z</mi></mrow><mn>2</mn></msubsup><mo>=</mo><msubsup><mover><mi>σ</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><mi>o</mi><mn>2</mn></msubsup><mo>+</mo><mi>k</mi><mspace width="0.1667em"></mspace><msubsup><mover><mi>σ</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><mi>c</mi><mn>2</mn></msubsup><mo>+</mo><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mn>1</mn><mo>−</mo><mi>k</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mspace width="0.1667em"></mspace><msubsup><mover><mi>σ</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><mrow><mi>R</mi><mi>S</mi></mrow><mn>2</mn></msubsup><mo separator="true">,</mo><mspace width="2em"></mspace><mi>k</mi><mo>=</mo><mfrac><mn>0.34</mn><mrow><mn>1.34</mn><mo>+</mo><mfrac><mrow><mi>n</mi><mo>+</mo><mn>1</mn></mrow><mrow><mi>n</mi><mo>−</mo><mn>1</mn></mrow></mfrac></mrow></mfrac></mrow><annotation encoding="application/x-tex">\hat\sigma^2_{YZ} = \hat\sigma^2_o + k\,\hat\sigma^2_c + (1-k)\,\hat\sigma^2_{RS}, \qquad k = \frac{0.34}{1.34 + \frac{n+1}{n-1}}</annotation></semantics></math></div>
+<p>For the one-month (21-bar) windows this session uses, <math><semantics><mrow><mi>k</mi><mo>≈</mo></mrow><annotation encoding="application/x-tex">k \approx</annotation></semantics></math> <span data-lab="yz_k" data-fmt=".3f">0.139</span> — small for any realistic window length, so Yang-Zhang leans mainly on the overnight term and the Rogers-Satchell blend rather than the plain open-to-close variance. That is exactly why it stays accurate once trading stops overnight and the other two formulas do not (§5.5.4).</p>
+
+<div class="co note"><span class="co-t">🧭 Margin note — k is not a free dial</span>
+<p>k is fixed by the window length n, not chosen by hand: it is the weighting that minimises the estimator's own sampling variance for a random walk. You cannot tune it for a better-looking number without changing what the formula is estimating — the same discipline as the Yang-Zhang paper's own derivation. A practitioner who instead hand-picks weights to match a preferred answer has quietly left the realm of estimation and entered the realm of curve-fitting a single number.</p>
+</div>
+</section>
+
+<!-- ============ §5.5.4 — in code ============ -->
+<section id="s4">
+<h2><span class="no">5.5.4</span> In code: efficiency, and what a gap breaks</h2>
+<p class="lede">Simulate an OHLC bar with a known true volatility, and every claim above becomes checkable.</p>
+
+<p>To grade an estimator you need to know the truth, so the companion lab simulates a month of one-day bars with a chosen true annualised volatility of <span data-lab="sigma_true" data-fmt=".0%">20%</span>, using <a class="xref" href="../unit03-math-toolkit/session05-simulation-monte-carlo.html" data-xref="3.5" data-auto="">Session 3.5 — Simulation &amp; Monte Carlo</a>'s exact log-space geometric Brownian motion at <span data-lab="m_intraday" data-fmt=",">200</span> steps per day, and keeps the running maximum and minimum within each day — exactly how a real exchange's OHLC bar is built, just from ticks instead of steps:</p>
+
+<pre><span class="c"># the whole Parkinson formula, on arrays of log(open), log(high), log(low), log(close)</span>
+<span class="k">def</span> parkinson_var(o, h, l, c):
+    <span class="k">return</span> ((h - l) ** 2).mean(axis=1) / (4 * np.log(2)) / DT_DAY</pre>
+
+<p>Repeating this <span data-lab="n_trials" data-fmt=",">20,000</span> times gives a distribution of estimates for every formula, which answers two questions a single backtest never could. First: with no overnight gap, how much less noisy is each estimator than close-to-close? <strong>Relative efficiency</strong> is the ratio of sampling variances — an estimator that is 5× more efficient has a fifth of the estimation error for the same number of days, or needs a fifth as many days for the same precision. This simulation finds <span data-lab="eff_park" data-fmt=".1f">5.6</span>× for Parkinson, <span data-lab="eff_gk" data-fmt=".1f">8.9</span>× for Garman-Klass and <span data-lab="eff_yz" data-fmt=".1f">8.1</span>× for Yang-Zhang (fig 5.5.3) — the same regime as, though not identical to, the papers' continuous-time figures (Parkinson up to ~5.2×, Garman-Klass up to ~7.4×, Yang-Zhang up to ~14×), because a finite number of trials and a 200-step daily discretisation are not quite their continuous-time limit. That same discretisation also very slightly under-samples the true high and low, biasing every range-based estimate down by a small, known amount — between <span data-lab="corr_park" data-fmt=".0%">110%</span> and <span data-lab="corr_gk" data-fmt=".0%">114%</span> relative — which is corrected once here and carried through the rest of this section.</p>
+
+<figure class="diagram chart">
+<!-- chart:estimator_efficiency -->
+<svg viewBox="0 0 720 260" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Relative efficiency vs close-to-close, no overnight gaps (20,000 simulated months)">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">RELATIVE EFFICIENCY VS CLOSE-TO-CLOSE, NO OVERNIGHT GAPS (20,000 SIMULATED MONTHS)</text>
+  <line x1="64" y1="216" x2="690" y2="216" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="220" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.0×</text>
+  <line x1="64" y1="181.6" x2="690" y2="181.6" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="185.6" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">2.5×</text>
+  <line x1="64" y1="147.2" x2="690" y2="147.2" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="151.2" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">5.0×</text>
+  <line x1="64" y1="112.8" x2="690" y2="112.8" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="116.8" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">7.5×</text>
+  <line x1="64" y1="78.4" x2="690" y2="78.4" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="82.4" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">10.0×</text>
+  <line x1="64" y1="44" x2="690" y2="44" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="48" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">12.5×</text>
+  <line x1="64" y1="216" x2="690" y2="216" stroke="#C9CFC6" stroke-width="1"/>
+  <path d="M130.2,216 V206.2 Q130.2,202.2 134.2,202.2 H150.2 Q154.2,202.2 154.2,206.2 V216 Z" fill="#4A5A68"><title>close-close: 1.0×</title></path>
+  <text x="142.2" y="195.2" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">1.0×</text>
+  <text x="142.2" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">close-close</text>
+  <path d="M286.8,216 V142.8 Q286.8,138.8 290.8,138.8 H306.8 Q310.8,138.8 310.8,142.8 V216 Z" fill="#3A56C5"><title>Parkinson: 5.6×</title></path>
+  <text x="298.8" y="131.8" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">5.6×</text>
+  <text x="298.8" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">Parkinson</text>
+  <path d="M443.2,216 V98.1 Q443.2,94.1 447.2,94.1 H463.2 Q467.2,94.1 467.2,98.1 V216 Z" fill="#E8850C"><title>Garman-Klass: 8.9×</title></path>
+  <text x="455.2" y="87.1" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">8.9×</text>
+  <text x="455.2" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">Garman-Klass</text>
+  <path d="M599.8,216 V108.6 Q599.8,104.6 603.8,104.6 H619.8 Q623.8,104.6 623.8,108.6 V216 Z" fill="#3F8E5A"><title>Yang-Zhang: 8.1×</title></path>
+  <text x="611.8" y="97.6" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">8.1×</text>
+  <text x="611.8" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">Yang-Zhang</text>
+</svg>
+<!-- /chart:estimator_efficiency -->
+<figcaption>fig 5.5.3 — relative efficiency vs close-to-close, no overnight gaps: more of the bar is more precision</figcaption>
+</figure>
+
+<p>Second, and more consequentially: what happens once trading actually stops overnight? Re-running the same simulation with 30% of each day's <em>true</em> variance moved into an overnight gap shows exactly the blind spot fig 5.5.3 hides. Parkinson and Garman-Klass only ever look at one day's own bar, so neither can see a jump that happened before that day's open: both land at <span data-lab="gap_park_vol" data-fmt=".1%">16.7%</span> and <span data-lab="gap_gk_vol" data-fmt=".1%">16.7%</span> — matching the <em>intraday-only</em> truth of <span data-lab="sigma_intraday" data-fmt=".1%">16.7%</span>, not the <span data-lab="sigma_true" data-fmt=".1%">20.0%</span> total — a <span data-lab="park_bias_pp" data-fmt=".1f">3.3</span>-percentage-point understatement that sits <span data-lab="park_bias_z" data-fmt=",.0f">549</span> standard errors from noise. Close-to-close and Yang-Zhang, which both look across the gap, land on <span data-lab="gap_cc_vol" data-fmt=".1%">20.0%</span> and <span data-lab="gap_yz_vol" data-fmt=".1%">20.0%</span> — correct, and, for Yang-Zhang, still far less noisy than close-to-close (fig 5.5.4). Put in terms a live risk system cares about: an estimator several times more efficient reaches a given precision in a corresponding fraction of the trading days — the difference between a volatility estimate that reacts within a week and one that needs a calendar quarter to say anything with confidence.</p>
+
+<figure class="diagram chart">
+<!-- chart:bias_with_gaps -->
+<svg viewBox="0 0 720 260" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Estimated annual volatility with a 30%-overnight, 70%-intraday split">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">ESTIMATED ANNUAL VOLATILITY WITH A 30%-OVERNIGHT, 70%-INTRADAY SPLIT</text>
+  <line x1="64" y1="216" x2="690" y2="216" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="220" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.0%</text>
+  <line x1="64" y1="181.6" x2="690" y2="181.6" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="185.6" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">5.0%</text>
+  <line x1="64" y1="147.2" x2="690" y2="147.2" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="151.2" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">10.0%</text>
+  <line x1="64" y1="112.8" x2="690" y2="112.8" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="116.8" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">15.0%</text>
+  <line x1="64" y1="78.4" x2="690" y2="78.4" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="82.4" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">20.0%</text>
+  <line x1="64" y1="44" x2="690" y2="44" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="48" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">25.0%</text>
+  <line x1="64" y1="216" x2="690" y2="216" stroke="#C9CFC6" stroke-width="1"/>
+  <path d="M104.2,216 V82.4 Q104.2,78.4 108.2,78.4 H124.2 Q128.2,78.4 128.2,82.4 V216 Z" fill="#4A5A68"><title>true total σ: 20.0%</title></path>
+  <text x="116.2" y="71.4" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">20.0%</text>
+  <text x="116.2" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">true total σ</text>
+  <path d="M208.5,216 V104.9 Q208.5,100.9 212.5,100.9 H228.5 Q232.5,100.9 232.5,104.9 V216 Z" fill="#4A5A68"><title>true intraday-only σ: 16.7%</title></path>
+  <text x="220.5" y="93.9" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">16.7%</text>
+  <text x="220.5" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">true intraday-only σ</text>
+  <path d="M312.8,216 V82.5 Q312.8,78.5 316.8,78.5 H332.8 Q336.8,78.5 336.8,82.5 V216 Z" fill="#3A56C5"><title>close-close: 20.0%</title></path>
+  <text x="324.8" y="71.5" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">20.0%</text>
+  <text x="324.8" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">close-close</text>
+  <path d="M417.2,216 V104.8 Q417.2,100.8 421.2,100.8 H437.2 Q441.2,100.8 441.2,104.8 V216 Z" fill="#D64B2A"><title>Parkinson: 16.7%</title></path>
+  <text x="429.2" y="93.8" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">16.7%</text>
+  <text x="429.2" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">Parkinson</text>
+  <path d="M521.5,216 V104.8 Q521.5,100.8 525.5,100.8 H541.5 Q545.5,100.8 545.5,104.8 V216 Z" fill="#D64B2A"><title>Garman-Klass: 16.7%</title></path>
+  <text x="533.5" y="93.8" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">16.7%</text>
+  <text x="533.5" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">Garman-Klass</text>
+  <path d="M625.8,216 V82.4 Q625.8,78.4 629.8,78.4 H645.8 Q649.8,78.4 649.8,82.4 V216 Z" fill="#3A56C5"><title>Yang-Zhang: 20.0%</title></path>
+  <text x="637.8" y="71.4" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">20.0%</text>
+  <text x="637.8" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">Yang-Zhang</text>
+</svg>
+<!-- /chart:bias_with_gaps -->
+<figcaption>fig 5.5.4 — with a realistic overnight gap, only close-to-close and Yang-Zhang land on the true total</figcaption>
+</figure>
+</section>
+
+<!-- ============ §5.5.5 — EWMA ============ -->
+<section id="s5">
+<h2><span class="no">5.5.5</span> EWMA: one parameter, a real trade-off</h2>
+<p class="lede">RiskMetrics reduced the <strong>volatility forecast</strong> problem to a single number — and a trade-off you cannot dial away.</p>
+
+<p>The simplest volatility forecast that actually reacts to news is J.P. Morgan's RiskMetrics <strong>EWMA volatility</strong>: an exponentially weighted moving average of squared returns, updated with one decay parameter λ:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><msubsup><mover><mi>σ</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><mi>t</mi><mn>2</mn></msubsup><mo>=</mo><mi>λ</mi><mspace width="0.1667em"></mspace><msubsup><mover><mi>σ</mi><mo stretchy="false" class="wbk-acc" style="math-depth:0;">ˆ</mo></mover><mrow><mi>t</mi><mo>−</mo><mn>1</mn></mrow><mn>2</mn></msubsup><mo>+</mo><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mn>1</mn><mo>−</mo><mi>λ</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mspace width="0.1667em"></mspace><msubsup><mi>r</mi><mrow><mi>t</mi><mo>−</mo><mn>1</mn></mrow><mn class="tml-sml-pad">2</mn></msubsup></mrow><annotation encoding="application/x-tex">\hat\sigma^2_t = \lambda\,\hat\sigma^2_{t-1} + (1-\lambda)\,r_{t-1}^2</annotation></semantics></math></div>
+<p>λ is a multiplier, not a probability, but it behaves like one: it is the weight carried over from yesterday's estimate, so <math><semantics><mrow><mn>1</mn><mo>−</mo><mi>λ</mi></mrow><annotation encoding="application/x-tex">1-\lambda</annotation></semantics></math> is the weight given to yesterday's single squared return. RiskMetrics' original convention — still the default in most risk systems descended from it — is λ = 0.94 for daily data and λ = 0.97 for monthly data (RiskMetrics, 1996).</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 210" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">HOW MUCH WEIGHT EACH λ PUTS ON PAST DAYS</text>
+  <text x="30" y="52" font-size="10.5" font-weight="700" fill="#3A56C5">λ = 0.90 — reacts fast</text>
+  <rect x="150" y="35" width="50" height="65" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <rect x="235" y="41.5" width="50" height="58.5" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <rect x="320" y="47.3" width="50" height="52.7" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <rect x="405" y="52.6" width="50" height="47.4" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <rect x="490" y="57.4" width="50" height="42.6" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <rect x="575" y="61.7" width="50" height="38.3" fill="#EDF0FC" stroke="#3A56C5" stroke-width="1.5"/>
+  <text x="30" y="137" font-size="10.5" font-weight="700" fill="#8A6D00">λ = 0.97 — reacts slow</text>
+  <rect x="150" y="120" width="50" height="65" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <rect x="235" y="121.95" width="50" height="63.05" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <rect x="320" y="123.84" width="50" height="61.16" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <rect x="405" y="125.68" width="50" height="59.32" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <rect x="490" y="127.46" width="50" height="57.54" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <rect x="575" y="129.18" width="50" height="55.82" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="175" y="200" font-size="9" text-anchor="middle" fill="#4A5A68" font-family="IBM Plex Mono,monospace">day t</text>
+  <text x="260" y="200" font-size="9" text-anchor="middle" fill="#4A5A68" font-family="IBM Plex Mono,monospace">t−1</text>
+  <text x="345" y="200" font-size="9" text-anchor="middle" fill="#4A5A68" font-family="IBM Plex Mono,monospace">t−2</text>
+  <text x="430" y="200" font-size="9" text-anchor="middle" fill="#4A5A68" font-family="IBM Plex Mono,monospace">t−3</text>
+  <text x="515" y="200" font-size="9" text-anchor="middle" fill="#4A5A68" font-family="IBM Plex Mono,monospace">t−4</text>
+  <text x="600" y="200" font-size="9" text-anchor="middle" fill="#4A5A68" font-family="IBM Plex Mono,monospace">t−5</text>
+</svg>
+<figcaption>fig 5.5.5 — schematic decay of EWMA's weight on past days (bar heights relative to each row's own day-t weight)</figcaption>
+</figure>
+
+<p>fig 5.5.5 makes the trade-off literal: a small λ gives yesterday's return a big vote, so the estimate reacts fast to a real regime change but also jumps around on ordinary noise; a large λ barely moves from one day to the next, so it is smooth but slow to admit the world has changed. There is no λ that is both. The same shrinkage converts to a <strong>half-life</strong> — the number of days for a shock's weight to halve, <math><semantics><mrow><mrow><mi>ln</mi><mo>⁡</mo></mrow><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mn>0.5</mn><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mi>/</mi><mrow><mspace width="0.1667em"></mspace><mi>ln</mi><mo>⁡</mo></mrow><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>λ</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">\ln(0.5)/\ln(\lambda)</annotation></semantics></math> — of <span data-lab="ewma_90_half_life" data-fmt=".0f">7</span> days at λ = 0.90, <span data-lab="ewma_94_half_life" data-fmt=".0f">11</span> days at λ = 0.94, and <span data-lab="ewma_97_half_life" data-fmt=".0f">23</span> days at λ = 0.97 (Table 2).</p>
+
+<table>
+<thead><tr><th>λ</th><th>Half-life</th><th>RMSE vs true annualised vol</th></tr></thead>
+<tbody>
+<tr><td>0.90</td><td><span data-lab="ewma_90_half_life" data-fmt=".1f">6.6</span> days</td><td><span data-lab="ewma_90_rmse_pp" data-fmt=".2f">1.49</span> pp</td></tr>
+<tr><td>0.94 (RiskMetrics default)</td><td><span data-lab="ewma_94_half_life" data-fmt=".1f">11.2</span> days</td><td><span data-lab="ewma_94_rmse_pp" data-fmt=".2f">1.55</span> pp</td></tr>
+<tr><td>0.97</td><td><span data-lab="ewma_97_half_life" data-fmt=".1f">22.8</span> days</td><td><span data-lab="ewma_97_rmse_pp" data-fmt=".2f">2.68</span> pp</td></tr>
+</tbody>
+</table>
+
+<p>Measured against a simulated process whose <em>true</em> conditional volatility is known exactly (the same GARCH(1,1) process §5.5.6 fits), no fixed λ wins by construction: λ = 0.90 tracks it best here, with a root-mean-square error of <span data-lab="ewma_90_rmse_pp" data-fmt=".2f">1.49</span> percentage points of annualised volatility, against <span data-lab="ewma_94_rmse_pp" data-fmt=".2f">1.55</span> for the RiskMetrics default and <span data-lab="ewma_97_rmse_pp" data-fmt=".2f">2.68</span> for λ = 0.97. That is not a general result — a different true process would favour a different λ — which is exactly EWMA's limitation: the decay parameter is fixed once, by convention, and never adapts to how persistent the data actually turn out to be. §5.5.6 fits that persistence directly instead of assuming it.</p>
+</section>
+
+<!-- ============ §5.5.6 — GARCH and GJR-GARCH ============ -->
+<section id="s6">
+<h2><span class="no">5.5.6</span> GARCH and GJR-GARCH: a fitted alternative</h2>
+<p class="lede">GARCH replaces EWMA's fixed decay with numbers estimated from the data — and knows where volatility is heading, not just where it is.</p>
+
+<p>A GARCH(1,1) model (Bollerslev, 1986, generalising Engle's 1982 ARCH) writes tomorrow's variance as three pieces: a constant, a reaction to yesterday's squared shock, and memory of yesterday's own variance:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><msubsup><mi>σ</mi><mi>t</mi><mn>2</mn></msubsup><mo>=</mo><mi>ω</mi><mo>+</mo><mi>α</mi><mspace width="0.1667em"></mspace><msubsup><mi>ε</mi><mrow><mi>t</mi><mo>−</mo><mn>1</mn></mrow><mn>2</mn></msubsup><mo>+</mo><mi>β</mi><mspace width="0.1667em"></mspace><msubsup><mi>σ</mi><mrow><mi>t</mi><mo>−</mo><mn>1</mn></mrow><mn>2</mn></msubsup></mrow><annotation encoding="application/x-tex">\sigma_t^2 = \omega + \alpha\,\varepsilon_{t-1}^2 + \beta\,\sigma_{t-1}^2</annotation></semantics></math></div>
+
+<div class="co note"><span class="co-t">🧭 Margin note — reusing α, β, γ</span>
+<p>GARCH's own literature calls its coefficients α, β and (below) γ — so does the <code>arch</code> package's own output — which collides with this course's reserved α (a return not explained by factors) and β (factor exposure) elsewhere in the course, and with γ as risk aversion in Unit 3. In this section and the lab, α, β and γ always mean GARCH's own reaction, memory and asymmetry coefficients, never a factor loading or a risk-aversion parameter.</p>
+</div>
+
+<p>EWMA is the special case ω = 0, α = 1−λ, β = λ — an "integrated" GARCH whose reaction and memory sum to exactly 1, which is why its forecast never reverts anywhere (§5.5.5). A genuine GARCH(1,1) instead reverts to a long-run variance <math><semantics><mrow><mi>ω</mi><mi>/</mi><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mn>1</mn><mo>−</mo><mi>α</mi><mo>−</mo><mi>β</mi><mo fence="true" form="postfix" stretchy="false">)</mo></mrow></mrow><annotation encoding="application/x-tex">\omega/(1-\alpha-\beta)</annotation></semantics></math>, so it needs α and β estimated precisely, not assumed. We fit one with the <code>arch</code> package's maximum likelihood rather than hand-rolling the optimisation:</p>
+
+<pre><span class="c"># arch's own advice: scale returns to roughly unit variance before fitting</span>
+<span class="k">from</span> arch <span class="k">import</span> arch_model
+res = arch_model(returns * 100, mean=<span class="s">"Zero"</span>, vol=<span class="s">"GARCH"</span>, p=1, q=1, dist=<span class="s">"t"</span>).fit()</pre>
+
+<p>On <span data-lab="n_days_garch" data-fmt=",">2,500</span> simulated days from a known GARCH(1,1) (true α = <span data-lab="garch_alpha_true" data-fmt=".2f">0.08</span>, β = <span data-lab="garch_beta_true" data-fmt=".2f">0.90</span>), the fit recovers α = <span data-lab="garch_alpha_hat" data-fmt=".3f">0.102</span> and β = <span data-lab="garch_beta_hat" data-fmt=".3f">0.879</span> — both within the model's own reported standard errors of the truth (Table 3) — and tracks the true conditional volatility with a root-mean-square error of <span data-lab="garch_rmse_pp" data-fmt=".2f">0.61</span> percentage points, beating every fixed λ from §5.5.5, including the best one at <span data-lab="ewma_best_rmse_pp" data-fmt=".2f">1.49</span> (fig 5.5.6).</p>
+
+<figure class="diagram chart">
+<!-- chart:vol_paths -->
+<svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Tracking the true conditional volatility: EWMA vs a fitted GARCH(1,1) (last 500 days)">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">TRACKING THE TRUE CONDITIONAL VOLATILITY: EWMA VS A FITTED GARCH(1,1) (LAST 500 DAYS)</text>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#4A5A68" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">true conditional vol</text>
+  <line x1="198.0" y1="32" x2="214.0" y2="32" stroke="#E8850C" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="220.0" y="36" font-size="11" fill="#4A5A68">EWMA (λ=0.94)</text>
+  <line x1="325.2" y1="32" x2="341.2" y2="32" stroke="#3A56C5" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="347.2" y="36" font-size="11" fill="#4A5A68">fitted GARCH(1,1)</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="268" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0%</text>
+  <line x1="64" y1="211" x2="602" y2="211" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="215" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">10%</text>
+  <line x1="64" y1="158" x2="602" y2="158" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="162" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">20%</text>
+  <line x1="64" y1="105" x2="602" y2="105" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="109" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">30%</text>
+  <line x1="64" y1="52" x2="602" y2="52" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="56" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">40%</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#C9CFC6" stroke-width="1"/>
+  <line x1="198.8" y1="264" x2="198.8" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="198.8" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">0.5</text>
+  <line x1="334.6" y1="264" x2="334.6" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="334.6" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">1</text>
+  <line x1="470.5" y1="264" x2="470.5" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="470.5" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">1.5</text>
+  <polyline points="64,208.2 65.1,207.5 66.2,207.5 67.2,208.3 69.4,210.7 70.5,212 71.5,206.5 72.6,207 74.8,204.2 75.9,206 76.9,204.1 78,205.9 79.1,198.3 81.3,202.1 82.3,203.7 83.4,204.8 84.5,206.6 86.6,209.7 87.7,211.1 88.8,211.7 89.9,212.2 92,210.8 93.1,212.1 94.2,196.9 96.3,201.1 97.4,202.8 98.5,202.6 99.6,204.4 101.7,207.5 102.8,204 103.9,203.1 105,203.3 107.1,203 108.2,199 109.3,189.4 110.4,190.2 112.5,192.3 113.6,194.9 114.7,196.9 115.8,199.1 117.9,202.6 119,204 120.1,204.5 121.1,206.3 122.2,208 124.4,210 125.5,210.8 126.5,211.9 127.6,207.2 129.8,207.5 130.8,207.4 131.9,195.9 134.1,200 135.2,202.1 136.2,203 137.3,204.7 139.5,205.4 140.5,204.1 141.6,203.8 142.7,204.6 143.8,205 145.9,207.3 147,208.9 148.1,209.4 150.3,210.2 151.3,202.3 152.4,204.1 153.5,203.2 155.6,199.3 156.7,201.3 157.8,200.1 158.9,201.2 160,203.1 162.1,206.4 163.2,208 164.3,209.3 165.3,210.8 167.5,211.7 168.6,212.9 169.7,212.5 171.8,208.6 172.9,209.7 174,209.9 175.1,209.7 176.1,203.9 178.3,204.8 179.4,201.5 180.4,202.3 182.6,204 183.7,202 184.8,204 185.8,204.5 188,198.5 189.1,200 190.1,199.7 191.2,201.7 192.3,203.4 194.5,202.7 195.5,204 196.6,199.3 198.8,201 199.8,197.2 200.9,198.8 202,182.1 203.1,183.5 205.2,175.3 206.3,177.9 207.4,146.1 208.5,150 210.6,159.8 211.7,161.8 212.8,166.1 214.9,105.1 216,112.8 217.1,118.6 218.2,125.4 220.3,132.9 221.4,120.8 222.5,121.7 223.6,122.1 225.7,128.8 226.8,128.1 227.9,133.5 229,139.4 230,143.5 232.2,152.5 233.3,156.4 234.3,154.7 235.4,153.8 237.6,162.1 238.7,162.8 239.7,165.9 241.9,172 243,175.9 244.1,166 245.1,167.2 246.2,159.6 248.4,161.8 249.4,165.7 250.5,169.9 252.7,175.1 253.8,169.1 254.8,156.6 255.9,154.3 258.1,136.2 259.1,141.8 260.2,147.3 261.3,152.4 263.5,140.6 264.5,146 265.6,150.7 266.7,155.9 268.8,159.9 269.9,164 271,164.4 272.1,159.2 273.2,161 275.3,169 276.4,173 277.5,175.5 278.6,169.6 280.7,172.8 281.8,176.6 282.9,180.1 285,182 286.1,181.7 287.2,185 288.3,184 290.4,187.7 291.5,186.6 292.6,189.1 293.6,190.4 295.8,195.6 296.9,197.4 298,198.4 299,199.8 300.1,201.9 302.3,202.6 303.4,203.9 304.4,202.8 305.5,204.7 307.7,204.9 308.7,205.8 309.8,207.5 312,208.3 313.1,203 314.1,204 315.2,202.3 317.4,203.2 318.4,205.1 319.5,205.8 320.6,204.1 321.7,202.6 323.8,196.4 324.9,195.8 326,194.9 327.1,195.5 329.2,199.1 330.3,200.8 331.4,194.8 333.5,197.2 334.6,196.4 335.7,190.1 336.8,192.8 338.9,184.3 340,184.6 341.1,176.4 343.2,182.5 344.3,182.3 345.4,183.1 346.5,180.2 348.6,185.6 349.7,187 350.8,187.1 351.9,187.3 352.9,189.5 355.1,188.9 356.2,189.5 357.3,190.8 358.3,189.5 360.5,194.2 361.6,196.8 362.6,199 363.7,197.2 365.9,200.5 367,202.1 368,204.1 370.2,194.3 371.3,196.8 372.4,195.1 373.4,195.5 374.5,197.2 376.7,201.5 377.7,203.6 378.8,203.7 381,204.8 382.1,203 383.1,200.7 384.2,200.6 386.4,199.3 387.4,195.2 388.5,197.5 389.6,195.5 390.7,193.1 392.8,196 393.9,198.3 395,198 397.2,197.4 398.2,187.7 399.3,184 400.4,187.2 402.5,191.3 403.6,185.5 404.7,188.6 405.8,188.9 407.9,194.3 409,194.9 410.1,197.3 411.2,197.6 412.2,198.8 414.4,203 415.5,204.2 416.6,206 417.6,207.6 419.8,207.6 420.9,208.5 421.9,210 424.1,211.9 425.2,211.1 426.3,211.9 427.3,212.9 429.5,212.5 430.6,207.9 431.7,208.8 432.7,209.1 433.8,208.1 436,210.2 437,210.7 438.1,200.6 440.3,201.4 441.4,203.4 442.4,201.9 443.5,203.3 444.6,199.9 446.7,202.3 447.8,204.2 448.9,205.8 450,206.5 452.1,201 453.2,202 454.3,203.1 456.4,191.4 457.5,194.1 458.6,195.8 459.7,197 460.8,199.2 462.9,203.1 464,204 465.1,202.3 467.2,192.6 468.3,195.1 469.4,197.5 470.5,199 472.6,201.6 473.7,203.3 474.8,203.4 475.9,196.6 476.9,199 479.1,199.9 480.2,199.1 481.2,200.6 482.3,202.6 484.5,203.2 485.6,202.9 486.6,204.5 487.7,200.6 489.9,203.5 490.9,205.3 492,207 493.1,206.8 495.3,209.9 496.3,211 497.4,212.1 498.5,211.3 500.7,213 501.7,213.7 502.8,211.9 505,214.2 506,215.1 507.1,215.8 508.2,216.7 509.3,215.7 511.4,208.3 512.5,209.5 513.6,211 514.7,211.4 516.8,213.7 517.9,211.5 519,189 520.1,191.8 522.2,187.7 523.3,188.9 524.4,191.3 526.5,179.1 527.6,182.4 528.7,183.4 529.8,182.7 531.9,188 533,185.7 534.1,188.7 535.2,187.3 536.2,179.8 538.4,179.3 539.5,144.3 540.5,136.5 542.7,145.1 543.8,142.9 544.9,147 545.9,148.4 547,148 549.2,156.6 550.2,147.4 551.3,148.5 553.5,158.1 554.6,162.5 555.6,166.9 556.7,171.1 557.8,175 560,175.5 561,177.6 562.1,173.1 563.2,143.8 565.3,133.5 566.4,138.4 567.5,143.6 569.7,151.4 570.7,156.1 571.8,160.4 572.9,165 574,168.8 576.1,134 577.2,138.8 578.3,138.9 579.4,134.6 581.5,143.3 582.6,147.6 583.7,151.1 585.8,160.7 586.9,147 588,151.8 589.1,155.6 591.2,164.1 592.3,89.3 593.4,82.8 594.5,91.3 596.6,91.2 597.7,97.7 598.8,105.7 599.8,111.9 602,118.2" fill="none" stroke="#4A5A68" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><title>true conditional vol</title></polyline>
+  <circle cx="602" cy="118.2" r="4" fill="#4A5A68" stroke="#FBFBF8" stroke-width="2"><title>true conditional vol: 28%</title></circle>
+  <polyline points="64,216.7 65.1,216 66.2,215.9 67.2,216.5 69.4,219 70.5,220.4 71.5,215.9 72.6,216.5 74.8,213.7 75.9,215.2 76.9,213.7 78,215.2 79.1,208.7 81.3,211.5 82.3,212.9 83.4,213.8 84.5,215.3 86.6,218.2 87.7,219.5 88.8,220.2 91,221 92,220.3 93.1,221.6 94.2,208.4 96.3,211.5 97.4,212.7 98.5,212.2 99.6,213.6 101.7,216.4 102.8,213 103.9,212 105,212.2 107.1,211.6 108.2,207.8 109.3,199.6 110.4,199.7 112.5,201 113.6,202.8 114.7,204.2 115.8,206 116.8,207.1 119,209.9 120.1,210.6 121.1,212.2 122.2,213.8 124.4,215.8 125.5,216.6 126.5,217.8 127.6,213.8 129.8,214.4 130.8,214.6 131.9,205.2 134.1,208.4 135.2,210 136.2,210.8 137.3,212.3 139.5,212.7 140.5,211.4 141.6,211.4 142.7,212.2 144.9,213.4 145.9,214.7 147,216.2 148.1,216.9 150.3,218 151.3,211.5 152.4,213 153.5,212.4 155.6,209.1 156.7,210.6 157.8,209.7 158.9,210.5 161,213.2 162.1,214.7 163.2,216.2 164.3,217.4 165.3,218.8 167.5,220.2 168.6,221.4 169.7,221.4 171.8,217.7 172.9,218.7 174,219.1 175.1,219.1 176.1,214.3 178.3,214.5 179.4,211.7 180.4,212.1 182.6,213.2 183.7,211.1 184.8,212.7 185.8,212.9 188,207.5 189.1,208.6 190.1,208 191.2,209.6 192.3,210.9 194.5,210.3 195.5,211.5 196.6,207.8 198.8,208.9 199.8,205.3 200.9,206.4 202,191.7 203.1,192.4 205.2,184.5 206.3,186.1 207.4,159.4 208.5,161.2 210.6,167.1 211.7,168.1 212.8,170.9 214.9,119.5 216,123.9 217.1,127.1 218.2,131.2 220.3,135.2 221.4,125.5 222.5,125.4 223.6,124.9 225.7,128.3 226.8,127 227.9,130.4 229,134.3 230,137.1 232.2,143.3 233.3,146.3 234.3,145.2 235.4,144.7 237.6,150.9 238.7,151.9 239.7,154.5 241.9,159.6 243,162.7 244.1,156.5 245.1,157.6 246.2,152.5 248.4,154.6 249.4,157.6 250.5,160.8 252.7,165.4 253.8,162 254.8,153.5 255.9,151.9 258.1,137.9 259.1,141.4 260.2,145 261.3,148.5 262.4,152 264.5,143.5 265.6,146.7 266.7,150.3 268.8,153.2 269.9,156.2 271,156.8 272.1,153.2 273.2,154.7 275.3,160.7 276.4,163.8 277.5,165.9 278.6,162.5 280.7,165.1 281.8,168.1 282.9,170.9 285,173.4 286.1,173.9 287.2,176.6 288.3,176.6 290.4,180 291.5,180 292.6,182.2 293.6,183.6 295.8,188.3 296.9,190.1 298,191.4 299,193.1 300.1,195.2 302.3,196.9 303.4,198.5 304.4,198.3 305.5,200.3 307.7,202.1 308.7,203.2 309.8,205 312,207.1 313.1,203.5 314.1,204.5 315.2,203.4 317.4,204.8 318.4,206.6 319.5,207.4 320.6,206.6 321.7,205.6 323.8,200.5 324.9,200.3 326,199.7 328.1,201.4 329.2,203 330.3,204.6 331.4,200.2 333.5,201.8 334.6,201 335.7,195.6 336.8,197.7 338.9,190.5 340,190.6 341.1,183.3 343.2,187.2 344.3,187 345.4,187.2 346.5,184.5 348.6,188.2 349.7,189.3 350.8,189.5 351.9,189.5 352.9,191.1 355.1,190.4 356.2,191.1 357.3,192 358.3,191.3 360.5,195 361.6,197.1 362.6,199.1 363.7,198.3 365.9,201.4 367,202.8 368,204.7 370.2,197.9 371.3,199.9 372.4,198.5 373.4,199 374.5,200.5 376.7,204.2 377.7,206 378.8,206.3 381,207.4 382.1,206.2 383.1,204.3 384.2,204.6 386.4,203.8 387.4,200.3 388.5,202.2 389.6,200.4 390.7,198.2 392.8,200.4 393.9,202.3 395,202.3 397.2,202.1 398.2,193.9 399.3,190.4 400.4,192.6 402.5,195.7 403.6,191.2 404.7,193.4 405.8,193.3 407.9,197.5 409,197.9 410.1,199.8 411.2,200.4 412.2,201.5 414.4,205.2 415.5,206.6 416.6,208.3 418.7,208.9 419.8,210.5 420.9,211.6 421.9,213.1 424.1,215.6 425.2,215.2 426.3,216.2 427.3,217.5 429.5,217.9 430.6,214.6 431.7,215.6 432.7,216.2 433.8,215.3 436,217.5 437,218 438.1,209.1 440.3,209.9 441.4,211.4 442.4,209.9 443.5,211.1 444.6,208.4 446.7,210 447.8,211.6 448.9,213.1 450,213.9 452.1,208.7 453.2,209.3 454.3,210.4 456.4,200.1 457.5,202.1 458.6,203.1 459.7,204 460.8,205.8 462.9,209 464,209.9 465.1,208.8 467.2,200.7 468.3,202.6 469.4,204.3 470.5,205.6 472.6,207.9 473.7,209.4 474.8,209.7 475.9,203.8 476.9,205.6 479.1,206.3 480.2,205.9 481.2,207.1 483.4,207.4 484.5,209.1 485.6,208.9 486.6,210.3 487.7,207.4 489.9,209.7 490.9,211.3 492,212.9 493.1,213.1 495.3,216 496.3,217.3 497.4,218.5 498.5,218.3 500.7,220.4 501.7,221.1 502.8,220.1 505,222.6 506,223.6 507.1,224.4 508.2,225.6 509.3,224.8 511.4,218.9 512.5,220.1 513.6,221.4 514.7,222 516.8,224.4 517.9,222.1 519,201.1 520.1,202.9 522.2,198.3 523.3,198.7 524.4,200.3 526.5,189.6 527.6,191.7 528.7,192.1 529.8,190.9 531.9,194.4 533,192.4 534.1,194.5 535.2,192.9 536.2,187 538.4,185.5 539.5,156.8 540.5,148.8 542.7,153.2 543.8,150.3 544.9,152.6 545.9,153 547,151.8 549.2,157.2 550.2,150.1 551.3,150.5 552.4,153.4 554.6,159.8 555.6,162.9 556.7,165.9 557.8,168.9 560,169.8 561,171.5 562.1,168.8 563.2,147.4 565.3,138.3 566.4,141.1 567.5,144.4 569.7,149.3 570.7,152.5 571.8,155.5 572.9,158.8 574,161.7 576.1,135.1 577.2,138 578.3,137.4 579.4,134 581.5,139.3 582.6,142.1 583.7,144.7 585.8,151.6 586.9,142.5 588,145.8 589.1,148.6 591.2,154.9 592.3,98.5 593.4,91.5 594.5,96.5 596.6,93.9 597.7,97.6 598.8,102.6 599.8,106.4 602,109.8" fill="none" stroke="#E8850C" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>EWMA (λ=0.94)</title></polyline>
+  <circle cx="602" cy="109.8" r="4" fill="#E8850C" stroke="#FBFBF8" stroke-width="2"><title>EWMA (λ=0.94): 29%</title></circle>
+  <polyline points="64,208.7 65.1,207.5 66.2,207.4 67.2,208.2 68.3,209.9 70.5,213.2 71.5,206.3 72.6,207.2 74.8,203.2 75.9,205.6 76.9,203.5 78,205.9 79.1,196.8 81.3,201.7 82.3,203.9 83.4,205.3 84.5,207.6 86.6,211.4 87.7,213 88.8,213.5 89.9,214.1 92,212.4 93.1,213.9 94.2,195 96.3,200.7 97.4,202.7 98.5,202.2 99.6,204.5 101.7,208.5 102.8,203.6 103.9,202.2 105,202.7 107.1,202.3 108.2,197 109.3,185.9 110.4,187 112.5,190.5 113.6,193.7 114.7,196.2 115.8,199.1 117.9,203.3 119,205 120.1,205.7 121.1,207.9 122.2,209.9 124.4,211.9 125.5,212.5 126.5,213.7 127.6,207 129.8,207.5 130.8,207.6 131.9,193.8 133,196.6 135.2,202 136.2,203.3 137.3,205.5 139.5,205.8 140.5,203.8 141.6,203.7 142.7,204.9 144.9,206.5 145.9,208.2 147,210.2 148.1,210.9 150.3,211.7 151.3,201.9 152.4,204.2 153.5,203.3 155.6,198.8 156.7,201.4 157.8,200.2 158.9,201.6 160,204 162.1,208 163.2,209.9 164.3,211.3 165.3,213 167.5,214.1 168.6,215.4 169.7,214.8 171.8,208.8 172.9,210 174,210.4 175.1,210.4 176.1,203.4 178.3,204.2 179.4,200.4 180.4,201.4 182.6,203.5 183.7,200.7 184.8,203.4 185.8,203.8 188,196.1 189.1,198.3 190.1,197.8 191.2,200.4 192.3,202.6 194.5,201.9 195.5,203.7 196.6,198.2 198.8,200.4 199.8,195.4 200.9,197.4 202,176.5 203.1,178.9 205.2,170.2 206.3,173.9 207.4,136.7 208.5,142 210.6,154.9 211.7,157.9 212.8,163.5 214.9,89.9 216,100.2 217.1,108.4 218.2,117.3 220.3,127.6 221.4,113.6 222.5,115.4 223.6,116.4 225.7,125.2 226.8,124.1 227.9,130.9 229,138.2 230,143.4 232.2,154.1 233.3,158.8 234.3,155.7 235.4,153.8 237.6,163.9 238.7,164.6 239.7,168.3 241.9,175.2 243,179.7 244.1,165.7 245.1,166.9 246.2,156.7 248.4,160 249.4,164.9 250.5,170.2 252.7,176.7 253.8,169 254.8,153.5 255.9,151.1 258.1,128.7 259.1,136 260.2,143.1 261.3,149.6 263.5,135.6 264.5,142.5 265.6,148.6 266.7,155 267.8,160.1 269.9,164.4 271,164.9 272.1,157.7 273.2,160.1 275.3,170 276.4,174.9 277.5,177.6 278.6,169.9 280.7,173.3 281.8,177.9 282.9,182.2 285,184.2 286.1,183.7 287.2,187.6 288.3,186.1 290.4,190 291.5,188.5 292.6,191.5 293.6,192.6 295.8,198.7 296.9,200.5 298,201.2 299,202.7 300.1,205.1 302.3,204.9 303.4,206.5 304.4,204.4 305.5,206.7 307.7,206.9 308.7,207.6 309.8,209.7 312,210.5 313.1,202.9 314.1,204 315.2,201.5 317.4,202.8 318.4,205.2 319.5,205.9 320.6,204 321.7,201.8 323.8,193.6 324.9,193.4 326,192.8 328.1,195.7 329.2,198.4 330.3,200.8 331.4,193.5 333.5,196.4 334.6,195.1 335.7,187 336.8,190.6 338.9,180.6 340,181.6 341.1,171.3 343.2,179.3 344.3,179.6 345.4,180.6 346.5,176.8 348.6,183.8 349.7,185.7 350.8,186.1 351.9,186.1 352.9,188.8 355.1,187.6 356.2,188.6 357.3,190 358.3,188.6 360.5,194.5 361.6,197.7 362.6,200.4 363.7,198.3 365.9,202.3 367,204 368,206.4 370.2,193.5 371.3,196.7 372.4,194.2 373.4,194.9 374.5,197.2 376.7,202.5 377.7,205 378.8,204.8 381,205.6 382.1,202.9 383.1,199.6 384.2,199.9 386.4,198.5 387.4,192.9 388.5,196.1 389.6,193.4 390.7,190.2 392.8,194.4 393.9,197.5 395,197.4 397.2,197.1 398.2,184.4 399.3,179.8 400.4,184.1 402.5,189.7 403.6,183 404.7,186.9 405.8,187.2 407.9,194.1 409,194.7 410.1,197.7 411.2,198.2 412.2,199.8 414.4,204.9 415.5,206.4 416.6,208.4 418.7,207.6 419.8,209.5 420.9,210.6 421.9,212.2 424.1,214.3 425.2,212.7 426.3,213.4 427.3,214.7 429.5,213.7 430.6,208.1 431.7,209.3 432.7,209.9 433.8,208.2 436,211 437,211.4 438.1,198.2 439.2,200.7 441.4,202.4 442.4,200.3 443.5,202.4 444.6,198.5 446.7,201.5 447.8,204 448.9,206.2 450,207.2 452.1,199.5 453.2,200.7 454.3,202.4 455.4,191.6 457.5,191.8 458.6,194 459.7,195.7 460.8,198.6 462.9,203.5 464,204.8 465.1,202.7 467.2,190.6 468.3,194 469.4,196.9 470.5,199.1 472.6,202.5 473.7,204.6 474.8,204.9 475.9,195.5 476.9,198.5 479.1,199.9 480.2,199.2 481.2,201.1 483.4,201.2 484.5,203.8 485.6,203.2 486.6,205.2 487.7,200.5 489.9,203.9 490.9,206.1 492,208.3 493.1,208.1 495.3,211.7 496.3,213.1 497.4,214.3 498.5,213.2 500.7,215.2 501.7,215.7 502.8,213.5 505,216.1 506,217 507.1,217.6 508.2,218.7 509.3,216.9 511.4,208 512.5,209.8 513.6,211.6 514.7,212.3 516.8,215.2 517.9,211.8 519,183.5 520.1,187.4 522.2,183.2 523.3,185 524.4,188.2 526.5,174.3 527.6,178.7 528.7,180.5 529.8,179.6 531.9,186.4 533,183.9 534.1,187.8 535.2,185.6 536.2,176.9 538.4,176.1 539.5,135 540.5,126.1 542.7,137.8 543.8,135.4 544.9,141.1 545.9,143.4 547,142.9 549.2,153.9 550.2,143 551.3,144.8 553.5,156.9 554.6,162.4 555.6,167.8 556.7,172.9 557.8,177.5 560,177.3 561,179.4 562.1,173.5 563.2,137.6 565.3,126.8 566.4,133.2 567.5,139.9 569.7,149.8 570.7,155.8 571.8,161 572.9,166.6 574,171.2 576.1,126.9 577.2,133.1 578.3,133.3 579.4,128.7 581.5,139.8 582.6,145.2 583.7,149.8 585.8,161.7 586.9,144.4 588,150.6 589.1,155.4 591.2,165.8 592.3,73.6 593.4,67 594.5,78.4 595.5,87.1 597.7,88.5 598.8,98.8 599.8,106.7 602,114.4" fill="none" stroke="#3A56C5" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>fitted GARCH(1,1)</title></polyline>
+  <circle cx="602" cy="114.4" r="4" fill="#3A56C5" stroke="#FBFBF8" stroke-width="2"><title>fitted GARCH(1,1): 28%</title></circle>
+  <text x="614" y="113.8" font-size="11" fill="#1F2C38">EWMA: 29%</text>
+  <line x1="607" y1="114.4" x2="614" y2="119.8" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="614" y="127.8" font-size="11" fill="#1F2C38">GARCH: 28%</text>
+  <line x1="607" y1="118.2" x2="614" y2="133.8" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="614" y="141.8" font-size="11" fill="#1F2C38">true σ: 28%</text>
+</svg>
+<!-- /chart:vol_paths -->
+<figcaption>fig 5.5.6 — tracking the true conditional volatility: EWMA vs a fitted GARCH(1,1)</figcaption>
+</figure>
+
+<p>The gap is starkest in a genuine forecast. GARCH's own multi-step forecast decays geometrically toward its long-run level as the horizon grows; EWMA's, because reaction and memory sum to exactly 1, is <em>flat</em> at today's estimate for every horizon — it has no long-run level to revert to. From the same day, GARCH's <span data-lab="forecast_horizon_days" data-fmt=",">60</span>-trading-day-ahead forecast moves from <span data-lab="forecast_garch_1d" data-fmt=".1%">27.2%</span> toward the true long-run volatility of <span data-lab="longrun_vol_true" data-fmt=".1%">15.9%</span>, reaching <span data-lab="forecast_garch_60d" data-fmt=".1%">21.1%</span> — <span data-lab="forecast_gap_garch_pp" data-fmt=".1f">5.2</span> percentage points still to go — while EWMA's forecast sits frozen at <span data-lab="forecast_ewma_flat" data-fmt=".1%">29.1%</span>, <span data-lab="forecast_gap_ewma_pp" data-fmt=".1f">13.2</span> points away (fig 5.5.7). Persistence this high means even a correctly specified GARCH model reverts slowly — but it moves in a direction EWMA structurally cannot. This is not a subtle difference in practice: a risk desk that reports a flat 30-day volatility forecast every single day, whatever just happened, is not forecasting — it is relabelling today's estimate and hoping nobody asks what "30-day" was supposed to mean.</p>
+
+<figure class="diagram chart">
+<!-- chart:forecast_horizon -->
+<svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="60-trading-day-ahead volatility forecast from the same day">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">60-TRADING-DAY-AHEAD VOLATILITY FORECAST FROM THE SAME DAY</text>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#E8850C" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">EWMA forecast (flat)</text>
+  <line x1="198.0" y1="32" x2="214.0" y2="32" stroke="#3A56C5" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="220.0" y="36" font-size="11" fill="#4A5A68">GARCH(1,1) forecast</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="268" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">15%</text>
+  <line x1="64" y1="193.3" x2="602" y2="193.3" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="197.3" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">20%</text>
+  <line x1="64" y1="122.7" x2="602" y2="122.7" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="126.7" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">25%</text>
+  <line x1="64" y1="52" x2="602" y2="52" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="56" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">30%</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#C9CFC6" stroke-width="1"/>
+  <line x1="169.8" y1="264" x2="169.8" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="169.8" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">0.05</text>
+  <line x1="284.7" y1="264" x2="284.7" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="284.7" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">0.1</text>
+  <line x1="399.6" y1="264" x2="399.6" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="399.6" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">0.15</text>
+  <line x1="514.5" y1="264" x2="514.5" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="514.5" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">0.2</text>
+  <line x1="64" y1="251.6" x2="602" y2="251.6" stroke="#4A5A68" stroke-width="1"/>
+  <text x="68" y="246.6" font-size="10.5" fill="#4A5A68">true long-run vol</text>
+  <polyline points="64,64.9 73.1,64.9 82.2,64.9 91.4,64.9 100.5,64.9 109.6,64.9 118.7,64.9 127.8,64.9 136.9,64.9 146.1,64.9 155.2,64.9 164.3,64.9 173.4,64.9 182.5,64.9 191.7,64.9 200.8,64.9 209.9,64.9 219,64.9 228.1,64.9 237.3,64.9 246.4,64.9 255.5,64.9 264.6,64.9 273.7,64.9 282.8,64.9 292,64.9 301.1,64.9 310.2,64.9 319.3,64.9 328.4,64.9 337.6,64.9 346.7,64.9 355.8,64.9 364.9,64.9 374,64.9 383.2,64.9 392.3,64.9 401.4,64.9 410.5,64.9 419.6,64.9 428.7,64.9 437.9,64.9 447,64.9 456.1,64.9 465.2,64.9 474.3,64.9 483.5,64.9 492.6,64.9 501.7,64.9 510.8,64.9 519.9,64.9 529.1,64.9 538.2,64.9 547.3,64.9 556.4,64.9 565.5,64.9 574.6,64.9 583.8,64.9 592.9,64.9 602,64.9" fill="none" stroke="#E8850C" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>EWMA forecast (flat)</title></polyline>
+  <circle cx="602" cy="64.9" r="4" fill="#E8850C" stroke="#FBFBF8" stroke-width="2"><title>EWMA forecast (flat): 29%</title></circle>
+  <polyline points="64,91.7 73.1,93.9 82.2,96 91.4,98.1 100.5,100.1 109.6,102.1 118.7,104.1 127.8,106.1 136.9,108 146.1,110 155.2,111.8 164.3,113.7 173.4,115.5 182.5,117.4 191.7,119.1 200.8,120.9 209.9,122.6 219,124.4 228.1,126.1 237.3,127.7 246.4,129.4 255.5,131 264.6,132.6 273.7,134.2 282.8,135.7 292,137.2 301.1,138.8 310.2,140.2 319.3,141.7 328.4,143.1 337.6,144.6 346.7,146 355.8,147.4 364.9,148.7 374,150.1 383.2,151.4 392.3,152.7 401.4,154 410.5,155.2 419.6,156.5 428.7,157.7 437.9,158.9 447,160.1 456.1,161.3 465.2,162.4 474.3,163.6 483.5,164.7 492.6,165.8 501.7,166.9 510.8,167.9 519.9,169 529.1,170 538.2,171.1 547.3,172.1 556.4,173.1 565.5,174 574.6,175 583.8,175.9 592.9,176.9 602,177.8" fill="none" stroke="#3A56C5" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>GARCH(1,1) forecast</title></polyline>
+  <circle cx="602" cy="177.8" r="4" fill="#3A56C5" stroke="#FBFBF8" stroke-width="2"><title>GARCH(1,1) forecast: 21%</title></circle>
+  <text x="614" y="68.9" font-size="11" fill="#1F2C38">EWMA: 29%</text>
+  <text x="614" y="181.8" font-size="11" fill="#1F2C38">GARCH: 21%</text>
+</svg>
+<!-- /chart:forecast_horizon -->
+<figcaption>fig 5.5.7 — a genuine multi-step forecast (GARCH) vs one that cannot move (EWMA)</figcaption>
+</figure>
+
+<p>Both models still treat a positive and a negative shock of the same size identically. <span class="xref soon" data-xref="5.1" data-auto="" title="Coming soon">Session 5.1 — Stylized Facts of Returns</span> calls the real-world asymmetry — bad news raising volatility by more than equally-sized good news — the <span class="term soon" data-term="leverage effect" title="Defined in Session 5.1 (coming soon)">leverage effect</span>; fig 5.5.8 is the decision it implies.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 200" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <rect x="260" y="14" width="200" height="36" rx="8" fill="#fff" stroke="#1F2C38" stroke-width="1.5"/>
+  <text x="360" y="37" font-size="10.5" font-weight="600" text-anchor="middle" fill="#1F2C38">A GARCH(1,1) IS FITTED</text>
+  <path d="M360 50 V70" stroke="#1F2C38" stroke-width="1.7" marker-end="url(#s6a)"/>
+  <polygon points="360,74 458,112 360,150 262,112" fill="#FFF6C9" stroke="#B99B22" stroke-width="1.5"/>
+  <text x="360" y="106" font-size="10" font-weight="600" text-anchor="middle" fill="#8A6D00">DOES A NEGATIVE SHOCK</text>
+  <text x="360" y="120" font-size="10" font-weight="600" text-anchor="middle" fill="#8A6D00">MOVE σ² MORE THAN A</text>
+  <text x="360" y="134" font-size="10" font-weight="600" text-anchor="middle" fill="#8A6D00">POSITIVE ONE THIS SIZE?</text>
+  <path d="M458 112 H516" stroke="#D64B2A" stroke-width="1.7" marker-end="url(#s6y)"/>
+  <text x="486" y="104" font-size="10" text-anchor="middle" fill="#D64B2A" font-weight="600">yes</text>
+  <rect x="520" y="86" width="176" height="52" rx="9" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="608" y="108" font-size="11" font-weight="600" text-anchor="middle" fill="#D64B2A">GJR-GARCH</text>
+  <text x="608" y="125" font-size="9.5" text-anchor="middle" fill="#4A5A68">add γ (§5.5.6)</text>
+  <path d="M262 112 H204" stroke="#1F7A55" stroke-width="1.7" marker-end="url(#s6n)"/>
+  <text x="233" y="104" font-size="10" text-anchor="middle" fill="#1F7A55" font-weight="600">no</text>
+  <rect x="24" y="86" width="176" height="52" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="112" y="108" font-size="11" font-weight="600" text-anchor="middle" fill="#1F7A55">PLAIN GARCH</text>
+  <text x="112" y="125" font-size="9.5" text-anchor="middle" fill="#4A5A68">the simpler model is enough</text>
+  <text x="360" y="186" font-size="11.5" text-anchor="middle" fill="#4A5A68" font-style="italic">Test it — don't assume it; §5.5.6 shows the test.</text>
+  <defs>
+    <marker id="s6a" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F2C38"/></marker>
+    <marker id="s6y" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#D64B2A"/></marker>
+    <marker id="s6n" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 z" fill="#1F7A55"/></marker>
+  </defs>
+</svg>
+<figcaption>fig 5.5.8 — how to choose between GARCH and GJR-GARCH</figcaption>
+</figure>
+
+<p>The <strong>GJR-GARCH model</strong> (Glosten, Jagannathan &amp; Runkle, 1993) answers it with one extra parameter γ, switched on only when yesterday's shock was negative — let <math><semantics><mrow><msub><mi>d</mi><mrow><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub><mo>=</mo><mn>1</mn></mrow><annotation encoding="application/x-tex">d_{t-1}=1</annotation></semantics></math> when <math><semantics><mrow><msub><mi>ε</mi><mrow><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub><mo>&lt;</mo><mn>0</mn></mrow><annotation encoding="application/x-tex">\varepsilon_{t-1}\lt0</annotation></semantics></math>, else 0:</p>
+<div class="eq"><math display="block" class="tml-display" style="display:block math;"><semantics><mrow><msubsup><mi>σ</mi><mi>t</mi><mn>2</mn></msubsup><mo>=</mo><mi>ω</mi><mo>+</mo><mrow><mo fence="true" form="prefix" stretchy="false">(</mo><mi>α</mi><mo>+</mo><mi>γ</mi><mspace width="0.1667em"></mspace><msub><mi>d</mi><mrow><mi>t</mi><mo>−</mo><mn>1</mn></mrow></msub><mo fence="true" form="postfix" stretchy="false">)</mo></mrow><mspace width="0.1667em"></mspace><msubsup><mi>ε</mi><mrow><mi>t</mi><mo>−</mo><mn>1</mn></mrow><mn>2</mn></msubsup><mo>+</mo><mi>β</mi><mspace width="0.1667em"></mspace><msubsup><mi>σ</mi><mrow><mi>t</mi><mo>−</mo><mn>1</mn></mrow><mn>2</mn></msubsup></mrow><annotation encoding="application/x-tex">\sigma_t^2 = \omega + (\alpha + \gamma\,d_{t-1})\,\varepsilon_{t-1}^2 + \beta\,\sigma_{t-1}^2</annotation></semantics></math></div>
+<p>Simulating a process with true γ = <span data-lab="gjr_gamma_true" data-fmt=".2f">0.09</span> — so a bad-news shock moves next-day variance by α+γ = <span data-lab="gjr_alpha_plus_gamma_true" data-fmt=".2f">0.12</span> for every good-news shock's α = <span data-lab="gjr_alpha_true" data-fmt=".2f">0.03</span> — and fitting GJR-GARCH the same way recovers γ = <span data-lab="gjr_gamma_hat" data-fmt=".3f">0.077</span>, <span data-lab="gjr_gamma_z" data-fmt=".1f">5.7</span> standard errors from zero: detected reliably, not a coin flip. Fit the plain, symmetric GARCH(1,1) to the very same asymmetric data instead, and its single α lands at <span data-lab="gjr_alpha_wrong_fit" data-fmt=".3f">0.065</span> — close to the theoretical average reaction α+γ/2 = <span data-lab="gjr_alpha_wrong_theory" data-fmt=".3f">0.075</span> — a compromise number that hides the asymmetry rather than measuring it (fig 5.5.9, Table 3).</p>
+
+<figure class="diagram chart">
+<!-- chart:news_response -->
+<svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif" role="img" aria-label="Next-day volatility implied by a shock of a given size (in long-run daily σ)">
+  <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">NEXT-DAY VOLATILITY IMPLIED BY A SHOCK OF A GIVEN SIZE (IN LONG-RUN DAILY σ)</text>
+  <line x1="26" y1="32" x2="42" y2="32" stroke="#4A5A68" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="48" y="36" font-size="11" fill="#4A5A68">true model</text>
+  <line x1="134.0" y1="32" x2="150.0" y2="32" stroke="#D64B2A" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="156.0" y="36" font-size="11" fill="#4A5A68">symmetric GARCH fit</text>
+  <line x1="299.6" y1="32" x2="315.6" y2="32" stroke="#3A56C5" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="321.6" y="36" font-size="11" fill="#4A5A68">GJR-GARCH fit</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="268" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">15.0%</text>
+  <line x1="64" y1="211" x2="602" y2="211" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="215" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">20.0%</text>
+  <line x1="64" y1="158" x2="602" y2="158" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="162" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">25.0%</text>
+  <line x1="64" y1="105" x2="602" y2="105" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="109" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">30.0%</text>
+  <line x1="64" y1="52" x2="602" y2="52" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="56" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">35.0%</text>
+  <line x1="64" y1="264" x2="602" y2="264" stroke="#C9CFC6" stroke-width="1"/>
+  <line x1="64" y1="264" x2="64" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="64" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">-4</text>
+  <line x1="198.5" y1="264" x2="198.5" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="198.5" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">-2</text>
+  <line x1="333" y1="264" x2="333" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="333" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">0</text>
+  <line x1="467.5" y1="264" x2="467.5" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="467.5" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">2</text>
+  <line x1="602" y1="264" x2="602" y2="268" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="602" y="282" font-size="11" text-anchor="middle" fill="#4A5A68">4</text>
+  <polyline points="64,95.3 77.5,106.2 90.9,117 104.4,127.5 117.8,137.8 131.2,147.9 144.7,157.6 158.2,167 171.6,176 185,184.6 198.5,192.7 212,200.3 225.4,207.3 238.8,213.7 252.3,219.4 265.8,224.4 279.2,228.5 292.7,231.8 306.1,234.2 319.6,235.6 333,236.1 346.4,236 359.9,235.6 373.4,235 386.8,234.2 400.2,233.1 413.7,231.8 427.2,230.3 440.6,228.5 454.1,226.6 467.5,224.4 480.9,222 494.4,219.4 507.9,216.7 521.3,213.7 534.8,210.6 548.2,207.3 561.7,203.9 575.1,200.3 588.6,196.6 602,192.7" fill="none" stroke="#4A5A68" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"><title>true model</title></polyline>
+  <circle cx="602" cy="192.7" r="4" fill="#4A5A68" stroke="#FBFBF8" stroke-width="2"><title>true model: 21.7%</title></circle>
+  <polyline points="64,160.1 77.5,167.4 90.9,174.6 104.4,181.5 117.8,188.3 131.2,194.8 144.7,201.1 158.2,207.1 171.6,212.8 185,218.2 198.5,223.3 212,228 225.4,232.3 238.8,236.2 252.3,239.6 265.8,242.5 279.2,245 292.7,246.9 306.1,248.3 319.6,249.1 333,249.4 346.4,249.1 359.9,248.3 373.4,246.9 386.8,245 400.2,242.5 413.7,239.6 427.2,236.2 440.6,232.3 454.1,228 467.5,223.3 480.9,218.2 494.4,212.8 507.9,207.1 521.3,201.1 534.8,194.8 548.2,188.3 561.7,181.5 575.1,174.6 588.6,167.4 602,160.1" fill="none" stroke="#D64B2A" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>symmetric GARCH fit</title></polyline>
+  <circle cx="602" cy="160.1" r="4" fill="#D64B2A" stroke="#FBFBF8" stroke-width="2"><title>symmetric GARCH fit: 24.8%</title></circle>
+  <polyline points="64,111.1 77.5,121 90.9,130.6 104.4,140.1 117.8,149.3 131.2,158.2 144.7,166.9 158.2,175.2 171.6,183.2 185,190.8 198.5,197.9 212,204.6 225.4,210.7 238.8,216.2 252.3,221.2 265.8,225.5 279.2,229 292.7,231.9 306.1,233.9 319.6,235.1 333,235.6 346.4,235.5 359.9,235.1 373.4,234.6 386.8,233.9 400.2,232.9 413.7,231.8 427.2,230.5 440.6,228.9 454.1,227.2 467.5,225.3 480.9,223.2 494.4,221 507.9,218.5 521.3,216 534.8,213.2 548.2,210.3 561.7,207.3 575.1,204.1 588.6,200.8 602,197.4" fill="none" stroke="#3A56C5" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><title>GJR-GARCH fit</title></polyline>
+  <circle cx="602" cy="197.4" r="4" fill="#3A56C5" stroke="#FBFBF8" stroke-width="2"><title>GJR-GARCH fit: 21.3%</title></circle>
+  <text x="614" y="164.1" font-size="11" fill="#1F2C38">GARCH: 24.8%</text>
+  <text x="614" y="196.7" font-size="11" fill="#1F2C38">true: 21.7%</text>
+  <line x1="607" y1="197.4" x2="614" y2="202.7" stroke="#C9CFC6" stroke-width="1"/>
+  <text x="614" y="210.7" font-size="11" fill="#1F2C38">GJR: 21.3%</text>
+</svg>
+<!-- /chart:news_response -->
+<figcaption>fig 5.5.9 — next-day volatility implied by a shock of a given size: the symmetric fit misses the kink</figcaption>
+</figure>
+
+<table>
+<thead><tr><th>Parameter</th><th>True</th><th>Fitted</th></tr></thead>
+<tbody>
+<tr><td>GARCH(1,1) α</td><td><span data-lab="garch_alpha_true" data-fmt=".2f">0.08</span></td><td><span data-lab="garch_alpha_hat" data-fmt=".3f">0.102</span></td></tr>
+<tr><td>GARCH(1,1) β</td><td><span data-lab="garch_beta_true" data-fmt=".2f">0.90</span></td><td><span data-lab="garch_beta_hat" data-fmt=".3f">0.879</span></td></tr>
+<tr><td>GJR-GARCH α</td><td><span data-lab="gjr_alpha_true" data-fmt=".2f">0.03</span></td><td><span data-lab="gjr_alpha_hat" data-fmt=".3f">0.026</span></td></tr>
+<tr><td>GJR-GARCH γ</td><td><span data-lab="gjr_gamma_true" data-fmt=".2f">0.09</span></td><td><span data-lab="gjr_gamma_hat" data-fmt=".3f">0.077</span></td></tr>
+<tr><td>GJR-GARCH β</td><td><span data-lab="gjr_beta_true" data-fmt=".2f">0.88</span></td><td><span data-lab="gjr_beta_hat" data-fmt=".3f">0.887</span></td></tr>
+</tbody>
+</table>
+</section>
+
+<!-- ============ §5.5.7 — where people go wrong ============ -->
+<section id="s7">
+<h2><span class="no">5.5.7</span> Where people go wrong</h2>
+<p class="lede">Four mistakes this session's numbers were built to catch.</p>
+
+<p><strong>Reading only the close when the bar already has a high and a low.</strong> Every venue already timestamps open, high and low for free; ignoring them and computing a plain close-to-close standard deviation throws away the efficiency gain fig 5.5.3 measures, for no saving in data or effort (fig 5.5.10). The only honest reason to prefer close-to-close is genuinely having closes but no intraday range — end-of-day-only data — not habit.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 220" xmlns="http://www.w3.org/2000/svg" style="font-family:'IBM Plex Sans',sans-serif">
+  <text x="26" y="20" font-size="11" font-weight="600" fill="#1F2C38">SAME BAR, TWO USES OF IT</text>
+  <rect x="26" y="32" width="326" height="176" rx="9" fill="#FCEEE9" stroke="#D64B2A" stroke-width="1.5"/>
+  <text x="189" y="54" font-size="11" font-weight="700" text-anchor="middle" fill="#D64B2A">CLOSE-TO-CLOSE ONLY</text>
+  <rect x="46" y="66" width="286" height="24" rx="5" fill="#fff" stroke="#F2CDBF"/>
+  <text x="58" y="82" font-size="9.5" fill="#1F2C38">reads one price a day</text>
+  <rect x="46" y="96" width="286" height="24" rx="5" fill="#fff" stroke="#F2CDBF"/>
+  <text x="58" y="112" font-size="9.5" fill="#1F2C38">same data cost as OHLC</text>
+  <text x="189" y="148" font-size="9.5" text-anchor="middle" fill="#D64B2A" font-weight="600">Needs far more days</text>
+  <text x="189" y="166" font-size="9" text-anchor="middle" fill="#4A5A68">for the same precision (fig 5.5.3).</text>
+  <rect x="368" y="32" width="326" height="176" rx="9" fill="#E9F5EF" stroke="#1F7A55" stroke-width="1.5"/>
+  <text x="531" y="54" font-size="11" font-weight="700" text-anchor="middle" fill="#1F7A55">USE THE WHOLE BAR</text>
+  <rect x="388" y="66" width="286" height="24" rx="5" fill="#fff" stroke="#BFE0CF"/>
+  <text x="400" y="82" font-size="9.5" fill="#1F2C38">O, H, L, C — already there</text>
+  <rect x="388" y="96" width="286" height="24" rx="5" fill="#fff" stroke="#BFE0CF"/>
+  <text x="400" y="112" font-size="9.5" fill="#1F2C38">Parkinson / GK / Yang-Zhang</text>
+  <text x="531" y="148" font-size="9.5" text-anchor="middle" fill="#1F7A55" font-weight="600">Same data, a fraction</text>
+  <text x="531" y="166" font-size="9" text-anchor="middle" fill="#4A5A68">of the estimation noise.</text>
+</svg>
+<figcaption>fig 5.5.10 — the naive and disciplined uses of a bar you already store</figcaption>
+</figure>
+
+<p><strong>Getting the annualisation exponent wrong.</strong> <a class="xref" href="../unit02-markets-instruments/session03-returns-pnl-leverage.html" data-xref="2.3" data-auto="">Session 2.3 — Returns, P&amp;L, Compounding &amp; Leverage</a> fixed the rule: variance scales with the number of periods, so volatility — its square root — scales with the square root of the number of periods (the √n rule, distinct from <span class="xref soon" data-xref="14.3" data-style="short" data-auto="" title="Coming soon">Session 14.3</span>'s market-impact "square-root law"). A GARCH or EWMA output like this session's is a <em>daily</em> figure; multiplying a daily σ by 252 instead of √252 overstates annual volatility roughly sixteen-fold — an error invisible until it is checked against an actual annual number.</p>
+
+<p><strong>Quoting IGARCH's flat forecast as if it knew something about a specific future date.</strong> §5.5.6's forecast comparison (fig 5.5.7) is the whole point: an EWMA-based "60-day-ahead volatility forecast" is mathematically identical to today's estimate at every horizon — that is not evidence the desk expects volatility to stay exactly where it is, only that the model cannot say otherwise.</p>
+
+<p><strong>Confusing GARCH's α, β, γ with a factor model's alpha and beta.</strong> A course that reuses Greek letters across units makes this an easy slip; §5.5.6's margin note flags it once. The fix is context: a GARCH table's α, β, γ always describe how variance updates, never a factor loading or a return in excess of a benchmark — if a sentence mixes "alpha" and "volatility" in the same breath, stop and check which α is meant before trusting the conclusion.</p>
+
+<div class="co warn"><span class="co-t">⚠️ Pitfall — "more data means a better volatility estimate"</span>
+<p>None of the four mistakes above are about sample size. A Parkinson estimate computed from a hundred days is still measuring the wrong quantity if the market gapped overnight on every one of them (§5.5.4); more data sharpens a biased estimator's precision without ever fixing its bias. If a volatility number looks suspiciously stable across a market you know gaps often, that stability is itself a symptom, not a reassurance.</p>
+</div>
+</section>
+
+<!-- ============ §5.5.8 — try it ============ -->
+<section id="s8">
+<h2><span class="no">5.5.8</span> Try it</h2>
+<p class="lede">Change one assumption in the lab and watch which estimator breaks.</p>
+
+<div class="co lab"><span class="co-t">🔧 Try it (15 min, in the lab)</span>
+<p>Open the companion lab and find <code>FRAC_INTRADAY = 0.70</code> in §2. Change it to <code>0.50</code> — a market that gaps more, moving half of each day's variance overnight — and re-run from that cell down. Watch the printed <code>gap_park_vol</code> and <code>gap_gk_vol</code>: both should drop further below <code>SIGMA_TRUE</code>, tracking the new, lower <code>SIGMA_INTRADAY</code>, while <code>gap_cc_vol</code> and <code>gap_yz_vol</code> should stay close to 20%. Success looks like: every assertion still passes — the checks are written in terms of the variables you just changed, never hard-coded numbers — and you can say in one sentence why Yang-Zhang barely moved.</p>
+</div>
+</section>
+
+<hr>
+
+<!-- ============ §5.5.9 — close ============ -->
+<section id="s9">
+<h2><span class="no">5.5.9</span> Glossary · Check yourself · Go deeper</h2>
+<div class="gloss" id="glossary">
+<div id="g-realized-volatility"><b>realized volatility</b> — a volatility estimate built directly from prices actually observed over a period (a day's own open, high, low and close), rather than one implied by a fitted model.</div>
+<div id="g-parkinson-estimator"><b>Parkinson estimator</b> — a realized-volatility formula using only a period's high and low, rescaled by 1/(4 ln 2) to be unbiased for a driftless, continuously observed price.</div>
+<div id="g-garman-klass-estimator"><b>Garman-Klass estimator</b> — a realized-volatility formula that adds a period's open-to-close move to the Parkinson range term, for a further gain in precision.</div>
+<div id="g-yang-zhang-estimator"><b>Yang-Zhang estimator</b> — a realized-volatility formula that adds an explicit overnight (close-to-open) variance term, so it stays accurate even when the market gaps between periods.</div>
+<div id="g-ewma-volatility"><b>EWMA volatility</b> — an exponentially weighted moving average of squared returns with one decay parameter λ; RiskMetrics' 1996 convention for a fast, simple volatility forecast.</div>
+<div id="g-garch-model"><b>GARCH model</b> — a fitted model of conditional variance as a constant plus a reaction to the last shock and memory of the last variance, mean-reverting to a long-run level EWMA cannot express.</div>
+<div id="g-gjr-garch-model"><b>GJR-GARCH model</b> — a GARCH model with one extra parameter that lets a negative shock raise next period's variance by more than an equally-sized positive one.</div>
+<div id="g-volatility-forecast"><b>volatility forecast</b> — a statement about a future period's volatility, as opposed to a measurement of a period that already happened; EWMA and GARCH each produce one in a structurally different way.</div>
+</div>
+
+<h3>Check yourself</h3>
+<details class="q"><summary>1. A desk stores full OHLC bars, but a junior analyst computes historical volatility from daily closes only. What is the analyst leaving on the table, and when would close-to-close actually be the right choice?</summary><div>They are giving up several times the estimation precision for free (fig 5.5.3) — the closing price alone throws away the day's own high and low. Close-to-close is the right choice only when there genuinely is no intraday range to use, such as weekly or monthly bars built from period-end prices only.</div></details>
+<details class="q"><summary>2. Two numbers both get described as "today's annualised volatility is 18%": one is a Yang-Zhang estimate from the last 21 trading days, the other is a GARCH(1,1) forecast for tomorrow. Are these the same statement?</summary><div>No. The first measures a period that already happened (backward-looking); the second forecasts one that hasn't (forward-looking). Treating a realized estimate as if it were a forecast, or vice versa, is §5.5.1's key idea and §5.5.7's first cousin of the main pitfall.</div></details>
+<details class="q"><summary>3. Why can EWMA's 60-day-ahead volatility forecast never differ from its 1-day-ahead forecast, no matter which λ you pick?</summary><div>Because EWMA is GARCH with reaction and memory (α+β) pinned to exactly 1 — an integrated GARCH with no long-run level to revert to. Its forecast is flat at today's estimate at every horizon, by construction, not by a modelling choice (§5.5.6, fig 5.5.7).</div></details>
+<details class="q"><summary>4. A fitted GARCH(1,1) reports α = 0.10. A separate factor-model regression on the same asset also reports a coefficient of 0.10. Are these measuring the same thing?</summary><div>No. GARCH's α is how much next-day variance reacts to yesterday's squared shock; a factor model's coefficient is a return sensitivity to a benchmark or a return unexplained by one. The shared Greek letter is a standard, flagged collision (§5.5.6's margin note), not a shared meaning.</div></details>
+<details class="q"><summary>5. Parkinson and Garman-Klass both assume the market never stops trading. A stock you are modelling gaps by 2% at the open most days. Which estimator should you reach for, and why?</summary><div>Yang-Zhang: it adds the overnight close-to-open variance explicitly, so it is not blind to a jump that happens before the bar even opens (§5.5.3–§5.5.4). Parkinson and Garman-Klass would both systematically understate the true volatility.</div></details>
+<details class="q"><summary>6. You fit a plain GARCH(1,1) to an equity index known for a strong leverage effect. Its single α comes out close to the average of the true up-shock and down-shock reactions. What test tells you whether you actually need GJR-GARCH's extra parameter?</summary><div>Fit GJR-GARCH and check how many standard errors γ's own estimate sits from zero (§5.5.6 found about 5.7). If γ is not reliably different from zero, the extra parameter is not earning its added complexity.</div></details>
+
+<div class="co lab"><span class="co-t">🔧 Homework (~1 h before Session 5.6)</span>
+<p>1. In the lab, refit the GARCH(1,1) model with <code>dist="normal"</code> instead of <code>dist="t"</code> and compare the fitted α, β and the RMSE against the true path to this session's Student-t fit — note which parameter moves most, and why a fat-tailed shock distribution matters for a volatility model (<span class="xref soon" data-xref="5.1" data-auto="" title="Coming soon">Session 5.1 — Stylized Facts of Returns</span>).<br>
+2. Read the short section of RiskMetrics (1996) that sets λ = 0.94 for daily data, and note the one sentence that justifies λ = 0.97 for monthly data instead.<br>
+3. Skim Yang &amp; Zhang (2000)'s abstract and write, in one sentence, which specific assumption of Parkinson's and Garman-Klass's it relaxes — <span class="xref soon" data-xref="5.6" data-auto="" title="Coming soon">Session 5.6 — Cointegration &amp; Mean Reversion</span> assumes you can name it.</p>
+</div>
+
+<h3>📚 Go deeper</h3>
+<ol class="refs">
+<li>Engle, R. F. (1982). "Autoregressive Conditional Heteroscedasticity with Estimates of the Variance of United Kingdom Inflation." <em>Econometrica</em> 50(4), 987–1007. <span class="rid">doi:10.2307/1912773</span></li>
+<li>Bollerslev, T. (1986). "Generalized Autoregressive Conditional Heteroskedasticity." <em>Journal of Econometrics</em> 31(3), 307–327. <span class="rid">doi:10.1016/0304-4076(86)90063-1</span></li>
+<li>Glosten, L. R., Jagannathan, R. &amp; Runkle, D. E. (1993). "On the Relation between the Expected Value and the Volatility of the Nominal Excess Return on Stocks." <em>Journal of Finance</em> 48(5), 1779–1801. <span class="rid">doi:10.1111/j.1540-6261.1993.tb05128.x</span></li>
+<li>Sheppard, K. et al. (2025). <em>arch: Autoregressive Conditional Heteroskedasticity (ARCH) models in Python</em>, v8.0.0. <span class="rid">doi:10.5281/zenodo.17404619</span></li>
+</ol>
+
+<h3>Sources for the numbers</h3>
+<ol class="refs">
+<li>Parkinson, M. (1980). "The Extreme Value Method for Estimating the Variance of the Rate of Return." <em>Journal of Business</em> 53(1), 61–65. <span class="rid">doi:10.1086/296071</span></li>
+<li>Garman, M. B. &amp; Klass, M. J. (1980). "On the Estimation of Security Price Volatilities from Historical Data." <em>Journal of Business</em> 53(1), 67–78. <span class="rid">doi:10.1086/296072</span></li>
+<li>Rogers, L. C. G. &amp; Satchell, S. E. (1991). "Estimating Variance From High, Low and Closing Prices." <em>Annals of Applied Probability</em> 1(4), 504–512. <span class="rid">doi:10.1214/aoap/1177005835</span></li>
+<li>Yang, D. &amp; Zhang, Q. (2000). "Drift-Independent Volatility Estimation Based on High, Low, Open, and Close Prices." <em>Journal of Business</em> 73(3), 477–491. <span class="rid">doi:10.1086/209650</span></li>
+<li>J.P. Morgan/Reuters (1996). <em>RiskMetrics — Technical Document</em> (4th ed.). New York. <span class="rid">https://www.msci.com/documents/10199/5915b101-4206-4ba0-aee2-3449d5c7e95a</span></li>
+</ol>
+</section>
+
+<!-- nav:foot -->
+<div class="foot">
+<span class="soon" title="Coming soon">← Prev: 5.4 · Stationarity &amp; ARMA</span>
+<span class="soon" title="Coming soon">Next: 5.6 · Cointegration →</span>
+</div>
+<p class="legal">Educational material only — not investment, legal or tax advice. Backtests and simulations are hypothetical. <a href="../start-here.html#disclaimer">Disclaimer</a> · Text CC BY 4.0 · Code MIT.</p>
+<!-- /nav:foot -->
+</main>
+</div></body></html>
