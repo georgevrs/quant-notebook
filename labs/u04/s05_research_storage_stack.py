@@ -161,7 +161,7 @@ mono_parquet_path = TMP / "panel_single_file.parquet"
 partitioned_dir = TMP / "panel_partitioned"
 
 t0 = time.perf_counter()
-panel.to_csv(csv_path, index=False)
+panel.to_csv(csv_path, index=False, lineterminator="\n")  # LF only: deterministic byte count cross-platform
 t_write_csv = time.perf_counter() - t0
 csv_bytes = csv_path.stat().st_size
 

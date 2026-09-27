@@ -36,6 +36,24 @@ NONDETERMINISTIC_KEYS = (
     "_scs_dvol_bp", "_scs_dw", "_scs_minw",
     # Session 4.5's three write-timing keys (seconds, no "_ms" suffix): see the note below.
     "t_write_csv", "t_write_mono_parquet", "t_write_partitioned_parquet",
+    # A CSV of float columns' exact byte count is sensitive to the last digit of each float's text
+    # representation, which inherits the same cross-platform/BLAS-level numeric noise that REL_TOL
+    # already tolerates in the underlying data -- just amplified, because a one-bit-different float
+    # can print with a different number of characters. Confirmed on Sessions 4.1/4.5/4.6: fixing the
+    # dominant cause (to_csv defaulted to the platform line ending, CRLF on Windows vs LF on Linux --
+    # now pinned to "\n" in all three labs) took the gap from ~1.4% to ~0.001%, but didn't zero it.
+    # Exact key names, unique to these three sessions (checked against every other lab's keys).
+    "compression_ratio", "csv_bytes", "csv_mb",
+    # GARCH/GJR-GARCH maximum-likelihood fits (via the `arch` package's scipy-based optimizer) are
+    # far more BLAS-sensitive than closed-form arithmetic -- the optimizer's exact convergence path,
+    # not just float summation order, differs slightly by platform. Observed exceeding the default
+    # 1e-6 relative tolerance by up to ~6x on Linux CI vs the Windows-committed value. Exact key
+    # names from Sessions 5.1 and 5.5 (a broader "garch"/"_hat"/"fit_" substring match would wrongly
+    # exempt dozens of unrelated, genuinely-reproducible closed-form values across many other
+    # sessions -- checked and rejected). Each session's own live assert on the same fitted quantity
+    # (e.g. `fit_asym.pvalues["gamma[1]"] < 0.01`, `gamma_z > N_SE`) still guards a real regression.
+    "fit_asym_alpha", "fit_sym_gamma", "fit_sym_gamma_p",
+    "forecast_gap_garch_pp", "forecast_garch_60d", "garch_alpha_hat", "garch_rmse_pp", "gjr_alpha_hat",
 )
 
 # Wall-clock timing benchmarks (Session 4.5's storage-stack comparison: naive CSV vs Parquet vs

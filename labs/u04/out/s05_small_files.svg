@@ -2,17 +2,21 @@
   <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">READING THE IDENTICAL SLICE AS ONE FILE VS ONE FILE PER SYMBOL</text>
   <line x1="64" y1="216" x2="690" y2="216" stroke="#E4E8EC" stroke-width="1"/>
   <text x="56" y="220" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.0 ms</text>
-  <line x1="64" y1="158.7" x2="690" y2="158.7" stroke="#E4E8EC" stroke-width="1"/>
-  <text x="56" y="162.7" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">50.0 ms</text>
-  <line x1="64" y1="101.3" x2="690" y2="101.3" stroke="#E4E8EC" stroke-width="1"/>
-  <text x="56" y="105.3" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">100.0 ms</text>
+  <line x1="64" y1="181.6" x2="690" y2="181.6" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="185.6" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">25.0 ms</text>
+  <line x1="64" y1="147.2" x2="690" y2="147.2" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="151.2" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">50.0 ms</text>
+  <line x1="64" y1="112.8" x2="690" y2="112.8" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="116.8" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">75.0 ms</text>
+  <line x1="64" y1="78.4" x2="690" y2="78.4" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="82.4" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">100.0 ms</text>
   <line x1="64" y1="44" x2="690" y2="44" stroke="#E4E8EC" stroke-width="1"/>
-  <text x="56" y="48" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">150.0 ms</text>
+  <text x="56" y="48" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">125.0 ms</text>
   <line x1="64" y1="216" x2="690" y2="216" stroke="#C9CFC6" stroke-width="1"/>
-  <path d="M208.5,216 V212.7 Q208.5,209.4 211.8,209.4 H229.2 Q232.5,209.4 232.5,212.7 V216 Z" fill="#3A56C5"><title>1 file: 5.7 ms</title></path>
-  <text x="220.5" y="202.4" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">5.7 ms</text>
+  <path d="M208.5,216 V212.2 Q208.5,208.5 212.3,208.5 H228.7 Q232.5,208.5 232.5,212.2 V216 Z" fill="#3A56C5"><title>1 file: 5.5 ms</title></path>
+  <text x="220.5" y="201.5" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">5.5 ms</text>
   <text x="220.5" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">1 file</text>
-  <path d="M521.5,216 V92.5 Q521.5,88.5 525.5,88.5 H541.5 Q545.5,88.5 545.5,92.5 V216 Z" fill="#D64B2A"><title>150 tiny files: 111.2 ms</title></path>
-  <text x="533.5" y="81.5" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">111.2 ms</text>
+  <path d="M521.5,216 V89.5 Q521.5,85.5 525.5,85.5 H541.5 Q545.5,85.5 545.5,89.5 V216 Z" fill="#D64B2A"><title>150 tiny files: 94.9 ms</title></path>
+  <text x="533.5" y="78.5" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">94.9 ms</text>
   <text x="533.5" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">150 tiny files</text>
 </svg>

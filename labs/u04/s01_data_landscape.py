@@ -137,7 +137,7 @@ with tempfile.TemporaryDirectory() as tmp_str:
     bars_pq_path = tmp / "bars.parquet"
     bars.to_parquet(bars_pq_path, engine="pyarrow", index=False)
     ticks_csv_path = tmp / "ticks.csv"
-    ticks.to_csv(ticks_csv_path, index=False)
+    ticks.to_csv(ticks_csv_path, index=False, lineterminator="\n")  # LF only: deterministic byte count cross-platform
 
     ticks_pq_bytes = ticks_pq_path.stat().st_size
     quotes_pq_bytes = quotes_pq_path.stat().st_size

@@ -13,8 +13,8 @@
   <line x1="64" y1="44" x2="690" y2="44" stroke="#E4E8EC" stroke-width="1"/>
   <text x="56" y="48" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">250 MB</text>
   <line x1="64" y1="216" x2="690" y2="216" stroke="#C9CFC6" stroke-width="1"/>
-  <path d="M156.3,216 V77.8 Q156.3,73.8 160.3,73.8 H176.3 Q180.3,73.8 180.3,77.8 V216 Z" fill="#D64B2A"><title>CSV: 207 MB</title></path>
-  <text x="168.3" y="66.8" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">207 MB</text>
+  <path d="M156.3,216 V79.1 Q156.3,75.1 160.3,75.1 H176.3 Q180.3,75.1 180.3,79.1 V216 Z" fill="#D64B2A"><title>CSV: 205 MB</title></path>
+  <text x="168.3" y="68.1" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">205 MB</text>
   <text x="168.3" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">CSV</text>
   <path d="M365,216 V168 Q365,164 369,164 H385 Q389,164 389,168 V216 Z" fill="#E8850C"><title>Parquet (1 file): 76 MB</title></path>
   <text x="377" y="157" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">76 MB</text>

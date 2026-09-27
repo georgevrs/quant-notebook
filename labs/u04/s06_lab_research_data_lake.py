@@ -382,7 +382,7 @@ assert abs(mean_pl - mean_pd) < 1e-6, "polars (lazy, over Parquet) and pandas (i
 
 # Parquet's columnar, dictionary/RLE-encoded layout compresses this table far below an equivalent CSV.
 csv_path = LAKE_DIR / "curated_full.csv"
-curated.to_csv(csv_path, index=False)
+curated.to_csv(csv_path, index=False, lineterminator="\n")  # LF only: deterministic byte count cross-platform
 parquet_bytes = sum(p.stat().st_size for p in DATASET_DIR.rglob("*.parquet"))
 csv_bytes = csv_path.stat().st_size
 lab.record("parquet_bytes", parquet_bytes)

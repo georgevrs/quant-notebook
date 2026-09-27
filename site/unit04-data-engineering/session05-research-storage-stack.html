@@ -145,9 +145,9 @@
 <table>
 <thead><tr><th>Format</th><th>Size on disk</th><th>Write time</th></tr></thead>
 <tbody>
-<tr><td>CSV, one file</td><td><span data-lab="csv_mb" data-fmt=",.0f">207</span> MB</td><td><span data-lab="t_write_csv" data-fmt=".1f">9.5</span> s</td></tr>
-<tr><td>Parquet, one file (no partitioning)</td><td><span data-lab="mono_parquet_mb" data-fmt=",.0f">76</span> MB</td><td><span data-lab="t_write_mono_parquet" data-fmt=".2f">1.04</span> s</td></tr>
-<tr><td>Parquet, partitioned (<span data-lab="n_partition_files" data-fmt=",.0f">50</span> files)</td><td><span data-lab="partitioned_parquet_mb" data-fmt=",.0f">100</span> MB</td><td><span data-lab="t_write_partitioned_parquet" data-fmt=".2f">0.42</span> s</td></tr>
+<tr><td>CSV, one file</td><td><span data-lab="csv_mb" data-fmt=",.0f">205</span> MB</td><td><span data-lab="t_write_csv" data-fmt=".1f">8.6</span> s</td></tr>
+<tr><td>Parquet, one file (no partitioning)</td><td><span data-lab="mono_parquet_mb" data-fmt=",.0f">76</span> MB</td><td><span data-lab="t_write_mono_parquet" data-fmt=".2f">1.19</span> s</td></tr>
+<tr><td>Parquet, partitioned (<span data-lab="n_partition_files" data-fmt=",.0f">50</span> files)</td><td><span data-lab="partitioned_parquet_mb" data-fmt=",.0f">100</span> MB</td><td><span data-lab="t_write_partitioned_parquet" data-fmt=".2f">0.68</span> s</td></tr>
 </tbody>
 </table>
 
@@ -170,8 +170,8 @@
   <line x1="64" y1="44" x2="690" y2="44" stroke="#E4E8EC" stroke-width="1"/>
   <text x="56" y="48" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">250 MB</text>
   <line x1="64" y1="216" x2="690" y2="216" stroke="#C9CFC6" stroke-width="1"/>
-  <path d="M156.3,216 V77.8 Q156.3,73.8 160.3,73.8 H176.3 Q180.3,73.8 180.3,77.8 V216 Z" fill="#D64B2A"><title>CSV: 207 MB</title></path>
-  <text x="168.3" y="66.8" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">207 MB</text>
+  <path d="M156.3,216 V79.1 Q156.3,75.1 160.3,75.1 H176.3 Q180.3,75.1 180.3,79.1 V216 Z" fill="#D64B2A"><title>CSV: 205 MB</title></path>
+  <text x="168.3" y="68.1" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">205 MB</text>
   <text x="168.3" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">CSV</text>
   <path d="M365,216 V168 Q365,164 369,164 H385 Q389,164 389,168 V216 Z" fill="#E8850C"><title>Parquet (1 file): 76 MB</title></path>
   <text x="377" y="157" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">76 MB</text>
@@ -296,10 +296,10 @@ result = (lf.filter((pl.col(<span class="s">"year"</span>) == YEAR) &amp; (pl.co
 <table>
 <thead><tr><th>Method</th><th>Wall time</th><th>vs. naive CSV</th></tr></thead>
 <tbody>
-<tr><td>pandas + CSV (full scan)</td><td><span data-lab="t_naive_csv_ms" data-fmt=",.0f">2,162</span> ms</td><td>—</td></tr>
-<tr><td>pandas + 1 Parquet file (full scan)</td><td><span data-lab="t_naive_parquet_ms" data-fmt=",.0f">347</span> ms</td><td><span data-lab="speedup_duckdb_vs_mono" data-fmt=".1f">7.2</span>× slower than partitioned DuckDB</td></tr>
-<tr><td>DuckDB + partitioned Parquet</td><td><span data-lab="t_duckdb_ms" data-fmt=",.1f">48.1</span> ms</td><td><span data-lab="speedup_duckdb_vs_csv" data-fmt=",.0f">45</span>× faster</td></tr>
-<tr><td>polars (lazy) + partitioned Parquet</td><td><span data-lab="t_polars_ms" data-fmt=",.1f">32.7</span> ms</td><td><span data-lab="speedup_polars_vs_csv" data-fmt=",.0f">66</span>× faster</td></tr>
+<tr><td>pandas + CSV (full scan)</td><td><span data-lab="t_naive_csv_ms" data-fmt=",.0f">2,694</span> ms</td><td>—</td></tr>
+<tr><td>pandas + 1 Parquet file (full scan)</td><td><span data-lab="t_naive_parquet_ms" data-fmt=",.0f">345</span> ms</td><td><span data-lab="speedup_duckdb_vs_mono" data-fmt=".1f">8.0</span>× slower than partitioned DuckDB</td></tr>
+<tr><td>DuckDB + partitioned Parquet</td><td><span data-lab="t_duckdb_ms" data-fmt=",.1f">42.9</span> ms</td><td><span data-lab="speedup_duckdb_vs_csv" data-fmt=",.0f">63</span>× faster</td></tr>
+<tr><td>polars (lazy) + partitioned Parquet</td><td><span data-lab="t_polars_ms" data-fmt=",.1f">31.1</span> ms</td><td><span data-lab="speedup_polars_vs_csv" data-fmt=",.0f">87</span>× faster</td></tr>
 </tbody>
 </table>
 
@@ -335,7 +335,7 @@ result = (lf.filter((pl.col(<span class="s">"year"</span>) == YEAR) &amp; (pl.co
 <figcaption>fig 4.5.5 — naive vs. disciplined: the same question, sized by how much of the archive it has to touch</figcaption>
 </figure>
 
-<p>The second failure is subtler and hits people who took the first lesson too literally: if partitioning by year and sector helps, why not also partition by symbol, so every query finds an even smaller file? The lab tests this directly — it takes the exact slice one query wants and writes it two ways, as the single file it already is, and again split into one tiny file per symbol. Reading the identical bytes is <span data-lab="slowdown_many_files" data-fmt=".1f">19.4</span>× slower as <span data-lab="n_tiny_files" data-fmt=",.0f">150</span> tiny files than as one: opening a file, reading its footer and its metadata costs roughly the same whether the file holds ten rows or ten million, so once files get small that fixed cost dominates and the filesystem's directory-listing overhead starts to show up too.</p>
+<p>The second failure is subtler and hits people who took the first lesson too literally: if partitioning by year and sector helps, why not also partition by symbol, so every query finds an even smaller file? The lab tests this directly — it takes the exact slice one query wants and writes it two ways, as the single file it already is, and again split into one tiny file per symbol. Reading the identical bytes is <span data-lab="slowdown_many_files" data-fmt=".1f">17.4</span>× slower as <span data-lab="n_tiny_files" data-fmt=",.0f">150</span> tiny files than as one: opening a file, reading its footer and its metadata costs roughly the same whether the file holds ten rows or ten million, so once files get small that fixed cost dominates and the filesystem's directory-listing overhead starts to show up too.</p>
 
 <figure class="diagram chart">
 <!-- chart:small_files -->
@@ -343,18 +343,22 @@ result = (lf.filter((pl.col(<span class="s">"year"</span>) == YEAR) &amp; (pl.co
   <text x="26" y="22" font-size="11" font-weight="600" fill="#1F2C38">READING THE IDENTICAL SLICE AS ONE FILE VS ONE FILE PER SYMBOL</text>
   <line x1="64" y1="216" x2="690" y2="216" stroke="#E4E8EC" stroke-width="1"/>
   <text x="56" y="220" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">0.0 ms</text>
-  <line x1="64" y1="158.7" x2="690" y2="158.7" stroke="#E4E8EC" stroke-width="1"/>
-  <text x="56" y="162.7" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">50.0 ms</text>
-  <line x1="64" y1="101.3" x2="690" y2="101.3" stroke="#E4E8EC" stroke-width="1"/>
-  <text x="56" y="105.3" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">100.0 ms</text>
+  <line x1="64" y1="181.6" x2="690" y2="181.6" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="185.6" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">25.0 ms</text>
+  <line x1="64" y1="147.2" x2="690" y2="147.2" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="151.2" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">50.0 ms</text>
+  <line x1="64" y1="112.8" x2="690" y2="112.8" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="116.8" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">75.0 ms</text>
+  <line x1="64" y1="78.4" x2="690" y2="78.4" stroke="#E4E8EC" stroke-width="1"/>
+  <text x="56" y="82.4" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">100.0 ms</text>
   <line x1="64" y1="44" x2="690" y2="44" stroke="#E4E8EC" stroke-width="1"/>
-  <text x="56" y="48" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">150.0 ms</text>
+  <text x="56" y="48" font-size="11" text-anchor="end" fill="#4A5A68" style="font-variant-numeric:tabular-nums">125.0 ms</text>
   <line x1="64" y1="216" x2="690" y2="216" stroke="#C9CFC6" stroke-width="1"/>
-  <path d="M208.5,216 V212.7 Q208.5,209.4 211.8,209.4 H229.2 Q232.5,209.4 232.5,212.7 V216 Z" fill="#3A56C5"><title>1 file: 5.7 ms</title></path>
-  <text x="220.5" y="202.4" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">5.7 ms</text>
+  <path d="M208.5,216 V212.2 Q208.5,208.5 212.3,208.5 H228.7 Q232.5,208.5 232.5,212.2 V216 Z" fill="#3A56C5"><title>1 file: 5.5 ms</title></path>
+  <text x="220.5" y="201.5" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">5.5 ms</text>
   <text x="220.5" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">1 file</text>
-  <path d="M521.5,216 V92.5 Q521.5,88.5 525.5,88.5 H541.5 Q545.5,88.5 545.5,92.5 V216 Z" fill="#D64B2A"><title>150 tiny files: 111.2 ms</title></path>
-  <text x="533.5" y="81.5" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">111.2 ms</text>
+  <path d="M521.5,216 V89.5 Q521.5,85.5 525.5,85.5 H541.5 Q545.5,85.5 545.5,89.5 V216 Z" fill="#D64B2A"><title>150 tiny files: 94.9 ms</title></path>
+  <text x="533.5" y="78.5" font-size="11" text-anchor="middle" fill="#1F2C38" style="font-variant-numeric:tabular-nums">94.9 ms</text>
   <text x="533.5" y="234" font-size="11" text-anchor="middle" fill="#4A5A68">150 tiny files</text>
 </svg>
 <!-- /chart:small_files -->
@@ -440,7 +444,7 @@ result = (lf.filter((pl.col(<span class="s">"year"</span>) == YEAR) &amp; (pl.co
 <details class="q"><summary>2. You partition a dataset by <code>trade_id</code> because "then every query finds its row instantly." What goes wrong?</summary><div>A high-cardinality column produces one partition per distinct value — potentially millions of tiny files. Reading even a small slice now means opening thousands of files, each paying the same fixed footer/metadata/open() cost regardless of how little data it holds; §4.5.5 measures a 7× slowdown from turning one file into 150. Partition on the handful of columns your queries actually filter on, not on the column with the most detail.</div></details>
 <details class="q"><summary>3. Your team's shared research dataset gets slow and inconsistent once eight people query it at once from their own laptops. Is the fix kdb+?</summary><div>No — that is a concurrency and governance problem (many readers, one source of truth, someone accountable for access and uptime), which is what a managed warehouse solves. kdb+ solves a different problem: very high-rate, low-latency live tick capture. Reaching for either tool without matching it to the actual bottleneck just adds licensing cost and operational complexity.</div></details>
 <details class="q"><summary>4. polars' <code>scan_parquet(...).filter(...)</code> hasn't touched disk yet, even though you wrote the filter. Why does that matter?</summary><div>Because nothing has executed, the optimiser can still see the whole query when it finally runs at <code>.collect()</code> — including a later <code>.select()</code> — and push both the filter and the column selection down into the scan itself. If <code>filter</code> ran eagerly the moment it was called, the engine would already have decoded every column of every row before it knew which ones the rest of the query needed.</div></details>
-<details class="q"><summary>5. The lab reports DuckDB at roughly <span data-lab="speedup_duckdb_vs_csv" data-fmt=",.0f">45</span>× faster than naive CSV on this machine. Should you expect exactly that number on yours?</summary><div>No. The <em>ratio</em> is expected to stay large and in the same rough range, because it comes from how much less data is read (a property of the query and the partitioning, not the hardware); the exact millisecond figures depend on disk speed, core count, background load and whether the OS has already cached the files. That is why the lab asserts a wide, conservative margin (5×, not 126×) rather than the specific number it happens to measure.</div></details>
+<details class="q"><summary>5. The lab reports DuckDB at roughly <span data-lab="speedup_duckdb_vs_csv" data-fmt=",.0f">63</span>× faster than naive CSV on this machine. Should you expect exactly that number on yours?</summary><div>No. The <em>ratio</em> is expected to stay large and in the same rough range, because it comes from how much less data is read (a property of the query and the partitioning, not the hardware); the exact millisecond figures depend on disk speed, core count, background load and whether the OS has already cached the files. That is why the lab asserts a wide, conservative margin (5×, not 126×) rather than the specific number it happens to measure.</div></details>
 
 <div class="co lab"><span class="co-t">🔧 Homework (~1 h before Session 4.6)</span>
 <p>1. In the lab, add a fifth method: <code>pyarrow.dataset</code> reading the same partitioned directory with a filter expression, and time it against DuckDB and polars — they should land in the same neighbourhood, since all three ultimately execute over Arrow.<br>

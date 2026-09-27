@@ -6,7 +6,7 @@
     "bytes_per_bar": 59.92051282051282,
     "bytes_per_quote": 29.158991666666665,
     "bytes_per_tick": 20.30465,
-    "compression_ratio": 2.611286084714585,
+    "compression_ratio": 2.562033819839298,
     "duckdb_matches_pandas": true,
     "m_subintervals": 78,
     "mu_mc": 0.08,

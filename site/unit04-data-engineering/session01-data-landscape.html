@@ -261,7 +261,7 @@
 <h2><span class="no">4.1.6</span> In code: pricing granularity</h2>
 <p class="lede">The numbers above came from three tools this unit leans on hard: pandas or polars to build the data, Parquet to store it, and DuckDB to query it without loading everything into memory.</p>
 
-<p>The lab writes one synthetic session's ticks, quotes and 1-minute bars to Parquet and measures the files on disk. Compressed columnar storage beats a plain CSV of the same ticks by <span data-lab="compression_ratio" data-fmt=".2f">2.61</span>×, and the raw tick-and-quote feed for the day is <span data-lab="raw_to_bar_ratio" data-fmt=".0f">167</span>× the size of the 1-minute bars built from it — the gap that makes "just buy the ticks, you can always aggregate later" an expensive habit at scale, and "buy the bars, you can never get the ticks back" a one-way door.</p>
+<p>The lab writes one synthetic session's ticks, quotes and 1-minute bars to Parquet and measures the files on disk. Compressed columnar storage beats a plain CSV of the same ticks by <span data-lab="compression_ratio" data-fmt=".2f">2.56</span>×, and the raw tick-and-quote feed for the day is <span data-lab="raw_to_bar_ratio" data-fmt=".0f">167</span>× the size of the 1-minute bars built from it — the gap that makes "just buy the ticks, you can always aggregate later" an expensive habit at scale, and "buy the bars, you can never get the ticks back" a one-way door.</p>
 
 <figure class="diagram chart">
 <!-- chart:bytes_per_record -->

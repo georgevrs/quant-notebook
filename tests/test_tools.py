@@ -146,3 +146,14 @@ def test_verify_labs_skips_wall_clock_timings():
     assert verify_labs.compare({"t_oos_years": 8.0}, {"t_oos_years": 7.0}) != []
     # the key must still be present on both sides
     assert verify_labs.compare({"tol_daily_scs_dw": 1.0}, {}) == ["tol_daily_scs_dw: missing after re-run"]
+
+
+def test_verify_labs_skips_csv_bytes_and_garch_mle_fits():
+    # A CSV byte count is sensitive to the last digit of each float's text representation.
+    assert verify_labs.compare({"compression_ratio": 2.611, "csv_bytes": 162060}, {"compression_ratio": 2.562, "csv_bytes": 159788}) == []
+    # GARCH/GJR-GARCH MLE fits are more BLAS-sensitive than closed-form arithmetic.
+    assert verify_labs.compare({"garch_alpha_hat": 0.10216521188802603}, {"garch_alpha_hat": 0.10216533378050499}) == []
+    # a "_hat" or "garch" substring used elsewhere for an ordinary closed-form value is NOT
+    # exempted — only these exact, named MLE/CSV-byte-count keys are.
+    assert verify_labs.compare({"alpha_hat": 1.0}, {"alpha_hat": 1.1}) != []
+    assert verify_labs.compare({"garch_a": 0.08}, {"garch_a": 0.09}) != []
