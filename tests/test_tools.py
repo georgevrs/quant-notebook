@@ -156,12 +156,29 @@ def test_verify_labs_skips_csv_bytes_key():
     assert verify_labs.compare({"alpha_hat": 1.0}, {"alpha_hat": 1.1}) != []
 
 
-def test_verify_labs_rel_tol_covers_garch_mle_noise_but_not_a_real_regression():
-    # GARCH/GJR-GARCH MLE fits are more BLAS-sensitive than closed-form arithmetic: two independent
-    # Linux CI runs each exceeded the old 1e-6 tolerance on a different set of keys (up to ~6e-6
-    # relative), which an exact-name exclusion list can't keep up with. The module-wide REL_TOL
-    # (1e-5) covers this directly instead.
-    assert verify_labs.compare({"garch_alpha_hat": 0.10216521188802603}, {"garch_alpha_hat": 0.10216533378050499}) == []
-    assert verify_labs.compare({"gjr_gamma_hat": 0.07677403741821932}, {"gjr_gamma_hat": 0.07677385499971123}) == []
+def test_verify_labs_skips_garch_fits_scoped_to_their_own_sessions():
+    # GARCH/GJR-GARCH MLE fits are more BLAS-sensitive than closed-form arithmetic. Three
+    # independent Linux CI runs each exceeded increasingly generous tolerances on a different set
+    # of keys, so the fix is an exhaustive, session-scoped enumeration (every key in Sessions 5.1's
+    # and 5.5's results.json was read and classified), not a name pattern or a global tolerance.
+    assert verify_labs.compare(
+        {"garch_alpha_hat": 0.10216521188802603}, {"garch_alpha_hat": 0.10216533378050499}, "5.5"
+    ) == []
+    assert verify_labs.compare(
+        {"gjr_gamma_hat": 0.07677403741821932}, {"gjr_gamma_hat": 0.07677385499971123}, "5.5"
+    ) == []
+    assert verify_labs.compare(
+        {"fit_asym_gamma": 0.10860530148273316}, {"fit_asym_gamma": 0.10860547711175295}, "5.1"
+    ) == []
+    # the SAME key name, without the matching session_id (or under an unrelated session), is NOT
+    # exempted — the scoping is real, not a disguised global pattern.
+    assert verify_labs.compare({"garch_alpha_hat": 0.10216521188802603}, {"garch_alpha_hat": 0.10216533378050499}) != []
+    assert verify_labs.compare(
+        {"garch_alpha_hat": 0.10216521188802603}, {"garch_alpha_hat": 0.10216533378050499}, "3.2"
+    ) != []
+    # a session's own *_true/*_theory design constants and ordinary arithmetic (ACF, EWMA with a
+    # fixed lambda) are never exempted, even under 5.1/5.5 — only the fit-derived keys are.
+    assert verify_labs.compare({"garch_alpha_true": 0.08}, {"garch_alpha_true": 0.09}, "5.5") != []
+    assert verify_labs.compare({"ewma_94_rmse_pp": 1.0}, {"ewma_94_rmse_pp": 1.1}, "5.5") != []
     # a real regression (orders of magnitude larger than any observed BLAS noise) still fails
     assert verify_labs.compare({"garch_a": 0.08}, {"garch_a": 0.09}) != []

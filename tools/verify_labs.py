@@ -6,7 +6,7 @@
     uv run python tools/verify_labs.py --changed    labs whose files changed vs origin/main
 
 A lab passes when it exits 0 (its own asserts hold) and every number in its results.json matches
-the committed value within a relative tolerance of 1e-5 (floating-point summation order can differ
+the committed value within a relative tolerance of 1e-6 (floating-point summation order can differ
 across platforms and BLAS builds; anything larger is a real change and must be committed).
 """
 from __future__ import annotations
@@ -22,7 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from build import run_lab  # noqa: E402
 from course import ROOT, Course  # noqa: E402
 
-REL_TOL, ABS_TOL = 1e-5, 1e-9
+REL_TOL, ABS_TOL = 1e-6, 1e-9
 
 # SCS (an ADMM solver) converges to a genuinely different near-optimal point from one CI run to
 # the next, even on identical hardware and the same commit — observed swinging between -6e-5 and
@@ -46,19 +46,6 @@ NONDETERMINISTIC_KEYS = (
     "compression_ratio", "csv_bytes", "csv_mb",
 )
 
-# GARCH/GJR-GARCH maximum-likelihood fits (Sessions 5.1, 5.5, via the `arch` package's scipy-based
-# optimizer) are more BLAS-sensitive than closed-form arithmetic -- the optimizer's exact
-# convergence path, not just float summation order, differs slightly by platform. A first attempt
-# excluded the specific keys that failed on one Linux CI run by exact name; a second, independent
-# run then failed on six entirely DIFFERENT keys from the same two labs (up to ~6x over the old
-# 1e-6 tolerance) -- proving the unpredictable set of affected keys can't be enumerated by name.
-# REL_TOL is widened module-wide instead: every value observed so far, across both runs, stays
-# under 6e-6 relative, so 1e-5 gives a >1.6x margin while remaining 100-1000x tighter than any real
-# bug this project has produced (the SCS/CSV cases above needed their own categorical exclusion
-# because they ran 3+ orders of magnitude past even this wider bound). Each session's own live
-# assert on the fitted quantity (e.g. `fit_asym.pvalues["gamma[1]"] < 0.01`, `gamma_z > N_SE`)
-# still guards a real regression.
-
 # Wall-clock timing benchmarks (Session 4.5's storage-stack comparison: naive CSV vs Parquet vs
 # DuckDB vs polars) vary with disk cache state and machine load, especially on a shared CI runner —
 # by design, not by bug. Match only the deliberate "_ms" duration suffix and the "speedup_"/
@@ -68,11 +55,38 @@ NONDETERMINISTIC_KEYS = (
 NONDETERMINISTIC_SUFFIXES = ("_ms",)
 NONDETERMINISTIC_PREFIXES = ("speedup_", "slowdown_")
 
+# GARCH/GJR-GARCH maximum-likelihood fits (via the `arch` package's scipy-based optimizer) are more
+# BLAS-sensitive than closed-form arithmetic -- the optimizer's exact convergence path, not just
+# float summation order, differs slightly by platform. Two increasingly broad attempts to exclude
+# this by exact key name or by widening REL_TOL module-wide each still failed on the next Linux CI
+# run, on yet another key -- because the set of affected keys isn't a fixed handful, it's every
+# *fitted* value these two labs record. Enumerated precisely instead, per session, by reading each
+# lab's full key list end to end and classifying every key: a fit's own coefficients/p-values/
+# z-stats and anything computed FROM the fit (a forecast, an RMSE against a forecast) go here; the
+# *_true/_theory design constants the fit is checked against, and every value computed by ordinary
+# arithmetic (ACF, realized-vol estimators, EWMA with a fixed lambda -- no iterative optimizer
+# involved) do not, and stay strictly checked. Scoped by session id so this can never affect an
+# unrelated session's same-named key. Each session's own live assert on the fitted quantity (e.g.
+# `fit_asym.pvalues["gamma[1]"] < 0.01`, `gamma_z > N_SE`) still guards a real regression.
+SESSION_NONDETERMINISTIC_KEYS = {
+    "5.1": (
+        "fit_asym_alpha", "fit_asym_beta", "fit_asym_gamma", "fit_asym_gamma_p", "fit_asym_nu",
+        "fit_asym_omega", "fit_sym_gamma", "fit_sym_gamma_p", "persist_fit_mean", "persist_fit_se",
+    ),
+    "5.5": (
+        "garch_alpha_hat", "garch_beta_hat", "garch_omega_hat", "garch_rmse_pp",
+        "gjr_alpha_hat", "gjr_beta_hat", "gjr_gamma_hat", "gjr_omega_hat",
+        "gjr_alpha_wrong_fit", "gjr_gamma_z",
+        "forecast_garch_1d", "forecast_garch_60d", "forecast_gap_garch_pp",
+    ),
+}
 
-def is_nondeterministic(key: str) -> bool:
+
+def is_nondeterministic(key: str, session_id: str | None = None) -> bool:
     return (any(s in key for s in NONDETERMINISTIC_KEYS)
             or key.endswith(NONDETERMINISTIC_SUFFIXES)
-            or key.startswith(NONDETERMINISTIC_PREFIXES))
+            or key.startswith(NONDETERMINISTIC_PREFIXES)
+            or key in SESSION_NONDETERMINISTIC_KEYS.get(session_id, ()))
 
 
 def changed_sessions(course: Course) -> set[str]:
@@ -88,14 +102,14 @@ def changed_sessions(course: Course) -> set[str]:
     return ids
 
 
-def compare(old: dict, new: dict) -> list[str]:
+def compare(old: dict, new: dict, session_id: str | None = None) -> list[str]:
     problems = []
     for key in sorted(set(old) | set(new)):
         if key not in new:
             problems.append(f"{key}: missing after re-run")
         elif key not in old:
             problems.append(f"{key}: new result not committed")
-        elif is_nondeterministic(key):
+        elif is_nondeterministic(key, session_id):
             pass  # present on both sides; value is allowed to vary run to run (see above)
         else:
             a, b = old[key], new[key]
@@ -132,7 +146,7 @@ def main() -> None:
             failed += 1
             continue
         fresh = json.loads(s.results_json.read_text(encoding="utf-8"))["results"]
-        problems = compare(committed, fresh)
+        problems = compare(committed, fresh, s.id)
         for p in problems:
             print(f"  FAIL {s.id}: {p}")
         failed += bool(problems)
